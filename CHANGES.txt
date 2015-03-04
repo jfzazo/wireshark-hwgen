@@ -1,0 +1,41 @@
+List of modifications that have been aaplied to the original version of wireshark
+
+
+
+	1) Modify the file wireshark-1.99.2/wiretap/CMakeLists.txt in order to compile the new files.
+
+		Added in the line 80 the following file:
+				hw-gen.c
+	
+	2) Develope the files hw-gen.[c|h] and copy them to wireshark-1.99.2/wiretap/
+
+	3) 	Specify the type as ethernet for HW to pcap conversion, wireshark-1.99.2/wiretap/pcap-common:96
+		{ 1,		WTAP_ENCAP_HW_GENERATOR },
+
+	4) Specify capabilities (default extension or description for instance) and function pointers	 
+
+
+		wireshark-1.99.2/wiretap/file_access:160
+
+					{ "HW FPGA generator format", "simple" },	
+
+
+		wireshark-1.99.2/wiretap/file_access:400
+
+				{ "HW FPGA generator format",           	OPEN_INFO_MAGIC,     hwgen_open,               "simple",     NULL, NULL },	
+
+		
+		wireshark-1.99.2/wiretap/file_access:1199
+
+			{ "HW FPGA generator format", "hw_gen", "simple", NULL,
+		  FALSE, FALSE, 0,
+		  hwgen_dump_can_write_encap, hwgen_dump_open, NULL },
+
+	5) Add a new type and subtype (optional)
+		wireshark-1.99.2/wiretap/wtap.h:268
+		#define WTAP_ENCAP_HW_GENERATOR          		175
+
+		wireshark-1.99.2/wiretap/wtap.h:355
+		#define WTAP_FILE_TYPE_SUBTYPE_HWGEN_V1						 77
+
+
