@@ -1196,10 +1196,6 @@ static const struct file_type_subtype_info dump_open_table_base[] = {
 	  FALSE, FALSE, 0,
 	  libpcap_dump_can_write_encap, libpcap_dump_open, NULL },
 
-	{ "HW FPGA generator format", "hw_gen", "simple", NULL,
-	  FALSE, FALSE, 0,
-	  hwgen_dump_can_write_encap, hwgen_dump_open, NULL },
-
 	/* WTAP_FILE_TYPE_SUBTYPE_5VIEWS */
 	{ "InfoVista 5View capture", "5views", "5vw", NULL,
 	   TRUE, FALSE, 0,
@@ -1539,6 +1535,13 @@ static const struct file_type_subtype_info dump_open_table_base[] = {
 	{ "Colasoft Packet Builder format", "colasoft-pb", "cscpkt", NULL,
 	  FALSE, FALSE, 0,
 	  NULL, NULL, NULL },
+
+
+	{ "HW packet format", "hw_gen", "simple", NULL,
+	  FALSE, FALSE, 0,
+	  hwgen_dump_can_write_encap, hwgen_dump_open, NULL },
+
+
 };
 
 gint wtap_num_file_types_subtypes = sizeof(dump_open_table_base) / sizeof(struct file_type_subtype_info);
