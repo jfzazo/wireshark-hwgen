@@ -27,10 +27,11 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 
-#define UDP_PORT_SAP   9875
+#define UDP_PORT_SAP	9875
 
 #define MCAST_SAP_VERSION_MASK 0xE0 /* 3 bits for  SAP version*/
 #define MCAST_SAP_VERSION_SHIFT 5   /* Right shift 5 bits to get the version */
@@ -147,9 +148,9 @@ dissect_sap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         si = proto_tree_add_item(tree, proto_sap, tvb, offset, -1, ENC_NA);
         sap_tree = proto_item_add_subtree(si, ett_sap);
 
-        sif = proto_tree_add_item(sap_tree, hf_sap_flags, tvb, offset, 1, ENC_BIG_ENDIAN);
+        sif = proto_tree_add_item(sap_tree, hf_sap_flags, tvb, offset, 1, ENC_NA);
         sap_flags_tree = proto_item_add_subtree(sif, ett_sap_flags);
-        proto_tree_add_item(sap_flags_tree, hf_sap_flags_v, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(sap_flags_tree, hf_sap_flags_v, tvb, offset, 1, ENC_NA);
         proto_tree_add_item(sap_flags_tree, hf_sap_flags_a, tvb, offset, 1, ENC_NA);
         proto_tree_add_item(sap_flags_tree, hf_sap_flags_r, tvb, offset, 1, ENC_NA);
         proto_tree_add_item(sap_flags_tree, hf_sap_flags_t, tvb, offset, 1, ENC_NA);
@@ -160,7 +161,7 @@ dissect_sap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     offset++;
 
     auth_len = tvb_get_guint8(tvb, offset);
-    proto_tree_add_item(sap_tree, hf_sap_auth_len, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(sap_tree, hf_sap_auth_len, tvb, offset, 1, ENC_NA);
     offset++;
 
     proto_tree_add_item(sap_tree, hf_sap_message_identifier_hash, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -186,11 +187,11 @@ dissect_sap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         sa_tree = proto_item_add_subtree(sdi, ett_sap_auth);
 
         auth_flags = tvb_get_guint8(tvb, offset);
-        sai = proto_tree_add_item(sa_tree, hf_auth_flags, tvb, offset, 1, ENC_BIG_ENDIAN);
+        sai = proto_tree_add_item(sa_tree, hf_auth_flags, tvb, offset, 1, ENC_NA);
         saf_tree = proto_item_add_subtree(sai, ett_sap_authf);
-        proto_tree_add_item(saf_tree, hf_auth_flags_v, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(saf_tree, hf_auth_flags_v, tvb, offset, 1, ENC_NA);
         proto_tree_add_item(saf_tree, hf_auth_flags_p, tvb, offset, 1, ENC_NA);
-        proto_tree_add_item(saf_tree, hf_auth_flags_t, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(saf_tree, hf_auth_flags_t, tvb, offset, 1, ENC_NA);
 
         has_pad = auth_flags&MCAST_SAP_AUTH_BIT_P;
         if (has_pad) {
@@ -206,7 +207,7 @@ dissect_sap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         proto_tree_add_item(sa_tree, hf_sap_auth_subheader, tvb, offset+1, auth_data_len-pad_len-1, ENC_NA);
         if (has_pad) {
-            proto_tree_add_item(sa_tree, hf_sap_auth_data_padding_len, tvb, offset+auth_data_len-1, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(sa_tree, hf_sap_auth_data_padding_len, tvb, offset+auth_data_len-1, 1, ENC_NA);
             proto_tree_add_item(sa_tree, hf_sap_auth_data_padding, tvb, offset+auth_data_len-pad_len, pad_len, ENC_NA);
         }
 
@@ -263,7 +264,7 @@ dissect_sap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                 pt_len = pt_string_len + 1;
             }
 
-            pt_str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, pt_string_len, ENC_ASCII);
+            pt_str = tvb_get_string(wmem_packet_scope(), tvb, offset, pt_string_len);
             proto_tree_add_string_format_value(sap_tree, hf_sap_payload_type, tvb, offset, pt_len,
                 pt_str, "%.*s", pt_string_len, pt_str);
             offset += pt_len;
@@ -389,16 +390,3 @@ proto_reg_handoff_sap(void)
      */
     sdp_handle = find_dissector("sdp");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

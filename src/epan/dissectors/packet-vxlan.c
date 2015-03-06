@@ -159,19 +159,19 @@ proto_register_vxlan(void)
         },
         { &hf_vxlan_flag_b2,
           { "Reserved(R)", "vxlan.flag_b2",
-            FT_BOOLEAN, 8, NULL, 0x04,
+            FT_BOOLEAN, 8, NULL, 0x10,
             NULL, HFILL,
           },
         },
         { &hf_vxlan_flag_b1,
           { "Reserved(R)", "vxlan.flag_b1",
-            FT_BOOLEAN, 8, NULL, 0x02,
+            FT_BOOLEAN, 8, NULL, 0x10,
             NULL, HFILL,
           },
         },
         { &hf_vxlan_flag_b0,
           { "Reserved(R)", "vxlan.flag_b0",
-            FT_BOOLEAN, 8, NULL, 0x01,
+            FT_BOOLEAN, 8, NULL, 0x10,
             NULL, HFILL,
           },
         },
@@ -221,7 +221,7 @@ proto_reg_handoff_vxlan(void)
 
     vxlan_handle = create_dissector_handle(dissect_vxlan, proto_vxlan);
     dissector_add_uint("udp.port", UDP_PORT_VXLAN, vxlan_handle);
-    dissector_add_for_decode_as("udp.port", vxlan_handle);
+    dissector_add_handle("udp.port", vxlan_handle);  /* For 'Decode As' */
 
 }
 

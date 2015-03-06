@@ -28,7 +28,7 @@
 
 #include "config.h"
 
-#include <epan/wmem/wmem.h>
+#include <epan/emem.h>
 
 /* WSLUA_MODULE Pinfo Obtaining packet information */
 
@@ -81,8 +81,8 @@ WSLUA_CONSTRUCTOR NSTime_new(lua_State *L) {
 
     if (!nstime) return 0;
 
-    nstime->secs = (time_t) luaL_optinteger(L,WSLUA_OPTARG_NSTime_new_SECONDS,0);
-    nstime->nsecs = (int) luaL_optinteger(L,WSLUA_OPTARG_NSTime_new_NSECONDS,0);
+    nstime->secs = (time_t) luaL_optint(L,WSLUA_OPTARG_NSTime_new_SECONDS,0);
+    nstime->nsecs = luaL_optint(L,WSLUA_OPTARG_NSTime_new_NSECONDS,0);
 
     pushNSTime(L,nstime);
 
@@ -98,11 +98,8 @@ WSLUA_METAMETHOD NSTime__call(lua_State* L) { /* Creates a NSTime object. */
 
 WSLUA_METAMETHOD NSTime__tostring(lua_State* L) {
     NSTime nstime = checkNSTime(L,1);
-    gchar *str;
 
-    str = wmem_strdup_printf(NULL, "%ld.%09d", (long)nstime->secs, nstime->nsecs);
-    lua_pushstring(L, str);
-    wmem_free(NULL, str);
+    lua_pushstring(L,ep_strdup_printf("%ld.%09d", (long)nstime->secs, nstime->nsecs));
 
     WSLUA_RETURN(1); /* The string representing the nstime. */
 }
@@ -380,11 +377,8 @@ WSLUA_METHODS Address_methods[] = {
 
 WSLUA_METAMETHOD Address__tostring(lua_State* L) {
     Address addr = checkAddress(L,1);
-    const gchar *str = address_to_display(NULL, addr);
 
-    lua_pushstring(L, str);
-
-    wmem_free(NULL, (void*) str);
+    lua_pushstring(L,ep_address_to_display(addr));
 
     WSLUA_RETURN(1); /* The string representing the address. */
 }
@@ -583,6 +577,11 @@ WSLUA_METHOD Column_set(lua_State *L) {
     if (!(c->cinfo))
         return 0;
 
+    if (!s) {
+        WSLUA_ARG_ERROR(Column_set,TEXT,"must be a string");
+        return 0;
+    }
+
     col_add_str(c->cinfo, c->col, s);
 
     return 0;
@@ -597,6 +596,11 @@ WSLUA_METHOD Column_append(lua_State *L) {
     if (!(c->cinfo))
         return 0;
 
+    if (!s) {
+        WSLUA_ARG_ERROR(Column_append,TEXT,"must be a string");
+        return 0;
+    }
+
     col_append_str(c->cinfo, c->col, s);
 
     return 0;
@@ -610,6 +614,11 @@ WSLUA_METHOD Column_prepend(lua_State *L) {
 
     if (!(c->cinfo))
         return 0;
+
+    if (!s) {
+        WSLUA_ARG_ERROR(Column_prepend,TEXT,"must be a string");
+        return 0;
+    }
 
     col_prepend_fstr(c->cinfo, c->col, "%s",s);
 
@@ -731,6 +740,8 @@ WSLUA_METAMETHOD Columns__index(lua_State *L) {
         return 0;
     }
 
+    if (!colname) return 0;
+
     for(cn = colnames; cn->name; cn++) {
         if( g_str_equal(cn->name,colname) ) {
             Column c = (Column)g_malloc(sizeof(struct _wslua_col_info));
@@ -840,7 +851,7 @@ static int PrivateTable__newindex(lua_State* L) {
     }
 
     if (string) {
-      g_hash_table_replace (priv->table, (gpointer) g_strdup(name), (gpointer) g_strdup(string));
+      g_hash_table_replace (priv->table, (gpointer) ep_strdup(name), (gpointer) ep_strdup(string));
     } else {
       g_hash_table_remove (priv->table, (gconstpointer) name);
     }
@@ -952,6 +963,9 @@ WSLUA_ATTRIBUTE_BLOCK_NUMBER_GETTER(Pinfo,delta_ts,lua_delta_nstime_to_sec(obj, 
 /* WSLUA_ATTRIBUTE Pinfo_delta_dis_ts RO Number of seconds passed since the last displayed packet. */
 WSLUA_ATTRIBUTE_BLOCK_NUMBER_GETTER(Pinfo,delta_dis_ts,lua_delta_nstime_to_sec(obj, obj->ws_pinfo->fd, obj->ws_pinfo->fd->prev_dis_num));
 
+/* WSLUA_ATTRIBUTE Pinfo_ipproto RO IP Protocol id. */
+PINFO_NUMBER_GETTER(ipproto);
+
 /* WSLUA_ATTRIBUTE Pinfo_circuit_id RW For circuit based protocols. */
 PINFO_NUMBER_GETTER(circuit_id);
 PINFO_NUMBER_SETTER(circuit_id,guint32);
@@ -970,6 +984,9 @@ PINFO_NUMBER_SETTER(desegment_len,guint32);
 /* WSLUA_ATTRIBUTE Pinfo_desegment_offset RW Offset in the tvbuff at which the dissector will continue processing when next called. */
 PINFO_NUMBER_GETTER(desegment_offset);
 PINFO_NUMBER_SETTER(desegment_offset,int);
+
+/* WSLUA_ATTRIBUTE Pinfo_private_data RO Access to private data. */
+WSLUA_ATTRIBUTE_GET(Pinfo,private_data, {lua_pushlightuserdata(L,(void *)(obj->ws_pinfo->private_data));});
 
 /* WSLUA_ATTRIBUTE Pinfo_fragmented RO If the protocol is only a fragment. */
 PINFO_NAMED_BOOLEAN_GETTER(fragmented,fragmented);
@@ -1062,7 +1079,7 @@ static int Pinfo_get_private(lua_State *L) {
     gboolean is_allocated = FALSE;
 
     if (!pinfo->ws_pinfo->private_table) {
-        pinfo->ws_pinfo->private_table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+        pinfo->ws_pinfo->private_table = g_hash_table_new(g_str_hash,g_str_equal);
         is_allocated = TRUE;
     }
 
@@ -1170,6 +1187,7 @@ WSLUA_ATTRIBUTES Pinfo_attributes[] = {
     WSLUA_ATTRIBUTE_ROREG(Pinfo,port_type),
     WSLUA_ATTRIBUTE_RWREG(Pinfo,src_port),
     WSLUA_ATTRIBUTE_RWREG(Pinfo,dst_port),
+    WSLUA_ATTRIBUTE_ROREG(Pinfo,ipproto),
     WSLUA_ATTRIBUTE_RWREG(Pinfo,circuit_id),
     WSLUA_ATTRIBUTE_ROREG(Pinfo,match),
     WSLUA_ATTRIBUTE_ROREG(Pinfo,curr_proto),
@@ -1178,6 +1196,7 @@ WSLUA_ATTRIBUTES Pinfo_attributes[] = {
     WSLUA_ATTRIBUTE_RWREG(Pinfo,can_desegment),
     WSLUA_ATTRIBUTE_RWREG(Pinfo,desegment_len),
     WSLUA_ATTRIBUTE_RWREG(Pinfo,desegment_offset),
+    WSLUA_ATTRIBUTE_ROREG(Pinfo,private_data),
     WSLUA_ATTRIBUTE_ROREG(Pinfo,private),
     WSLUA_ATTRIBUTE_ROREG(Pinfo,fragmented),
     WSLUA_ATTRIBUTE_ROREG(Pinfo,in_error_pkt),

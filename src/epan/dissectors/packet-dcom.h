@@ -45,7 +45,7 @@ typedef struct dcom_machine_s {
     GList           *objects;
     gint            first_packet;
 
-    address         ip;
+    guint8          ip[4];
 } dcom_machine_t;
 
 typedef struct dcom_object_s {
@@ -78,11 +78,10 @@ typedef struct dcom_marshaler_s {
     dcom_dissect_fn_t routine;
 } dcom_marshaler_t;
 
-WS_DLL_PUBLIC dcom_interface_t *dcom_interface_new(packet_info *pinfo, const address *addr, e_uuid_t *iid, guint64 oxid, guint64 oid, e_uuid_t *ipid);
-WS_DLL_PUBLIC dcom_interface_t *dcom_interface_find(packet_info *pinfo, const address *addr, e_uuid_t *ipid);
-#ifdef DEBUG
+WS_DLL_PUBLIC dcom_interface_t *dcom_interface_new(packet_info *pinfo, const guint8 *ip, e_uuid_t *iid, guint64 oxid, guint64 oid, e_uuid_t *ipid);
+WS_DLL_PUBLIC dcom_interface_t *dcom_interface_find(packet_info *pinfo, const guint8 *ip, e_uuid_t *ipid);
 extern void dcom_interface_dump(void);
-#endif
+
 extern int dcom_register_rountine(dcom_dissect_fn_t routine, e_uuid_t* uuid);
 extern void dcom_register_common_routines_(void);
 

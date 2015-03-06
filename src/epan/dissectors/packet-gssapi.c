@@ -25,26 +25,29 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/exceptions.h>
+#include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
 #include <epan/prefs.h>
 #include <epan/reassemble.h>
+#include <epan/asn1.h>
+#include <epan/to_str.h>
 #include <epan/show_exception.h>
 
-#include "packet-ber.h"
-#include "packet-dcerpc.h"
-#include "packet-gssapi.h"
+#include <epan/dissectors/packet-ber.h>
+#include <epan/dissectors/packet-dcerpc.h>
+#include <epan/dissectors/packet-gssapi.h>
 
 void proto_register_gssapi(void);
 void proto_reg_handoff_gssapi(void);
 
 static int proto_gssapi = -1;
 
-static int hf_gssapi_token_object = -1;
-static int hf_gssapi_auth_verifier = -1;
-static int hf_gssapi_auth_credentials = -1;
 static int hf_gssapi_oid = -1;
 static int hf_gssapi_segments = -1;
 static int hf_gssapi_segment = -1;
@@ -61,14 +64,12 @@ static gint ett_gssapi = -1;
 static gint ett_gssapi_segment = -1;
 static gint ett_gssapi_segments = -1;
 
-static expert_field ei_gssapi_unknown_header = EI_INIT;
-
 static gboolean gssapi_reassembly = TRUE;
 
 typedef struct _gssapi_conv_info_t {
 	gssapi_oid_value *oid;
 
-	wmem_tree_t *frags;
+        wmem_tree_t *frags;
 
 	gboolean do_reassembly;  /* this field is used on first sequential scan of packets to help indicate when the next blob is a fragment continuing a previous one */
 	int first_frame;
@@ -197,6 +198,7 @@ dissect_gssapi_work(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 	gssapi_frag_info_t *fi;
 	tvbuff_t *volatile gss_tvb=NULL;
 	asn1_ctx_t asn1_ctx;
+	void *pd_save;
 
 	start_offset=0;
 	offset=0;
@@ -241,6 +243,7 @@ dissect_gssapi_work(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 	 * in the packet after our blob to see, so we just re-throw the
 	 * exception.
 	 */
+	pd_save = pinfo->private_data;
 	TRY {
 		gss_tvb=tvb;
 
@@ -378,9 +381,9 @@ dissect_gssapi_work(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		  }
 		  if (!oidvalue)
 		  {
-			  proto_tree_add_expert_format(subtree, pinfo, &ei_gssapi_unknown_header, gss_tvb, start_offset, 0,
-					      "Unknown header (class=%d, pc=%d, tag=%d)",
-					      appclass, pc, tag);
+                    proto_tree_add_text(subtree, gss_tvb, start_offset, 0,
+					  "Unknown header (class=%d, pc=%d, tag=%d)",
+					  appclass, pc, tag);
 		    return_offset = tvb_length(gss_tvb);
 		    goto done;
 		  } else {
@@ -447,7 +450,8 @@ dissect_gssapi_work(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		if ((oidvalue == NULL) ||
 		    !proto_is_protocol_enabled(oidvalue->proto)) {
 			/* No dissector for this oid */
-			proto_tree_add_item(subtree, hf_gssapi_token_object, gss_tvb, oid_start_offset, -1, ENC_NA);
+			proto_tree_add_text(subtree, gss_tvb, oid_start_offset, -1,
+					    "Token object");
 
 			return_offset = tvb_length(gss_tvb);
 			goto done;
@@ -476,7 +480,8 @@ dissect_gssapi_work(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 				else
 					return_offset = offset + len;
 			} else {
-				proto_tree_add_item(subtree, hf_gssapi_auth_verifier, gss_tvb, offset, -1, ENC_NA);
+				proto_tree_add_text(subtree, gss_tvb, offset, -1,
+				    "Authentication verifier");
 				return_offset = tvb_length(gss_tvb);
 			}
 		} else {
@@ -490,7 +495,8 @@ dissect_gssapi_work(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 				else
 					return_offset = offset + len;
 			} else {
-				proto_tree_add_item(subtree, hf_gssapi_auth_credentials, gss_tvb, offset, -1, ENC_NA);
+				proto_tree_add_text(subtree, gss_tvb, offset, -1,
+				    "Authentication credentials");
 				return_offset = tvb_length(gss_tvb);
 			}
 		}
@@ -509,7 +515,12 @@ dissect_gssapi_work(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		 * the trailer, after noting that a dissector was found
 		 * and restoring the protocol value that was in effect
 		 * before we called the subdissector.
+		 *
+		 * Restore the private_data structure in case one of the
+		 * called dissectors modified it (and, due to the exception,
+		 * was unable to restore it).
 		 */
+		pinfo->private_data = pd_save;
 		show_exception(gss_tvb, pinfo, tree, EXCEPT_CODE, GET_MESSAGE);
 	} ENDTRY;
 
@@ -534,17 +545,8 @@ proto_register_gssapi(void)
 {
 	static hf_register_info hf[] = {
 	{ &hf_gssapi_oid,
-		{ "OID", "gss-api.OID", FT_STRING, BASE_NONE,
+	    	{ "OID", "gss-api.OID", FT_STRING, BASE_NONE,
 		  NULL, 0, "This is a GSS-API Object Identifier", HFILL }},
-	{ &hf_gssapi_token_object,
-		{ "Token object", "gss-api.token_object", FT_BYTES, BASE_NONE,
-		  NULL, 0, NULL, HFILL }},
-	{ &hf_gssapi_auth_verifier,
-		{ "Authentication verifier", "gss-api.auth_verifier", FT_BYTES, BASE_NONE,
-		  NULL, 0, NULL, HFILL }},
-	{ &hf_gssapi_auth_credentials,
-		{ "Authentication credentials", "gss-api.auth_credentials", FT_BYTES, BASE_NONE,
-		  NULL, 0, NULL, HFILL }},
 	{ &hf_gssapi_segment,
 		{ "GSSAPI Segment", "gss-api.segment", FT_FRAMENUM, BASE_NONE,
 		  NULL, 0x0, NULL, HFILL }},
@@ -582,13 +584,7 @@ proto_register_gssapi(void)
 		&ett_gssapi_segment,
 		&ett_gssapi_segments,
 	};
-
-	static ei_register_info ei[] = {
-		{ &ei_gssapi_unknown_header, { "gssapi.unknown_header", PI_PROTOCOL, PI_WARN, "Unknown header", EXPFILL }},
-	};
-
 	module_t *gssapi_module;
-	expert_module_t *expert_gssapi;
 
 	proto_gssapi = proto_register_protocol(
 		"GSS-API Generic Security Service Application Program Interface",
@@ -601,8 +597,6 @@ proto_register_gssapi(void)
 		&gssapi_reassembly);
 	proto_register_field_array(proto_gssapi, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_gssapi = expert_register_protocol(proto_gssapi);
-	expert_register_field_array(expert_gssapi, ei, array_length(ei));
 
 	register_dissector("gssapi", dissect_gssapi, proto_gssapi);
 	new_register_dissector("gssapi_verf", dissect_gssapi_verf, proto_gssapi);
@@ -642,7 +636,7 @@ wrap_dissect_gssapi_payload(tvbuff_t *data_tvb, tvbuff_t *auth_tvb,
 {
 	tvbuff_t *result;
 
-	/* we need a full auth and a full data tvb or else we can't
+	/* we need a full auth and a full data tvb or else we cant
 	   decrypt anything
 	*/
 	if((!auth_tvb)||(!data_tvb)){
@@ -698,16 +692,3 @@ proto_reg_handoff_gssapi(void)
 	gssapi_handle = find_dissector("gssapi");
 	dissector_add_string("dns.tsig.mac", "gss.microsoft.com", gssapi_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

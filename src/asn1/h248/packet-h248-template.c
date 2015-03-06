@@ -25,12 +25,13 @@
 
 #include "config.h"
 
-#include <packet.h>
+#include "packet-h248.h"
 #include <epan/exceptions.h>
 #include <epan/tap.h>
+#include <epan/wmem/wmem.h>
 #include "packet-tpkt.h"
+#include <ctype.h>
 #include "packet-mtp3.h"
-#include "packet-h248.h"
 
 #define PNAME  "H.248 MEGACO"
 #define PSNAME "H248"
@@ -92,7 +93,6 @@ static gcp_hf_ett_t h248_arrel = {{-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1}};
 static expert_field ei_h248_errored_command = EI_INIT;
 static expert_field ei_h248_transactionId64 = EI_INIT;
 static expert_field ei_h248_context_id64 = EI_INIT;
-static expert_field ei_h248_octet_string_expected = EI_INIT;
 
 static dissector_table_t subdissector_table;
 
@@ -124,7 +124,7 @@ static int dissect_h248_AuditReplyV1(gboolean implicit_tag, tvbuff_t *tvb, int o
 static int dissect_h248_EventParameterV1(gboolean implicit_tag, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index);
 static int dissect_h248_SigParameterV1(gboolean implicit_tag, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index);
 static int dissect_h248_SigParamValueV1(gboolean implicit_tag, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index);
-static int dissect_h248_ValueV1(gboolean implicit_tag, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index);
+
 #if 0
 static const value_string context_id_type[] = {
     {NULL_CONTEXT,"0 (Null Context)"},
@@ -805,7 +805,7 @@ static int dissect_h248_trx_id(gboolean implicit_tag, packet_info *pinfo, proto_
         offset=dissect_ber_identifier(pinfo, tree, tvb, offset, &ber_class, &pc, &tag);
         offset=dissect_ber_length(pinfo, tree, tvb, offset, &len, NULL);
     } else {
-        len=tvb_reported_length_remaining(tvb, offset);
+        len=tvb_length_remaining(tvb, offset);
     }
 
 
@@ -843,7 +843,7 @@ static int dissect_h248_ctx_id(gboolean implicit_tag, packet_info *pinfo, proto_
         offset=dissect_ber_identifier(pinfo, tree, tvb, offset, &ber_class, &pc, &tag);
         offset=dissect_ber_length(pinfo, tree, tvb, offset, &len, NULL);
     } else {
-        len=tvb_reported_length_remaining(tvb, offset);
+        len=tvb_length_remaining(tvb, offset);
     }
 
 
@@ -981,28 +981,26 @@ void h248_register_package(h248_package_t* pkg, pkg_reg_action reg_action) {
     }
     pkg_found = s_pkg->pkg;
     if (reg_action==MERGE_PKG_HIGH) {
-        pkg_high = (h248_package_t *)pkg;
-        pkg_low = pkg_found;
+            pkg_high = (h248_package_t *)pkg;
+            pkg_low = pkg_found;
     };
     if (reg_action==MERGE_PKG_LOW) {
-        pkg_high = pkg_found;
-        pkg_low = (h248_package_t *)pkg;
+            pkg_high = pkg_found;
+            pkg_low = (h248_package_t *)pkg;
     };
-    if(pkg_high) {
-        /* if h248_package_t High Priority value !NULL, replace it in the found tree entry else use current entry */
-        (pkg_high->hfid ? (pkg_found->hfid=pkg_high->hfid) : (pkg_found->hfid=pkg_low->hfid));
-        (pkg_high->ett ? (pkg_found->ett=pkg_high->ett ):( pkg_found->ett=pkg_low->ett));
-        (pkg_high->param_names ? (pkg_found->param_names=pkg_high->param_names ):( pkg_found->param_names=pkg_low->param_names));
-        (pkg_high->signal_names ? (pkg_found->signal_names=pkg_high->signal_names ):( pkg_found->signal_names=pkg_low->signal_names));
-        (pkg_high->event_names ? (pkg_found->event_names=pkg_high->event_names ):( pkg_found->event_names=pkg_low->event_names));
-        (pkg_high->stats_names ? (pkg_found->stats_names=pkg_high->stats_names ):( pkg_found->stats_names=pkg_low->stats_names));
-        (pkg_high->properties ? (pkg_found->properties=pkg_high->properties ):( pkg_found->properties=pkg_low->properties));
-        (pkg_high->signals ? (pkg_found->signals=pkg_high->signals ):( pkg_found->signals=pkg_low->signals));
-        (pkg_high->events ? (pkg_found->events=pkg_high->events ):( pkg_found->events=pkg_low->events));
-        (pkg_high->statistics ? (pkg_found->statistics=pkg_high->statistics ):( pkg_found->statistics=pkg_low->statistics));
-        s_pkg->pkg = pkg_found;
-        s_pkg->is_default = FALSE;
-    }
+    /* if h248_package_t High Priority value !NULL, replace it in the found tree entry else use current entry */
+    (pkg_high->hfid ? (pkg_found->hfid=pkg_high->hfid) : (pkg_found->hfid=pkg_low->hfid));
+    (pkg_high->ett ? (pkg_found->ett=pkg_high->ett ):( pkg_found->ett=pkg_low->ett));
+    (pkg_high->param_names ? (pkg_found->param_names=pkg_high->param_names ):( pkg_found->param_names=pkg_low->param_names));
+    (pkg_high->signal_names ? (pkg_found->signal_names=pkg_high->signal_names ):( pkg_found->signal_names=pkg_low->signal_names));
+    (pkg_high->event_names ? (pkg_found->event_names=pkg_high->event_names ):( pkg_found->event_names=pkg_low->event_names));
+    (pkg_high->stats_names ? (pkg_found->stats_names=pkg_high->stats_names ):( pkg_found->stats_names=pkg_low->stats_names));
+    (pkg_high->properties ? (pkg_found->properties=pkg_high->properties ):( pkg_found->properties=pkg_low->properties));
+    (pkg_high->signals ? (pkg_found->signals=pkg_high->signals ):( pkg_found->signals=pkg_low->signals));
+    (pkg_high->events ? (pkg_found->events=pkg_high->events ):( pkg_found->events=pkg_low->events));
+    (pkg_high->statistics ? (pkg_found->statistics=pkg_high->statistics ):( pkg_found->statistics=pkg_low->statistics));
+    s_pkg->pkg = pkg_found;
+    s_pkg->is_default = FALSE;
 }
 
 
@@ -1201,12 +1199,11 @@ static int dissect_h248_PropertyID(gboolean implicit_tag _U_, tvbuff_t *tvb, int
 
     if( (ber_class!=BER_CLASS_UNI)
       ||(tag!=BER_UNI_TAG_OCTETSTRING) ){
-        proto_tree_add_expert_format(tree, actx->pinfo, &ei_h248_octet_string_expected, tvb, offset-2, 2,
-            "H.248 BER Error: OctetString expected but Class:%d PC:%d Tag:%d was unexpected", ber_class, pc, tag);
+        proto_tree_add_text(tree, tvb, offset-2, 2, "H.248 BER Error: OctetString expected but Class:%d PC:%d Tag:%d was unexpected", ber_class, pc, tag);
         return end_offset;
     }
 
-    next_tvb = tvb_new_subset_length(tvb,offset,len);
+    next_tvb = tvb_new_subset(tvb,offset,len,len);
 
     name_minor = packageandid & 0xffff;
 
@@ -1240,7 +1237,7 @@ static int dissect_h248_SigParameterName(gboolean implicit_tag _U_, tvbuff_t *tv
     offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset,  hf_index, &next_tvb);
     pi = actx->created_item;
 
-    switch(tvb_reported_length(next_tvb)) {
+    switch(tvb_length(next_tvb)) {
         case 4: param_id = tvb_get_ntohl(next_tvb,0); break;
         case 3: param_id = tvb_get_ntoh24(next_tvb,0); break;
         case 2: param_id = tvb_get_ntohs(next_tvb,0); break;
@@ -1284,12 +1281,11 @@ static int dissect_h248_SigParamValue(gboolean implicit_tag _U_, tvbuff_t *tvb, 
 
     if( (ber_class!=BER_CLASS_UNI)
         ||(tag!=BER_UNI_TAG_OCTETSTRING) ){
-        proto_tree_add_expert_format(tree, actx->pinfo, &ei_h248_octet_string_expected, tvb, offset-2, 2,
-            "H.248 BER Error: OctetString expected but Class:%d PC:%d Tag:%d was unexpected", ber_class, pc, tag);
+        proto_tree_add_text(tree, tvb, offset-2, 2, "H.248 BER Error: OctetString expected but Class:%d PC:%d Tag:%d was unexpected", ber_class, pc, tag);
         return end_offset;
     }
 
-    next_tvb = tvb_new_subset_length(tvb,offset,len);
+    next_tvb = tvb_new_subset(tvb,offset,len,len);
 
     if ( curr_info.par && curr_info.par->dissector) {
         curr_info.par->dissector(tree, next_tvb, actx->pinfo, *(curr_info.par->hfid), &curr_info, curr_info.par->data);
@@ -1314,7 +1310,7 @@ static int dissect_h248_EventParameterName(gboolean implicit_tag _U_, tvbuff_t *
     pi = actx->created_item;
 
     if (next_tvb) {
-        switch(tvb_reported_length(next_tvb)) {
+        switch(tvb_length(next_tvb)) {
             case 4: param_id = tvb_get_ntohl(next_tvb,0); break;
             case 3: param_id = tvb_get_ntoh24(next_tvb,0); break;
             case 2: param_id = tvb_get_ntohs(next_tvb,0); break;
@@ -1363,12 +1359,11 @@ static int dissect_h248_EventParamValue(gboolean implicit_tag _U_, tvbuff_t *tvb
 
     if( (ber_class!=BER_CLASS_UNI)
         ||(tag!=BER_UNI_TAG_OCTETSTRING) ){
-        proto_tree_add_expert_format(tree, actx->pinfo, &ei_h248_octet_string_expected, tvb, offset-2, 2,
-            "H.248 BER Error: OctetString expected but Class:%d PC:%d Tag:%d was unexpected", ber_class, pc, tag);
+        proto_tree_add_text(tree, tvb, offset-2, 2, "H.248 BER Error: OctetString expected but Class:%d PC:%d Tag:%d was unexpected", ber_class, pc, tag);
         return end_offset;
     }
 
-    next_tvb = tvb_new_subset_length(tvb,offset,len);
+    next_tvb = tvb_new_subset(tvb,offset,len,len);
 
     if ( curr_info.par && curr_info.par->dissector) {
         curr_info.par->dissector(tree, next_tvb, actx->pinfo, *(curr_info.par->hfid), &curr_info, curr_info.par->data);
@@ -1394,7 +1389,7 @@ static int dissect_h248_MtpAddress(gboolean implicit_tag, tvbuff_t *tvb, int off
     if (new_tvb) {
         /* this field is either 2 or 4 bytes  so just read it into an integer */
         val=0;
-        len=tvb_reported_length(new_tvb);
+        len=tvb_length(new_tvb);
         for(i=0;i<len;i++){
             val= (val<<8)|tvb_get_guint8(new_tvb, i);
         }
@@ -1444,7 +1439,7 @@ dissect_h248(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
        dissect with the "megaco" dissector in Wireshark.  (Both
        encodings are MEGACO (RFC 3015) and both are H.248.)
      */
-    if(tvb_captured_length(tvb)>=6){
+    if(tvb_length(tvb)>=6){
         if(!tvb_strneql(tvb, 0, "MEGACO", 6)){
             static dissector_handle_t megaco_handle=NULL;
             if(!megaco_handle){
@@ -1603,7 +1598,6 @@ void proto_register_h248(void) {
         { &ei_h248_errored_command, { "h248.errored_command", PI_RESPONSE_CODE, PI_WARN, "Errored Command", EXPFILL }},
         { &ei_h248_transactionId64, { "h248.transactionId.error", PI_MALFORMED, PI_WARN, "Transaction ID invalid", EXPFILL }},
         { &ei_h248_context_id64, { "h248.contextId.error", PI_MALFORMED, PI_WARN, "Context ID invalid", EXPFILL }},
-        { &ei_h248_octet_string_expected, { "h248.octet_string_expected", PI_PROTOCOL, PI_WARN, "H.248 BER Error: OctetString expected", EXPFILL }},
     };
 
     expert_module_t* expert_h248;

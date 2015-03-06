@@ -58,6 +58,8 @@
 #include <string.h>
 #include "wtap-int.h"
 #include "file_wrappers.h"
+#include <wsutil/buffer.h>
+#include "atm.h"
 #include "ngsniffer.h"
 
 /* Magic number in Sniffer files. */
@@ -526,24 +528,23 @@ static int fix_pseudo_header(int encap, Buffer *buf, int len,
 static void ngsniffer_sequential_close(wtap *wth);
 static void ngsniffer_close(wtap *wth);
 static gboolean ngsniffer_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
-    const guint8 *pd, int *err, gchar **err_info);
+    const guint8 *pd, int *err);
 static gboolean ngsniffer_dump_close(wtap_dumper *wdh, int *err);
 static int SnifferDecompress( unsigned char * inbuf, size_t inlen,
-    unsigned char * outbuf, size_t outlen, int *err, gchar **err_info );
-static gboolean ng_read_bytes_or_eof(wtap *wth, void *buffer,
-    unsigned int nbytes, gboolean is_random, int *err, gchar **err_info);
-static gboolean ng_read_bytes(wtap *wth, void *buffer, unsigned int nbytes,
+    unsigned char * outbuf, size_t outlen, int *err );
+static gint64 ng_file_read(void *buffer, unsigned int nbytes, wtap *wth,
     gboolean is_random, int *err, gchar **err_info);
-static gboolean read_blob(FILE_T infile, ngsniffer_comp_stream_t *comp_stream,
+static int read_blob(FILE_T infile, ngsniffer_comp_stream_t *comp_stream,
     int *err, gchar **err_info);
 static gboolean ng_file_skip_seq(wtap *wth, gint64 delta, int *err,
     gchar **err_info);
 static gboolean ng_file_seek_rand(wtap *wth, gint64 offset, int *err,
     gchar **err_info);
 
-wtap_open_return_val
+int
 ngsniffer_open(wtap *wth, int *err, gchar **err_info)
 {
+	int bytes_read;
 	char magic[sizeof ngsniffer_magic];
 	char record_type[2];
 	char record_length[4]; /* only the first 2 bytes are length,
@@ -574,35 +575,55 @@ ngsniffer_open(wtap *wth, int *err, gchar **err_info)
 	ngsniffer_t *ngsniffer;
 
 	/* Read in the string that should be at the start of a Sniffer file */
-	if (!wtap_read_bytes(wth->fh, magic, sizeof magic, err, err_info)) {
-		if (*err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(magic, sizeof magic, wth->fh);
+	if (bytes_read != sizeof magic) {
+		*err = file_error(wth->fh, err_info);
+		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+			return -1;
+		return 0;
 	}
 
 	if (memcmp(magic, ngsniffer_magic, sizeof ngsniffer_magic)) {
-		return WTAP_OPEN_NOT_MINE;
+		return 0;
 	}
 
 	/*
 	 * Read the first record, which the manual says is a version
 	 * record.
 	 */
-	if (!wtap_read_bytes(wth->fh, record_type, 2, err, err_info))
-		return WTAP_OPEN_ERROR;
-	if (!wtap_read_bytes(wth->fh, record_length, 4, err, err_info))
-		return WTAP_OPEN_ERROR;
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(record_type, 2, wth->fh);
+	if (bytes_read != 2) {
+		*err = file_error(wth->fh, err_info);
+		if (*err == 0)
+			*err = WTAP_ERR_SHORT_READ;
+		return -1;
+	}
+	bytes_read = file_read(record_length, 4, wth->fh);
+	if (bytes_read != 4) {
+		*err = file_error(wth->fh, err_info);
+		if (*err == 0)
+			*err = WTAP_ERR_SHORT_READ;
+		return -1;
+	}
 
 	type = pletoh16(record_type);
 
 	if (type != REC_VERS) {
 		*err = WTAP_ERR_BAD_FILE;
 		*err_info = g_strdup_printf("ngsniffer: Sniffer file doesn't start with a version record");
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 
-	if (!wtap_read_bytes(wth->fh, &version, sizeof version, err, err_info))
-		return WTAP_OPEN_ERROR;
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(&version, sizeof version, wth->fh);
+	if (bytes_read != sizeof version) {
+		*err = file_error(wth->fh, err_info);
+		if (*err == 0)
+			*err = WTAP_ERR_SHORT_READ;
+		return -1;
+	}
 
 	/* Check the data link type. */
 	if (version.network >= NUM_NGSNIFF_ENCAPS
@@ -610,14 +631,14 @@ ngsniffer_open(wtap *wth, int *err, gchar **err_info)
 		*err = WTAP_ERR_UNSUPPORTED;
 		*err_info = g_strdup_printf("ngsniffer: network type %u unknown or unsupported",
 		    version.network);
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 
 	/* Check the time unit */
 	if (version.timeunit >= NUM_NGSNIFF_TIMEUNITS) {
 		*err = WTAP_ERR_UNSUPPORTED;
 		*err_info = g_strdup_printf("ngsniffer: Unknown timeunit %u", version.timeunit);
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 
 	/* compressed or uncompressed Sniffer file? */
@@ -648,7 +669,7 @@ ngsniffer_open(wtap *wth, int *err, gchar **err_info)
 	maj_vers = pletoh16(&version.maj_vers);
 	if (process_header_records(wth, err, err_info, maj_vers,
 	    version.network) < 0)
-		return WTAP_OPEN_ERROR;
+		return -1;
 	if ((version.network == NETWORK_SYNCHRO ||
 	    version.network == NETWORK_ASYNC) &&
 	    wth->file_encap == WTAP_ENCAP_PER_PACKET) {
@@ -698,7 +719,7 @@ ngsniffer_open(wtap *wth, int *err, gchar **err_info)
 	 */
 	if (wth->random_fh != NULL) {
 		if (file_seek(wth->random_fh, current_offset, SEEK_SET, err) == -1)
-			return WTAP_OPEN_ERROR;
+			return -1;
 	}
 
 	/* This is a ngsniffer file */
@@ -768,15 +789,16 @@ ngsniffer_open(wtap *wth, int *err, gchar **err_info)
 	 * isn't stored in the capture file.
 	 */
 
-	wth->file_tsprec = WTAP_TSPREC_NSEC;	/* XXX */
+	wth->tsprecision = WTAP_FILE_TSPREC_NSEC;	/* XXX */
 
-	return WTAP_OPEN_MINE;
+	return 1;
 }
 
 static int
 process_header_records(wtap *wth, int *err, gchar **err_info, gint16 maj_vers,
     guint8 network)
 {
+	int bytes_read;
 	char record_type[2];
 	char record_length[4]; /* only the first 2 bytes are length,
 				  the last 2 are "reserved" and are thrown away */
@@ -785,9 +807,16 @@ process_header_records(wtap *wth, int *err, gchar **err_info, gint16 maj_vers,
 	unsigned char buffer[256];
 
 	for (;;) {
-		if (!wtap_read_bytes_or_eof(wth->fh, record_type, 2, err, err_info)) {
+		errno = WTAP_ERR_CANT_READ;
+		bytes_read = file_read(record_type, 2, wth->fh);
+		if (bytes_read != 2) {
+			*err = file_error(wth->fh, err_info);
 			if (*err != 0)
 				return -1;
+			if (bytes_read != 0) {
+				*err = WTAP_ERR_SHORT_READ;
+				return -1;
+			}
 			return 0;	/* EOF */
 		}
 
@@ -809,9 +838,14 @@ process_header_records(wtap *wth, int *err, gchar **err_info, gint16 maj_vers,
 			return 0;
 		}
 
-		if (!wtap_read_bytes(wth->fh, record_length, 4,
-		    err, err_info))
+		errno = WTAP_ERR_CANT_READ;
+		bytes_read = file_read(record_length, 4, wth->fh);
+		if (bytes_read != 4) {
+			*err = file_error(wth->fh, err_info);
+			if (*err == 0)
+				*err = WTAP_ERR_SHORT_READ;
 			return -1;
+		}
 
 		length = pletoh16(record_length);
 
@@ -832,9 +866,14 @@ process_header_records(wtap *wth, int *err, gchar **err_info, gint16 maj_vers,
 			 * record data.
 			 */
 			bytes_to_read = MIN(length, (int)sizeof buffer);
-			if (!wtap_read_bytes(wth->fh, buffer,
-			    bytes_to_read, err, err_info))
+			bytes_read = file_read(buffer, bytes_to_read,
+				wth->fh);
+			if (bytes_read != bytes_to_read) {
+				*err = file_error(wth->fh, err_info);
+				if (*err == 0)
+					*err = WTAP_ERR_SHORT_READ;
 				return -1;
+			}
 
 			switch (maj_vers) {
 
@@ -1128,6 +1167,7 @@ ngsniffer_process_record(wtap *wth, gboolean is_random, guint *padding,
     struct wtap_pkthdr *phdr, Buffer *buf, int *err, gchar **err_info)
 {
 	ngsniffer_t *ngsniffer;
+	gint64	bytes_read;
 	char	record_type[2];
 	char	record_length[4]; /* only 1st 2 bytes are length */
 	guint16	type, length;
@@ -1141,13 +1181,24 @@ ngsniffer_process_record(wtap *wth, gboolean is_random, guint *padding,
 	/*
 	 * Read the record header.
 	 */
-	if (!ng_read_bytes_or_eof(wth, record_type, 2, is_random, err, err_info)) {
+	bytes_read = ng_file_read(record_type, 2, wth, is_random, err,
+	    err_info);
+	if (bytes_read != 2) {
 		if (*err != 0)
 			return -1;
+		if (bytes_read != 0) {
+			*err = WTAP_ERR_SHORT_READ;
+			return -1;
+		}
 		return REC_EOF;
 	}
-	if (!ng_read_bytes(wth, record_length, 4, is_random, err, err_info))
+	bytes_read = ng_file_read(record_length, 4, wth, is_random, err,
+	    err_info);
+	if (bytes_read != 4) {
+		if (*err == 0)
+			*err = WTAP_ERR_SHORT_READ;
 		return -1;
+	}
 
 	type = pletoh16(record_type);
 	length = pletoh16(record_length);
@@ -1167,9 +1218,13 @@ ngsniffer_process_record(wtap *wth, gboolean is_random, guint *padding,
 		}
 
 		/* Read the f_frame2_struct */
-		if (!ng_read_bytes(wth, &frame2, (unsigned int)sizeof frame2,
-		   is_random, err, err_info))
+		bytes_read = ng_file_read(&frame2, (unsigned int)sizeof frame2,
+		   wth, is_random, err, err_info);
+		if (bytes_read != sizeof frame2) {
+			if (*err == 0)
+				*err = WTAP_ERR_SHORT_READ;
 			return -1;
+		}
 		time_low = pletoh16(&frame2.time_low);
 		time_med = pletoh16(&frame2.time_med);
 		time_high = frame2.time_high;
@@ -1194,9 +1249,13 @@ ngsniffer_process_record(wtap *wth, gboolean is_random, guint *padding,
 		}
 
 		/* Read the f_frame4_struct */
-		if (!ng_read_bytes(wth, &frame4, (unsigned int)sizeof frame4,
-		    is_random, err, err_info))
+		bytes_read = ng_file_read(&frame4, (unsigned int)sizeof frame4,
+		    wth, is_random, err, err_info);
+		if (bytes_read != sizeof frame4) {
+			if (*err == 0)
+				*err = WTAP_ERR_SHORT_READ;
 			return -1;
+		}
 		time_low = pletoh16(&frame4.time_low);
 		time_med = pletoh16(&frame4.time_med);
 		time_high = frame4.time_high;
@@ -1223,9 +1282,13 @@ ngsniffer_process_record(wtap *wth, gboolean is_random, guint *padding,
 
 	case REC_FRAME6:
 		/* Read the f_frame6_struct */
-		if (!ng_read_bytes(wth, &frame6, (unsigned int)sizeof frame6,
-		    is_random, err, err_info))
+		bytes_read = ng_file_read(&frame6, (unsigned int)sizeof frame6,
+		    wth, is_random, err, err_info);
+		if (bytes_read != sizeof frame6) {
+			if (*err == 0)
+				*err = WTAP_ERR_SHORT_READ;
 			return -1;
+		}
 		time_low = pletoh16(&frame6.time_low);
 		time_med = pletoh16(&frame6.time_med);
 		time_high = frame6.time_high;
@@ -1291,10 +1354,14 @@ ngsniffer_process_record(wtap *wth, gboolean is_random, guint *padding,
 	/*
 	 * Read the packet data.
 	 */
-	ws_buffer_assure_space(buf, size);
-	if (!ng_read_bytes(wth, ws_buffer_start_ptr(buf), size, is_random,
-	    err, err_info))
+	buffer_assure_space(buf, size);
+	bytes_read = ng_file_read(buffer_start_ptr(buf), size, wth,
+	    is_random, err, err_info);
+	if (bytes_read != (gint64) size) {
+		if (*err == 0)
+			*err = WTAP_ERR_SHORT_READ;
 		return -1;
+	}
 
 	phdr->pkt_encap = fix_pseudo_header(wth->file_encap,
 	    buf, length, &phdr->pseudo_header);
@@ -1795,7 +1862,7 @@ fix_pseudo_header(int encap, Buffer *buf, int len,
 {
 	const guint8 *pd;
 
-	pd = ws_buffer_start_ptr(buf);
+	pd = buffer_start_ptr(buf);
 	switch (encap) {
 
 	case WTAP_ENCAP_PER_PACKET:
@@ -1955,7 +2022,7 @@ ngsniffer_dump_can_write_encap(int encap)
 		return WTAP_ERR_ENCAP_PER_PACKET_UNSUPPORTED;
 
 	if (encap < 0 || (unsigned)encap >= NUM_WTAP_ENCAPS || wtap_encap[encap] == -1)
-		return WTAP_ERR_UNWRITABLE_ENCAP;
+		return WTAP_ERR_UNSUPPORTED_ENCAP;
 
 	return 0;
 }
@@ -1991,7 +2058,7 @@ ngsniffer_dump_open(wtap_dumper *wdh, int *err)
    Returns TRUE on success, FALSE on failure. */
 static gboolean
 ngsniffer_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
-	       const guint8 *pd, int *err, gchar **err_info _U_)
+	       const guint8 *pd, int *err)
 {
 	const union wtap_pseudo_header *pseudo_header = &phdr->pseudo_header;
 	ngsniffer_dump_t *ngsniffer = (ngsniffer_dump_t *)wdh->priv;
@@ -2008,7 +2075,7 @@ ngsniffer_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
 
 	/* We can only write packet records. */
 	if (phdr->rec_type != REC_TYPE_PACKET) {
-		*err = WTAP_ERR_UNWRITABLE_REC_TYPE;
+		*err = WTAP_ERR_REC_TYPE_UNSUPPORTED;
 		return FALSE;
 	}
 
@@ -2151,89 +2218,12 @@ ngsniffer_dump_close(wtap_dumper *wdh, int *err)
       outbuf - decompressed contents, could contain a partial Sniffer
 	      record at the end.
       outlen - length of outbuf.
-      err - return error code here
-      err_info - for WTAP_ERR_DECOMPRESS, return descriptive string here
 
    Return value is the number of bytes in outbuf on return.
 */
-
-/*
- * Make sure we have at least "length" bytes remaining
- * in the input buffer.
- */
-#define CHECK_INPUT_POINTER( length ) \
-	if ( pin + (length - 1) >= pin_end ) \
-	{ \
-		*err = WTAP_ERR_DECOMPRESS; \
-		*err_info = g_strdup("ngsniffer: Compressed data item goes past the end of the compressed block"); \
-		return ( -1 ); \
-	}
-
-/*
- * Make sure the byte containing the high order part of a buffer
- * offset is present.
- *
- * If it is, then fetch it and combine it with the low-order part.
- */
-#define FETCH_OFFSET_HIGH \
-	CHECK_INPUT_POINTER( 1 ); \
-	offset = code_low + ((unsigned int)(*pin++) << 4) + 3;
-
-/*
- * Make sure the output buffer is big enough to get "length"
- * bytes added to it.
- */
-#define CHECK_OUTPUT_LENGTH( length ) \
-	if ( pout + length > pout_end ) \
-	{ \
-		*err = WTAP_ERR_UNC_OVERFLOW; \
-		return ( -1 ); \
-	}
-
-/*
- * Make sure we have another byte to fetch, and then fetch it and
- * append it to the buffer "length" times.
- */
-#define APPEND_RLE_BYTE( length ) \
-	/* If length would put us past end of output, avoid overflow */ \
-	CHECK_OUTPUT_LENGTH( length ); \
-	CHECK_INPUT_POINTER( 1 ); \
-	memset( pout, *pin++, length ); \
-	pout += length;
-
-/*
- * Make sure the specified offset and length refer, in the output
- * buffer, to data that's entirely within the part of the output
- * buffer that we've already filled in.
- *
- * Then append the string from the specified offset, with the
- * specified length, to the output buffer.
- */
-#define APPEND_LZW_STRING( offset, length ) \
-	/* If length would put us past end of output, avoid overflow */ \
-	CHECK_OUTPUT_LENGTH( length ); \
-	/* Check if offset would put us back past begin of buffer */ \
-	if ( pout - offset < outbuf ) \
-	{ \
-		*err = WTAP_ERR_DECOMPRESS; \
-		*err_info = g_strdup("ngsniffer: LZ77 compressed data has bad offset to string"); \
-		return ( -1 ); \
-	} \
-	/* Check if offset would cause us to copy on top of ourselves */ \
-	if ( pout - offset + length > pout ) \
-	{ \
-		*err = WTAP_ERR_DECOMPRESS; \
-		*err_info = g_strdup("ngsniffer: LZ77 compressed data has bad offset to string"); \
-		return ( -1 ); \
-	} \
-	/* Copy the string from previous text to output position, \
-	   advance output pointer */ \
-	memcpy( pout, pout - offset, length ); \
-	pout += length;
-
 static int
 SnifferDecompress(unsigned char *inbuf, size_t inlen, unsigned char *outbuf,
-		  size_t outlen, int *err, gchar **err_info)
+		  size_t outlen, int *err)
 {
 	unsigned char * pin  = inbuf;
 	unsigned char * pout = outbuf;
@@ -2254,7 +2244,7 @@ SnifferDecompress(unsigned char *inbuf, size_t inlen, unsigned char *outbuf,
 	/* Process until we've consumed all the input */
 	while (pin < pin_end)
 	{
-		/* Shift down the bit mask we use to see what's encoded */
+		/* Shift down the bit mask we use to see whats encoded */
 		bit_mask = bit_mask >> 1;
 
 		/* If there are no bits left, time to get another 16 bits */
@@ -2263,7 +2253,11 @@ SnifferDecompress(unsigned char *inbuf, size_t inlen, unsigned char *outbuf,
 			/* make sure there are at least *three* bytes
 			   available - the two bytes of the bit value,
 			   plus one byte after it */
-			CHECK_INPUT_POINTER( 3 );
+			if ( pin + 2 >= pin_end )
+			{
+				*err = WTAP_ERR_UNC_TRUNCATED;
+				return ( -1 );
+			}
 			bit_mask  = 0x8000;  /* start with the high bit */
 			bit_value = pletoh16(pin);   /* get the next 16 bits */
 			pin += 2;          /* skip over what we just grabbed */
@@ -2275,7 +2269,11 @@ SnifferDecompress(unsigned char *inbuf, size_t inlen, unsigned char *outbuf,
 			/* bit not set - raw byte we just copy */
 
 			/* If length would put us past end of output, avoid overflow */
-			CHECK_OUTPUT_LENGTH( 1 );
+			if ( pout + 1 > pout_end )
+			{
+				*err = WTAP_ERR_UNC_OVERFLOW;
+				return ( -1 );
+			}
 			*(pout++) = *(pin++);
 		}
 		else
@@ -2286,6 +2284,11 @@ SnifferDecompress(unsigned char *inbuf, size_t inlen, unsigned char *outbuf,
 			code_type = (unsigned int) ((*pin) >> 4 ) & 0xF;
 			code_low  = (unsigned int) ((*pin) & 0xF );
 			pin++;   /* increment over the code byte we just retrieved */
+			if ( pin >= pin_end )
+			{
+				*err = WTAP_ERR_UNC_TRUNCATED;	 /* data was oddly truncated */
+				return ( -1 );
+			}
 
 			/* Based on the code type, decode the compressed string */
 			switch ( code_type )
@@ -2297,10 +2300,16 @@ SnifferDecompress(unsigned char *inbuf, size_t inlen, unsigned char *outbuf,
 				  Total code size: 2 bytes.
 				*/
 				length = code_low + 3;
+				/* If length would put us past end of output, avoid overflow */
+				if ( pout + length > pout_end )
+				{
+					*err = WTAP_ERR_UNC_OVERFLOW;
+					return ( -1 );
+				}
 
-				/* check the length and then, if it's OK,
-				   generate the repeated series of bytes */
-				APPEND_RLE_BYTE( length );
+				/* generate the repeated series of bytes */
+				memset( pout, *pin++, length );
+				pout += length;
 				break;
 			case 1  :   /* RLE long runs */
 				/*
@@ -2310,12 +2319,24 @@ SnifferDecompress(unsigned char *inbuf, size_t inlen, unsigned char *outbuf,
 				  Byte to repeat immediately follows.
 				  Total code size: 3 bytes.
 				*/
-				CHECK_INPUT_POINTER( 1 );
 				length = code_low + ((unsigned int)(*pin++) << 4) + 19;
+				/* If we are already at end of input, there is no byte
+				   to repeat */
+				if ( pin >= pin_end )
+				{
+					*err = WTAP_ERR_UNC_TRUNCATED;	 /* data was oddly truncated */
+					return ( -1 );
+				}
+				/* If length would put us past end of output, avoid overflow */
+				if ( pout + length > pout_end )
+				{
+					*err = WTAP_ERR_UNC_OVERFLOW;
+					return ( -1 );
+				}
 
-				/* check the length and then, if it's OK,
-				   generate the repeated series of bytes */
-				APPEND_RLE_BYTE( length );
+				/* generate the repeated series of bytes */
+				memset( pout, *pin++, length );
+				pout += length;
 				break;
 			case 2  :   /* LZ77 long strings */
 				/*
@@ -2325,15 +2346,39 @@ SnifferDecompress(unsigned char *inbuf, size_t inlen, unsigned char *outbuf,
 				  Length of string immediately follows.
 				  Total code size: 3 bytes.
 				*/
-				FETCH_OFFSET_HIGH;
+				offset = code_low + ((unsigned int)(*pin++) << 4) + 3;
+				/* If we are already at end of input, there is no byte
+				   to repeat */
+				if ( pin >= pin_end )
+				{
+					*err = WTAP_ERR_UNC_TRUNCATED;	 /* data was oddly truncated */
+					return ( -1 );
+				}
+				/* Check if offset would put us back past begin of buffer */
+				if ( pout - offset < outbuf )
+				{
+					*err = WTAP_ERR_UNC_BAD_OFFSET;
+					return ( -1 );
+				}
 
 				/* get length from next byte, make sure it won't overrun buf */
-				CHECK_INPUT_POINTER( 1 );
 				length = (unsigned int)(*pin++) + 16;
+				if ( pout + length > pout_end )
+				{
+					*err = WTAP_ERR_UNC_OVERFLOW;
+					return ( -1 );
+				}
+				/* Check if offset would cause us to copy on top of ourselves */
+				if ( pout - offset + length > pout )
+				{
+					*err = WTAP_ERR_UNC_BAD_OFFSET;
+					return ( -1 );
+				}
 
-				/* check the offset and length and then, if
-				   they're OK, copy the data */
-				APPEND_LZW_STRING( offset, length );
+				/* Copy the string from previous text to output position,
+				   advance output pointer */
+				memcpy( pout, pout - offset, length );
+				pout += length;
 				break;
 			default :   /* (3 to 15): LZ77 short strings */
 				/*
@@ -2343,14 +2388,32 @@ SnifferDecompress(unsigned char *inbuf, size_t inlen, unsigned char *outbuf,
 				  Length of string to repeat is overloaded into code_type.
 				  Total code size: 2 bytes.
 				*/
-				FETCH_OFFSET_HIGH;
+				offset = code_low + ((unsigned int)(*pin++) << 4) + 3;
+				/* Check if offset would put us back past begin of buffer */
+				if ( pout - offset < outbuf )
+				{
+					*err = WTAP_ERR_UNC_BAD_OFFSET;
+					return ( -1 );
+				}
 
-				/* get length from code_type */
+				/* get length from code_type, make sure it won't overrun buf */
 				length = code_type;
+				if ( pout + length > pout_end )
+				{
+					*err = WTAP_ERR_UNC_OVERFLOW;
+					return ( -1 );
+				}
+				/* Check if offset would cause us to copy on top of ourselves */
+				if ( pout - offset + length > pout )
+				{
+					*err = WTAP_ERR_UNC_BAD_OFFSET;
+					return ( -1 );
+				}
 
-				/* check the offset and length and then, if
-				   they're OK, copy the data */
-				APPEND_LZW_STRING( offset, length );
+				/* Copy the string from previous text to output position,
+				   advance output pointer */
+				memcpy( pout, pout - offset, length );
+				pout += length;
 				break;
 			}
 		}
@@ -2360,7 +2423,7 @@ SnifferDecompress(unsigned char *inbuf, size_t inlen, unsigned char *outbuf,
 }
 
 /*
- * XXX - is there any guarantee that 65535 bytes is big enough to hold the
+ * XXX - is there any guarantee that this is big enough to hold the
  * uncompressed data from any blob?
  */
 #define	OUTBUF_SIZE	65536
@@ -2374,13 +2437,14 @@ typedef struct {
 	gint64	blob_uncomp_offset;
 } blob_info_t;
 
-static gboolean
-ng_read_bytes_or_eof(wtap *wth, void *buffer, unsigned int nbytes, gboolean is_random,
-    int *err, gchar **err_info)
+static gint64
+ng_file_read(void *buffer, unsigned int nbytes, wtap *wth, gboolean is_random,
+	     int *err, gchar **err_info)
 {
 	ngsniffer_t *ngsniffer;
 	FILE_T infile;
 	ngsniffer_comp_stream_t *comp_stream;
+	unsigned int copybytes = nbytes;					/* bytes left to be copied */
 	gint64 copied_bytes = 0;							/* bytes already copied */
 	unsigned char *outbuffer = (unsigned char *)buffer; /* where to write next decompressed data */
 	blob_info_t *blob;
@@ -2397,11 +2461,15 @@ ng_read_bytes_or_eof(wtap *wth, void *buffer, unsigned int nbytes, gboolean is_r
 	}
 
 	if (wth->file_type_subtype == WTAP_FILE_TYPE_SUBTYPE_NGSNIFFER_UNCOMPRESSED) {
-		if (!wtap_read_bytes_or_eof(infile, buffer, nbytes, err, err_info))
-			return FALSE;
-		comp_stream->uncomp_offset += nbytes;
-		comp_stream->comp_offset += nbytes;
-		return TRUE;
+		errno = WTAP_ERR_CANT_READ;
+		copied_bytes = file_read(buffer, copybytes, infile);
+		if ((unsigned int) copied_bytes != copybytes)
+			*err = file_error(infile, err_info);
+		if (copied_bytes != -1) {
+			comp_stream->uncomp_offset += copied_bytes;
+			comp_stream->comp_offset += copied_bytes;
+		}
+		return copied_bytes;
 	}
 
 	/* Allocate the stream buffer if it hasn't already been allocated. */
@@ -2431,10 +2499,10 @@ ng_read_bytes_or_eof(wtap *wth, void *buffer, unsigned int nbytes, gboolean is_r
 		}
 
 		/* Now read the first blob into the buffer. */
-		if (!read_blob(infile, comp_stream, err, err_info))
-			return FALSE;
+		if (read_blob(infile, comp_stream, err, err_info) < 0)
+			return -1;
 	}
-	while (nbytes > 0) {
+	while (copybytes > 0) {
 		bytes_left = comp_stream->nbytes - comp_stream->nextout;
 		if (bytes_left == 0) {
 			/* There's no decompressed stuff left to copy from the current
@@ -2449,7 +2517,7 @@ ng_read_bytes_or_eof(wtap *wth, void *buffer, unsigned int nbytes, gboolean is_r
 					 * blob for every byte in the file.
 					 */
 					*err = WTAP_ERR_CANT_SEEK;
-					return FALSE;
+					return -1;
 				}
 			} else {
 				/* If we also have a random stream open, add a new element,
@@ -2466,48 +2534,33 @@ ng_read_bytes_or_eof(wtap *wth, void *buffer, unsigned int nbytes, gboolean is_r
 				}
 			}
 
-			if (!read_blob(infile, comp_stream, err, err_info))
-				return FALSE;
+			if (read_blob(infile, comp_stream, err, err_info) < 0)
+				return -1;
 			bytes_left = comp_stream->nbytes - comp_stream->nextout;
 		}
 
-		bytes_to_copy = nbytes;
+		bytes_to_copy = copybytes;
 		if (bytes_to_copy > bytes_left)
 			bytes_to_copy = bytes_left;
 		memcpy(outbuffer, &comp_stream->buf[comp_stream->nextout],
 		       bytes_to_copy);
-		nbytes -= bytes_to_copy;
+		copybytes -= bytes_to_copy;
 		copied_bytes += bytes_to_copy;
 		outbuffer += bytes_to_copy;
 		comp_stream->nextout += bytes_to_copy;
 		comp_stream->uncomp_offset += bytes_to_copy;
 	}
-	return TRUE;
-}
-
-static gboolean
-ng_read_bytes(wtap *wth, void *buffer, unsigned int nbytes, gboolean is_random,
-    int *err, gchar **err_info)
-{
-	if (!ng_read_bytes_or_eof(wth, buffer, nbytes, is_random, err, err_info)) {
-		/*
-		 * In this case, even reading zero bytes, because we're at
-		 * the end of the file, is a short read.
-		 */
-		if (*err == 0)
-			*err = WTAP_ERR_SHORT_READ;
-		return FALSE;
-	}
-	return TRUE;
+	return copied_bytes;
 }
 
 /* Read a blob from a compressed stream.
-   Return FALSE and set "*err" and "*err_info" on error, otherwise return TRUE. */
-static gboolean
+   Return -1 and set "*err" and "*err_info" on error, otherwise return 0. */
+static int
 read_blob(FILE_T infile, ngsniffer_comp_stream_t *comp_stream, int *err,
 	  gchar **err_info)
 {
 	int in_len;
+	size_t read_len;
 	unsigned short blob_len;
 	gint16 blob_len_host;
 	gboolean uncompressed;
@@ -2515,8 +2568,12 @@ read_blob(FILE_T infile, ngsniffer_comp_stream_t *comp_stream, int *err,
 	int out_len;
 
 	/* Read one 16-bit word which is length of next compressed blob */
-	if (!wtap_read_bytes_or_eof(infile, &blob_len, 2, err, err_info))
-		return FALSE;
+	errno = WTAP_ERR_CANT_READ;
+	read_len = file_read(&blob_len, 2, infile);
+	if (2 != read_len) {
+		*err = file_error(infile, err_info);
+		return -1;
+	}
 	comp_stream->comp_offset += 2;
 	blob_len_host = pletoh16(&blob_len);
 
@@ -2533,9 +2590,12 @@ read_blob(FILE_T infile, ngsniffer_comp_stream_t *comp_stream, int *err,
 	file_inbuf = (unsigned char *)g_malloc(INBUF_SIZE);
 
 	/* Read the blob */
-	if (!wtap_read_bytes(infile, file_inbuf, in_len, err, err_info)) {
+	errno = WTAP_ERR_CANT_READ;
+	read_len = file_read(file_inbuf, in_len, infile);
+	if ((size_t) in_len != read_len) {
+		*err = file_error(infile, err_info);
 		g_free(file_inbuf);
-		return FALSE;
+		return -1;
 	}
 	comp_stream->comp_offset += in_len;
 
@@ -2545,18 +2605,17 @@ read_blob(FILE_T infile, ngsniffer_comp_stream_t *comp_stream, int *err,
 	} else {
 		/* Decompress the blob */
 		out_len = SnifferDecompress(file_inbuf, in_len,
-					    comp_stream->buf, OUTBUF_SIZE, err,
-					    err_info);
+					    comp_stream->buf, OUTBUF_SIZE, err);
 		if (out_len < 0) {
 			g_free(file_inbuf);
-			return FALSE;
+			return -1;
 		}
 	}
 
 	g_free(file_inbuf);
 	comp_stream->nextout = 0;
 	comp_stream->nbytes = out_len;
-	return TRUE;
+	return 0;
 }
 
 /* Skip some number of bytes forward in the sequential stream. */
@@ -2584,7 +2643,7 @@ ng_file_skip_seq(wtap *wth, gint64 delta, int *err, gchar **err_info)
 		else
 			amount_to_read = (unsigned int) delta;
 
-		if (!ng_read_bytes(wth, buf, amount_to_read, FALSE, err, err_info)) {
+		if (ng_file_read(buf, amount_to_read, wth, FALSE, err, err_info) < 0) {
 			g_free(buf);
 			return FALSE;	/* error */
 		}
@@ -2732,7 +2791,7 @@ ng_file_seek_rand(wtap *wth, gint64 offset, int *err, gchar **err_info)
 		ngsniffer->rand.comp_offset = new_blob->blob_comp_offset;
 
 		/* Now fill the buffer. */
-		if (!read_blob(wth->random_fh, &ngsniffer->rand, err, err_info))
+		if (read_blob(wth->random_fh, &ngsniffer->rand, err, err_info) < 0)
 			return FALSE;
 
 		/* Set "delta" to the amount to move within this blob; it had
@@ -2752,16 +2811,3 @@ ng_file_seek_rand(wtap *wth, gint64 offset, int *err, gchar **err_info)
 
 	return TRUE;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

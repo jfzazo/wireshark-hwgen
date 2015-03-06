@@ -29,6 +29,5 @@
 void eo_dicom_cb(GtkWidget *widget _U_, gpointer data _U_);
 void eo_http_cb(GtkWidget *widget _U_, gpointer data _U_);
 void eo_smb_cb(GtkWidget *widget _U_, gpointer data _U_);
-void eo_tftp_cb(GtkWidget *widget _U_, gpointer data _U_);
 
 #endif /* __EXPORT_OBJECT_DLG_H__ */

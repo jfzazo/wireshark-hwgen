@@ -24,7 +24,6 @@
 #include "syntax_line_edit.h"
 #include "qt_ui_utils.h"
 #include "uat_dialog.h"
-#include "wireshark_application.h"
 
 #include <epan/prefs-int.h>
 
@@ -221,13 +220,6 @@ ModulePreferencesScrollArea::ModulePreferencesScrollArea(module_t *module, QWidg
     ui->setupUi(this);
 
     if (!module) return;
-
-    /* Show the preference's description at the top of the page */
-    QFont font;
-    font.setBold(TRUE);
-    QLabel *label = new QLabel(module->description);
-    label->setFont(font);
-    ui->verticalLayout->addWidget(label);
 
     /* Add items for each of the preferences */
     prefs_pref_foreach(module, pref_show, (gpointer) ui->verticalLayout);
@@ -475,7 +467,8 @@ void ModulePreferencesScrollArea::filenamePushButtonPressed()
     pref_t *pref = filename_pb->property(pref_prop_).value<pref_t *>();
     if (!pref) return;
 
-    QString filename = QFileDialog::getSaveFileName(this, wsApp->windowTitleString(pref->title),
+    QString filename = QFileDialog::getSaveFileName(this,
+                                            QString(tr("Wireshark: ")) + pref->description,
                                             pref->stashed_val.string);
 
     if (!filename.isEmpty()) {
@@ -493,7 +486,8 @@ void ModulePreferencesScrollArea::dirnamePushButtonPressed()
     pref_t *pref = dirname_pb->property(pref_prop_).value<pref_t *>();
     if (!pref) return;
 
-    QString dirname = QFileDialog::getExistingDirectory(this, wsApp->windowTitleString(pref->title),
+    QString dirname = QFileDialog::getExistingDirectory(this,
+                                                 QString(tr("Wireshark: ")) + pref->description,
                                                  pref->stashed_val.string);
 
     if (!dirname.isEmpty()) {

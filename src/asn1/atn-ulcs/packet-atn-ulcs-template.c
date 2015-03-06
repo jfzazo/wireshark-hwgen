@@ -113,16 +113,18 @@ which ATN standard is supported ?
 
 #include "config.h"
 
-#ifndef _MSC_VER
-#include <stdint.h>
-#endif
-
-
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/dissectors/packet-ber.h>
+#include <epan/dissectors/packet-per.h>
+#include <epan/wmem/wmem.h>
 #include <epan/address.h>
 #include <epan/conversation.h>
-#include "packet-ber.h"
-#include "packet-per.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
 #include "packet-atn-ulcs.h"
 
 #define ATN_ACSE_PROTO "ICAO Doc9705 ULCS ACSE (ISO 8649/8650-1:1996)"
@@ -170,11 +172,10 @@ static int dissect_atn_ulcs_T_externalt_encoding_arbitrary(
 		proto_tree *tree _U_,
 		int hf_index _U_);
 
-static int dissect_ACSE_apdu_PDU(
+static void dissect_ACSE_apdu_PDU(
 		tvbuff_t *tvb _U_,
 		packet_info *pinfo _U_,
-		proto_tree *tree _U_,
-    void *data _U_);
+		proto_tree *tree _U_);
 
 guint32 dissect_per_object_descriptor_t(
 		tvbuff_t *tvb,
@@ -290,7 +291,6 @@ const value_string atn_ses_type[] =
 #define ATN_PRES_PROTO "ICAO Doc9705 ULCS Presentation (ISO 8822/8823-1:1994)"
 
 static int hf_atn_pres_err	 = -1;
-static int hf_atn_pres_pdu_type = -1;
 static gint ett_atn_pres		= -1;
 
 #define ATN_SES_PRES_MASK 0xf803
@@ -601,7 +601,7 @@ dissect_atn_ulcs(
 				dissect_Fully_encoded_data_PDU(
 						tvb,
 						pinfo,
-						atn_ulcs_tree, NULL);
+						atn_ulcs_tree);
 
 				return offset +
 					tvb_reported_length_remaining(tvb, offset ) ;
@@ -614,9 +614,16 @@ dissect_atn_ulcs(
 				value_ses_pres = tvb_get_ntohs(tvb, offset);
 
 				/* SPDU: dissect session layer */
-				atn_ulcs_tree = proto_tree_add_subtree(
-						tree, tvb, offset, 0,
-						ett_atn_ses, NULL, ATN_SES_PROTO );
+				ti = proto_tree_add_text(
+						tree,
+						tvb,
+						offset,
+						0,
+						ATN_SES_PROTO );
+
+				atn_ulcs_tree = proto_item_add_subtree(
+						ti,
+						ett_atn_ses);
 
 				/* get SPDU (1 octet) */
 				value_ses = tvb_get_guint8(tvb, offset);
@@ -666,19 +673,26 @@ dissect_atn_ulcs(
 				offset++;
 
 				/* PPDU: dissect presentation layer */
-				atn_ulcs_tree = proto_tree_add_subtree(
-						tree, tvb, offset, 0,
-						ett_atn_pres, NULL, ATN_PRES_PROTO );
+				ti = proto_tree_add_text(
+						tree,
+						tvb,
+						offset,
+						0,
+						ATN_PRES_PROTO );
+
+				atn_ulcs_tree = proto_item_add_subtree(ti, ett_atn_pres);
 
 				value_pres = tvb_get_guint8(tvb, offset);
 
 				/* need session context to identify PPDU type */
 				/* note: */
-				proto_tree_add_uint_format(atn_ulcs_tree, hf_atn_pres_pdu_type,
+				/* it is *unfeasible* to use proto_tree_add_item here: */
+				/* presentation type is always the same constant but its type */
+				/* is implicitly determined by preceding session context */
+				proto_tree_add_text(atn_ulcs_tree,
 						tvb,
 						offset,
 						1,
-                        value_ses_pres,
 						"%s (0x%02x)",
 						val_to_str( value_ses_pres & ATN_SES_PRES_MASK , atn_pres_vals, "?"),
 						value_pres);
@@ -702,14 +716,21 @@ dissect_atn_ulcs(
 				offset++;
 
 				/* ACSE PDU: dissect application layer */
-				atn_ulcs_tree = proto_tree_add_subtree(
-						tree, tvb, offset, 0,
-						ett_atn_acse, NULL, ATN_ACSE_PROTO );
+				ti = proto_tree_add_text(
+						tree,
+						tvb,
+						offset,
+						0,
+						ATN_ACSE_PROTO );
+
+				atn_ulcs_tree = proto_item_add_subtree(
+						ti,
+						ett_atn_acse);
 
 				dissect_ACSE_apdu_PDU(
 						tvb_new_subset_remaining(tvb, offset),
 						pinfo,
-						atn_ulcs_tree, NULL);
+						atn_ulcs_tree);
 
 				return offset +
 						tvb_reported_length_remaining(tvb, offset );
@@ -835,14 +856,6 @@ void proto_register_atn_ulcs (void)
 					PRES_CPR_ER_MASK,
 					NULL,
 					HFILL}},
-			{ &hf_atn_pres_pdu_type,
-				{ "PDU type", "atn-ulcs.pres.pdu_type",
-					FT_UINT8,
-					BASE_HEX,
-					NULL,
-					ATN_SES_PRES_MASK,
-					NULL,
-					HFILL}},
 		};
 
 		static gint *ett[] = {
@@ -876,7 +889,9 @@ void proto_register_atn_ulcs (void)
 		atn_cpdlc_handle = find_dissector("atn-cpdlc");
 
 		/* initiate sub dissector list */
-		atn_ulcs_heur_subdissector_list = register_heur_dissector_list("atn-ulcs");
+		register_heur_dissector_list(
+				"atn-ulcs",
+				&atn_ulcs_heur_subdissector_list);
 
 		/* init aare/aare data */
 		aarq_data_tree = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());

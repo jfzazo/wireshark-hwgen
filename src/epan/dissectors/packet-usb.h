@@ -24,12 +24,10 @@
 
 #include <epan/value_string.h>
 #include <epan/wmem/wmem.h>
-#include <epan/conversation.h>
 
 typedef struct _usb_address_t {
     guint32 device;
     guint32 endpoint;
-    guint16 bus_id;
 } usb_address_t;
 #define USB_ADDR_LEN (sizeof(usb_address_t))
 
@@ -41,23 +39,17 @@ typedef struct _usb_address_t {
 
 typedef struct _usb_conv_info_t usb_conv_info_t;
 
-/* header type */
-typedef enum {
-    USB_HEADER_LINUX_48_BYTES,
-    USB_HEADER_LINUX_64_BYTES,
-    USB_HEADER_USBPCAP,
-    USB_HEADER_MAUSB
-} usb_header_t;
-
-#define USB_HEADER_IS_LINUX(type) \
-    ((type) == USB_HEADER_LINUX_48_BYTES || (type) == USB_HEADER_LINUX_64_BYTES)
+/* header flags */
+#define USB_HEADER_IS_LINUX    (1 << 0)
+#define USB_HEADER_IS_64_BYTES (1 << 1)
+#define USB_HEADER_IS_USBPCAP  (1 << 2)
 
 /* there is one such structure for each request/response */
 typedef struct _usb_trans_info_t {
     guint32 request_in;
     guint32 response_in;
     nstime_t req_time;
-    usb_header_t header_type;
+    guint8 header_info;
 
     /* Valid only for SETUP transactions */
     struct _usb_setup {
@@ -122,11 +114,11 @@ typedef struct _usb_tap_data_t {
 } usb_tap_data_t;
 
 
-/* the value for "no endpoint" that's used usb_addr_t, e.g. for the address of the host */
-#define NO_ENDPOINT  0xffffffff
-/* the 8bit version of NO_ENDPOINT, it's used in usb_conv_info_t
-   0xff would be an invalid endpoint number (reserved bits are 1) */
-#define NO_ENDPOINT8 ((guint8)(NO_ENDPOINT& G_MAXUINT8))
+/* This is the endpoint number used for "no endpoint" or the fake endpoint
+ * for the host side since we need two endpoints to manage conversations
+ * properly.
+ */
+#define NO_ENDPOINT 0xffffffff
 
 /*
  * Values from the Linux USB pseudo-header.
@@ -140,13 +132,12 @@ typedef struct _usb_tap_data_t {
 #define URB_ERROR         'E'
 
 /*
- * URB transfer_type values
+ * transfer_type values
  */
 #define URB_ISOCHRONOUS   0x0
 #define URB_INTERRUPT     0x1
 #define URB_CONTROL       0x2
 #define URB_BULK          0x3
-#define URB_UNKNOWN       0xFF
 
 #define URB_TRANSFER_IN   0x80		/* to host */
 
@@ -203,17 +194,6 @@ typedef struct _usb_tap_data_t {
 #define ENDPOINT_TYPE_BULK              2
 #define ENDPOINT_TYPE_INTERRUPT         3
 
-/* 9.6.6 */
-extern const true_false_string tfs_endpoint_direction;
-
-usb_conv_info_t *
-get_usb_conv_info(conversation_t *conversation);
-
-conversation_t *
-get_usb_conversation(packet_info *pinfo,
-                     address *src_addr, address *dst_addr,
-                     guint32 src_endpoint, guint32 dst_endpoint);
-
 usb_conv_info_t *get_usb_iface_conv_info(packet_info *pinfo, guint8 interface_num);
 
 proto_item * dissect_usb_descriptor_header(proto_tree *tree,
@@ -224,32 +204,12 @@ void dissect_usb_endpoint_address(proto_tree *tree, tvbuff_t *tvb, int offset);
 int
 dissect_usb_endpoint_descriptor(packet_info *pinfo, proto_tree *parent_tree,
                                 tvbuff_t *tvb, int offset,
-                                usb_conv_info_t  *usb_conv_info);
+                                usb_trans_info_t *usb_trans_info,
+                                usb_conv_info_t  *usb_conv_info _U_);
 
 int
 dissect_usb_unknown_descriptor(packet_info *pinfo _U_, proto_tree *parent_tree,
                                tvbuff_t *tvb, int offset,
+                               usb_trans_info_t *usb_trans_info _U_,
                                usb_conv_info_t  *usb_conv_info _U_);
-
-int
-dissect_usb_setup_response(packet_info *pinfo, proto_tree *tree,
-                           tvbuff_t *tvb, int offset,
-                           guint8 urb_type, usb_conv_info_t *usb_conv_info);
-
-int
-dissect_usb_setup_request(packet_info *pinfo, proto_tree *tree,
-                          tvbuff_t *tvb, int offset,
-                          guint8 urb_type, usb_conv_info_t *usb_conv_info,
-                          usb_header_t header_type);
-
-
-void
-usb_set_addr(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, guint16 bus_id, guint16 device_address,
-             int endpoint, gboolean req);
-
-usb_trans_info_t
-*usb_get_trans_info(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-                    usb_header_t header_type, usb_conv_info_t *usb_conv_info);
-
-
 #endif

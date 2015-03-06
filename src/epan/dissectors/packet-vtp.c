@@ -22,6 +22,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
 
@@ -48,7 +50,6 @@ static int hf_vtp_md5_digest = -1;
 static int hf_vtp_seq_num = -1;
 static int hf_vtp_start_value = -1;
 static int hf_vtp_vlan_info_len = -1;
-static int hf_vtp_vlan_status = -1;
 static int hf_vtp_vlan_status_vlan_susp = -1;
 static int hf_vtp_vlan_type = -1;
 static int hf_vtp_vlan_name_len = -1;
@@ -71,7 +72,6 @@ static int hf_vtp_vlan_bridge_type = -1;
 static int hf_vtp_vlan_max_are_hop_count = -1;
 static int hf_vtp_vlan_max_ste_hop_count = -1;
 static int hf_vtp_vlan_backup_crf_mode = -1;
-static int hf_vtp_vlan_data = -1;
 
 static gint ett_vtp = -1;
 static gint ett_vtp_vlan_info = -1;
@@ -85,7 +85,7 @@ static int
 dissect_vlan_info(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree);
 static void
 dissect_vlan_info_tlv(tvbuff_t *tvb, packet_info *pinfo, int offset, int length,
-		      proto_tree *tree, proto_item *ti, guint8 type);
+    proto_tree *tree, proto_item *ti, guint8 type);
 
 #define SUMMARY_ADVERT		0x01
 #define SUBSET_ADVERT		0x02
@@ -103,37 +103,37 @@ static const value_string type_vals[] = {
 static void
 set_vtp_info_col(tvbuff_t *tvb, packet_info *pinfo)
 {
-	switch (tvb_get_guint8(tvb, 1)) {
+        switch (tvb_get_guint8(tvb, 1)) {
 
-	case SUMMARY_ADVERT:
-		col_add_fstr(pinfo->cinfo, COL_INFO,
-		    "Summary Advertisement, Revision: %u", tvb_get_ntohl(tvb, 36));
+        case SUMMARY_ADVERT:
+                col_add_fstr(pinfo->cinfo, COL_INFO,
+                    "Summary Advertisement, Revision: %u", tvb_get_ntohl(tvb, 36));
 
-		if (tvb_get_guint8(tvb, 2) > 0) {
-			col_append_fstr(pinfo->cinfo, COL_INFO,
-			    ", Followers: %u", tvb_get_guint8(tvb, 2));
-		}
+                if (tvb_get_guint8(tvb, 2) > 0) {
+                        col_append_fstr(pinfo->cinfo, COL_INFO,
+                            ", Followers: %u", tvb_get_guint8(tvb, 2));
+                }
 
-		break;
+                break;
 
-	case SUBSET_ADVERT:
-		col_add_fstr(pinfo->cinfo, COL_INFO,
-		    "Subset Advertisement, Revision: %u, Seq: %u",
-		    tvb_get_ntohl(tvb, 36), tvb_get_guint8(tvb, 2));
-		break;
+        case SUBSET_ADVERT:
+                col_add_fstr(pinfo->cinfo, COL_INFO,
+                    "Subset Advertisement, Revision: %u, Seq: %u",
+                    tvb_get_ntohl(tvb, 36), tvb_get_guint8(tvb, 2));
+                break;
 
-	case ADVERT_REQUEST:
-		col_set_str(pinfo->cinfo, COL_INFO, "Advertisement Request");
-		break;
+        case ADVERT_REQUEST:
+                col_set_str(pinfo->cinfo, COL_INFO, "Advertisement Request");
+                break;
 
-	case JOIN_MSG:
-		col_set_str(pinfo->cinfo, COL_INFO, "Join");
-		break;
+        case JOIN_MSG:
+                col_set_str(pinfo->cinfo, COL_INFO, "Join");
+                break;
 
-	default:
-		col_set_str(pinfo->cinfo, COL_INFO, "Unrecognized VTP message");
-		break;
-	}
+        default:
+                col_set_str(pinfo->cinfo, COL_INFO, "Unrecognized VTP message");
+                break;
+        }
 }
 
 static void
@@ -178,7 +178,7 @@ dissect_vtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		proto_tree_add_item(vtp_tree, hf_vtp_upd_id, tvb, offset, 4, ENC_BIG_ENDIAN);
 		offset += 4;
 
-		upd_timestamp = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 12, ENC_ASCII);
+		upd_timestamp = tvb_get_string(wmem_packet_scope(), tvb, offset, 12);
 		proto_tree_add_string_format_value(vtp_tree, hf_vtp_upd_ts, tvb,
 			offset, 12, (gchar*)upd_timestamp,
 			"%.2s-%.2s-%.2s %.2s:%.2s:%.2s",
@@ -240,8 +240,9 @@ dissect_vtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			2, ENC_BIG_ENDIAN);
 		offset += 2;
 
-		vtp_pruning_tree = proto_tree_add_subtree(vtp_tree, tvb, offset, -1,
-			ett_vtp_pruning, NULL, "Advertised active (i.e. not pruned) VLANs");
+		ti = proto_tree_add_text (vtp_tree, tvb, offset, -1,
+			"Advertised active (i.e. not pruned) VLANs");
+		vtp_pruning_tree = proto_item_add_subtree(ti, ett_vtp_pruning);
 
 		while (tvb_reported_length_remaining(tvb, offset) > 0) {
 			guint8 vlan_usage_bitmap;
@@ -317,8 +318,9 @@ dissect_vlan_info(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tre
 	proto_tree *tlv_tree;
 
 	vlan_info_len = tvb_get_guint8(tvb, offset);
-	vlan_info_tree = proto_tree_add_subtree(tree, tvb, offset, vlan_info_len,
-	    ett_vtp_vlan_info, NULL, "VLAN Information");
+	ti = proto_tree_add_text(tree, tvb, offset, vlan_info_len,
+	    "VLAN Information");
+	vlan_info_tree = proto_item_add_subtree(ti, ett_vtp_vlan_info);
 	vlan_info_left = vlan_info_len;
 
 	proto_tree_add_uint(vlan_info_tree, hf_vtp_vlan_info_len, tvb, offset, 1,
@@ -327,9 +329,9 @@ dissect_vlan_info(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tre
 	vlan_info_left -= 1;
 
 	status = tvb_get_guint8(tvb, offset);
-	ti = proto_tree_add_uint(vlan_info_tree, hf_vtp_vlan_status, tvb, offset, 1, status);
-	if (status & VLAN_SUSPENDED)
-	    proto_item_append_text(ti, " (VLAN suspended)");
+	ti = proto_tree_add_text(vlan_info_tree, tvb, offset, 1,
+	    "Status: 0x%02x%s", status,
+	    (status & VLAN_SUSPENDED) ? "(VLAN suspended)" : "");
 	status_tree = proto_item_add_subtree(ti, ett_vtp_vlan_status);
 	proto_tree_add_boolean(status_tree, hf_vtp_vlan_status_vlan_susp, tvb, offset, 1,
 	    status);
@@ -367,10 +369,11 @@ dissect_vlan_info(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tre
 		type = tvb_get_guint8(tvb, offset + 0);
 		length = tvb_get_guint8(tvb, offset + 1);
 
-		tlv_tree = proto_tree_add_subtree(vlan_info_tree, tvb, offset,
-		    2 + length*2, ett_vtp_tlv, &ti,
+		ti = proto_tree_add_text(vlan_info_tree, tvb, offset,
+		    2 + length*2, "%s",
 		    val_to_str(type, vlan_tlv_type_vals,
 		      "Unknown TLV type: 0x%02x"));
+		tlv_tree = proto_item_add_subtree(ti, ett_vtp_tlv);
 		proto_tree_add_item(tlv_tree, hf_vtp_vlan_tlvtype, tvb, offset, 1, ENC_BIG_ENDIAN);
 		proto_tree_add_item(tlv_tree, hf_vtp_vlan_tlvlength, tvb, offset+1, 1, ENC_BIG_ENDIAN);
 		offset += 2;
@@ -413,7 +416,7 @@ static const value_string backup_crf_mode_vals[] = {
 
 static void
 dissect_vlan_info_tlv(tvbuff_t *tvb, packet_info *pinfo, int offset, int length,
-		      proto_tree *tree, proto_item *ti, guint8 type)
+    proto_tree *tree, proto_item *ti, guint8 type)
 {
 	switch (type) {
 
@@ -498,7 +501,7 @@ dissect_vlan_info_tlv(tvbuff_t *tvb, packet_info *pinfo, int offset, int length,
 		break;
 
 	default:
-		proto_tree_add_item(tree, hf_vtp_vlan_data, tvb, offset, length, ENC_NA);
+		proto_tree_add_text(tree, tvb, offset, length, "Data");
 		break;
 	}
 }
@@ -554,10 +557,6 @@ proto_register_vtp(void)
 		{ &hf_vtp_vlan_info_len,
 		{ "VLAN Information Length",	"vtp.vlan_info.len", FT_UINT8, BASE_DEC, NULL, 0x0,
 			"Length of the VLAN information field", HFILL }},
-
-		{ &hf_vtp_vlan_status,
-		{ "Status",	"vtp.vlan_info.status", FT_UINT8, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
 
 		{ &hf_vtp_vlan_status_vlan_susp,
 		{ "VLAN suspended",	"vtp.vlan_info.status.vlan_susp", FT_BOOLEAN, 8, NULL, VLAN_SUSPENDED,
@@ -646,12 +645,7 @@ proto_register_vtp(void)
 		{ &hf_vtp_vlan_backup_crf_mode,
 		{ "Backup CRF Mode", "vtp.vlan_info.backup_crf_mode", FT_UINT16, BASE_HEX, VALS(backup_crf_mode_vals), 0x0,
 			NULL, HFILL }},
-
-		{ &hf_vtp_vlan_data,
-		{ "Data",	"vtp.vlan_info.data", FT_BYTES, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }},
-	};
-
+        };
 	static gint *ett[] = {
 		&ett_vtp,
 		&ett_vtp_vlan_info,
@@ -681,16 +675,3 @@ proto_reg_handoff_vtp(void)
 	vtp_handle = create_dissector_handle(dissect_vtp, proto_vtp);
 	dissector_add_uint("llc.cisco_pid", 0x2003, vtp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

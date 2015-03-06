@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/asn1.h>
@@ -70,7 +71,7 @@ static gint ett_ilp = -1;
 
 
 static guint
-get_ilp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_ilp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   /* PDU length = Message length */
   return tvb_get_ntohs(tvb,offset);
@@ -81,7 +82,7 @@ dissect_ilp_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
   tcp_dissect_pdus(tvb, pinfo, tree, ilp_desegment, ILP_HEADER_SIZE,
                    get_ilp_pdu_len, dissect_ILP_PDU_PDU, data);
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 void proto_reg_handoff_ilp(void);

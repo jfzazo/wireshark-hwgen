@@ -27,21 +27,26 @@
 
 #include "config.h"
 
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
-
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
 
 #include "packet-ber.h"
 #include "packet-pkcs12.h"
 #include "packet-x509af.h"
 #include "packet-x509if.h"
 #include "packet-cms.h"
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
 
 #ifdef HAVE_LIBGCRYPT
 #include <wsutil/wsgcrypt.h>
@@ -64,9 +69,6 @@ static int proto_pkcs12 = -1;
 static int hf_pkcs12_X509Certificate_PDU = -1;
 static gint ett_decrypted_pbe = -1;
 
-static expert_field ei_pkcs12_octet_string_expected = EI_INIT;
-
-
 static const char *object_identifier_id = NULL;
 static int iteration_count = 0;
 static tvbuff_t *salt = NULL;
@@ -75,7 +77,7 @@ static gboolean try_null_password = FALSE;
 
 static void dissect_AuthenticatedSafe_OCTETSTRING_PDU(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 static void dissect_SafeContents_OCTETSTRING_PDU(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
-static int dissect_PrivateKeyInfo_PDU(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data);
+static void dissect_PrivateKeyInfo_PDU(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 
 #include "packet-pkcs12-hf.c"
 
@@ -86,7 +88,7 @@ static void append_oid(proto_tree *tree, const char *oid)
 {
   	const char *name = NULL;
 
-	name = oid_resolved_from_string(wmem_packet_scope(), oid);
+	name = oid_resolved_from_string(oid);
 	proto_item_append_text(tree, " (%s)", name ? name : oid);
 }
 
@@ -110,7 +112,7 @@ generate_key_or_iv(unsigned int id, tvbuff_t *salt_tvb, unsigned int iter,
 
   cur_keylen = 0;
 
-  salt_size = tvb_captured_length(salt_tvb);
+  salt_size = tvb_length(salt_tvb);
   salt_p = (char *)tvb_memdup(wmem_packet_scope(), salt_tvb, 0, salt_size);
 
   if (pw == NULL)
@@ -311,7 +313,7 @@ int PBE_decrypt_data(const char *object_identifier_id_param, tvbuff_t *encrypted
 		  }
 	}
 
-	datalen = tvb_captured_length(encrypted_tvb);
+	datalen = tvb_length(encrypted_tvb);
 	clear_data = (char *)g_malloc(datalen);
 
 	err = gcry_cipher_decrypt (cipher, clear_data, datalen, (char *)tvb_memdup(wmem_packet_scope(), encrypted_tvb, 0, datalen), datalen);
@@ -369,7 +371,7 @@ int PBE_decrypt_data(const char *object_identifier_id_param, tvbuff_t *encrypted
 	tvb_set_free_cb(clear_tvb, g_free);
 
 	name = g_string_new("");
-	oidname = oid_resolved_from_string(wmem_packet_scope(), object_identifier_id_param);
+	oidname = oid_resolved_from_string(object_identifier_id_param);
 	g_string_printf(name, "Decrypted %s", oidname ? oidname : object_identifier_id_param);
 
 	/* add it as a new source */
@@ -420,7 +422,7 @@ static void dissect_AuthenticatedSafe_OCTETSTRING_PDU(tvbuff_t *tvb, packet_info
   if((offset = strip_octet_string(tvb)) > 0)
     dissect_pkcs12_AuthenticatedSafe(FALSE, tvb, offset, &asn1_ctx, tree, hf_pkcs12_AuthenticatedSafe_PDU);
   else
-    proto_tree_add_expert(tree, pinfo, &ei_pkcs12_octet_string_expected, tvb, 0, 1);
+    proto_tree_add_text(tree, tvb, 0, 1, "BER Error: OCTET STRING expected");
 }
 
 static void dissect_SafeContents_OCTETSTRING_PDU(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
@@ -443,7 +445,7 @@ static void dissect_X509Certificate_OCTETSTRING_PDU(tvbuff_t *tvb, packet_info *
   if((offset = strip_octet_string(tvb)) > 0)
 	dissect_x509af_Certificate(FALSE, tvb, offset, &asn1_ctx, tree, hf_pkcs12_X509Certificate_PDU);
   else
-	proto_tree_add_expert(tree, pinfo, &ei_pkcs12_octet_string_expected, tvb, 0, 1);
+	proto_tree_add_text(tree, tvb, 0, 1, "BER Error: OCTET STRING expected");
 }
 
 /*--- proto_register_pkcs12 ----------------------------------------------*/
@@ -463,12 +465,7 @@ void proto_register_pkcs12(void) {
 	  &ett_decrypted_pbe,
 #include "packet-pkcs12-ettarr.c"
   };
-  static ei_register_info ei[] = {
-      { &ei_pkcs12_octet_string_expected, { "pkcs12.octet_string_expected", PI_PROTOCOL, PI_WARN, "BER Error: OCTET STRING expected", EXPFILL }},
-  };
-
   module_t *pkcs12_module;
-  expert_module_t* expert_pkcs12;
 
   /* Register protocol */
   proto_pkcs12 = proto_register_protocol(PNAME, PSNAME, PFNAME);
@@ -476,8 +473,6 @@ void proto_register_pkcs12(void) {
   /* Register fields and subtrees */
   proto_register_field_array(proto_pkcs12, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
-  expert_pkcs12 = expert_register_protocol(proto_pkcs12);
-  expert_register_field_array(expert_pkcs12, ei, array_length(ei));
 
   /* Register preferences */
   pkcs12_module = prefs_register_protocol(proto_pkcs12, NULL);
@@ -492,7 +487,7 @@ void proto_register_pkcs12(void) {
 	"Whether to try and decrypt the encrypted data within the"
 	" PKCS#12 with a NULL password", &try_null_password);
 
-  new_register_ber_syntax_dissector("PKCS#12", proto_pkcs12, dissect_PFX_PDU);
+  register_ber_syntax_dissector("PKCS#12", proto_pkcs12, dissect_PFX_PDU);
   register_ber_oid_syntax(".p12", NULL, "PKCS#12");
   register_ber_oid_syntax(".pfx", NULL, "PKCS#12");
 }

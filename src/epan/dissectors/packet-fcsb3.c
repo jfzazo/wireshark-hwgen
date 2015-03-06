@@ -24,7 +24,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/conversation.h>
+#include <epan/etypes.h>
 #include "packet-fc.h"
 #include "packet-fcsb3.h"
 
@@ -101,7 +105,6 @@ static int hf_sbccs_dib_ctlparam_ro = -1;
 static int hf_sbccs_dib_linkctlinfo = -1;
 static int hf_sbccs_dib_linkctlinfo_ctcconn = -1;
 static int hf_sbccs_dib_linkctlinfo_ecrcg = -1;
-static int hf_sbccs_logical_path = -1;
 
 /* Initialize the subtree pointers */
 static gint ett_fc_sbccs = -1;
@@ -248,12 +251,14 @@ static const value_string fc_sbccs_dib_lrj_errcode_val[] = {
 static void
 dissect_iui_flags (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint16 flags)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item = NULL;
+    proto_tree *tree = NULL;
 
-    item=proto_tree_add_uint(parent_tree, hf_sbccs_iui,
-                                tvb, offset, 1, flags);
-    tree=proto_item_add_subtree(item, ett_sbccs_iui);
+    if (parent_tree) {
+        item=proto_tree_add_uint(parent_tree, hf_sbccs_iui,
+                                 tvb, offset, 1, flags);
+        tree=proto_item_add_subtree(item, ett_sbccs_iui);
+    }
 
     proto_tree_add_boolean(tree, hf_sbccs_iui_as, tvb, offset, 1, flags);
     if (flags & 0x10) {
@@ -275,12 +280,14 @@ dissect_iui_flags (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint16 f
 static void
 dissect_linkctlinfo (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint16 flags)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item = NULL;
+    proto_tree *tree = NULL;
 
-    item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_linkctlinfo,
-                                tvb, offset, 2, flags);
-    tree=proto_item_add_subtree(item, ett_sbccs_dib_linkctlinfo);
+    if (parent_tree) {
+        item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_linkctlinfo,
+                                 tvb, offset, 2, flags);
+        tree=proto_item_add_subtree(item, ett_sbccs_dib_linkctlinfo);
+    }
 
     proto_tree_add_boolean(tree, hf_sbccs_dib_linkctlinfo_ctcconn, tvb, offset, 2, flags);
     if (flags & 0x80) {
@@ -299,12 +306,14 @@ dissect_linkctlinfo (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint16
 static void
 dissect_dh_flags (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint16 flags)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item = NULL;
+    proto_tree *tree = NULL;
 
-    item=proto_tree_add_uint(parent_tree, hf_sbccs_dhflags,
-                                tvb, offset, 1, flags);
-    tree=proto_item_add_subtree(item, ett_sbccs_dhflags);
+    if (parent_tree) {
+        item=proto_tree_add_uint(parent_tree, hf_sbccs_dhflags,
+                                 tvb, offset, 1, flags);
+        tree=proto_item_add_subtree(item, ett_sbccs_dhflags);
+    }
 
     proto_tree_add_boolean(tree, hf_sbccs_dhflags_end, tvb, offset, 1, flags);
     if (flags & 0x80) {
@@ -335,12 +344,14 @@ dissect_dh_flags (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint16 fl
 static void
 dissect_ccw_flags (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint8 flags)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item = NULL;
+    proto_tree *tree = NULL;
 
-    item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_ccw_flags,
-                                tvb, offset, 1, flags);
-    tree=proto_item_add_subtree(item, ett_sbccs_dib_ccw_flags);
+    if (parent_tree) {
+        item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_ccw_flags,
+                                 tvb, offset, 1, flags);
+        tree=proto_item_add_subtree(item, ett_sbccs_dib_ccw_flags);
+    }
 
     proto_tree_add_boolean(tree, hf_sbccs_dib_ccw_flags_cd, tvb, offset, 1, flags);
     if (flags & 0x80) {
@@ -371,12 +382,14 @@ dissect_ccw_flags (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint8 fl
 static void
 dissect_cmd_flags (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint8 flags)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item = NULL;
+    proto_tree *tree = NULL;
 
-    item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_cmdflags,
-                                tvb, offset, 1, flags);
-    tree=proto_item_add_subtree(item, ett_sbccs_dib_cmdflags);
+    if (parent_tree) {
+        item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_cmdflags,
+                                 tvb, offset, 1, flags);
+        tree=proto_item_add_subtree(item, ett_sbccs_dib_cmdflags);
+    }
 
     proto_tree_add_boolean(tree, hf_sbccs_dib_cmdflags_du, tvb, offset, 1, flags);
     if (flags & 0x10) {
@@ -420,12 +433,15 @@ static const value_string status_ffc_val[] = {
 static void
 dissect_status_flags (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint8 flags)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item = NULL;
+    proto_tree *tree = NULL;
 
-    item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_statusflags,
-                                tvb, offset, 1, flags);
-    tree=proto_item_add_subtree(item, ett_sbccs_dib_statusflags);
+    if (parent_tree) {
+        item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_statusflags,
+                                 tvb, offset, 1, flags);
+        tree=proto_item_add_subtree(item, ett_sbccs_dib_statusflags);
+    }
+
 
     proto_tree_add_item (tree, hf_sbccs_dib_statusflags_ffc, tvb, offset, 1, ENC_BIG_ENDIAN);
     proto_item_append_text(item, "%s", val_to_str ((flags>>5) & 0x07, status_ffc_val, "Reserved:0x%x"));
@@ -461,12 +477,15 @@ dissect_status_flags (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint8
 static void
 dissect_status (packet_info *pinfo, proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint8 flags)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item = NULL;
+    proto_tree *tree = NULL;
 
-    item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_status,
-                                tvb, offset, 1, flags);
-    tree=proto_item_add_subtree(item, ett_sbccs_dib_status);
+    if (parent_tree) {
+        item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_status,
+                                 tvb, offset, 1, flags);
+        tree=proto_item_add_subtree(item, ett_sbccs_dib_status);
+    }
+
 
     proto_tree_add_boolean(tree, hf_sbccs_dib_status_attention, tvb, offset, 1, flags);
     if (flags & 0x80) {
@@ -530,12 +549,14 @@ dissect_status (packet_info *pinfo, proto_tree *parent_tree, tvbuff_t *tvb, int 
 static void
 dissect_sel_rst_param (proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint32 flags)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item = NULL;
+    proto_tree *tree = NULL;
 
-    item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_ctlparam,
-                                tvb, offset, 3, flags);
-    tree=proto_item_add_subtree(item, ett_sbccs_dib_ctlparam);
+    if (parent_tree) {
+        item=proto_tree_add_uint(parent_tree, hf_sbccs_dib_ctlparam,
+                                 tvb, offset, 3, flags);
+        tree=proto_item_add_subtree(item, ett_sbccs_dib_ctlparam);
+    }
 
     proto_tree_add_boolean(tree, hf_sbccs_dib_ctlparam_rc, tvb, offset, 3, flags);
     if (flags & 0x80) {
@@ -573,6 +594,7 @@ static void
 dissect_fc_sbccs_sb3_iu_hdr (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                              guint offset)
 {
+    proto_item *subti;
     proto_tree *sb3hdr_tree;
     proto_tree *iuhdr_tree;
     guint8      iui, dhflags;
@@ -586,16 +608,18 @@ dissect_fc_sbccs_sb3_iu_hdr (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 
     if (tree) {
         /* Dissect SB3 header first */
-        sb3hdr_tree = proto_tree_add_subtree(tree, tvb, offset, FC_SBCCS_SB3_HDR_SIZE,
-                                     ett_fc_sbccs, NULL, "SB-3 Header");
+        subti = proto_tree_add_text (tree, tvb, offset, FC_SBCCS_SB3_HDR_SIZE,
+                                     "SB-3 Header");
+        sb3hdr_tree = proto_item_add_subtree (subti, ett_fc_sbccs);
 
         proto_tree_add_item (sb3hdr_tree, hf_sbccs_chid, tvb, offset+1, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item (sb3hdr_tree, hf_sbccs_cuid, tvb, offset+3, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item (sb3hdr_tree, hf_sbccs_devaddr, tvb, offset+4, 2, ENC_BIG_ENDIAN);
 
         /* Dissect IU Header */
-        iuhdr_tree = proto_tree_add_subtree(tree, tvb, offset + FC_SBCCS_SB3_HDR_SIZE,
-                                     FC_SBCCS_IU_HDR_SIZE, ett_fc_sbccs, NULL, "IU Header");
+        subti = proto_tree_add_text (tree, tvb, offset + FC_SBCCS_SB3_HDR_SIZE,
+                                     FC_SBCCS_IU_HDR_SIZE, "IU Header");
+        iuhdr_tree = proto_item_add_subtree (subti, ett_fc_sbccs);
         offset += FC_SBCCS_SB3_HDR_SIZE;
 
         iui = tvb_get_guint8 (tvb, offset);
@@ -797,10 +821,10 @@ static void dissect_fc_sbccs_dib_link_hdr (tvbuff_t *tvb, packet_info *pinfo,
             offset += 16;
 
             while (i < link_payload_len) {
-                proto_tree_add_bytes_format(tree, hf_sbccs_logical_path, tvb, offset, 4,
-                                     NULL, "Logical Paths %d-%d: %s",
+                proto_tree_add_text (tree, tvb, offset, 4,
+                                     "Logical Paths %d-%d: %s",
                                      i*8, ((i+4)*8) - 1,
-                                     tvb_bytes_to_str_punct(wmem_packet_scope(), tvb, offset, 4, ':'));
+                                     tvb_bytes_to_ep_str_punct (tvb, offset, 4, ':'));
                 i += 4;
                 offset += 4;
             }
@@ -864,8 +888,9 @@ static void dissect_fc_sbccs (tvbuff_t *tvb, packet_info *pinfo,
         dissect_fc_sbccs_sb3_iu_hdr (tvb, pinfo, sb3_tree, offset);
         offset += (FC_SBCCS_SB3_HDR_SIZE + FC_SBCCS_IU_HDR_SIZE);
 
-        dib_tree = proto_tree_add_subtree(sb3_tree, tvb, offset,
-                                  FC_SBCCS_DIB_LRC_HDR_SIZE, ett_fc_sbccs, NULL, "DIB Header");
+        ti = proto_tree_add_text (sb3_tree, tvb, offset,
+                                  FC_SBCCS_DIB_LRC_HDR_SIZE, "DIB Header");
+        dib_tree = proto_item_add_subtree (ti, ett_fc_sbccs);
     }
     else {
         offset += (FC_SBCCS_SB3_HDR_SIZE + FC_SBCCS_IU_HDR_SIZE);
@@ -1250,11 +1275,6 @@ proto_register_fcsbccs (void)
         { &hf_sbccs_dib_linkctlinfo_ecrcg,
           { "Enhanced CRC Generation", "fcsb3.linkctlinfo.ecrcg",
             FT_BOOLEAN, 16, TFS(&tfs_supported_not_supported), 0x01,
-            NULL, HFILL}},
-
-        { &hf_sbccs_logical_path,
-          { "Logical Path", "fcsb3.logical_path",
-            FT_BYTES, SEP_COLON, NULL, 0x0,
             NULL, HFILL}},
     };
 

@@ -48,6 +48,11 @@
 
 #include "config.h"
 
+#include <assert.h>
+#include <string.h>
+#include <ctype.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
@@ -55,13 +60,11 @@
 #include <epan/expert.h>
 #include <epan/show_exception.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
+
 
 #include "packet-x11-keysymdef.h"
 #include "packet-x11.h"
-
-#ifndef HAVE_POPCOUNT
-# include "wsutil/popcount.h"
-#endif
 
 void proto_register_x11(void);
 void proto_reg_handoff_x11(void);
@@ -201,18 +204,9 @@ static gint ett_x11_configure_window_mask = -1; /* XXX - unused */
 static gint ett_x11_keyboard_value_mask = -1;   /* XXX - unused */
 static gint ett_x11_same_screen_focus = -1;
 static gint ett_x11_event = -1;
-static gint ett_x11_list_of_pixmap_format = -1;
-static gint ett_x11_pixmap_format = -1;
-static gint ett_x11_list_of_screen = -1;
-static gint ett_x11_screen = -1;
-static gint ett_x11_list_of_depth_detail = -1;
-static gint ett_x11_depth_detail = -1;
-static gint ett_x11_list_of_visualtype= -1;
-static gint ett_x11_visualtype= -1;
 
 static expert_field ei_x11_invalid_format = EI_INIT;
 static expert_field ei_x11_request_length = EI_INIT;
-static expert_field ei_x11_keycode_value_out_of_range = EI_INIT;
 
 /* desegmentation of X11 messages */
 static gboolean x11_desegment = TRUE;
@@ -954,7 +948,7 @@ static const value_string eventcode_vals[] = {
                                            list from other than the local host.
                                         */
 #define BadAlloc                11      /* insufficient resources */
-#define BadColormap             12      /* no such colormap */
+#define BadColor                12      /* no such colormap */
 #define BadGC                   13      /* parameter not a GC */
 #define BadIDChoice             14      /* choice not in range or already used */
 #define BadName                 15      /* font or color name doesn't exist */
@@ -974,7 +968,7 @@ static const value_string errorcode_vals[] = {
       { BadDrawable,           "BadDrawable" },
       { BadAccess,             "BadAccess" },
       { BadAlloc,              "BadAlloc" },
-      { BadColormap,           "BadColormap" },
+      { BadColor,              "BadColor" },
       { BadGC,                 "BadGC" },
       { BadIDChoice,           "BadIDChoice" },
       { BadName,               "BadName" },
@@ -1160,18 +1154,20 @@ static const value_string zero_is_none_vals[] = {
       tvbuff_t *next_tvb;                                             \
       unsigned char eventcode;                                        \
       const char *sent;                                               \
+      proto_item *event_ti;                                           \
       proto_tree *event_proto_tree;                                   \
       next_tvb = tvb_new_subset(tvb, offset, next_offset - offset,    \
                                 next_offset - offset);                \
       eventcode = tvb_get_guint8(next_tvb, 0);                        \
       sent = (eventcode & 0x80) ? "Sent-" : "";                       \
-      event_proto_tree = proto_tree_add_subtree_format(t, next_tvb,   \
-                               0, -1, ett_x11_event, NULL,            \
-                               "event: %d (%s)",                      \
+      event_ti = proto_tree_add_text(t, next_tvb, 0, -1,              \
+                              "event: %d (%s)",                       \
                                eventcode,                             \
                                val_to_str(eventcode & 0x7F,           \
                                           state->eventcode_vals,      \
                                           "<Unknown eventcode %u>")); \
+      event_proto_tree = proto_item_add_subtree(event_ti,             \
+                                                ett_x11_event);       \
       decode_x11_event(next_tvb, eventcode, sent, event_proto_tree,   \
                        state, byte_order);                            \
       offset = next_offset;                                           \
@@ -1188,11 +1184,9 @@ static const value_string zero_is_none_vals[] = {
 #define LISTofKEYCODE(map, name, length) { listOfKeycode(tvb, offsetp, t, hf_x11_##name, map, (length), byte_order); }
 #define LISTofKEYSYM(name, map, keycode_first, keycode_count, \
     keysyms_per_keycode) {\
-      listOfKeysyms(tvb, pinfo, offsetp, t, hf_x11_##name, hf_x11_##name##_item, map, (keycode_first), (keycode_count), (keysyms_per_keycode), byte_order); }
+      listOfKeysyms(tvb, offsetp, t, hf_x11_##name, hf_x11_##name##_item, map, (keycode_first), (keycode_count), (keysyms_per_keycode), byte_order); }
 #define LISTofPOINT(name, length) { listOfPoint(tvb, offsetp, t, hf_x11_##name, (length) / 4, byte_order); }
 #define LISTofRECTANGLE(name) { listOfRectangle(tvb, offsetp, t, hf_x11_##name, (next_offset - *offsetp) / 8, byte_order); }
-#define LISTofPIXMAPFORMAT(name, length) { listOfPixmapFormat(tvb, offsetp, t, hf_x11_##name, (length), byte_order); }
-#define LISTofSCREEN(name, length) { listOfScreen(tvb, offsetp, t, hf_x11_##name, (length), byte_order); }
 #define LISTofSEGMENT(name) { listOfSegment(tvb, offsetp, t, hf_x11_##name, (next_offset - *offsetp) / 8, byte_order); }
 #define LISTofSTRING8(name, length) { listOfString8(tvb, offsetp, t, hf_x11_##name, hf_x11_##name##_string, (length), byte_order); }
 #define LISTofTEXTITEM8(name) { listOfTextItem(tvb, offsetp, t, hf_x11_##name, FALSE, next_offset, byte_order); }
@@ -1958,7 +1952,7 @@ static void listOfKeycode(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
       }
 }
 
-static void listOfKeysyms(tvbuff_t *tvb, packet_info *pinfo, int *offsetp, proto_tree *t, int hf,
+static void listOfKeysyms(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
                           int hf_item, int *keycodemap[256],
                           int keycode_first, int keycode_count,
                           int keysyms_per_keycode, guint byte_order)
@@ -1974,14 +1968,14 @@ static void listOfKeysyms(tvbuff_t *tvb, packet_info *pinfo, int *offsetp, proto
 
       for (keycode = keycode_first; keycode_count > 0;
            ++keycode, --keycode_count) {
-            tti = proto_tree_add_none_format(tt, hf_item, tvb, *offsetp,
-                                             4 * keysyms_per_keycode, "keysyms (keycode %d):", keycode);
             if (keycode >= 256) {
-                  expert_add_info_format(pinfo, tti, &ei_x11_keycode_value_out_of_range,
+                  proto_tree_add_text(tt, tvb, *offsetp, 4 * keysyms_per_keycode,
                                       "keycode value %d is out of range", keycode);
                   *offsetp += 4 * keysyms_per_keycode;
                   continue;
             }
+            tti = proto_tree_add_none_format(tt, hf_item, tvb, *offsetp,
+                                             4 * keysyms_per_keycode, "keysyms (keycode %d):", keycode);
 
             ttt = proto_item_add_subtree(tti, ett_x11_keysym);
 
@@ -2114,145 +2108,6 @@ static void listOfSegment(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
       }
 }
 
-static void listOfVisualTypes(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
-                              int length, guint byte_order)
-{
-      proto_item *ti = proto_tree_add_item(t, hf, tvb, *offsetp, length * 24, byte_order);
-      proto_tree *tt = proto_item_add_subtree(ti, ett_x11_list_of_visualtype);
-      while(length--) {
-            proto_item *tti;
-            proto_tree *ttt;
-
-            tti = proto_tree_add_none_format(tt, hf_x11_visualtype, tvb, *offsetp, 24,
-                                             "visualtype");
-            ttt = proto_item_add_subtree(tti, ett_x11_visualtype);
-            proto_tree_add_item(ttt, hf_x11_visualtype_visualid, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            proto_tree_add_item(ttt, hf_x11_visualtype_class, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            proto_tree_add_item(ttt, hf_x11_visualtype_bits_per_rgb_value, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            proto_tree_add_item(ttt, hf_x11_visualtype_colormap_entries, tvb, *offsetp, 2, byte_order);
-            *offsetp += 2;
-            proto_tree_add_item(ttt, hf_x11_visualtype_red_mask, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            proto_tree_add_item(ttt, hf_x11_visualtype_green_mask, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            proto_tree_add_item(ttt, hf_x11_visualtype_blue_mask, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            proto_tree_add_item(ttt, hf_x11_unused, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-      }
-}
-static void listOfDepth(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
-                        int length, guint byte_order)
-{
-      guint8 number_of_visualtypes;
-      proto_item *ti;
-      proto_tree *tt;
-
-      ti = proto_tree_add_item(t, hf, tvb, *offsetp, -1, byte_order);
-      tt = proto_item_add_subtree(ti, ett_x11_list_of_depth_detail);
-      while(length--) {
-            proto_item *tti;
-            proto_tree *ttt;
-            number_of_visualtypes = VALUE16(tvb, *offsetp + 2);
-
-            tti = proto_tree_add_none_format(tt, hf_x11_depth_detail, tvb, *offsetp, 8 + 24 * number_of_visualtypes,
-                                             "depth-detail");
-            ttt = proto_item_add_subtree(tti, ett_x11_screen);
-            proto_tree_add_item(ttt, hf_x11_depth_detail_depth, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            proto_tree_add_item(ttt, hf_x11_unused, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            proto_tree_add_item(ttt, hf_x11_depth_detail_visualtypes_numbers, tvb, *offsetp, 2, byte_order);
-            *offsetp += 2;
-            proto_tree_add_item(ttt, hf_x11_unused, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            if (number_of_visualtypes > 0)
-                    listOfVisualTypes(tvb, offsetp, ttt, hf_x11_visualtype, number_of_visualtypes, byte_order);
-      }
-}
-
-static void listOfScreen(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
-                         int length, guint byte_order)
-{
-      proto_item *ti = proto_tree_add_item(t, hf, tvb, *offsetp, -1, byte_order);
-      proto_tree *tt = proto_item_add_subtree(ti, ett_x11_list_of_screen);
-      while(length--) {
-            guint8 number_of_depths, root_depth;
-            guint16 width_in_pixels, height_in_pixels;
-            guint32 screen_root;
-            proto_item *tti;
-            proto_tree *ttt;
-
-            screen_root = VALUE32(tvb, *offsetp);
-            width_in_pixels = VALUE16(tvb, *offsetp + 20);
-            height_in_pixels = VALUE16(tvb, *offsetp + 22);
-            root_depth = VALUE8(tvb, *offsetp + 38);
-            tti = proto_tree_add_none_format(tt, hf_x11_screen, tvb, *offsetp, 0,
-                                                 "screen (%08x: %d x %d x %d)", screen_root,
-                                                 width_in_pixels, height_in_pixels, root_depth);
-            ttt = proto_item_add_subtree(tti, ett_x11_screen);
-            proto_tree_add_item(ttt, hf_x11_screen_root, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            proto_tree_add_item(ttt, hf_x11_screen_default_colormap, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            proto_tree_add_item(ttt, hf_x11_screen_white_pixel, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            proto_tree_add_item(ttt, hf_x11_screen_black_pixel, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            proto_tree_add_item(ttt, hf_x11_screen_current_input_masks, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            proto_tree_add_item(ttt, hf_x11_screen_width_in_pixels, tvb, *offsetp, 2, byte_order);
-            *offsetp += 2;
-            proto_tree_add_item(ttt, hf_x11_screen_height_in_pixels, tvb, *offsetp, 2, byte_order);
-            *offsetp += 2;
-            proto_tree_add_item(ttt, hf_x11_screen_width_in_millimeters, tvb, *offsetp, 2, byte_order);
-            *offsetp += 2;
-            proto_tree_add_item(ttt, hf_x11_screen_height_in_millimeters, tvb, *offsetp, 2, byte_order);
-            *offsetp += 2;
-            proto_tree_add_item(ttt, hf_x11_screen_min_installed_maps, tvb, *offsetp, 2, byte_order);
-            *offsetp += 2;
-            proto_tree_add_item(ttt, hf_x11_screen_max_installed_maps, tvb, *offsetp, 2, byte_order);
-            *offsetp += 2;
-            proto_tree_add_item(ttt, hf_x11_screen_root_visual, tvb, *offsetp, 4, byte_order);
-            *offsetp += 4;
-            proto_tree_add_item(ttt, hf_x11_screen_backing_stores, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            proto_tree_add_item(ttt, hf_x11_screen_save_unders, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            proto_tree_add_item(ttt, hf_x11_screen_root_depth, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            number_of_depths = VALUE8(tvb, *offsetp);
-            proto_tree_add_item(ttt, hf_x11_screen_allowed_depths_len, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            listOfDepth(tvb, offsetp, ttt, hf_x11_depth_detail, number_of_depths, byte_order);
-      }
-}
-static void listOfPixmapFormat(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
-                               int length, guint byte_order)
-{
-      proto_item *ti = proto_tree_add_item(t, hf, tvb, *offsetp, length * 8, byte_order);
-      proto_tree *tt = proto_item_add_subtree(ti, ett_x11_list_of_pixmap_format);
-      while(length--) {
-            proto_item *tti;
-            proto_tree *ttt;
-
-            tti = proto_tree_add_none_format(tt, hf_x11_pixmap_format, tvb, *offsetp, 8,
-                                                 "pixmap-format");
-            ttt = proto_item_add_subtree(tti, ett_x11_pixmap_format);
-            proto_tree_add_item(ttt, hf_x11_pixmap_format_depth, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            proto_tree_add_item(ttt, hf_x11_pixmap_format_bits_per_pixel, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            proto_tree_add_item(ttt, hf_x11_pixmap_format_scanline_pad, tvb, *offsetp, 1, byte_order);
-            *offsetp += 1;
-            proto_tree_add_item(ttt, hf_x11_unused, tvb, *offsetp, 5, byte_order);
-            *offsetp += 5;
-      }
-}
-
 static void listOfString8(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
                           int hf_item, int length, guint byte_order)
 {
@@ -2275,14 +2130,17 @@ static void listOfString8(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
 
       while(length--) {
             guint l = VALUE8(tvb, *offsetp);
-            s = tvb_get_string_enc(wmem_packet_scope(), tvb, *offsetp + 1, l, ENC_ASCII);
+            s = tvb_get_string(wmem_packet_scope(), tvb, *offsetp + 1, l);
             proto_tree_add_string_format(tt, hf_item, tvb, *offsetp, l + 1, s, "\"%s\"", s);
             *offsetp += l + 1;
       }
 }
 
+#define STRING16_MAX_DISPLAYED_LENGTH 150
+
 static int stringIsActuallyAn8BitString(tvbuff_t *tvb, int offset, guint length)
 {
+      if (length > STRING16_MAX_DISPLAYED_LENGTH) length = STRING16_MAX_DISPLAYED_LENGTH;
       for(; length > 0; offset += 2, length--) {
             if (tvb_get_guint8(tvb, offset))
                   return FALSE;
@@ -2290,28 +2148,48 @@ static int stringIsActuallyAn8BitString(tvbuff_t *tvb, int offset, guint length)
       return TRUE;
 }
 
-#define UNREPL 0x00FFFD
+/* length is the length of the _byte_zone_ (that is, twice the length of the string) */
 
-/* XXX - assumes that the string encoding is ASCII; even if 0x00 through
-   0x7F are ASCII, 0x80 through 0xFF might not be, and even 0x00 through
-   0x7F aren't necessarily ASCII. */
-static char *tvb_get_ascii_string16(tvbuff_t *tvb, int offset, guint length)
+static void string16_with_buffer_preallocated(tvbuff_t *tvb, proto_tree *t,
+                                              int hf, int hf_bytes,
+                                              int offset, guint length,
+                                              char **s, guint byte_order)
 {
-      wmem_strbuf_t *str;
-      guint8 ch;
+      int truncated = FALSE;
+      guint l = length / 2;
 
-      str = wmem_strbuf_sized_new(wmem_packet_scope(), length + 1, 0);
+      if (stringIsActuallyAn8BitString(tvb, offset, l)) {
+            char *dp;
+            int soffset = offset;
 
-      while(length--) {
-            offset++;
-            ch = tvb_get_guint8(tvb, offset);
-            if (ch < 0x80)
-                  wmem_strbuf_append_c(str, ch);
-            else
-                  wmem_strbuf_append_unichar(str, UNREPL);
-            offset++;
-      }
-      return wmem_strbuf_finalize(str);
+            if (l > STRING16_MAX_DISPLAYED_LENGTH) {
+                  truncated = TRUE;
+                  l = STRING16_MAX_DISPLAYED_LENGTH;
+            }
+
+            *s = (char *)wmem_alloc(wmem_packet_scope(), l + 3);
+            dp = *s;
+            *dp++ = '"';
+            if (truncated) l -= 3;
+
+            while(l--) {
+                  soffset++;
+                  *dp++ = tvb_get_guint8(tvb, soffset);
+                  soffset++;
+            }
+            *dp++ = '"';
+
+            /* If truncated, add an ellipsis */
+            if (truncated) { *dp++ = '.'; *dp++ = '.'; *dp++ = '.'; }
+
+            *dp++ = '\0';
+            proto_tree_add_string_format_value(t, hf, tvb, offset, length,
+                                         (const gchar *)tvb_get_ptr(tvb, offset, length),
+                                         "%s",
+                                         *s);
+      } else
+            proto_tree_add_item(t, hf_bytes, tvb, offset, length, byte_order);
+
 }
 
 static void listOfTextItem(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
@@ -2349,37 +2227,22 @@ static void listOfTextItem(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
                   proto_item *tti;
                   proto_tree *ttt;
                   gint8 delta = VALUE8(tvb, *offsetp + 1);
-                  if (sizeIs16) {
-                        if (stringIsActuallyAn8BitString(tvb, *offsetp + 2, l)) {
-                              s = tvb_get_ascii_string16(tvb, *offsetp + 2, l);
-                              tti = proto_tree_add_none_format(tt, hf_x11_textitem_string, tvb, *offsetp, l*2 + 2,
-                                                               "textitem (string): delta = %d, \"%s\"",
-                                                               delta, s);
-                              ttt = proto_item_add_subtree(tti, ett_x11_text_item);
-                              proto_tree_add_item(ttt, hf_x11_textitem_string_delta, tvb, *offsetp + 1, 1, byte_order);
-                              proto_tree_add_string_format_value(ttt, hf_x11_textitem_string_string16, tvb,
-                                                                 *offsetp + 2, l, s, "\"%s\"", s);
-                        } else {
-                              tti = proto_tree_add_none_format(tt, hf_x11_textitem_string, tvb, *offsetp, l*2 + 2,
-                                                               "textitem (string): delta = %d, %s",
-                                                               delta,
-                                                               tvb_bytes_to_str(wmem_packet_scope(), tvb, *offsetp + 2, l*2));
-                              ttt = proto_item_add_subtree(tti, ett_x11_text_item);
-                              proto_tree_add_item(ttt, hf_x11_textitem_string_delta, tvb, *offsetp + 1, 1, byte_order);
-                              proto_tree_add_item(ttt, hf_x11_textitem_string_string16_bytes, tvb, *offsetp + 2, l*2, byte_order);
-                        }
-                        *offsetp += l*2 + 2;
-                  } else {
-                        s = tvb_get_string_enc(wmem_packet_scope(), tvb, *offsetp + 2, l, ENC_ASCII);
-                        tti = proto_tree_add_none_format(tt, hf_x11_textitem_string, tvb, *offsetp, l + 2,
-                                                         "textitem (string): delta = %d, \"%s\"",
-                                                         delta, s);
-                        ttt = proto_item_add_subtree(tti, ett_x11_text_item);
-                        proto_tree_add_item(ttt, hf_x11_textitem_string_delta, tvb, *offsetp + 1, 1, byte_order);
+                  if (sizeIs16) l += l;
+                  s = tvb_get_string(wmem_packet_scope(), tvb, *offsetp + 2, l);
+                  tti = proto_tree_add_none_format(tt, hf_x11_textitem_string, tvb, *offsetp, l + 2,
+                                                       "textitem (string): delta = %d, \"%s\"",
+                                                       delta, s);
+                  ttt = proto_item_add_subtree(tti, ett_x11_text_item);
+                  proto_tree_add_item(ttt, hf_x11_textitem_string_delta, tvb, *offsetp + 1, 1, byte_order);
+                  if (sizeIs16)
+                        string16_with_buffer_preallocated(tvb, ttt, hf_x11_textitem_string_string16,
+                                                          hf_x11_textitem_string_string16_bytes,
+                                                          *offsetp + 2, l,
+                                                          &s, byte_order);
+                  else
                         proto_tree_add_string_format(ttt, hf_x11_textitem_string_string8, tvb,
                                                      *offsetp + 2, l, s, "\"%s\"", s);
-                        *offsetp += l + 2;
-                  }
+                  *offsetp += l + 2;
             }
       }
 }
@@ -2639,21 +2502,18 @@ static void string8(tvbuff_t *tvb, int *offsetp, proto_tree *t,
       *offsetp += length;
 }
 
-/* The length supplied is the length of the string in CHAR2Bs (half the number of bytes) */
+/* The length is the length of the _byte_zone_ (twice the length of the string) */
 
 static void string16(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
     int hf_bytes, guint length, guint byte_order)
 {
-      guint l = length*2; /* byte count */
-      char *s;
+      char *s = NULL;
 
-      if (stringIsActuallyAn8BitString(tvb, *offsetp, length)) {
-            s = tvb_get_ascii_string16(tvb, *offsetp, length);
-            proto_tree_add_string_format_value(t, hf, tvb, *offsetp, l, s, "\"%s\"", s);
-      } else
-            proto_tree_add_item(t, hf_bytes, tvb, *offsetp, l, byte_order);
+      length += length;
+      string16_with_buffer_preallocated(tvb, t, hf, hf_bytes, *offsetp, length,
+                                        &s, byte_order);
 
-      *offsetp += l;
+      *offsetp += length;
 }
 
 static void timestamp(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
@@ -3122,9 +2982,6 @@ static void dissect_x11_initial_reply(tvbuff_t *tvb, packet_info *pinfo,
       unsigned char success;
       int length_of_vendor;
       int length_of_reason;
-      int number_of_formats_in_pixmap_formats;
-      int number_of_screens_in_roots;
-      int unused;
       proto_item *ti;
       proto_tree *t;
 
@@ -3152,8 +3009,8 @@ static void dissect_x11_initial_reply(tvbuff_t *tvb, packet_info *pinfo,
             INT32(motion_buffer_size);
             length_of_vendor = INT16(length_of_vendor);
             INT16(maximum_request_length);
-            number_of_screens_in_roots = INT8(number_of_screens_in_roots);
-            number_of_formats_in_pixmap_formats = INT8(number_of_formats_in_pixmap_formats);
+            INT8(number_of_screens_in_roots);
+            INT8(number_of_formats_in_pixmap_formats);
             INT8(image_byte_order);
             INT8(bitmap_format_bit_order);
             INT8(bitmap_format_scanline_unit);
@@ -3162,11 +3019,6 @@ static void dissect_x11_initial_reply(tvbuff_t *tvb, packet_info *pinfo,
             INT8(max_keycode);
             UNUSED(4);
             STRING8(vendor, length_of_vendor);
-            unused = (4 - (length_of_vendor % 4)) % 4;
-            if (unused > 0)
-                UNUSED(unused);
-            LISTofPIXMAPFORMAT(pixmap_format, number_of_formats_in_pixmap_formats);
-            LISTofSCREEN(screen, number_of_screens_in_roots);
       } else {
             STRING8(reason, length_of_reason);
       }
@@ -3203,6 +3055,21 @@ static void set_handler(const char *name, void (*func)(tvbuff_t *tvb, packet_inf
       if (genevent_info)
           g_hash_table_insert(genevent_table, (gpointer)name, (gpointer)genevent_info);
       g_hash_table_insert(reply_table, (gpointer)name, (gpointer)reply_info);
+}
+
+static int popcount(unsigned int mask)
+{
+#if (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4))
+      /* GCC 3.4 or newer */
+      return __builtin_popcount(mask);
+#else
+      /* HACKMEM 169 */
+      unsigned long y;
+
+      y = (mask >> 1) &033333333333;
+      y = mask - y - ((y >>1) & 033333333333);
+      return (((y + (y >> 3)) & 030707070707) % 077);
+#endif
 }
 
 #include "x11-extension-errors.h"
@@ -3398,7 +3265,7 @@ static void dissect_x11_request(tvbuff_t *tvb, packet_info *pinfo,
                   /* necessary processing even if tree == NULL */
 
                   v16 = VALUE16(tvb, 4);
-                  name = tvb_get_string_enc(wmem_file_scope(), tvb, 8, v16, ENC_ASCII);
+                  name = tvb_get_string(wmem_file_scope(), tvb, 8, v16);
 
                   /* store string of extension, opcode will be set at reply */
                   i = 0;
@@ -4494,6 +4361,7 @@ static void dissect_x11_requests(tvbuff_t *tvb, packet_info *pinfo,
       guint8 opcode;
       volatile int plen;
       proto_item *ti;
+      proto_tree *t;
       volatile gboolean is_initial_creq;
       guint16 auth_proto_len, auth_data_len;
       const char *volatile sep = NULL;
@@ -4567,8 +4435,11 @@ static void dissect_x11_requests(tvbuff_t *tvb, packet_info *pinfo,
                    * helped.
                    * Give up.
                    */
-                  ti = proto_tree_add_item(tree, proto_x11, tvb, offset, -1, ENC_NA);
-                  expert_add_info_format(pinfo, ti, &ei_x11_request_length, "Bogus request length (0)");
+                  ti = proto_tree_add_item(tree, proto_x11, tvb, offset, -1,
+                  ENC_NA);
+                  t = proto_item_add_subtree(ti, ett_x11);
+                  proto_tree_add_text(t, tvb, offset, -1,
+                      "Bogus request length (0)");
                   return;
             }
 
@@ -5741,16 +5612,6 @@ dissect_x11_error(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             case BadValue:
                   CARD32(error_badvalue);
                   break;
-            case BadWindow:
-            case BadPixmap:
-            case BadCursor:
-            case BadFont:
-            case BadDrawable:
-            case BadColormap:
-            case BadGC:
-            case BadIDChoice:
-                  CARD32(error_badresourceid);
-                  break;
 
             default:
                   UNDECODED(4);
@@ -5825,20 +5686,11 @@ void proto_register_x11(void)
             &ett_x11_keyboard_value_mask,
             &ett_x11_same_screen_focus,
             &ett_x11_event,
-            &ett_x11_list_of_pixmap_format,
-            &ett_x11_pixmap_format,
-            &ett_x11_list_of_screen,
-            &ett_x11_screen,
-            &ett_x11_list_of_depth_detail,
-            &ett_x11_depth_detail,
-            &ett_x11_list_of_visualtype,
-            &ett_x11_visualtype,
       };
 
       static ei_register_info ei[] = {
             { &ei_x11_invalid_format, { "x11.invalid_format", PI_PROTOCOL, PI_WARN, "Invalid Format", EXPFILL }},
             { &ei_x11_request_length, { "x11.request-length.invalid", PI_PROTOCOL, PI_WARN, "Invalid Length", EXPFILL }},
-            { &ei_x11_keycode_value_out_of_range, { "x11.keycode_value_out_of_range", PI_PROTOCOL, PI_WARN, "keycode value is out of range", EXPFILL }},
       };
 
       module_t *x11_module;

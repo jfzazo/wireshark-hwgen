@@ -39,11 +39,14 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/addr_resolv.h>
 #include <epan/prefs.h>
 #include <epan/afn.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
 #include <epan/show_exception.h>
 
@@ -304,11 +307,6 @@ static int hf_ldp_tlv_must_be_zero = -1;
 static int hf_ldp_tlv_tunnel_id = -1;
 static int hf_ldp_tlv_ext_tunnel_id = -1;
 static int hf_ldp_tlv_inv_length = -1;
-static int hf_ldp_returned_pdu_data = -1;
-static int hf_ldp_returned_message_parameters = -1;
-static int hf_ldp_data = -1;
-static int hf_ldp_unknown_data = -1;
-
 
 static int ett_ldp = -1;
 static int ett_ldp_header = -1;
@@ -575,19 +573,19 @@ static const value_string tlv_unknown_vals[] = {
 #define VC_FEC          0x80    /* draft-martini-l2circuit-trans-mpls */
 #define GEN_FEC         0x81
 #define P2MP_FEC        0x06
-#define MP2MP_FEC_UP    0x07
-#define MP2MP_FEC_DOWN  0x08
+#define MP2MP_FEC_UP	0x07
+#define MP2MP_FEC_DOWN	0x08
 
 const value_string fec_types_vals[] = {
-  {WILDCARD_FEC,        "Wildcard FEC"},
-  {PREFIX_FEC,          "Prefix FEC"},
-  {HOST_FEC,            "Host Address FEC"},
-  {CRLSP_FEC,           "CR LSP FEC"},
-  {VC_FEC,              "Virtual Circuit FEC"},
-  {GEN_FEC,             "Generalized PWid FEC"},
-  {P2MP_FEC,            "P2MP FEC"},
-  {MP2MP_FEC_UP,        "MP2MP FEC upstream"},
-  {MP2MP_FEC_DOWN,      "MP2MP FEC Downstream"},
+  {WILDCARD_FEC, 	"Wildcard FEC"},
+  {PREFIX_FEC,   	"Prefix FEC"},
+  {HOST_FEC,     	"Host Address FEC"},
+  {CRLSP_FEC,    	"CR LSP FEC"},
+  {VC_FEC,       	"Virtual Circuit FEC"},
+  {GEN_FEC,      	"Generalized PWid FEC"},
+  {P2MP_FEC,     	"P2MP FEC"},
+  {MP2MP_FEC_UP, 	"MP2MP FEC upstream"},
+  {MP2MP_FEC_DOWN,	"MP2MP FEC Downstream"},
   {0, NULL}
 };
 
@@ -897,6 +895,18 @@ static const true_false_string tlv_upstr_sbit_vals = {
 #define PW_PSN_PW_INGRESS_RECV_FAULT    0x8
 #define PW_PSN_PW_EGRESS_TRANS_FAULT    0x10
 
+/* Define storage class for a string handler function
+ * with a const guint8 * argument, and returning a const gchar *
+ */
+typedef const gchar *(string_handler_func)(const guint8 *);
+
+/* Default handler for address to string conversion */
+static const gchar *
+default_str_handler(const guint8 * bytes _U_)
+{
+    return "<Support for this Address Family not implemented>";
+}
+
 static void
 dissect_subtlv_interface_parameters(tvbuff_t *tvb, guint offset, proto_tree *tree, int rem, int *interface_parameters_hf[]);
 
@@ -956,19 +966,19 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
     guint16     op_length = tvb_get_bits16(tvb, ((offset+8)*8), 16, ENC_BIG_ENDIAN);
     guint8      addr_size=0, *addr, implemented, prefix_len_octets, prefix_len, host_len, vc_len;
     guint8      intparam_len, aai_type = 0;
+    string_handler_func *str_handler = default_str_handler;
     const char *str;
     guint8 gen_fec_id_len = 0;
-    address_type addr_type;
-    address      addr_str;
 
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "FEC Elements");
+    ti=proto_tree_add_text(tree, tvb, offset, rem, "FEC Elements");
+    val_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     while (rem > 0){
         switch (tvb_get_guint8(tvb, offset)) {
         case WILDCARD_FEC:
         case CRLSP_FEC:
-            fec_tree = proto_tree_add_subtree_format(val_tree, tvb, offset, 1,
-                                        ett_ldp_fec, NULL, "FEC Element %u", ix);
+            ti = proto_tree_add_text(val_tree, tvb, offset, 1, "FEC Element %u", ix);
+            fec_tree = proto_item_add_subtree(ti, ett_ldp_fec);
             proto_tree_add_item(fec_tree, hf_ldp_tlv_fec_wc,tvb, offset, 1, ENC_BIG_ENDIAN);
             rem -= 1;
             offset += 1;
@@ -987,11 +997,11 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             switch(family) {
             case AFNUM_INET: /*IPv4*/
                 addr_size=4;
-                addr_type = AT_IPv4;
+                str_handler=ip_to_str;
                 break;
             case AFNUM_INET6: /*IPv6*/
                 addr_size=16;
-                addr_type = AT_IPv6;
+                str_handler = (string_handler_func *) ip6_to_str;
                 break;
             default:
                 implemented=0;
@@ -1014,8 +1024,8 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             }
 
             /*Add a subtree for this*/
-            fec_tree = proto_tree_add_subtree_format(val_tree, tvb, offset, 4+MIN(addr_size, prefix_len_octets),
-                                            ett_ldp_fec, NULL, "FEC Element %u", ix);
+            ti = proto_tree_add_text(val_tree, tvb, offset, 4+MIN(addr_size, prefix_len_octets), "FEC Element %u", ix);
+            fec_tree = proto_item_add_subtree(ti, ett_ldp_fec);
             proto_tree_add_item(fec_tree, hf_ldp_tlv_fec_wc, tvb, offset, 1, ENC_BIG_ENDIAN);
             offset += 1;
 
@@ -1042,8 +1052,7 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             if ( prefix_len % 8 )
                 addr[ax-1] = addr[ax-1]&(0xFF<<(8-prefix_len%8));
 
-            SET_ADDRESS(&addr_str, addr_type, addr_size, addr);
-            str = address_to_str(wmem_packet_scope(), &addr_str);
+            str = str_handler((const guint8 *)addr);
             proto_tree_add_string_format(fec_tree, hf_ldp_tlv_fec_pfval, tvb, offset, prefix_len_octets,
                                          str, "Prefix: %s", str);
 
@@ -1063,11 +1072,11 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             switch(family) {
             case AFNUM_INET: /*IPv4*/
                 addr_size=4;
-                addr_type = AT_IPv4;
+                str_handler=ip_to_str;
                 break;
             case AFNUM_INET6: /*IPv6*/
                 addr_size=16;
-                addr_type = AT_IPv6;
+                str_handler = (string_handler_func *) ip6_to_str;
                 break;
             default:
                 implemented=0;
@@ -1090,7 +1099,8 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             }
 
             /*Add a subtree for this*/
-            fec_tree = proto_tree_add_subtree_format(val_tree, tvb, offset, 4+addr_size, ett_ldp_fec, NULL, "FEC Element %u", ix);
+            ti = proto_tree_add_text(val_tree, tvb, offset, 4+addr_size, "FEC Element %u", ix);
+            fec_tree = proto_item_add_subtree(ti, ett_ldp_fec);
             proto_tree_add_item(fec_tree, hf_ldp_tlv_fec_wc, tvb, offset, 1, ENC_BIG_ENDIAN);
             offset += 1;
 
@@ -1115,8 +1125,7 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             for(ax=0; ax+1 <= host_len; ax++)
                 addr[ax]=tvb_get_guint8(tvb, offset+ax);
 
-            SET_ADDRESS(&addr_str, addr_type, addr_size, addr);
-            str = address_to_str(wmem_packet_scope(), &addr_str);
+            str = str_handler((const guint8 *)addr);
             proto_tree_add_string_format(fec_tree, hf_ldp_tlv_fec_hoval, tvb, offset, host_len,
                                          str, "Address: %s", str);
 
@@ -1132,7 +1141,8 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             vc_len = tvb_get_guint8 (tvb, offset+3);
 
 
-            fec_tree = proto_tree_add_subtree_format(val_tree, tvb, offset, 8+vc_len, ett_ldp_fec, &ti, "FEC Element %u", ix);
+            ti = proto_tree_add_text(val_tree, tvb, offset, 8+vc_len, "FEC Element %u", ix);
+            fec_tree = proto_item_add_subtree(ti, ett_ldp_fec);
             proto_tree_add_item(fec_tree, hf_ldp_tlv_fec_wc, tvb, offset, 1, ENC_BIG_ENDIAN);
             proto_tree_add_item(fec_tree, hf_ldp_tlv_fec_vc_controlword, tvb, offset+1, 1, ENC_BIG_ENDIAN);
             proto_tree_add_item(fec_tree, hf_ldp_tlv_fec_vc_vctype, tvb, offset+1, 2, ENC_BIG_ENDIAN);
@@ -1181,7 +1191,8 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             vc_len = tvb_get_guint8 (tvb, offset+3);
 
             /* Add the FEC to the tree */
-            fec_tree = proto_tree_add_subtree_format(val_tree, tvb, offset, 8+vc_len, ett_ldp_fec, NULL, "FEC Element %u", ix);
+            ti = proto_tree_add_text(val_tree, tvb, offset, 8+vc_len, "FEC Element %u", ix);
+            fec_tree = proto_item_add_subtree(ti, ett_ldp_fec);
             proto_tree_add_item(fec_tree, hf_ldp_tlv_fec_wc, tvb, offset, 1, ENC_BIG_ENDIAN);
             proto_tree_add_item(fec_tree, hf_ldp_tlv_fec_vc_controlword, tvb, offset+1, 1, ENC_BIG_ENDIAN);
             proto_tree_add_item(fec_tree, hf_ldp_tlv_fec_vc_vctype, tvb, offset+1, 2, ENC_BIG_ENDIAN);
@@ -1192,7 +1203,8 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             if ( (vc_len > 1) && ( rem > 1 ) ) { /* there is enough room for AGI */
                 gen_fec_id_len = tvb_get_guint8 (tvb, offset+1);
                 /* Add AGI to the tree */
-                agi_tree = proto_tree_add_subtree_format(fec_tree, tvb, offset, 2 + gen_fec_id_len, ett_ldp_gen_agi, NULL, "AGI");
+                ti = proto_tree_add_text(fec_tree, tvb, offset, 2 + gen_fec_id_len, "AGI");
+                agi_tree = proto_item_add_subtree(ti, ett_ldp_gen_agi);
                 proto_tree_add_item(agi_tree, hf_ldp_tlv_fec_gen_agi_type,tvb, offset, 1, ENC_BIG_ENDIAN);
                 proto_tree_add_item(agi_tree, hf_ldp_tlv_fec_gen_agi_length,tvb, offset + 1, 1, ENC_BIG_ENDIAN);
                 if ( gen_fec_id_len > 0)
@@ -1219,7 +1231,8 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
                 }
                 else
                 {
-                    saii_tree = proto_tree_add_subtree(fec_tree, tvb, offset, 2 + gen_fec_id_len, ett_ldp_gen_saii, NULL, "SAII");
+                    ti = proto_tree_add_text(fec_tree, tvb, offset, 2 + gen_fec_id_len, "SAII");
+                    saii_tree = proto_item_add_subtree(ti, ett_ldp_gen_saii);
                     proto_tree_add_item(saii_tree, hf_ldp_tlv_fec_gen_saii_type,tvb, offset, 1, ENC_BIG_ENDIAN);
                     proto_tree_add_item(saii_tree, hf_ldp_tlv_fec_gen_saii_length,tvb, offset + 1, 1, ENC_BIG_ENDIAN);
                     if ( gen_fec_id_len > 0)
@@ -1274,7 +1287,8 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
                 }
                 else
                 {
-                    taii_tree = proto_tree_add_subtree(fec_tree, tvb, offset, 2 + gen_fec_id_len, ett_ldp_gen_taii, NULL, "TAII");
+                    ti = proto_tree_add_text(fec_tree, tvb, offset, 2 + gen_fec_id_len, "TAII");
+                    taii_tree = proto_item_add_subtree(ti, ett_ldp_gen_taii);
                     proto_tree_add_item(taii_tree, hf_ldp_tlv_fec_gen_taii_type,tvb, offset, 1, ENC_BIG_ENDIAN);
                     proto_tree_add_item(taii_tree, hf_ldp_tlv_fec_gen_taii_length,tvb, offset + 1, 1, ENC_BIG_ENDIAN);
                     if ( gen_fec_id_len > 0)
@@ -1317,16 +1331,15 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             break;
         }
         case P2MP_FEC:
-        {
-            if (rem < 4 ){/*not enough*/
-                proto_item* inv_length;
-                inv_length = proto_tree_add_item(val_tree, hf_ldp_tlv_inv_length, tvb, offset, rem, ENC_BIG_ENDIAN);
+        {   if (rem < 4 ){/*not enough*/
+		proto_item* inv_length;
+		inv_length = proto_tree_add_item(val_tree, hf_ldp_tlv_inv_length, tvb, offset, rem, ENC_BIG_ENDIAN);
                 expert_add_info(pinfo, inv_length, &ei_ldp_inv_length);
                 return;
             }
 
-            fec_tree = proto_tree_add_subtree_format(val_tree, tvb, offset, 4+tvb_get_guint8 (tvb, offset+1),
-                                                            ett_ldp_fec, NULL, "FEC Element %u", ix);
+            ti = proto_tree_add_text(val_tree, tvb, offset, 4+tvb_get_guint8 (tvb, offset+1), "FEC Element %u", ix);
+            fec_tree = proto_item_add_subtree(ti, ett_ldp_fec);
             proto_tree_add_item(fec_tree, hf_ldp_tlv_fec_wc, tvb, offset, 1, ENC_BIG_ENDIAN);
             offset += 1;
 
@@ -1348,7 +1361,8 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
             /* XXX - do all FEC's have a length that's a multiple of 4? */
             /* Hmmm, don't think so. Will check. RJS. */
             /* If we don't know its structure, we have to exit */
-            fec_tree = proto_tree_add_subtree_format(val_tree, tvb, offset, 4, ett_ldp_fec, NULL, "FEC Element %u", ix);
+            ti = proto_tree_add_text(val_tree, tvb, offset, 4, "FEC Element %u", ix);
+            fec_tree = proto_item_add_subtree(ti, ett_ldp_fec);
             proto_tree_add_expert(fec_tree, pinfo, &ei_ldp_tlv_fec_type, tvb, offset, rem);
             return;
         }
@@ -1361,12 +1375,11 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
 static void
 dissect_tlv_address_list(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
     guint16     family, ix;
     guint8      addr_size, *addr;
+    string_handler_func *str_handler = default_str_handler;
     const char *str;
-    address_type addr_type;
-    address      addr_str;
 
     if ( rem < 2 ) {
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem,
@@ -1381,11 +1394,11 @@ dissect_tlv_address_list(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_
     switch(family) {
     case AFNUM_INET: /*IPv4*/
         addr_size=4;
-        addr_type = AT_IPv4;
+        str_handler=ip_to_str;
         break;
     case AFNUM_INET6: /*IPv6*/
         addr_size=16;
-        addr_type = AT_IPv6;
+        str_handler = (string_handler_func *) ip6_to_str;
         break;
     default:
         proto_tree_add_expert(tree, pinfo, &ei_ldp_address_family_not_implemented, tvb, offset+2, rem-2);
@@ -1393,7 +1406,8 @@ dissect_tlv_address_list(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_
     }
 
     offset+=2; rem-=2;
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Addresses");
+    ti=proto_tree_add_text(tree, tvb, offset, rem, "Addresses");
+    val_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     addr=(guint8 *)wmem_alloc(wmem_packet_scope(), addr_size);
 
@@ -1403,8 +1417,7 @@ dissect_tlv_address_list(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_
              == NULL)
             break;
 
-        SET_ADDRESS(&addr_str, addr_type, addr_size, addr);
-        str = address_to_str(wmem_packet_scope(), &addr_str);
+        str = str_handler((const guint8 *)addr);
         proto_tree_add_string_format(val_tree,
                                      hf_ldp_tlv_addrl_addr, tvb, offset, addr_size, str,
                                      "Address %u: %s", ix, str);
@@ -1418,18 +1431,19 @@ dissect_tlv_address_list(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_
 static void
 dissect_tlv_path_vector(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
     guint8      ix;
     guint32 addr;
 
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "LSR IDs");
+    ti=proto_tree_add_text(tree, tvb, offset, rem, "LSR IDs");
+    val_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     for(ix=1; rem >= 4; ix++, offset += 4, rem -= 4) {
         addr = tvb_get_ipv4(tvb, offset);
         proto_tree_add_ipv4_format(val_tree,
                                    hf_ldp_tlv_pv_lsrid, tvb, offset, 4,
                                    addr, "LSR Id %u: %s", ix,
-                                   tvb_ip_to_str(tvb, offset));
+                                   ip_to_str((guint8 *)&addr));
     }
     if (rem)
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem, "Error processing TLV: Extra data at end of path vector");
@@ -1440,13 +1454,14 @@ dissect_tlv_path_vector(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_t
 static void
 dissect_tlv_atm_label(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if (rem != 4){
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem, "Error processing ATM Label TLV: length is %d, should be 4", rem);
         return;
     }
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "ATM Label");
+    ti=proto_tree_add_text(tree, tvb, offset, rem, "ATM Label");
+    val_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     proto_tree_add_item(val_tree, hf_ldp_tlv_atm_label_vbits, tvb, offset, 1, ENC_BIG_ENDIAN);
 
@@ -1460,7 +1475,7 @@ dissect_tlv_atm_label(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
 static void
 dissect_tlv_frame_label(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
     guint8      len;
 
     if (rem != 4){
@@ -1469,7 +1484,8 @@ dissect_tlv_frame_label(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_t
                             rem);
         return;
     }
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Frame Relay Label");
+    ti=proto_tree_add_text(tree, tvb, offset, rem, "Frame Relay Label");
+    val_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     len=(guint8)(tvb_get_ntohs(tvb, offset)>>7) & 0x03;
     proto_tree_add_uint_format_value(val_tree, hf_ldp_tlv_fr_label_len, tvb, offset, 2, len,
@@ -1484,7 +1500,7 @@ dissect_tlv_frame_label(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_t
 static void
 dissect_tlv_status(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
     guint32     data;
 
     if (rem != 10){
@@ -1494,7 +1510,8 @@ dissect_tlv_status(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *
         return;
     }
 
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Status");
+    ti=proto_tree_add_text(tree, tvb, offset, rem, "Status");
+    val_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     proto_tree_add_item(val_tree, hf_ldp_tlv_status_ebit, tvb, offset, 1, ENC_BIG_ENDIAN);
     proto_tree_add_item(val_tree, hf_ldp_tlv_status_fbit, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -1512,7 +1529,7 @@ dissect_tlv_status(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *
 static void
 dissect_tlv_returned_pdu(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if (rem < 10){
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem,
@@ -1520,7 +1537,8 @@ dissect_tlv_returned_pdu(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_
                             rem);
         return;
     }
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Returned PDU");
+    ti=proto_tree_add_text(tree, tvb, offset, rem, "Returned PDU");
+    val_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     proto_tree_add_item(val_tree, hf_ldp_tlv_returned_version, tvb, offset, 2, ENC_BIG_ENDIAN);
     proto_tree_add_item(val_tree, hf_ldp_tlv_returned_pdu_len, tvb, offset+2, 2, ENC_BIG_ENDIAN);
@@ -1531,7 +1549,7 @@ dissect_tlv_returned_pdu(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_
 
     if ( rem > 0 ) {
         /*XXX - dissect returned pdu data*/
-        proto_tree_add_item(val_tree, hf_ldp_returned_pdu_data, tvb, offset, rem, ENC_NA);
+        proto_tree_add_text(val_tree, tvb, offset, rem, "Returned PDU Data");
     }
 }
 
@@ -1540,7 +1558,7 @@ dissect_tlv_returned_pdu(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_
 static void
 dissect_tlv_returned_message(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
     guint16     type;
 
     if (rem < 4) {
@@ -1549,7 +1567,8 @@ dissect_tlv_returned_message(tvbuff_t *tvb, packet_info *pinfo, guint offset, pr
                             rem);
         return;
     }
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Returned Message");
+    ti=proto_tree_add_text(tree, tvb, offset, rem, "Returned Message");
+    val_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     proto_tree_add_item(val_tree, hf_ldp_tlv_returned_msg_ubit, tvb, offset, 1, ENC_BIG_ENDIAN);
 
@@ -1579,7 +1598,7 @@ dissect_tlv_returned_message(tvbuff_t *tvb, packet_info *pinfo, guint offset, pr
 
     if ( rem > 0 ) {
         /*XXX - dissect returned msg parameters*/
-        proto_tree_add_item(val_tree, hf_ldp_returned_message_parameters, tvb, offset, rem, ENC_NA);
+        proto_tree_add_text(val_tree, tvb, offset, rem, "Returned Message Parameters");
     }
 }
 
@@ -1633,10 +1652,11 @@ dissect_tlv_common_hello_parms(tvbuff_t *tvb, packet_info *pinfo, guint offset, 
 static void
 dissect_tlv_mac(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree   *val_tree;
+    proto_tree   *ti, *val_tree;
     guint8        ix;
 
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "MAC addresses");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "MAC addresses");
+    val_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     for(ix=1; rem >= 6; ix++, offset += 6, rem -= 6) {
         proto_tree_add_item(val_tree, hf_ldp_tlv_mac, tvb, offset, 6, ENC_NA);
@@ -1652,13 +1672,14 @@ dissect_tlv_mac(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tre
 static void
 dissect_tlv_common_session_parms(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if ( rem != 14) { /*length of Comm Sess Parms tlv*/
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem, "Error processing Common Session Parameters TLV: length is %d, should be 14", rem);
         return;
     }
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Parameters");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "Parameters");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     /*Protocol Version*/
     proto_tree_add_item(val_tree, hf_ldp_tlv_sess_ver, tvb,offset, 2, ENC_BIG_ENDIAN);
@@ -1690,7 +1711,7 @@ dissect_tlv_common_session_parms(tvbuff_t *tvb, packet_info *pinfo, guint offset
 static void
 dissect_tlv_atm_session_parms(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree, *lbl_tree;
+    proto_tree *ti, *val_tree, *lbl_tree;
     guint8      numlr, ix;
 
     if (rem < 4) {
@@ -1700,7 +1721,8 @@ dissect_tlv_atm_session_parms(tvbuff_t *tvb, packet_info *pinfo, guint offset, p
         return;
     }
 
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "ATM Parameters");
+    ti = proto_tree_add_text(tree, tvb, offset, rem,"ATM Parameters");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     proto_tree_add_item(val_tree, hf_ldp_tlv_sess_atm_merge,tvb, offset, 1, ENC_BIG_ENDIAN);
 
@@ -1715,12 +1737,17 @@ dissect_tlv_atm_session_parms(tvbuff_t *tvb, packet_info *pinfo, guint offset, p
     /*move into range components*/
     offset += 4;
     rem    -= 4;
-    val_tree=proto_tree_add_subtree(val_tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "ATM Label Range Components");
+    ti = proto_tree_add_text(val_tree, tvb, offset, rem,"ATM Label Range Components");
 
+    if (numlr) {
+        val_tree=proto_item_add_subtree(ti,ett_ldp_tlv_val);
+        if ( ! val_tree ) return;
+    }
     /*now dissect ranges*/
     for(ix=1; numlr > 0 && rem >= 8; ix++, rem-=8, numlr--) {
-        lbl_tree=proto_tree_add_subtree_format(val_tree, tvb, offset, 8,
-                               ett_ldp_tlv_val, NULL, "ATM Label Range Component %u", ix);
+        ti=proto_tree_add_text(val_tree, tvb, offset, 8,
+                               "ATM Label Range Component %u", ix);
+        lbl_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
         proto_tree_add_item(lbl_tree,
                                    hf_ldp_tlv_sess_atm_minvpi,
@@ -1749,7 +1776,7 @@ dissect_tlv_atm_session_parms(tvbuff_t *tvb, packet_info *pinfo, guint offset, p
 static void
 dissect_tlv_frame_relay_session_parms(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree, *lbl_tree;
+    proto_tree *ti, *val_tree, *lbl_tree;
     guint8      numlr, ix, len;
 
     if(rem < 4) {
@@ -1759,7 +1786,8 @@ dissect_tlv_frame_relay_session_parms(tvbuff_t *tvb, packet_info *pinfo, guint o
         return;
     }
 
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Frame Relay Parameters");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "Frame Relay Parameters");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     proto_tree_add_item(val_tree, hf_ldp_tlv_sess_fr_merge,
                         tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -1776,13 +1804,20 @@ dissect_tlv_frame_relay_session_parms(tvbuff_t *tvb, packet_info *pinfo, guint o
     /*move into range components*/
     offset += 4;
     rem    -= 4;
-    val_tree=proto_tree_add_subtree(val_tree, tvb, offset, rem, ett_ldp_tlv_val, NULL,
+    ti = proto_tree_add_text(val_tree, tvb, offset, rem,
                              "Frame Relay Label Range Components");
+
+    if(numlr) {
+        val_tree=proto_item_add_subtree(ti,
+                                        ett_ldp_tlv_val);
+        if( ! val_tree ) return;
+    }
 
     /*now dissect ranges*/
     for(ix=1; numlr > 0 && rem >= 8; ix++, rem-=8, numlr--) {
-        lbl_tree=proto_tree_add_subtree_format(val_tree, tvb, offset, 8,
-                               ett_ldp_tlv_val, NULL, "Frame Relay Label Range Component %u", ix);
+        ti=proto_tree_add_text(val_tree, tvb, offset, 8,
+                               "Frame Relay Label Range Component %u", ix);
+        lbl_tree=proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
         len=(guint8)(tvb_get_ntohs(tvb, offset)>>7) & 0x03;
         proto_tree_add_uint_format_value(lbl_tree, hf_ldp_tlv_sess_fr_len, tvb, offset, 2, len,
@@ -1815,7 +1850,8 @@ dissect_tlv_ft_session(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tr
         return;
     }
 
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "FT Session Parameters");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "FT Session Parameters");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     /* Flags */
     ti = proto_tree_add_item(val_tree, hf_ldp_tlv_ft_sess_flags, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -1846,7 +1882,7 @@ dissect_tlv_ft_session(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tr
 static void
 dissect_tlv_lspid(tvbuff_t *tvb, packet_info *pinfo, guint offset,proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if(rem != 8) {
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem,
@@ -1855,7 +1891,8 @@ dissect_tlv_lspid(tvbuff_t *tvb, packet_info *pinfo, guint offset,proto_tree *tr
         return;
     }
 
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "LSP ID");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "LSP ID");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     proto_tree_add_item(val_tree, hf_ldp_tlv_lspid_act_flg,
                         tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -1870,7 +1907,7 @@ dissect_tlv_lspid(tvbuff_t *tvb, packet_info *pinfo, guint offset,proto_tree *tr
 static void
 dissect_tlv_er_hop_ipv4(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if(rem != 8) {
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem,
@@ -1878,7 +1915,8 @@ dissect_tlv_er_hop_ipv4(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_t
                             rem);
         return;
     }
-    val_tree=proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "ER HOP IPv4");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "ER HOP IPv4");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     if(val_tree != NULL) {
         proto_tree_add_item(val_tree, hf_ldp_tlv_er_hop_loose,
@@ -1895,7 +1933,7 @@ dissect_tlv_er_hop_ipv4(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_t
 static void
 dissect_tlv_er_hop_ipv6(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if(rem != 20) {
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem,
@@ -1903,7 +1941,8 @@ dissect_tlv_er_hop_ipv6(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_t
                             rem);
         return;
     }
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "ER HOP IPv6");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "ER HOP IPv6");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     if(val_tree != NULL) {
         proto_tree_add_item(val_tree, hf_ldp_tlv_er_hop_loose,
@@ -1920,7 +1959,7 @@ dissect_tlv_er_hop_ipv6(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_t
 static void
 dissect_tlv_er_hop_as(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if(rem != 4) {
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem,
@@ -1928,7 +1967,8 @@ dissect_tlv_er_hop_as(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
                             rem);
         return;
     }
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "ER HOP AS");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "ER HOP AS");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     if(val_tree != NULL) {
         proto_tree_add_item(val_tree, hf_ldp_tlv_er_hop_loose,
@@ -1942,7 +1982,7 @@ dissect_tlv_er_hop_as(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
 static void
 dissect_tlv_er_hop_lspid(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if(rem != 8) {
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem,
@@ -1950,7 +1990,8 @@ dissect_tlv_er_hop_lspid(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_
                             rem);
         return;
     }
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "ER HOP LSPID");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "ER HOP LSPID");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     if(val_tree != NULL) {
         proto_tree_add_item(val_tree, hf_ldp_tlv_er_hop_loose,
@@ -1967,7 +2008,7 @@ dissect_tlv_er_hop_lspid(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_
 static void
 dissect_tlv_traffic(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
     guint8  val_8;
     float   val_f;
     proto_item *pi;
@@ -1978,7 +2019,8 @@ dissect_tlv_traffic(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree 
                             rem);
         return;
     }
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Traffic parameters");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "Traffic parameters");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     if(val_tree != NULL) {
         /* flags */
@@ -2039,7 +2081,7 @@ dissect_tlv_traffic(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree 
 static void
 dissect_tlv_route_pinning(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if(rem != 4) {
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem,
@@ -2047,7 +2089,8 @@ dissect_tlv_route_pinning(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto
                             rem);
         return;
     }
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Route Pinning");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "Route Pinning");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     if(val_tree != NULL) {
         proto_tree_add_item(val_tree, hf_ldp_tlv_route_pinning,
@@ -2059,7 +2102,7 @@ dissect_tlv_route_pinning(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto
 static void
 dissect_tlv_resource_class(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if(rem != 4) {
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem,
@@ -2067,7 +2110,8 @@ dissect_tlv_resource_class(tvbuff_t *tvb, packet_info *pinfo, guint offset, prot
                             rem);
         return;
     }
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Resource Class");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "Resource Class");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     if(val_tree != NULL) {
         proto_tree_add_item(val_tree, hf_ldp_tlv_resource_class,
@@ -2079,7 +2123,7 @@ dissect_tlv_resource_class(tvbuff_t *tvb, packet_info *pinfo, guint offset, prot
 static void
 dissect_tlv_preemption(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if(rem != 4) {
         proto_tree_add_expert_format(tree, pinfo, &ei_ldp_tlv_fec_len, tvb, offset, rem,
@@ -2087,7 +2131,8 @@ dissect_tlv_preemption(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tr
                             rem);
         return;
     }
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Preemption");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "Preemption");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     if(val_tree != NULL) {
         proto_tree_add_item(val_tree, hf_ldp_tlv_set_prio,
@@ -2149,10 +2194,11 @@ dissect_tlv(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, i
 static void
 dissect_tlv_er(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
     int len;
 
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Explicit route");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "Explicit route");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     if(val_tree != NULL) {
         while (rem > 0) {
@@ -2174,18 +2220,19 @@ dissect_tlv_pw_grouping(tvbuff_t *tvb, guint offset, proto_tree *tree, int rem);
 static void
 dissect_tlv_upstrm_lbl_ass_cap(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if ( rem != 1)
     {
         proto_item* inv_length;
-        inv_length = proto_tree_add_item(tree, hf_ldp_tlv_inv_length, tvb, offset, rem, ENC_BIG_ENDIAN);
-        expert_add_info(pinfo, inv_length, &ei_ldp_inv_length);
-        return;
+		inv_length = proto_tree_add_item(tree, hf_ldp_tlv_inv_length, tvb, offset, rem, ENC_BIG_ENDIAN);
+                expert_add_info(pinfo, inv_length, &ei_ldp_inv_length);
+                return;
     }
 
     /*State bit*/
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "State Bit");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "State Bit");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
     proto_tree_add_item(val_tree, hf_ldp_tlv_upstr_sbit, tvb,offset, 1, ENC_BIG_ENDIAN);
 }
 /*Dissect Upstream Assigned Label Request TLV*/
@@ -2195,9 +2242,9 @@ dissect_tlv_upstrm_ass_lbl_req(tvbuff_t *tvb, packet_info *pinfo, guint offset, 
     if ( rem != 4)
     {
         proto_item* inv_length;
-        inv_length = proto_tree_add_item(tree, hf_ldp_tlv_inv_length, tvb, offset, rem, ENC_BIG_ENDIAN);
-        expert_add_info(pinfo, inv_length, &ei_ldp_inv_length);
-        return;
+		inv_length = proto_tree_add_item(tree, hf_ldp_tlv_inv_length, tvb, offset, rem, ENC_BIG_ENDIAN);
+                expert_add_info(pinfo, inv_length, &ei_ldp_inv_length);
+                return;
     }
 
     /*Reserved Bits*/
@@ -2208,31 +2255,33 @@ dissect_tlv_upstrm_ass_lbl_req(tvbuff_t *tvb, packet_info *pinfo, guint offset, 
 static void
 dissect_tlv_upstrm_ass_lbl(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     if ( rem != 8)
     {
         proto_item* inv_length;
-        inv_length = proto_tree_add_item(tree, hf_ldp_tlv_inv_length, tvb, offset, rem, ENC_BIG_ENDIAN);
-        expert_add_info(pinfo, inv_length, &ei_ldp_inv_length);
-        return;
+		inv_length = proto_tree_add_item(tree, hf_ldp_tlv_inv_length, tvb, offset, rem, ENC_BIG_ENDIAN);
+                expert_add_info(pinfo, inv_length, &ei_ldp_inv_length);
+                return;
     }
     /*Value Field starts here*/
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "Upstream-Assigned Label");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "Upstream-Assigned Label");
 
     /*Reserved bits*/
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
     proto_tree_add_item(val_tree, hf_ldp_tlv_upstr_lbl_resvbit, tvb,offset, 4, ENC_BIG_ENDIAN);
 
     /*The Upstream Label*/
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
     proto_tree_add_item(val_tree, hf_ldp_tlv_upstr_ass_lbl, tvb,offset + 4, 4, ENC_BIG_ENDIAN);
 }
 /*Dissect IPv4 Interface ID TLV*/
 static void
 dissect_tlv_ipv4_interface_id(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree, *sub_tree;
-
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "IPv4 Interface ID");
+    proto_tree *ti, *val_tree, *sub_tree = NULL;
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "IPv4 Interface ID");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
 
     /*Dissect IPv4 Next/Previous Hop Address*/
     proto_tree_add_item(val_tree, hf_ldp_tlv_ipv4_intID_hop_addr, tvb,offset, 4, ENC_BIG_ENDIAN);
@@ -2240,44 +2289,47 @@ dissect_tlv_ipv4_interface_id(tvbuff_t *tvb, packet_info *pinfo, guint offset, p
     /*Dissect Logical Interface ID*/
     proto_tree_add_item(val_tree, hf_ldp_tlv_logical_intID, tvb,offset + 4, 4, ENC_BIG_ENDIAN);
 
-    sub_tree = proto_tree_add_subtree(val_tree, tvb, offset + 8, rem, ett_ldp_sub_tlv, NULL, "Sub TLV");
+    ti = proto_tree_add_text(val_tree, tvb, offset + 8, rem, "Sub TLV");
+    sub_tree = proto_item_add_subtree(ti, ett_ldp_sub_tlv);
 
     if(rem != 20 && rem != 24 && rem != 28 && rem != 29)
-    {
-        /*rem = 20 >> Length of IP Multicast Tunnel TLV
-          rem = 29 >> Length of LDP P2MP LSV TLV
-          rem = 24 >> Length of RSVP-TE P2MP LSP TLV
-          rem = 28 >> Length of MPLS Context Label TLV*/
+    	{
+	    /*rem = 20 >> Length of IP Multicast Tunnel TLV
+	    rem = 29 >> Length of LDP P2MP LSV TLV
+	    rem = 24 >> Length of RSVP-TE P2MP LSP TLV
+	    rem = 28 >> Length of MPLS Context Label TLV*/
 
-        proto_item* inv_length;
-        inv_length = proto_tree_add_item(val_tree, hf_ldp_tlv_inv_length, tvb, offset, rem, ENC_BIG_ENDIAN);
-        expert_add_info(pinfo, inv_length, &ei_ldp_inv_length);
-    }
+	    proto_item* inv_length;
+	    inv_length = proto_tree_add_item(val_tree, hf_ldp_tlv_inv_length, tvb, offset, rem, ENC_BIG_ENDIAN);
+	    expert_add_info(pinfo, inv_length, &ei_ldp_inv_length);
+	}
     else
-    {
-        rem = rem - 8;
-        dissect_tlv(tvb, pinfo, offset + 8, sub_tree, rem);
-    }
+    	{
+	    rem = rem - 8;
+	    dissect_tlv(tvb, pinfo, offset + 8, sub_tree, rem);
+	}
 }
 /*Dissect IP Multicast Tunnel TLV*/
 static void
 dissect_tlv_ip_multicast_tunnel(tvbuff_t *tvb, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "IP Multicast Label");
-
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "IP Multicast Label");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
     proto_tree_add_item(val_tree, hf_ldp_tlv_ip_multicast_srcaddr, tvb,offset, 4, ENC_BIG_ENDIAN);
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
     proto_tree_add_item(val_tree, hf_ldp_tlv_ip_multicast_mltcstaddr, tvb,offset + 4, 4, ENC_BIG_ENDIAN);
 }
 
 static void
 dissect_tlv_mpls_context_lbl(tvbuff_t *tvb,packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *val_tree;
+    proto_tree *ti, *val_tree;
 
     proto_tree_add_item(tree, hf_ldp_tlv_ip_mpls_context_srcaddr, tvb,offset, 4, ENC_BIG_ENDIAN);
-    val_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_tlv_val, NULL, "MPLS Context Label");
+    ti = proto_tree_add_text(tree, tvb, offset, rem, "MPLS Context Label");
+    val_tree = proto_item_add_subtree(ti, ett_ldp_tlv_val);
     dissect_tlv(tvb, pinfo, offset + 4, val_tree, rem);
 }
 
@@ -2331,22 +2383,24 @@ dissect_tlv(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, i
     length = MIN(length, rem);  /* Don't go haywire if a problem ... */
 
     if (tree) {
-        proto_tree *tlv_tree;
+        proto_tree *ti = NULL, *tlv_tree;
         /*chk for vendor-private*/
         if(type>=TLV_VENDOR_PRIVATE_START && type<=TLV_VENDOR_PRIVATE_END){
             typebak=type;               /*keep type*/
             type=TLV_VENDOR_PRIVATE_START;
-            tlv_tree = proto_tree_add_subtree(tree, tvb, offset, length + 4, ett_ldp_tlv, NULL, "Vendor Private TLV");
+            ti = proto_tree_add_text(tree, tvb, offset, length + 4, "Vendor Private TLV");
             /*chk for experimental*/
         } else if(type>=TLV_EXPERIMENTAL_START && type<=TLV_EXPERIMENTAL_END){
             typebak=type;               /*keep type*/
             type=TLV_EXPERIMENTAL_START;
-            tlv_tree = proto_tree_add_subtree(tree, tvb, offset, length + 4, ett_ldp_tlv, NULL, "Experimental TLV");
+            ti = proto_tree_add_text(tree, tvb, offset, length + 4, "Experimental TLV");
         } else {
             typebak=0;
-            tlv_tree = proto_tree_add_subtree(tree, tvb, offset, length + 4, ett_ldp_tlv, NULL,
+            ti = proto_tree_add_text(tree, tvb, offset, length + 4, "%s",
                                      val_to_str(type, tlv_type_names, "Unknown TLV type (0x%04X)"));
         }
+
+        tlv_tree = proto_item_add_subtree(ti, ett_ldp_tlv);
 
         proto_tree_add_item(tlv_tree, hf_ldp_tlv_unknown, tvb, offset, 1, ENC_BIG_ENDIAN);
 
@@ -2579,7 +2633,7 @@ dissect_tlv(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, i
             else {
                 proto_tree_add_item(tlv_tree, hf_ldp_tlv_vendor_id, tvb,offset + 4, 4, ENC_BIG_ENDIAN);
                 if( length > 4 )  /*have data*/
-                    proto_tree_add_item(tlv_tree, hf_ldp_data, tvb, offset + 8, length-4, ENC_NA);
+                    proto_tree_add_text(tlv_tree, tvb, offset + 8, length-4,"Data");
             }
             break;
 
@@ -2591,7 +2645,7 @@ dissect_tlv(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, i
             else {
                 proto_tree_add_item(tlv_tree, hf_ldp_tlv_experiment_id, tvb,offset + 4, 4, ENC_BIG_ENDIAN);
                 if( length > 4 )  /*have data*/
-                    proto_tree_add_item(tlv_tree, hf_ldp_data, tvb, offset + 8, length-4, ENC_NA);
+                    proto_tree_add_text(tlv_tree, tvb, offset + 8, length-4,"Data");
             }
             break;
 
@@ -2765,18 +2819,21 @@ dissect_msg(tvbuff_t *tvb, guint offset, packet_info *pinfo, proto_tree *tree)
     }
 
     if (tree) {
+        proto_tree *ti = NULL;
 
         switch (type) {
         case LDP_VENDOR_PRIVATE_START:
-            msg_tree = proto_tree_add_subtree(tree, tvb, offset, length + 4, ett_ldp_message, NULL, "Vendor-Private Message");
+            ti = proto_tree_add_text(tree, tvb, offset, length + 4, "Vendor-Private Message");
             break;
         case LDP_EXPERIMENTAL_MESSAGE_START:
-            msg_tree = proto_tree_add_subtree(tree, tvb, offset, length + 4, ett_ldp_message, NULL, "Experimental Message");
+            ti = proto_tree_add_text(tree, tvb, offset, length + 4, "Experimental Message");
             break;
         default:
-            msg_tree = proto_tree_add_subtree(tree, tvb, offset, length + 4, ett_ldp_message, NULL,
+            ti = proto_tree_add_text(tree, tvb, offset, length + 4, "%s",
                                      val_to_str(type, ldp_message_types, "Unknown Message type (0x%04X)"));
         }
+
+        msg_tree = proto_item_add_subtree(ti, ett_ldp_message);
 
         proto_tree_add_item(msg_tree, hf_ldp_msg_ubit, tvb, offset, 1, ENC_BIG_ENDIAN);
 
@@ -2963,9 +3020,9 @@ dissect_subtlv_interface_parameters(tvbuff_t *tvb, guint offset, proto_tree *tre
         38 - hf_ldp_tlv_fec_vc_intparam_flowlabel_res
     };
 #endif
-    proto_tree *ti;
+    proto_tree *ti = proto_tree_add_text(tree, tvb, offset, rem, "Interface Parameter");
     proto_tree *cepopt_tree=NULL, *vccvtype_tree=NULL;
-    proto_tree *vcintparam_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_fec_vc_interfaceparam, &ti, "Interface Parameter");
+    proto_tree *vcintparam_tree = proto_item_add_subtree(ti, ett_ldp_fec_vc_interfaceparam);
 
     guint8  intparam_len = rem;
     proto_tree_add_item(vcintparam_tree,*interface_parameters_hf[3],tvb,offset,1,ENC_BIG_ENDIAN);
@@ -2996,7 +3053,8 @@ dissect_subtlv_interface_parameters(tvbuff_t *tvb, guint offset, proto_tree *tre
     case FEC_VC_INTERFACEPARAM_CEPOPTIONS:
         /* draft-ietf-pwe3-sonet-05.txt */
         proto_item_append_text(ti,": CEP Options");
-        cepopt_tree = proto_tree_add_subtree(vcintparam_tree, tvb, offset + 2, 2, ett_ldp_fec_vc_interfaceparam_cepopt, NULL, "CEP Options");
+        ti = proto_tree_add_text(vcintparam_tree, tvb, offset + 2, 2, "CEP Options");
+        cepopt_tree = proto_item_add_subtree(ti, ett_ldp_fec_vc_interfaceparam_cepopt);
         proto_tree_add_item(cepopt_tree, *interface_parameters_hf[7], tvb, offset + 2, 2, ENC_BIG_ENDIAN);
         proto_tree_add_item(cepopt_tree, *interface_parameters_hf[8], tvb, offset + 2, 2, ENC_BIG_ENDIAN);
         proto_tree_add_item(cepopt_tree, *interface_parameters_hf[9], tvb, offset + 2, 2, ENC_BIG_ENDIAN);
@@ -3043,11 +3101,13 @@ dissect_subtlv_interface_parameters(tvbuff_t *tvb, guint offset, proto_tree *tre
     case FEC_VC_INTERFACEPARAM_VCCV:
         /* draft-ietf-pwe3-vccv-03.txt */
         proto_item_append_text(ti,": VCCV");
-        vccvtype_tree = proto_tree_add_subtree(vcintparam_tree, tvb, offset + 2, 1, ett_ldp_fec_vc_interfaceparam_vccvtype, NULL, "CC Type");
+        ti = proto_tree_add_text(vcintparam_tree, tvb, offset + 2, 1, "CC Type");
+        vccvtype_tree = proto_item_add_subtree(ti, ett_ldp_fec_vc_interfaceparam_vccvtype);
         proto_tree_add_item(vccvtype_tree, *interface_parameters_hf[27], tvb, offset+2, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(vccvtype_tree, *interface_parameters_hf[28], tvb, offset+2, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(vccvtype_tree, *interface_parameters_hf[29], tvb, offset+2, 1, ENC_BIG_ENDIAN);
-        vccvtype_tree = proto_tree_add_subtree(vcintparam_tree, tvb, offset + 3, 1, ett_ldp_fec_vc_interfaceparam_vccvtype, NULL, "CV Type");
+        ti = proto_tree_add_text(vcintparam_tree, tvb, offset + 3, 1, "CV Type");
+        vccvtype_tree = proto_item_add_subtree(ti, ett_ldp_fec_vc_interfaceparam_vccvtype);
         proto_tree_add_item(vccvtype_tree, *interface_parameters_hf[30], tvb, offset+3, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(vccvtype_tree, *interface_parameters_hf[31], tvb, offset+3, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(vccvtype_tree, *interface_parameters_hf[32], tvb, offset+3, 1, ENC_BIG_ENDIAN);
@@ -3060,7 +3120,7 @@ dissect_subtlv_interface_parameters(tvbuff_t *tvb, guint offset, proto_tree *tre
         break;
     default: /* unknown */
         proto_item_append_text(ti," unknown");
-        proto_tree_add_item(vcintparam_tree, hf_ldp_unknown_data, tvb, offset+2, (intparam_len -2), ENC_NA);
+        proto_tree_add_text(vcintparam_tree,tvb, offset+2, (intparam_len -2), "Unknown data");
 
         break;
     }
@@ -3069,7 +3129,8 @@ dissect_subtlv_interface_parameters(tvbuff_t *tvb, guint offset, proto_tree *tre
 static void
 dissect_genpwid_fec_aai_type2_parameter(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree *tree, int rem)
 {
-    proto_tree *aai_param_tree = proto_tree_add_subtree(tree, tvb, offset, rem, ett_ldp_gen_aai_type2, NULL, "AAI");
+    proto_tree *ti             = proto_tree_add_text(tree, tvb, offset, rem, "AAI");
+    proto_tree *aai_param_tree = proto_item_add_subtree(ti, ett_ldp_gen_aai_type2);
     /* check if the remaining length is 12 bytes or not... */
     if ( rem != 12)
     {
@@ -3094,6 +3155,8 @@ dissect_ldp_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data 
     guint16             plen;
     int                 length;
     tvbuff_t *volatile  next_tvb;
+    void               *pd_save;
+
     while (tvb_reported_length_remaining(tvb, offset) != 0) {
         length_remaining = tvb_length_remaining(tvb, offset);
 
@@ -3208,10 +3271,16 @@ dissect_ldp_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data 
          * stop dissecting PDUs within this frame or chunk of reassembled
          * data.
          */
+        pd_save = pinfo->private_data;
         TRY {
             dissect_ldp_pdu(next_tvb, pinfo, tree);
         }
         CATCH_NONFATAL_ERRORS {
+            /*  Restore the private_data structure in case one of the
+             *  called dissectors modified it (and, due to the exception,
+             *  was unable to restore it).
+             */
+            pinfo->private_data = pd_save;
             show_exception(tvb, pinfo, tree, EXCEPT_CODE, GET_MESSAGE);
         }
         ENDTRY;
@@ -4210,22 +4279,6 @@ proto_register_ldp(void)
         { &hf_ldp_tlv_inv_length,
           { "Invalid length", "ldp.msg.tlv.invalid.length", FT_UINT16, BASE_HEX,
             NULL, 0x0, NULL, HFILL }},
-
-        { &hf_ldp_returned_pdu_data,
-          { "Returned PDU Data", "ldp.returned_pdu_data", FT_BYTES, BASE_NONE,
-            NULL, 0x0, NULL, HFILL }},
-
-        { &hf_ldp_returned_message_parameters,
-          { "Returned Message Parameters", "ldp.returned_message_parameters", FT_BYTES, BASE_NONE,
-            NULL, 0x0, NULL, HFILL }},
-
-        { &hf_ldp_data,
-          { "Data", "ldp.data", FT_BYTES, BASE_NONE,
-            NULL, 0x0, NULL, HFILL }},
-
-        { &hf_ldp_unknown_data,
-          { "Unknown Data", "ldp.unknown_data", FT_BYTES, BASE_NONE,
-            NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -4332,16 +4385,3 @@ proto_reg_handoff_ldp(void)
     dissector_add_uint("udp.port", global_ldp_udp_port, ldp_handle);
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

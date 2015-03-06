@@ -98,7 +98,7 @@ SearchRuleDescription
 SearchRuleId
 SubtreeSpecification
 
-#.PDU_NEW
+#.PDU
 DistinguishedName
 
 #.NO_EMIT
@@ -136,7 +136,7 @@ RequestAttribute/defaultValues/_item/values/_item	ra_values_item
 RequestAttribute/selectedValues				ra_selectedValues
 RequestAttribute/selectedValues/_item			ra_selectedValues_item
 
-#.REGISTER_NEW
+#.REGISTER
 DistinguishedName	B	"2.5.4.1"	"id-at-aliasedEntryName"
 DistinguishedName	B	"2.5.4.31"	"id-at-member"
 DistinguishedName	B	"2.5.4.32"	"id-at-owner"
@@ -194,7 +194,7 @@ DistinguishedName B "2.16.840.1.101.2.2.1.188" "id-at-primaryMember"
 
   if(actx->external.direct_reference) {
     /* see if we can find a nice name */
-    name = oid_resolved_from_string(wmem_packet_scope(), actx->external.direct_reference);
+    name = oid_resolved_from_string(actx->external.direct_reference);
     if(!name) name = actx->external.direct_reference;
 
     if(last_rdn) { /* append it to the RDN */
@@ -258,7 +258,7 @@ DistinguishedName B "2.16.840.1.101.2.2.1.188" "id-at-primaryMember"
         last_ava = (char *)wmem_alloc(wmem_packet_scope(), MAX_AVA_STR_LEN);
       }
 
-      if(!(name = oid_resolved_from_string(wmem_packet_scope(), actx->external.direct_reference)))
+      if(!(name = oid_resolved_from_string(actx->external.direct_reference)))
         name = actx->external.direct_reference;
       g_snprintf(last_ava, MAX_AVA_STR_LEN, "%%s %%s %%s", name, fmt, value);
 
@@ -343,7 +343,8 @@ DistinguishedName B "2.16.840.1.101.2.2.1.188" "id-at-primaryMember"
   /* now append this to the DN */
   if (last_dn) {
     if(*last_dn) {
-      temp_dn = (char *)wmem_strdup_printf(wmem_packet_scope(), "%%s,%%s", last_rdn, last_dn);
+      temp_dn = (char *)wmem_alloc(wmem_packet_scope(), MAX_DN_STR_LEN); /* is there a better way to use ep_alloc here ? */
+      g_snprintf(temp_dn, MAX_DN_STR_LEN, "%%s,%%s", last_rdn, last_dn);
       last_dn[0] = '\0';
       g_strlcat(last_dn, temp_dn, MAX_DN_STR_LEN);
     } else {

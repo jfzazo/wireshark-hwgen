@@ -20,7 +20,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <glib.h>
 
@@ -58,8 +58,8 @@ frame_read(struct tvb_frame *frame_tvb, struct wtap_pkthdr *phdr, Buffer *buf)
 	 * frame_tvb->tvb.length + frame_tvb->offset?
 	 */
 	if (!wtap_seek_read(frame_tvb->wth, frame_tvb->file_off, phdr, buf, &err, &err_info)) {
-		/* XXX - report error! */
 		switch (err) {
+			case WTAP_ERR_UNSUPPORTED_ENCAP:
 			case WTAP_ERR_BAD_FILE:
 				g_free(err_info);
 				break;
@@ -74,21 +74,19 @@ frame_cache(struct tvb_frame *frame_tvb)
 {
 	struct wtap_pkthdr phdr; /* Packet header */
 
-	wtap_phdr_init(&phdr);
+	memset(&phdr, 0, sizeof(struct wtap_pkthdr));
 
 	if (frame_tvb->buf == NULL) {
 		frame_tvb->buf = (struct Buffer *) g_malloc(sizeof(struct Buffer));
 
 		/* XXX, register frame_tvb to some list which frees from time to time not used buffers :] */
-		ws_buffer_init(frame_tvb->buf, frame_tvb->tvb.length + frame_tvb->offset);
+		buffer_init(frame_tvb->buf, frame_tvb->tvb.length + frame_tvb->offset);
 
 		if (!frame_read(frame_tvb, &phdr, frame_tvb->buf))
 			{ /* TODO: THROW(???); */ }
 	}
 
-	frame_tvb->tvb.real_data = ws_buffer_start_ptr(frame_tvb->buf) + frame_tvb->offset;
-
-	wtap_phdr_cleanup(&phdr);
+	frame_tvb->tvb.real_data = buffer_start_ptr(frame_tvb->buf) + frame_tvb->offset;
 }
 
 static void
@@ -97,7 +95,7 @@ frame_free(tvbuff_t *tvb)
 	struct tvb_frame *frame_tvb = (struct tvb_frame *) tvb;
 
 	if (frame_tvb->buf) {
-		ws_buffer_free(frame_tvb->buf);
+		buffer_free(frame_tvb->buf);
 
 		g_free(frame_tvb->buf);
 	}
@@ -233,7 +231,7 @@ frame_tvbuff_new(const frame_data *fd, const guint8 *buf)
 tvbuff_t *
 frame_tvbuff_new_buffer(const frame_data *fd, Buffer *buf)
 {
-	return frame_tvbuff_new(fd, ws_buffer_start_ptr(buf));
+	return frame_tvbuff_new(fd, buffer_start_ptr(buf));
 }
 
 static tvbuff_t *
@@ -338,18 +336,5 @@ file_tvbuff_new(const frame_data *fd, const guint8 *buf)
 tvbuff_t *
 file_tvbuff_new_buffer(const frame_data *fd, Buffer *buf)
 {
-	return frame_tvbuff_new(fd, ws_buffer_start_ptr(buf));
+	return frame_tvbuff_new(fd, buffer_start_ptr(buf));
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -77,17 +77,5 @@ typedef struct _sctp_frag_msg {
   struct _sctp_frag_msg* next;
 } sctp_frag_msg;
 
-#endif
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */
+#endif

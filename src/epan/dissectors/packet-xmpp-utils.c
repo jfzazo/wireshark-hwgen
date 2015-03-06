@@ -1,4 +1,4 @@
-/* packet-xmpp-utils.c
+/* xmpp-utils.c
  * Wireshark's XMPP dissector.
  *
  * Copyright 2011, Mariusz Okroj <okrojmariusz[]gmail.com>
@@ -24,12 +24,18 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/expert.h>
+#include <epan/tvbparse.h>
 #include <epan/strutil.h>
 
-#include "packet-xmpp.h"
-#include "packet-xmpp-core.h"
-#include "packet-xmpp-utils.h"
+#include <epan/dissectors/packet-xml.h>
+
+#include <packet-xmpp.h>
+#include <packet-xmpp-core.h>
+#include <packet-xmpp-utils.h>
 
 
 void
@@ -200,9 +206,8 @@ xmpp_unknown_items(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, xmpp_ele
     while(childs)
     {
         xmpp_element_t *child = (xmpp_element_t *)childs->data;
-        proto_item *child_item;
-        proto_tree *child_tree = proto_tree_add_subtree(tree, tvb, child->offset, child->length,
-            ett_unknown[level], &child_item, xmpp_ep_string_upcase(child->name));
+        proto_item *child_item = proto_tree_add_text(tree, tvb, child->offset, child->length, "%s", xmpp_ep_string_upcase(child->name));
+        proto_tree *child_tree = proto_item_add_subtree(child_item, ett_unknown[level]);
 
         if(child->default_ns_abbrev)
             proto_item_append_text(child_item, "(%s)", child->default_ns_abbrev);
@@ -546,7 +551,7 @@ xmpp_xml_frame_to_element_t(xml_frame_t *xml_frame, xmpp_element_t *parent, tvbu
 
     if((elem = tvbparse_get(tt,want_stream_end_with_ns))!=NULL)
     {
-        node->default_ns_abbrev = tvb_get_string_enc(wmem_packet_scope(), elem->sub->tvb, elem->sub->offset, elem->sub->len, ENC_ASCII);
+        node->default_ns_abbrev = tvb_get_string(wmem_packet_scope(), elem->sub->tvb, elem->sub->offset, elem->sub->len);
     }
 
     child = xml_frame->first_child;
@@ -722,7 +727,7 @@ xmpp_element_to_string(tvbuff_t *tvb, xmpp_element_t *element)
 
     if(tvb_offset_exists(tvb, element->offset+element->length-1))
     {
-        buff = tvb_get_string_enc(wmem_packet_scope(), tvb, element->offset, element->length, ENC_ASCII);
+        buff = tvb_get_string(wmem_packet_scope(), tvb, element->offset, element->length);
     }
     return buff;
 }
@@ -734,7 +739,7 @@ xmpp_attr_to_string(tvbuff_t *tvb, xmpp_attr_t *attr)
 
     if(tvb_offset_exists(tvb, attr->offset + attr->length-1))
     {
-        buff = tvb_get_string_enc(wmem_packet_scope(), tvb, attr->offset, attr->length, ENC_ASCII);
+        buff = tvb_get_string(wmem_packet_scope(), tvb, attr->offset, attr->length);
     }
     return buff;
 }

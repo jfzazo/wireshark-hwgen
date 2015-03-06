@@ -24,6 +24,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 
 #ifdef HAVE_UNISTD_H
@@ -285,23 +286,28 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
     case(TS_ABSOLUTE_WITH_YMD):
     case(TS_UTC_WITH_YMD):
         switch(precision) {
+            case(TS_PREC_AUTO_SEC):
             case(TS_PREC_FIXED_SEC):
                 return "0000-00-00 00:00:00";
                 break;
+            case(TS_PREC_AUTO_DSEC):
             case(TS_PREC_FIXED_DSEC):
                 return "0000-00-00 00:00:00.0";
                 break;
+            case(TS_PREC_AUTO_CSEC):
             case(TS_PREC_FIXED_CSEC):
                 return "0000-00-00 00:00:00.00";
                 break;
+            case(TS_PREC_AUTO_MSEC):
             case(TS_PREC_FIXED_MSEC):
                 return "0000-00-00 00:00:00.000";
                 break;
+            case(TS_PREC_AUTO_USEC):
             case(TS_PREC_FIXED_USEC):
                 return "0000-00-00 00:00:00.000000";
                 break;
+            case(TS_PREC_AUTO_NSEC):
             case(TS_PREC_FIXED_NSEC):
-            case(TS_PREC_AUTO):    /* Leave enough room for the maximum */
                 return "0000-00-00 00:00:00.000000000";
                 break;
             default:
@@ -311,23 +317,28 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
     case(TS_ABSOLUTE_WITH_YDOY):
     case(TS_UTC_WITH_YDOY):
         switch(precision) {
+            case(TS_PREC_AUTO_SEC):
             case(TS_PREC_FIXED_SEC):
                 return "0000/000 00:00:00";
                 break;
+            case(TS_PREC_AUTO_DSEC):
             case(TS_PREC_FIXED_DSEC):
                 return "0000/000 00:00:00.0";
                 break;
+            case(TS_PREC_AUTO_CSEC):
             case(TS_PREC_FIXED_CSEC):
                 return "0000/000 00:00:00.00";
                 break;
+            case(TS_PREC_AUTO_MSEC):
             case(TS_PREC_FIXED_MSEC):
                 return "0000/000 00:00:00.000";
                 break;
+            case(TS_PREC_AUTO_USEC):
             case(TS_PREC_FIXED_USEC):
                 return "0000/000 00:00:00.000000";
                 break;
+            case(TS_PREC_AUTO_NSEC):
             case(TS_PREC_FIXED_NSEC):
-            case(TS_PREC_AUTO):    /* Leave enough room for the maximum */
                 return "0000/000 00:00:00.000000000";
                 break;
             default:
@@ -337,23 +348,28 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
     case(TS_ABSOLUTE):
     case(TS_UTC):
         switch(precision) {
+            case(TS_PREC_AUTO_SEC):
             case(TS_PREC_FIXED_SEC):
                 return "00:00:00";
                 break;
+            case(TS_PREC_AUTO_DSEC):
             case(TS_PREC_FIXED_DSEC):
                 return "00:00:00.0";
                 break;
+            case(TS_PREC_AUTO_CSEC):
             case(TS_PREC_FIXED_CSEC):
                 return "00:00:00.00";
                 break;
+            case(TS_PREC_AUTO_MSEC):
             case(TS_PREC_FIXED_MSEC):
                 return "00:00:00.000";
                 break;
+            case(TS_PREC_AUTO_USEC):
             case(TS_PREC_FIXED_USEC):
                 return "00:00:00.000000";
                 break;
+            case(TS_PREC_AUTO_NSEC):
             case(TS_PREC_FIXED_NSEC):
-            case(TS_PREC_AUTO):    /* Leave enough room for the maximum */
                 return "00:00:00.000000000";
                 break;
             default:
@@ -364,23 +380,28 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
     case(TS_DELTA):
     case(TS_DELTA_DIS):
         switch(precision) {
+            case(TS_PREC_AUTO_SEC):
             case(TS_PREC_FIXED_SEC):
                 return "0000";
                 break;
+            case(TS_PREC_AUTO_DSEC):
             case(TS_PREC_FIXED_DSEC):
                 return "0000.0";
                 break;
+            case(TS_PREC_AUTO_CSEC):
             case(TS_PREC_FIXED_CSEC):
                 return "0000.00";
                 break;
+            case(TS_PREC_AUTO_MSEC):
             case(TS_PREC_FIXED_MSEC):
                 return "0000.000";
                 break;
+            case(TS_PREC_AUTO_USEC):
             case(TS_PREC_FIXED_USEC):
                 return "0000.000000";
                 break;
+            case(TS_PREC_AUTO_NSEC):
             case(TS_PREC_FIXED_NSEC):
-            case(TS_PREC_AUTO):    /* Leave enough room for the maximum */
                 return "0000.000000000";
                 break;
             default:
@@ -390,23 +411,28 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
     case(TS_EPOCH):
         /* This is enough to represent 2^63 (signed 64-bit integer) + fractions */
         switch(precision) {
+            case(TS_PREC_AUTO_SEC):
             case(TS_PREC_FIXED_SEC):
                 return "0000000000000000000";
                 break;
+            case(TS_PREC_AUTO_DSEC):
             case(TS_PREC_FIXED_DSEC):
                 return "0000000000000000000.0";
                 break;
+            case(TS_PREC_AUTO_CSEC):
             case(TS_PREC_FIXED_CSEC):
                 return "0000000000000000000.00";
                 break;
+            case(TS_PREC_AUTO_MSEC):
             case(TS_PREC_FIXED_MSEC):
                 return "0000000000000000000.000";
                 break;
+            case(TS_PREC_AUTO_USEC):
             case(TS_PREC_FIXED_USEC):
                 return "0000000000000000000.000000";
                 break;
+            case(TS_PREC_AUTO_NSEC):
             case(TS_PREC_FIXED_NSEC):
-            case(TS_PREC_AUTO):    /* Leave enough room for the maximum */
                 return "0000000000000000000.000000000";
                 break;
             default:
@@ -424,6 +450,18 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
     return "";
 }
 
+/* Returns the longer string of the column title or the hard-coded width of
+ * its contents for building the packet list layout. */
+const gchar *
+get_column_width_string(const gint format, const gint col)
+{
+    if(strlen(get_column_longest_string(format)) >
+       strlen(get_column_title(col)))
+        return get_column_longest_string(format);
+    else
+        return get_column_title(col);
+}
+
 /* Returns a string representing the longest possible value for a
    particular column type.  See also get_column_width_string() above.
 
@@ -436,7 +474,7 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
    is done, and given that the width for COL...SRC and COL...DST columns
    is somewhat arbitrary in any case.  We should probably clean
    that up eventually, though. */
-static const char *
+const char *
 get_column_longest_string(const gint format)
 {
   switch (format) {
@@ -580,18 +618,6 @@ get_column_longest_string(const gint format)
       return "Source port: kerberos-master  Destination port: kerberos-master";
       break;
   }
-}
-
-/* Returns the longer string of the column title or the hard-coded width of
- * its contents for building the packet list layout. */
-const gchar *
-get_column_width_string(const gint format, const gint col)
-{
-    if(strlen(get_column_longest_string(format)) >
-       strlen(get_column_title(col)))
-        return get_column_longest_string(format);
-    else
-        return get_column_title(col);
 }
 
 /* Returns the longest possible width, in characters, for a particular
@@ -799,7 +825,7 @@ build_column_format_array(column_info *cinfo, const gint num_cols, const gboolea
     if (cinfo->col_fmt[i] == COL_CUSTOM) {
       cinfo->col_custom_field[i] = g_strdup(get_column_custom_field(i));
       cinfo->col_custom_occurrence[i] = get_column_custom_occurrence(i);
-      if(!dfilter_compile(cinfo->col_custom_field[i], &cinfo->col_custom_dfilter[i], NULL)) {
+      if(!dfilter_compile(cinfo->col_custom_field[i], &cinfo->col_custom_dfilter[i])) {
         /* XXX: Should we issue a warning? */
         g_free(cinfo->col_custom_field[i]);
         cinfo->col_custom_field[i] = NULL;
@@ -824,7 +850,7 @@ build_column_format_array(column_info *cinfo, const gint num_cols, const gboolea
     if(reset_fences)
       cinfo->col_fence[i] = 0;
 
-    cinfo->col_expr.col_expr[i] = "";
+    cinfo->col_expr.col_expr[i] = (gchar *) g_malloc(sizeof(gchar) * COL_MAX_LEN);
     cinfo->col_expr.col_expr_val[i] = (gchar *) g_malloc(sizeof(gchar) * COL_MAX_LEN);
   }
 

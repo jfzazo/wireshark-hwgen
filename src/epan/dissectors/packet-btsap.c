@@ -27,6 +27,9 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
+#include "packet-btl2cap.h"
 #include "packet-btsdp.h"
 
 enum {
@@ -253,7 +256,7 @@ dissect_parameter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *top_tree,
         case 0x04: /* CommandAPDU */
             /* GSM 11.11 */
             if (gsm_sim_cmd_handle && top_dissect != TOP_DISSECT_OFF) {
-                next_tvb = tvb_new_subset_length(tvb, offset, parameter_length);
+                next_tvb = tvb_new_subset(tvb, offset, parameter_length, parameter_length);
                 col_append_str(pinfo->cinfo, COL_INFO, ": ");
 
                 if (top_dissect == TOP_DISSECT_INTERNAL) {
@@ -272,7 +275,7 @@ dissect_parameter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *top_tree,
         case 0x05: /* ResponseAPDU */
             /* GSM 11.11 or ISO/IEC 7816-4; depend of TRANSFER_APDU_REQ */
             if (gsm_sim_resp_handle && top_dissect != TOP_DISSECT_OFF) {
-                next_tvb = tvb_new_subset_length(tvb, offset, parameter_length);
+                next_tvb = tvb_new_subset(tvb, offset, parameter_length, parameter_length);
                 col_append_str(pinfo->cinfo, COL_INFO, ": ");
 
                 if (top_dissect == TOP_DISSECT_INTERNAL) {
@@ -291,7 +294,7 @@ dissect_parameter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *top_tree,
         case 0x06: /* ATR */
             /* ISO/IEC 7816-3 */
             if (iso7816_atr_handle && top_dissect != TOP_DISSECT_OFF) {
-                next_tvb = tvb_new_subset_length(tvb, offset, parameter_length);
+                next_tvb = tvb_new_subset(tvb, offset, parameter_length, parameter_length);
                 col_append_str(pinfo->cinfo, COL_INFO, ": ");
 
                 if (top_dissect == TOP_DISSECT_INTERNAL) {
@@ -337,7 +340,7 @@ dissect_parameter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *top_tree,
         case 0x10: /* CommandAPDU7816 */
             /* ISO/IEC 7816-4 */
             if (gsm_sim_cmd_handle && top_dissect != TOP_DISSECT_OFF) {
-                next_tvb = tvb_new_subset_length(tvb, offset, parameter_length);
+                next_tvb = tvb_new_subset(tvb, offset, parameter_length, parameter_length);
                 col_append_str(pinfo->cinfo, COL_INFO, ": ");
 
                 if (top_dissect == TOP_DISSECT_INTERNAL) {
@@ -407,7 +410,8 @@ dissect_btsap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
             col_set_str(pinfo->cinfo, COL_INFO, "Rcvd ");
             break;
         default:
-            col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection ");
+            col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction %d ",
+                pinfo->p2p_dir);
             break;
     }
 
@@ -735,7 +739,7 @@ proto_reg_handoff_btsap(void)
 
     dissector_add_uint("btrfcomm.service", BTSDP_SAP_SERVICE_UUID, btsap_handle);
 
-    dissector_add_for_decode_as("btrfcomm.channel", btsap_handle);
+    dissector_add_handle("btrfcomm.channel", btsap_handle);
 }
 
 /*

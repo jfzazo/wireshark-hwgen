@@ -23,19 +23,13 @@ set(CODECS_FILES
   codecs.c
   G711a/G711adecode.c
   G711u/G711udecode.c
-  # These are wrapped in "#ifdef HAVE_SPANDSP", which we don't currently
-  # handle or define.
-  # G722/G722decode.c
-  # G726/G726decode.c
+  G722/G722decode.c
+  G726/G726decode.c
+  sbc/sbc.c
 )
-
-if(SBC_FOUND)
-  set(CODECS_FILES ${CODECS_FILES} sbc/sbc.c)
-endif()
 
 add_library(codecs STATIC
   ${CODECS_FILES}
 )
-set_target_properties(codecs PROPERTIES
-	LINK_FLAGS "${WS_LINK_FLAGS}"
-	FOLDER "Libs")
+set_target_properties(codecs PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+set_target_properties(codecs PROPERTIES FOLDER "codecs")

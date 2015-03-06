@@ -609,6 +609,8 @@ char *Dtd_PreParse_text;
 	 *
 	 * Copyright 2004, Luis E. Garcia Ontanon <luis@ontanon.org>
 	 *
+	 * $Id$
+	 *
 	 * Wireshark - Network traffic analyzer
 	 * By Gerald Combs <gerald@wireshark.org>
 	 * Copyright 1998 Gerald Combs
@@ -667,7 +669,7 @@ static const gchar* location(void);
 #endif
 
 
-#line 671 "dtd_preparse.c"
+#line 673 "dtd_preparse.c"
 
 #define INITIAL 0
 #define OUTSIDE 1
@@ -859,11 +861,11 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 127 "dtd_preparse.l"
+#line 129 "dtd_preparse.l"
 
 
 
-#line 867 "dtd_preparse.c"
+#line 869 "dtd_preparse.c"
 
 	if ( !(yy_init) )
 		{
@@ -944,58 +946,58 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 130 "dtd_preparse.l"
+#line 132 "dtd_preparse.l"
 if (current) g_string_append_printf(current,"%s\n%s\n",replace_entity(Dtd_PreParse_text),location());
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 132 "dtd_preparse.l"
+#line 134 "dtd_preparse.l"
 if (current) g_string_append(current," ");
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 134 "dtd_preparse.l"
+#line 136 "dtd_preparse.l"
 { g_string_append(current,Dtd_PreParse_text); BEGIN XMLPI; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 135 "dtd_preparse.l"
+#line 137 "dtd_preparse.l"
 { g_string_append(current,Dtd_PreParse_text); }
 	YY_BREAK
 case 5:
 /* rule 5 can match eol */
 YY_RULE_SETUP
-#line 136 "dtd_preparse.l"
+#line 138 "dtd_preparse.l"
 { g_string_append(current,Dtd_PreParse_text); }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 137 "dtd_preparse.l"
+#line 139 "dtd_preparse.l"
 { g_string_append(current,Dtd_PreParse_text); BEGIN OUTSIDE; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 139 "dtd_preparse.l"
+#line 141 "dtd_preparse.l"
 { current = NULL; BEGIN IN_COMMENT; }
 	YY_BREAK
 case 8:
 /* rule 8 can match eol */
-#line 141 "dtd_preparse.l"
+#line 143 "dtd_preparse.l"
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 141 "dtd_preparse.l"
+#line 143 "dtd_preparse.l"
 ;
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 142 "dtd_preparse.l"
+#line 144 "dtd_preparse.l"
 { current = output; BEGIN OUTSIDE; }
 	YY_BREAK
 case 11:
 /* rule 11 can match eol */
 YY_RULE_SETUP
-#line 144 "dtd_preparse.l"
+#line 146 "dtd_preparse.l"
 {
 	linenum++;
 	if (current) g_string_append_printf(current,"%s\n",location());
@@ -1004,54 +1006,54 @@ YY_RULE_SETUP
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 150 "dtd_preparse.l"
+#line 152 "dtd_preparse.l"
 { BEGIN IN_ENTITY; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 151 "dtd_preparse.l"
+#line 153 "dtd_preparse.l"
 { entity_name = g_strdup_printf("%%%s;",Dtd_PreParse_text); BEGIN NAMED_ENTITY; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 152 "dtd_preparse.l"
+#line 154 "dtd_preparse.l"
 { current = g_string_new(location()); BEGIN IN_QUOTE; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 153 "dtd_preparse.l"
+#line 155 "dtd_preparse.l"
 { g_hash_table_insert(entities,entity_name,current);  BEGIN ENTITY_DONE; }
 	YY_BREAK
 case 16:
-#line 155 "dtd_preparse.l"
+#line 157 "dtd_preparse.l"
 case 17:
 /* rule 17 can match eol */
-#line 156 "dtd_preparse.l"
+#line 158 "dtd_preparse.l"
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 156 "dtd_preparse.l"
+#line 158 "dtd_preparse.l"
 g_string_append(current,Dtd_PreParse_text);
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 157 "dtd_preparse.l"
+#line 159 "dtd_preparse.l"
 {
-	g_string_append_printf(error,"at %s:%u: file inclusion is not supported!", filename, linenum);
-	yyterminate();
+    g_string_append_printf(error,"at %s:%u: file inclusion is not supported!", filename, linenum);
+    yyterminate();
 }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 161 "dtd_preparse.l"
+#line 163 "dtd_preparse.l"
 { current = output; g_string_append(current,"\n"); BEGIN OUTSIDE; }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 163 "dtd_preparse.l"
+#line 165 "dtd_preparse.l"
 ECHO;
 	YY_BREAK
-#line 1055 "dtd_preparse.c"
+#line 1057 "dtd_preparse.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(OUTSIDE):
 case YY_STATE_EOF(IN_COMMENT):
@@ -2016,7 +2018,7 @@ void Dtd_PreParse_free (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 163 "dtd_preparse.l"
+#line 165 "dtd_preparse.l"
 
 
 
@@ -2084,7 +2086,7 @@ extern GString* dtd_preparse(const gchar* dname,const  gchar* fname, GString* er
 	g_hash_table_foreach_remove(entities,free_gstring_hash_items,NULL);
 	g_hash_table_destroy(entities);
 
-	g_free(fullname);
+    g_free(fullname);
 
 	return output;
 }
@@ -2097,6 +2099,6 @@ extern GString* dtd_preparse(const gchar* dname,const  gchar* fname, GString* er
  */
 
 int Dtd_PreParse_wrap(void) {
-	return 1;
+    return 1;
 }
 

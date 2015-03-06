@@ -22,7 +22,7 @@
 #ifndef __PACKET_BTSDP_H__
 #define __PACKET_BTSDP_H__
 
-#include "packet-bluetooth.h"
+#include <epan/wmem/wmem.h>
 
 /*
  * Based on value provided by Bluetooth SIG:
@@ -132,13 +132,6 @@
 #define BTSDP_3D_GLASSES_UUID                           0x1138
 #define BTSDP_3D_SYNCHRONIZATION_UUID                   0x1139
 
-#define BTSDP_MULTI_PROFILE_UUID                        0x113A
-#define BTSDP_MULTI_PROFILE_SC_UUID                     0x113B
-
-#define BTSDP_CTN_ACCESS_SERVICE_UUID                   0x113C
-#define BTSDP_CTN_NOTIFICATION_SERVICE_UUID             0x113D
-#define BTSDP_CTN_SERVICE_UUID                          0x113E
-
 #define BTSDP_DID_SERVICE_UUID                          0x1200
 
 #define BTSDP_GENERIC_NETWORKING_SERVICE_UUID           0x1201
@@ -165,6 +158,12 @@
 #define BTSDP_SECONDARY_CHANNEL_FLAG_MASK               0x0002
 
 #define SDP_PSM_DEFAULT  1
+
+typedef struct _uuid_t {
+    guint16  bt_uuid;
+    guint8   size;
+    guint8   data[16];
+} uuid_t;
 
 /* This structure is passed to other dissectors
  * and contains information about the relation between service, PSM/server
@@ -204,7 +203,14 @@ typedef struct _service_info_t {
     struct _service_info_t *parent_info;
 } service_info_t;
 
-extern const value_string hid_country_code_vals[];
+
+typedef struct _custom_uuid_t {
+    const guint8  uuid[16];
+    const guint8  size;
+    const gchar  *name;
+} custom_uuid_t;
+
+extern const custom_uuid_t custom_uuid[];
 
 extern service_info_t* btsdp_get_service_info(wmem_tree_key_t* key);
 

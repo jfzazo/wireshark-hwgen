@@ -24,8 +24,6 @@
 #ifndef __PACKET_IPMI_H__
 #define __PACKET_IPMI_H__
 
-#include <epan/expert.h>
-
 /* IPMI definitions */
 
 /* Max 32 netfn codes: 6 bits, of which 1 designates request/response */
@@ -123,13 +121,16 @@ typedef struct ipmi_netfn_handler {
 	guint32 cmdtablen;
 } ipmi_netfn_t;
 
+/* Handy wrapper around decode_bitfield_value() */
+char *ipmi_dcd8(guint32 val, guint32 mask);
+
 /* Stub parser. Use this to substitute for not-yet-written subparsers;
    NULL in command table means 'no custom data in this request/response' */
 void ipmi_notimpl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 #define IPMI_TBD  ipmi_notimpl, ipmi_notimpl
 
 /* Add a Type/Length field to tree */
-void ipmi_add_typelen(proto_tree *tree, int hf_string, int hf_type, int hf_length, tvbuff_t *tvb,
+void ipmi_add_typelen(proto_tree *tree, const char *desc, tvbuff_t *tvb,
 		guint offs, gboolean is_fru);
 
 /* Add Timestamp in IPMI format */
@@ -163,8 +164,17 @@ ipmi_netfn_t *ipmi_getnetfn(guint32 netfn, const guint8 *sig);
 ipmi_cmd_t *ipmi_getcmd(ipmi_netfn_t *nf, guint32 cmd);
 const char *ipmi_get_completion_code(guint8 completion, ipmi_cmd_t *cmd);
 
-/* Used for sub-registrars (ipmi_*.c) */
-extern gint proto_ipmi;
+/* Sub-registrars (ipmi_*.c) */
+void ipmi_register_app(int proto);
+void ipmi_register_bridge(int proto);
+void ipmi_register_chassis(int proto);
+void ipmi_register_picmg(int proto);
+void ipmi_register_pps(int proto);
+void ipmi_register_se(int proto);
+void ipmi_register_storage(int proto);
+void ipmi_register_transport(int proto);
+void ipmi_register_update(int proto);
+void ipmi_register_vita(int proto);
 
 /* Main dissection routine */
 #define IPMI_D_NONE		0x0001 /* Do not parse at all */

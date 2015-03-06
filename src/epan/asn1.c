@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include <epan/emem.h>
 #include <epan/packet.h>
 
 #include "asn1.h"
@@ -63,7 +64,7 @@ void asn1_ctx_clean_epdv(asn1_ctx_t *actx) {
 void asn1_stack_frame_push(asn1_ctx_t *actx, const gchar *name) {
   asn1_stack_frame_t *frame;
 
-  frame = wmem_new0(wmem_packet_scope(), asn1_stack_frame_t);
+  frame = ep_new0(asn1_stack_frame_t);
   frame->name = name;
   frame->next = actx->stack;
   actx->stack = frame;
@@ -111,7 +112,7 @@ static asn1_par_t *push_new_par(asn1_ctx_t *actx) {
 
   DISSECTOR_ASSERT(actx->stack);
 
-  par = wmem_new0(wmem_packet_scope(), asn1_par_t);
+  par = ep_new0(asn1_par_t);
 
   pp = &(actx->stack->par);
   while (*pp)
@@ -195,105 +196,26 @@ rose_ctx_t *get_rose_ctx(void *ptr) {
   return rctx;
 }
 
-/** Only tested for BER */
-double asn1_get_real(const guint8 *real_ptr, gint len) {
+double asn1_get_real(const guint8 *real_ptr, gint real_len) {
   guint8 octet;
   const guint8 *p;
   guint8 *buf;
   double val = 0;
 
-  /* 8.5.2    If the real value is the value zero,
-   *          there shall be no contents octets in the encoding.
-   */
-  if (len < 1) return val;
-
+  if (real_len < 1) return val;
   octet = real_ptr[0];
   p = real_ptr + 1;
-  len -= 1;
+  real_len -= 1;
   if (octet & 0x80) {  /* binary encoding */
-    int i;
-    gboolean Eneg;
-    gint8 S; /* Sign */
-    guint8 B; /* Base */
-    guint8 F; /* scaling Factor */
-    gint32 E = 0; /* Exponent (supported max 3 octets/24 bit) */
-    guint64 N = 0; /* N (supported max 8 octets/64 bit) */
-
-    guint8 lenE, lenN;
-
-    if(octet & 0x40) S = -1; else S = 1;
-    switch(octet & 0x30) {
-      case 0x00: B = 2; break;
-      case 0x10: B = 8; break;
-      case 0x20: B = 16; break;
-      case 0x30: /* Reserved */
-      default:
-        /* TODO Add some warning in tree about reserved value for Base */
-        return 0;
-    }
-    F = (octet & 0x0c) >> 2;
-
-    /* 8.5.6.4 Exponent length */
-    lenE = (octet & 0x3) + 1;
-    if(lenE == 4)
-    {
-      /* we can't handle exponents > 24 bits */
-      /* TODO Next octet(s) define length of exponent */
-      DISSECTOR_ASSERT_NOT_REACHED();
-    }
-
-    Eneg = (*p) & 0x80 ? TRUE : FALSE;
-    for (i = 0; i < lenE; i++) {
-      if(Eneg) {
-        /* 2's complement: inverse bits */
-        E = (E<<8) | ((guint8) ~(*p));
-      } else {
-        E = (E<<8) | *p;
-      }
-      p++;
-    }
-    if(Eneg) {
-      /* 2's complement: ... and add 1 (and make negative of course) */
-      E = -(E + 1);
-    }
-
-    lenN = len - lenE;
-    if(lenN > 8)
-    {
-      /* we can't handle integers > 64 bits */
-      DISSECTOR_ASSERT_NOT_REACHED();
-    }
-    for (i=0; i<lenN; i++) {
-      N = (N<<8) | *p;
-      p++;
-    }
-    val = (double) S * N * pow(2, F) * pow(B, E);
-#ifdef DEBUG
-    printf("S = %d, N = %lu, F = %u, B = %u, E = %d -> %f\n", S, N, F, B, E, Eneg, val);
-#endif
   } else if (octet & 0x40) {  /* SpecialRealValue */
     switch (octet & 0x3F) {
       case 0x00: val = HUGE_VAL; break;
       case 0x01: val = -HUGE_VAL; break;
     }
   } else {  /* decimal encoding */
-    buf = g_strndup(p, len);
+    buf = ep_strndup(p, real_len);
     val = atof(buf);
-    g_free(buf);
   }
 
   return val;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

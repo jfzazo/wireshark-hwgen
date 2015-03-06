@@ -35,17 +35,17 @@
 
 #include "config.h"
 
-
 #include <epan/packet.h>
+#include <epan/to_str.h>
 #include <epan/prefs.h>
 #include <epan/reassemble.h>
 #include <epan/expert.h>
 #include <epan/asn1.h>
-#include <epan/in_cksum.h>
+#include <epan/wmem/wmem.h>
+#include <string.h>
 
 #include "packet-cdt.h"
 #include "packet-ber.h"
-#include "packet-s5066sis.h"
 
 void proto_register_p_mul(void);
 void proto_reg_handoff_p_mul(void);
@@ -274,8 +274,8 @@ static const gchar *get_type (guint8 value)
 }
 
 
-/* Function checksum, found in ACP 142 annex B04 (Fletcher algorithm) */
-static guint16 checksum_acp142 (guint8 *buffer, gint len, gint offset)
+/*Function checksum, found in ACP142 annex B-3 */
+static guint16 checksum (guint8 *buffer, gint len, gint offset)
 {
   guint16  c0 = 0, c1 = 0, ret, ctmp;
   gint16   cs;
@@ -286,7 +286,10 @@ static guint16 checksum_acp142 (guint8 *buffer, gint len, gint offset)
     return 0;
   }
 
+  buffer[offset] = 0;
+  buffer[offset+1] = 0;
   ctmp = len - offset - 1;
+
   pls = buffer + len;
   hpp = buffer;
 
@@ -331,7 +334,7 @@ static p_mul_seq_val *lookup_seq_val (guint32 message_id, guint16 seq_no,
 
   p_mul_key->id = message_id;
   p_mul_key->seq = seq_no;
-  WMEM_COPY_ADDRESS(wmem_file_scope(), &p_mul_key->addr, addr);
+  SE_COPY_ADDRESS(&p_mul_key->addr, addr);
 
   pkg_data = (p_mul_seq_val *) g_hash_table_lookup (p_mul_id_hash_table, p_mul_key);
 
@@ -391,7 +394,7 @@ static p_mul_seq_val *register_p_mul_id (packet_info *pinfo, address *addr, guin
     /* Try to match corresponding address PDU */
     p_mul_key->id = message_id;
     p_mul_key->seq = 0;
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &p_mul_key->addr, addr);
+    SE_COPY_ADDRESS(&p_mul_key->addr, addr);
     need_set_address = TRUE;
 
     p_mul_data = (p_mul_seq_val *) g_hash_table_lookup (p_mul_id_hash_table, p_mul_key);
@@ -445,7 +448,7 @@ static p_mul_seq_val *register_p_mul_id (packet_info *pinfo, address *addr, guin
     p_mul_key->id = message_id;
     p_mul_key->seq = seq_no;
     if (!need_set_address) {
-      WMEM_COPY_ADDRESS(wmem_file_scope(), &p_mul_key->addr, addr);
+      SE_COPY_ADDRESS(&p_mul_key->addr, addr);
     }
     p_mul_data = (p_mul_seq_val *) g_hash_table_lookup (p_mul_id_hash_table, p_mul_key);
 
@@ -546,8 +549,9 @@ static void add_ack_analysis (tvbuff_t *tvb, packet_info *pinfo, proto_tree *p_m
   }
 
   if (pdu_type == Address_PDU) {
-    analysis_tree = proto_tree_add_subtree(p_mul_tree, tvb, 0, 0, ett_ack_analysis, &sa, "ACK analysis");
+    sa = proto_tree_add_text (p_mul_tree, tvb, 0, 0, "ACK analysis");
     PROTO_ITEM_SET_GENERATED (sa);
+    analysis_tree = proto_item_add_subtree (sa, ett_ack_analysis);
 
     /* Fetch package data */
     if ((pkg_data = lookup_seq_val (message_id, 0, src)) == NULL) {
@@ -600,8 +604,9 @@ static void add_ack_analysis (tvbuff_t *tvb, packet_info *pinfo, proto_tree *p_m
       PROTO_ITEM_SET_HIDDEN (sa);
     }
   } else if (pdu_type == Ack_PDU) {
-    analysis_tree = proto_tree_add_subtree(p_mul_tree, tvb, 0, 0, ett_seq_ack_analysis, &sa, "SEQ/ACK analysis");
+    sa = proto_tree_add_text (p_mul_tree, tvb, 0, 0, "SEQ/ACK analysis");
     PROTO_ITEM_SET_GENERATED (sa);
+    analysis_tree = proto_item_add_subtree (sa, ett_seq_ack_analysis);
 
     /* Fetch package data */
     memcpy((guint8 *)&dstIp, dst->data, 4);
@@ -679,8 +684,9 @@ static p_mul_seq_val *add_seq_analysis (tvbuff_t *tvb, packet_info *pinfo,
     return NULL;
   }
 
-  analysis_tree = proto_tree_add_subtree(p_mul_tree, tvb, 0, 0, ett_seq_analysis, &sa, "SEQ analysis");
+  sa = proto_tree_add_text (p_mul_tree, tvb, 0, 0, "SEQ analysis");
   PROTO_ITEM_SET_GENERATED (sa);
+  analysis_tree = proto_item_add_subtree (sa, ett_seq_analysis);
 
   if (pdu_type == Data_PDU || pdu_type == Discard_Message_PDU) {
     /* Add reference to Address_PDU */
@@ -786,21 +792,20 @@ static void dissect_reassembled_data (tvbuff_t *tvb, packet_info *pinfo, proto_t
   }
 }
 
-static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
+static void dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
   proto_tree    *p_mul_tree, *field_tree, *checksum_tree;
   proto_item    *ti, *en, *len_en;
   gboolean       save_fragmented;
-  guint32        message_id = 0;
+  guint32        message_id = 0, ip;
   guint16        no_dest = 0, count = 0, len, data_len = 0;
-  guint16        checksum_calc, checksum_found;
+  guint16        checksum1, checksum2;
   guint16        pdu_length, no_pdus = 0, seq_no = 0;
   guint8         pdu_type, *value, map = 0, fec_len;
   gint           i, tot_no_missing = 0, no_missing = 0, offset = 0;
   address        src, dst;
   wmem_strbuf_t *message_id_list = NULL;
   nstime_t       ts;
-  gboolean       fletcher = FALSE;
 
   col_set_str (pinfo->cinfo, COL_PROTOCOL, "P_MUL");
   col_clear (pinfo->cinfo, COL_INFO);
@@ -910,24 +915,9 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
   checksum_tree = proto_item_add_subtree (en, ett_checksum);
   len = tvb_length (tvb);
   value = (guint8 *)tvb_memdup (wmem_packet_scope(), tvb, 0, len);
-  if (len >= offset+2) {
-    value[offset] = 0;
-    value[offset+1] = 0;
-  }
-  checksum_found = tvb_get_ntohs (tvb, offset);
-  /* This computed IP checksum is network-byte-order, so convert to host-byte-order */
-  checksum_calc = g_ntohs (ip_checksum (value, len));
-  if (checksum_calc != checksum_found) {
-    guint16 checksum1 = checksum_acp142 (value, len, offset);
-    if (checksum1 == checksum_found) {
-      checksum_calc = checksum1;
-      fletcher = TRUE;
-    }
-  }
-  if (checksum_calc == checksum_found) {
-    if (fletcher) {
-      proto_item_append_text (en, " [Fletcher algorithm]");
-    }
+  checksum1 = checksum (value, len, offset);
+  checksum2 = tvb_get_ntohs (tvb, offset);
+  if (checksum1 == checksum2) {
     proto_item_append_text (en, " (correct)");
     en = proto_tree_add_boolean (checksum_tree, hf_checksum_good, tvb,
                                  offset, 2, TRUE);
@@ -936,7 +926,7 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
                                  offset, 2, FALSE);
     PROTO_ITEM_SET_GENERATED (en);
   } else {
-    proto_item_append_text (en, " (incorrect, should be 0x%04x)", checksum_calc);
+    proto_item_append_text (en, " (incorrect, should be 0x%04x)", checksum1);
     expert_add_info(pinfo, en, &ei_checksum_bad);
     en = proto_tree_add_boolean (checksum_tree, hf_checksum_good, tvb,
                                  offset, 2, FALSE);
@@ -949,7 +939,8 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
 
   if (pdu_type == Ack_PDU) {
     /* Source ID of Ack Sender */
-    TVB_SET_ADDRESS (&dst, AT_IPv4, tvb, offset, 4);
+    ip = tvb_get_ipv4 (tvb, offset);
+    SET_ADDRESS (&dst, AT_IPv4, sizeof(ip), wmem_memdup (wmem_packet_scope(), &ip, 4));
     proto_tree_add_item (p_mul_tree, hf_source_id_ack, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset += 4;
 
@@ -959,7 +950,8 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
     offset += 2;
   } else {
     /* Source Id */
-    TVB_SET_ADDRESS (&src, AT_IPv4, tvb, offset, 4);
+    ip = tvb_get_ipv4 (tvb, offset);
+    SET_ADDRESS (&src, AT_IPv4, sizeof(ip), wmem_memdup (wmem_packet_scope(), &ip, 4));
     proto_tree_add_item (p_mul_tree, hf_source_id, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset += 4;
 
@@ -1034,7 +1026,8 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
       field_tree = proto_item_add_subtree (en, ett_dest_entry);
 
       /* Destination Id */
-      TVB_SET_ADDRESS (&dst, AT_IPv4, tvb, offset, 4);
+      ip = tvb_get_ipv4 (tvb, offset);
+      SET_ADDRESS (&dst, AT_IPv4, sizeof(ip), wmem_memdup(wmem_packet_scope(), &ip, 4));
       proto_tree_add_item (field_tree, hf_dest_id, tvb, offset, 4, ENC_BIG_ENDIAN);
       offset += 4;
 
@@ -1095,7 +1088,8 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
       }
 
       /* Source Id */
-      TVB_SET_ADDRESS (&src, AT_IPv4, tvb, offset, 4);
+      ip = tvb_get_ipv4 (tvb, offset);
+      SET_ADDRESS (&src, AT_IPv4, sizeof(ip), wmem_memdup (wmem_packet_scope(), &ip, 4));
       proto_tree_add_item (field_tree, hf_source_id, tvb, offset, 4, ENC_BIG_ENDIAN);
       offset += 4;
 
@@ -1313,8 +1307,6 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
     proto_item_append_text (len_en, " (more data in packet: %d)", len);
     expert_add_info(pinfo, len_en, &ei_more_data);
   }
-
-  return offset;
 }
 
 static void p_mul_init_routine (void)
@@ -1576,7 +1568,7 @@ void proto_register_p_mul (void)
 
   proto_p_mul = proto_register_protocol (PNAME, PSNAME, PFNAME);
 
-  p_mul_handle = new_register_dissector(PFNAME, dissect_p_mul, proto_p_mul);
+  p_mul_handle = register_dissector(PFNAME, dissect_p_mul, proto_p_mul);
 
   proto_register_field_array (proto_p_mul, hf, array_length (hf));
   proto_register_subtree_array (ett, array_length (ett));
@@ -1628,7 +1620,6 @@ void proto_reg_handoff_p_mul (void)
   if (!p_mul_prefs_initialized) {
     p_mul_prefs_initialized = TRUE;
     data_handle = find_dissector ("data");
-    dissector_add_uint ("s5066sis.ctl.appid", S5066_CLIENT_S4406_ANNEX_E_TMI_1_P_MUL, p_mul_handle);
   } else {
     dissector_delete_uint_range ("udp.port", p_mul_port_range, p_mul_handle);
     g_free (p_mul_port_range);

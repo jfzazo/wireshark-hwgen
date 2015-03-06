@@ -10,6 +10,13 @@
 
 
 #include "config.h"
+#ifdef _MSC_VER
+#pragma warning(disable:4005)
+#pragma warning(disable:4013)
+#pragma warning(disable:4018)
+#pragma warning(disable:4101)
+#endif
+
 #include <glib.h>
 #include <string.h>
 #include <epan/packet.h>
@@ -18,8 +25,6 @@
 #include "packet-dcerpc-nt.h"
 #include "packet-windows-common.h"
 #include "packet-dcerpc-wzcsvc.h"
-void proto_register_dcerpc_wzcsvc(void);
-void proto_reg_handoff_dcerpc_wzcsvc(void);
 
 /* Ett declarations */
 static gint ett_dcerpc_wzcsvc = -1;
@@ -408,7 +413,7 @@ void proto_register_dcerpc_wzcsvc(void)
 {
 	static hf_register_info hf[] = {
 	{ &hf_wzcsvc_opnum,
-		{ "Operation", "wzcsvc.opnum", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
+	  { "Operation", "wzcsvc.opnum", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
 	};
 
 

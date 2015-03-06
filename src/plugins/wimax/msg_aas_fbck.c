@@ -28,18 +28,19 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "wimax_mac.h"
 
-#define OFDMA_AAS_FBCK_REQ_NUMBER_OF_FRAME_MASK		0xFE
-#define OFDMA_AAS_FBCK_REQ_DATA_TYPE_MASK		0x01
-#define OFDMA_AAS_FBCK_REQ_FB_REQ_COUNTER_MASK		0xE0
+#define OFDMA_AAS_FBCK_REQ_NUMBER_OF_FRAME_MASK	0xFE
+#define OFDMA_AAS_FBCK_REQ_DATA_TYPE_MASK	0x01
+#define OFDMA_AAS_FBCK_REQ_FB_REQ_COUNTER_MASK	0xE0
 #define OFDMA_AAS_FBCK_REQ_FB_REQ_RESOLUTION_MASK	0x18
-#define OFDMA_AAS_FBCK_REQ_FB_REQ_RESERVED_MASK		0x07
+#define OFDMA_AAS_FBCK_REQ_FB_REQ_RESERVED_MASK	0x07
 
-#define OFDMA_AAS_FBCK_REQ_FB_RSP_RESERVED_MASK		0xC0
-#define OFDMA_AAS_FBCK_RSP_DATA_TYPE_MASK		0x20
-#define OFDMA_AAS_FBCK_REQ_FB_RSP_COUNTER_MASK		0x1C
+#define OFDMA_AAS_FBCK_REQ_FB_RSP_RESERVED_MASK	0xC0
+#define OFDMA_AAS_FBCK_RSP_DATA_TYPE_MASK	0x20
+#define OFDMA_AAS_FBCK_REQ_FB_RSP_COUNTER_MASK	0x1C
 #define OFDMA_AAS_FBCK_REQ_FB_RSP_RESOLUTION_MASK	0x03
 
 void proto_register_mac_mgmt_msg_aas_fbck(void);
@@ -51,27 +52,27 @@ static gint ett_mac_mgmt_msg_aas_fbck_rsp_decoder = -1;
 
 static const value_string vals_data_types[] =
 {
-	{0, "measure on downlink preamble only"},
-	{1, "measure on downlink data (for this SS) only"},
-	{0,  NULL}
+    {0, "measure on downlink preamble only"},
+    {1, "measure on downlink data (for this SS) only"},
+    {0,  NULL}
 };
 
 static const value_string vals_resolutions_0[] =
 {
-	{0, "32 subcarriers"},
-	{1, "64 subcarriers"},
-	{2, "128 subcarriers"},
-	{3, "256 subcarriers"},
-	{0,  NULL}
+    {0, "32 subcarriers"},
+    {1, "64 subcarriers"},
+    {2, "128 subcarriers"},
+    {3, "256 subcarriers"},
+    {0,  NULL}
 };
 
 static const value_string vals_resolutions_1[] =
 {
-	{0, "1 subcarrier"},
-	{1, "4 subcarriers"},
-	{2, "8 subcarriers"},
-	{3, "16 subcarriers"},
-	{0,  NULL}
+    {0, "1 subcarrier"},
+    {1, "4 subcarriers"},
+    {2, "8 subcarriers"},
+    {3, "16 subcarriers"},
+    {0,  NULL}
 };
 
 /* fix fields */
@@ -94,7 +95,7 @@ static int hf_aas_fbck_rssi_value = -1;
 static int hf_aas_fbck_cinr_value = -1;
 
 
-static void dissect_mac_mgmt_msg_aas_fbck_req_decoder(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
+void dissect_mac_mgmt_msg_aas_fbck_req_decoder(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
 	guint offset = 0;
 	guint data_type;
@@ -134,7 +135,7 @@ static void dissect_mac_mgmt_msg_aas_fbck_req_decoder(tvbuff_t *tvb, packet_info
 	}
 }
 
-static void dissect_mac_mgmt_msg_aas_fbck_rsp_decoder(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
+void dissect_mac_mgmt_msg_aas_fbck_rsp_decoder(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
 	guint offset = 0;
 	guint tvb_len, data_type;
@@ -344,16 +345,3 @@ proto_reg_handoff_mac_mgmt_msg_aas(void)
 	aas_handle = create_dissector_handle(dissect_mac_mgmt_msg_aas_fbck_rsp_decoder, proto_mac_mgmt_msg_aas_fbck_decoder);
 	dissector_add_uint("wmx.mgmtmsg", MAC_MGMT_MSG_AAS_FBCK_RSP, aas_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

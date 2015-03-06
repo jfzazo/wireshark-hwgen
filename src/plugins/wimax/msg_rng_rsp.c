@@ -28,6 +28,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "crc.h"
 #include "wimax_tlv.h"
@@ -38,6 +39,9 @@ void proto_register_mac_mgmt_msg_rng_rsp(void);
 void proto_reg_handoff_mac_mgmt_msg_rng_rsp(void);
 
 extern gboolean include_cor2_changes;
+
+/* external reference */
+extern void dissect_power_saving_class(proto_tree *rng_req_tree, gint tlv_type, tvbuff_t *tvb, guint compound_tlv_len, packet_info *pinfo, guint offset);
 
 static dissector_handle_t sbc_rsp_handle = NULL;
 static dissector_handle_t reg_rsp_handle = NULL;
@@ -109,8 +113,8 @@ static gint hf_rng_invalid_tlv					= -1;
 /* STRING RESOURCES */
 
 static const true_false_string tfs_rng_rsp_aas_broadcast = {
-	"SS shall not issue contention-based Bandwidth Request",
-	"SS may issue contention-based Bandwidth Request"
+    "SS shall not issue contention-based Bandwidth Request",
+    "SS may issue contention-based Bandwidth Request"
 };
 
 static const true_false_string tfs_rng_rsp_resource_retain_flag = {
@@ -119,11 +123,11 @@ static const true_false_string tfs_rng_rsp_resource_retain_flag = {
 };
 
 static const value_string vals_rng_rsp_ranging_status[] = {
-	{1,		"continue"},
-	{2,		"abort"},
-	{3,		"success"},
-	{4,		"rerange"},
-	{0,		NULL}
+    {1,					"continue"},
+    {2,					"abort"},
+    {3,					"success"},
+    {4,					"rerange"},
+    {0,					NULL}
 };
 
 static const value_string vals_rng_rsp_level_of_service[] = {
@@ -456,7 +460,7 @@ static void dissect_mac_mgmt_msg_rng_rsp_decoder(tvbuff_t *tvb, packet_info *pin
 						if(tlv_type == -1 || sub_tlv_len > MAX_TLV_LEN || sub_tlv_len < 1)
 						{	/* invalid tlv info */
 							col_append_sep_str(pinfo->cinfo, COL_INFO, NULL, "RNG-RSP TLV error");
-							proto_tree_add_item(rng_rsp_tree, hf_rng_invalid_tlv, tvb, tlv_offset, (tvb_len - tlv_offset), ENC_NA);
+							proto_tree_add_item(rng_rsp_tree, hf_rng_invalid_tlv, tvb, tlv_offset, (tvb_len - offset), ENC_NA);
 							break;
 						}
 						/* get the offset to the sub TLV data */
@@ -959,16 +963,3 @@ void proto_reg_handoff_mac_mgmt_msg_rng_rsp(void)
 	reg_rsp_handle = find_dissector("mac_mgmt_msg_reg_rsp_handler");
 }
 
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

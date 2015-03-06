@@ -28,6 +28,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "crc.h"
 #include "wimax_tlv.h"
@@ -164,16 +165,3 @@ proto_reg_handoff_mac_mgmt_msg_fpc(void)
 	fpc_handle = create_dissector_handle(dissect_mac_mgmt_msg_fpc_decoder, proto_mac_mgmt_msg_fpc_decoder);
 	dissector_add_uint("wmx.mgmtmsg", MAC_MGMT_MSG_FPC, fpc_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

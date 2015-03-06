@@ -55,7 +55,7 @@ init_process_policies(void)
 	 * If we have SetProcessDEPPolicy(), turn "data execution
 	 * prevention" on - i.e., if the MMU lets you set execute
 	 * permission on a per-page basis, turn execute permission
-	 * off on most data pages.  SetProcessDEPPolicy() fails on
+	 * off on most data pages.  PSetProcessDEPPolicy() fails on
 	 * 64-bit Windows (it's *always* on there), but if it fails,
 	 * we don't care (we did our best), so we don't check for
 	 * errors.
@@ -169,6 +169,7 @@ npf_sys_is_running() {
 #include <grp.h>
 #endif
 
+#include <glib.h>
 #include <string.h>
 #include <errno.h>
 

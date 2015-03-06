@@ -23,7 +23,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include <wiretap/netscaler.h>
 
 void proto_register_ns(void);
@@ -155,6 +157,7 @@ dissect_nstrace(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	guint8		flagoffset, flagval;
 	guint8		src_vmname_len = 0, dst_vmname_len = 0;
 	guint8		variable_ns_len = 0;
+	guint 		flagval32;
 
 	wmem_strbuf_append(flags_strbuf, "None");
 
@@ -176,14 +179,15 @@ dissect_nstrace(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	case NSPR_HEADER_VERSION300:
 	case NSPR_HEADER_VERSION206:
 		flagoffset = pnstr->ns_activity_offset;
-		flagitem = proto_tree_add_item(ns_tree, hf_ns_activity, tvb, flagoffset, 4, ENC_LITTLE_ENDIAN);
+		flagval32 = tvb_get_letohl(tvb, flagoffset);
+		flagitem = proto_tree_add_uint_format(ns_tree, hf_ns_activity, tvb, flagoffset, 4, flagval32,
+						"Activity Flags: 0x%04x", flagval32);
 		flagtree = proto_item_add_subtree(flagitem, ett_ns_activity_flags);
 		proto_tree_add_item(flagtree, hf_ns_activity_perf_collection, tvb, flagoffset, 4, ENC_LITTLE_ENDIAN);
 		proto_tree_add_item(flagtree, hf_ns_activity_pcb_zombie, tvb, flagoffset, 4, ENC_LITTLE_ENDIAN);
 		proto_tree_add_item(flagtree, hf_ns_activity_natpcb_zombie, tvb, flagoffset, 4, ENC_LITTLE_ENDIAN);
 		proto_tree_add_item(flagtree, hf_ns_activity_lbstats_sync, tvb, flagoffset, 4, ENC_LITTLE_ENDIAN);
 		proto_tree_add_item(flagtree, hf_ns_activity_stats_req, tvb, flagoffset, 4, ENC_LITTLE_ENDIAN);
-		/* fall through to next case */
 
 	case NSPR_HEADER_VERSION205:
 
@@ -194,7 +198,7 @@ dissect_nstrace(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		if(dst_vmname_len){
 			proto_tree_add_item(ns_tree,hf_ns_dst_vm,tvb,pnstr->data_offset+src_vmname_len,dst_vmname_len,ENC_ASCII|ENC_NA);
 			}
-		/* fall through to next case */
+
 
 	case NSPR_HEADER_VERSION204:
 
@@ -225,7 +229,6 @@ dissect_nstrace(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		proto_tree_add_boolean(flagtree, hf_ns_clflags_dfd, tvb, flagoffset, 1, flagval);
 		proto_tree_add_boolean(flagtree, hf_ns_clflags_fr, tvb, flagoffset, 1, flagval);
 		proto_tree_add_boolean(flagtree, hf_ns_clflags_fp, tvb, flagoffset, 1, flagval);
-		/* fall through to next case */
 
 	case NSPR_HEADER_VERSION203:
 		proto_tree_add_item(ns_tree, hf_ns_coreid, tvb, pnstr->coreid_offset, 2, ENC_LITTLE_ENDIAN);
@@ -371,7 +374,7 @@ proto_register_ns(void)
 		},
 
 		{ &hf_ns_activity,
-		  { "Activity Flags", "nstrace.activity",
+		  { "NetScaler Activity", "nstrace.activity",
 		    FT_UINT32, BASE_HEX, NULL, 0x0,
 		    NULL, HFILL}
 		},
@@ -432,16 +435,3 @@ void proto_reg_handoff_ns(void)
 	dissector_add_uint("wtap_encap", WTAP_ENCAP_NSTRACE_2_0, nstrace_handle);
 	dissector_add_uint("wtap_encap", WTAP_ENCAP_NSTRACE_3_0, nstrace_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

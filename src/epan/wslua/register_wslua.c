@@ -52,7 +52,6 @@ void wslua_register_classes(lua_State* L) {
 
 void wslua_register_functions(lua_State* L) {
 	WSLUA_REGISTER_FUNCTION(register_postdissector); 
-	WSLUA_REGISTER_FUNCTION(dissect_tcp_pdus); 
 	WSLUA_REGISTER_FUNCTION(gui_enabled); 
 	WSLUA_REGISTER_FUNCTION(register_menu); 
 	WSLUA_REGISTER_FUNCTION(new_dialog); 

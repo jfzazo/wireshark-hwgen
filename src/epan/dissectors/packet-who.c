@@ -23,6 +23,8 @@
 
 #include "config.h"
 
+#include <time.h>
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/to_str.h>
 
@@ -56,7 +58,7 @@ RWHOD(8)                 UNIX System Manager's Manual                 RWHOD(8)
            };
  *
  */
-
+ 
 void proto_register_who(void);
 void proto_reg_handoff_who(void);
 
@@ -211,7 +213,7 @@ dissect_whoent(tvbuff_t *tvb, int offset, proto_tree *tree)
 		idle_secs = tvb_get_ntohl(tvb, line_offset);
 		proto_tree_add_uint_format(whoent_tree, hf_who_idle, tvb,
 		    line_offset, 4, idle_secs, "Idle: %s",
-		    time_secs_to_str(wmem_packet_scope(), idle_secs));
+		    time_secs_to_ep_str(idle_secs));
 		line_offset += 4;
 
 		whoent_num++;
@@ -297,16 +299,3 @@ proto_reg_handoff_who(void)
 	who_handle = create_dissector_handle(dissect_who, proto_who);
 	dissector_add_uint("udp.port", UDP_PORT_WHO, who_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

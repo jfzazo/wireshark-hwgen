@@ -249,7 +249,7 @@ dissect_control(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                 guint8 *id;
 
                 proto_tree_add_item(tree, hf_bthcrp_control_1284_id, tvb, offset, -1, ENC_ASCII | ENC_NA);
-                id = tvb_get_string_enc(NULL, tvb, offset, tvb_length_remaining(tvb, offset), ENC_ASCII);
+                id = tvb_get_string(NULL, tvb, offset, tvb_length_remaining(tvb, offset));
                 col_append_fstr(pinfo->cinfo, COL_INFO, " - 1284 ID: %s", id);
                 offset += tvb_length_remaining(tvb, offset);
             }
@@ -401,7 +401,8 @@ dissect_bthcrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             col_set_str(pinfo->cinfo, COL_INFO, "Rcvd ");
             break;
         default:
-            col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection ");
+            col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction %d ",
+                pinfo->p2p_dir);
             break;
     }
 
@@ -684,8 +685,8 @@ proto_reg_handoff_bthcrp(void)
     dissector_add_uint("btl2cap.service", BTSDP_HCRP_SCAN_SERVICE_UUID, bthcrp_handle);
     dissector_add_uint("btl2cap.service", BTSDP_HCRP_SERVICE_UUID, bthcrp_handle);
 
-    dissector_add_for_decode_as("btl2cap.psm", bthcrp_handle);
-    dissector_add_for_decode_as("btl2cap.cid", bthcrp_handle);
+    dissector_add_handle("btl2cap.psm", bthcrp_handle);
+    dissector_add_handle("btl2cap.cid", bthcrp_handle);
 }
 
 /*

@@ -32,7 +32,6 @@
 
 #include <ui/preference_utils.h>
 
-#include "qt_ui_utils.h"
 #include "column_preferences_frame.h"
 #include "ui_column_preferences_frame.h"
 #include "syntax_line_edit.h"
@@ -85,16 +84,13 @@ void ColumnPreferencesFrame::unstash()
     QTreeWidgetItemIterator it(ui->columnTreeWidget);
     while (*it) {
         fmt_data *cfmt = g_new0(fmt_data, 1);
-
-        cfmt->title = qstring_strdup((*it)->text(title_col_));
-        cfmt->fmt = (*it)->data(type_col_, Qt::UserRole).value<int>();
         cfmt->visible = (*it)->checkState(visible_col_) == Qt::Checked ? TRUE : FALSE;
-        cfmt->resolved = TRUE;
-
+        cfmt->title = g_strdup((*it)->text(title_col_).toUtf8().constData());
+        cfmt->fmt = (*it)->data(type_col_, Qt::UserRole).value<int>();
         if (cfmt->fmt == COL_CUSTOM) {
             bool ok;
             int occurrence = (*it)->text(custom_occurrence_col_).toInt(&ok);
-            cfmt->custom_field = qstring_strdup((*it)->text(custom_field_col_));
+            cfmt->custom_field = g_strdup((*it)->text(custom_field_col_).toUtf8().constData());
             cfmt->custom_occurrence = ok ? occurrence : 0;
         }
 
@@ -137,7 +133,6 @@ void ColumnPreferencesFrame::keyPressEvent(QKeyEvent *evt)
         case Qt::Key_Escape:
             cur_line_edit_->setText(saved_col_string_);
             new_idx = saved_combo_idx_;
-            /* Fall Through */
         case Qt::Key_Enter:
         case Qt::Key_Return:
             switch (cur_column_) {
@@ -165,7 +160,6 @@ void ColumnPreferencesFrame::keyPressEvent(QKeyEvent *evt)
         switch (evt->key()) {
         case Qt::Key_Escape:
             cur_combo_box_->setCurrentIndex(saved_combo_idx_);
-            /* Fall Through */
         case Qt::Key_Enter:
         case Qt::Key_Return:
             // XXX The combo box eats enter and return
@@ -279,7 +273,7 @@ void ColumnPreferencesFrame::on_columnTreeWidget_itemActivated(QTreeWidgetItem *
         SyntaxLineEdit *syntax_edit = new SyntaxLineEdit();
         saved_col_string_ = item->text(custom_occurrence_col_);
         connect(syntax_edit, SIGNAL(textChanged(QString)),
-                syntax_edit, SLOT(checkInteger(QString)));
+                this, SLOT(customOccurrenceTextChanged(QString)));
         connect(syntax_edit, SIGNAL(editingFinished()), this, SLOT(customOccurrenceEditingFinished()));
         editor = cur_line_edit_ = syntax_edit;
 
@@ -361,6 +355,25 @@ void ColumnPreferencesFrame::customFieldEditingFinished()
 
     item->setText(custom_field_col_, cur_line_edit_->text());
     ui->columnTreeWidget->removeItemWidget(item, custom_field_col_);
+}
+
+void ColumnPreferencesFrame::customOccurrenceTextChanged(QString)
+{
+    SyntaxLineEdit *syntax_edit = qobject_cast<SyntaxLineEdit *>(cur_line_edit_);
+    QTreeWidgetItem *item = ui->columnTreeWidget->currentItem();
+    if (!syntax_edit || !item) return;
+
+    if (syntax_edit->text().isEmpty()) {
+        syntax_edit->setSyntaxState(SyntaxLineEdit::Empty);
+    } else {
+        bool ok;
+        syntax_edit->text().toInt(&ok);
+        if (ok) {
+            syntax_edit->setSyntaxState(SyntaxLineEdit::Valid);
+        } else {
+            syntax_edit->setSyntaxState(SyntaxLineEdit::Invalid);
+        }
+    }
 }
 
 void ColumnPreferencesFrame::customOccurrenceEditingFinished()

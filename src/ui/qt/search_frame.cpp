@@ -212,7 +212,7 @@ void SearchFrame::on_findButton_clicked()
 
     switch (sf_ui_->searchTypeComboBox->currentIndex()) {
     case df_search:
-        if (!dfilter_compile(sf_ui_->searchLineEdit->text().toUtf8().constData(), &dfp, NULL)) {
+        if (!dfilter_compile(sf_ui_->searchLineEdit->text().toUtf8().constData(), &dfp)) {
             err_string = tr("Invalid filter.");
             emit pushFilterSyntaxStatus(err_string);
             return;
@@ -338,22 +338,6 @@ void SearchFrame::on_findButton_clicked()
 void SearchFrame::on_cancelButton_clicked()
 {
     animatedHide();
-}
-
-void SearchFrame::changeEvent(QEvent* event)
-{
-    if (0 != event)
-    {
-        switch (event->type())
-        {
-        case QEvent::LanguageChange:
-            sf_ui_->retranslateUi(this);
-            break;
-        default:
-            break;
-        }
-    }
-    AccordionFrame::changeEvent(event);
 }
 
 /*

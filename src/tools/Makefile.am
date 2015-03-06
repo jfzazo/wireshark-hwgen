@@ -55,7 +55,6 @@ PIDL_FILES= \
 	pidl/lib/Parse/Pidl/Wireshark/Conformance.pm	\
 	pidl/lib/Parse/Pidl/Wireshark/NDR.pm		\
 	pidl/lib/Parse/Yapp/Driver.pm			\
-	pidl/lib/wscript_build				\
 	pidl/pidl					\
 	pidl/tests/Util.pm				\
 	pidl/tests/cutil.pl				\
@@ -82,65 +81,27 @@ PIDL_FILES= \
 	pidl/tests/typelist.pl				\
 	pidl/tests/util.pl				\
 	pidl/tests/wireshark-conf.pl			\
-	pidl/tests/wireshark-ndr.pl			\
-	pidl/wscript
+	pidl/tests/wireshark-ndr.pl
 
 EXTRA_DIST = \
 	$(PIDL_FILES)					\
-	asn2deb						\
 	asn2wrs.py					\
-	build-qt-sdk.bat				\
-	checkfiltername.pl				\
 	checkhf.pl					\
-	checklicenses.py				\
 	colorfilters2js.pl				\
-	commit-msg					\
 	compare-abis.sh					\
 	checkAPIs.pl					\
-	convert-proto-tree-new.awk			\
-	convert_expert_add_info_format.pl		\
-	convert_proto_tree_add_text.pl			\
 	cppcheck/cppcheck.sh				\
 	cppcheck/includes				\
 	cppcheck/suppressions				\
 	debian-setup.sh					\
-	dfilter-test.py					\
-	dftestfiles/arp.pcap				\
-	dftestfiles/http.pcap				\
-	dftestfiles/ipv6.pcap				\
-	dftestfiles/ipx_rip.pcap			\
-	dftestfiles/nfs.pcap				\
-	dftestfiles/ntp.pcap				\
-	dftestfiles/tftp.pcap				\
-	dftestlib/__init__.py				\
-	dftestlib/bytes_ether.py			\
-	dftestlib/bytes_ipv6.py				\
-	dftestlib/bytes_type.py				\
-	dftestlib/dftest.py				\
-	dftestlib/double.py				\
-	dftestlib/integer.py				\
-	dftestlib/integer_1byte.py			\
-	dftestlib/ipv4.py				\
-	dftestlib/range_method.py			\
-	dftestlib/scanner.py				\
-	dftestlib/string_type.py			\
-	dftestlib/stringz.py				\
-	dftestlib/time_relative.py			\
-	dftestlib/time_type.py				\
-	dftestlib/tvb.py				\
-	dftestlib/uint64.py				\
-	dftestlib/util.py				\
+	dfilter-test.py 				\
 	extract_asn1_from_spec.pl			\
 	fix-encoding-args.pl				\
-	fix_pragma_wdocumentation.sh	\
 	fixhf.pl					\
 	ftsanity.py					\
 	fuzz-test.sh					\
-	gen-bugnote					\
-	generate-bacnet-vendors.py	\
-	git-compare-abis.sh				\
-	git-export-release.sh				\
 	html2text.py					\
+	asn2deb						\
 	idl2deb						\
 	idl2wrs						\
 	indexcap.py					\
@@ -148,44 +109,30 @@ EXTRA_DIST = \
 	lex.py						\
 	list_protos_in_cap.sh				\
 	Makefile.nmake					\
+	make-dissector-reg				\
 	make-dissector-reg.py				\
 	make-manuf					\
-	make-sminmpec.pl				\
-	make-services.pl				\
-	make-services.py				\
+	make-sminmpec.pl 				\
+	make-services.py 				\
+	make-tapreg-dotc				\
 	make-tap-reg.py					\
-	make-usb.py					\
-	make_charset_table.c				\
 	msnchat						\
 	native-nmake.cmd				\
 	ncp2222.py					\
 	netscreen2dump.py				\
-	npl/ast.h					\
-	npl/npl.c					\
-	npl/parser.l					\
-	npl/xmem.h					\
-	parse_xml2skinny_dissector.py	\
 	pkt-from-core.py				\
-	pre-commit					\
 	process-x11-fields.pl				\
 	process-x11-xcb.pl				\
 	randpkt-test.sh					\
 	rdps.py						\
-	runa2x.sh					\
 	runlex.sh					\
 	setuid-root.pl.in				\
 	test-common.sh					\
 	test-captures.sh				\
-	textify.ps1					\
-	tpg/Makefile.am					\
-	tpg/Makefile.nmake				\
-	tpg/V2P.pm					\
-	tpg/tpg.pl					\
-	tpg/tpg.yp					\
-	usb-ptp-extract-models.pl			\
-	usb-ptp-extract-models.txt			\
+	textify.sh 					\
 	valgrind-wireshark.sh				\
-	vg-suppressions					\
+	win32-setup.sh					\
+	win64-setup.sh					\
 	win-setup.sh					\
 	wireshark_be.py					\
 	wireshark_gen.py				\

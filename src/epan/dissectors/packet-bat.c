@@ -27,6 +27,8 @@
 #include <epan/prefs.h>
 #include <epan/tap.h>
 #include <epan/addr_resolv.h>
+#include <epan/wmem/wmem.h>
+
 void proto_register_bat(void);
 void proto_reg_handoff_bat(void);
 
@@ -57,15 +59,15 @@ struct gw_packet {
 };
 #define GW_PACKET_SIZE 1
 
-#define TUNNEL_DATA		 0x01
-#define TUNNEL_IP_REQUEST	 0x02
-#define TUNNEL_IP_INVALID	 0x03
+#define TUNNEL_DATA 0x01
+#define TUNNEL_IP_REQUEST 0x02
+#define TUNNEL_IP_INVALID 0x03
 #define TUNNEL_KEEPALIVE_REQUEST 0x04
-#define TUNNEL_KEEPALIVE_REPLY	 0x05
+#define TUNNEL_KEEPALIVE_REPLY 0x05
 
-#define DATA_TYPE_NEIGH	 1
+#define DATA_TYPE_NEIGH 1
 #define DATA_TYPE_SEC_IF 2
-#define DATA_TYPE_HNA	 3
+#define DATA_TYPE_HNA 3
 
 struct vis_packet_v22 {
 	address sender_ip;
@@ -112,8 +114,6 @@ static int hf_bat_batman_version = -1;
 static int hf_bat_batman_flags = -1;
 static int hf_bat_batman_ttl = -1;
 static int hf_bat_batman_gwflags = -1;
-static int hf_bat_batman_gwflags_dl_speed = -1;
-static int hf_bat_batman_gwflags_ul_speed = -1;
 static int hf_bat_batman_seqno = -1;
 static int hf_bat_batman_gwport = -1;
 static int hf_bat_batman_orig = -1;
@@ -142,18 +142,18 @@ static int hf_bat_batman_flags_unidirectional = -1;
 static int hf_bat_batman_flags_directlink = -1;
 
 static const value_string gw_packettypenames[] = {
-	{ TUNNEL_DATA,		    "DATA" },
-	{ TUNNEL_IP_REQUEST,	    "IP_REQUEST" },
-	{ TUNNEL_IP_INVALID,	    "IP_INVALID" },
+	{ TUNNEL_DATA, "DATA" },
+	{ TUNNEL_IP_REQUEST, "IP_REQUEST" },
+	{ TUNNEL_IP_INVALID, "IP_INVALID" },
 	{ TUNNEL_KEEPALIVE_REQUEST, "KEEPALIVE_REQUEST" },
-	{ TUNNEL_KEEPALIVE_REPLY,   "KEEPALIVE_REPLY" },
+	{ TUNNEL_KEEPALIVE_REPLY, "KEEPALIVE_REPLY" },
 	{ 0, NULL }
 };
 
 static const value_string vis_packettypenames[] = {
-	{ DATA_TYPE_NEIGH,  "NEIGH" },
+	{ DATA_TYPE_NEIGH, "NEIGH" },
 	{ DATA_TYPE_SEC_IF, "SEC_IF" },
-	{ DATA_TYPE_HNA,    "HNA" },
+	{ DATA_TYPE_HNA, "HNA" },
 	{ 0, NULL }
 };
 
@@ -183,8 +183,8 @@ static int bat_follow_tap = -1;
 
 /* values changed by preferences */
 static guint global_bat_batman_udp_port = BAT_BATMAN_PORT;
-static guint global_bat_gw_udp_port	= BAT_GW_PORT;
-static guint global_bat_vis_udp_port	= BAT_VIS_PORT;
+static guint global_bat_gw_udp_port = BAT_GW_PORT;
+static guint global_bat_vis_udp_port = BAT_VIS_PORT;
 
 
 
@@ -217,29 +217,25 @@ static void dissect_bat_gwflags(tvbuff_t *tvb, guint8 gwflags, int offset, proto
 	guint8 s = (gwflags & 0x80) >> 7;
 	guint8 downbits = (gwflags & 0x78) >> 3;
 	guint8 upbits = (gwflags & 0x07);
-	guint  down, up;
+	guint down, up;
 
 	down = 32 * (s + 2) * (1 << downbits);
 	up = ((upbits + 1) * down) / 8;
 
 	gwflags_tree =  proto_item_add_subtree(tgw, ett_bat_batman_gwflags);
-	proto_tree_add_uint_format_value(gwflags_tree, hf_bat_batman_gwflags_dl_speed, tvb, offset, 1, down, "%dkbit", down);
-	proto_tree_add_uint_format_value(gwflags_tree, hf_bat_batman_gwflags_ul_speed, tvb, offset, 1, up, "%dkbit", up);
+	proto_tree_add_text(gwflags_tree, tvb, offset, 1, "Download Speed: %dkbit", down);
+	proto_tree_add_text(gwflags_tree, tvb, offset, 1, "Upload Speed: %dkbit", up);
 
 }
 
 static int dissect_bat_batman_v5(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree)
 {
-	proto_item *tgw;
-	proto_tree *bat_batman_tree = NULL;
+	proto_item *tf, *tgw;
+	proto_tree *bat_batman_tree = NULL, *flag_tree;
 	struct batman_packet_v5 *batman_packeth;
+	const guint8  *old_orig_addr, *orig_addr;
 	guint32 old_orig, orig;
 	gint i;
-	static const int * batman_flags[] = {
-		&hf_bat_batman_flags_unidirectional,
-		&hf_bat_batman_flags_directlink,
-		NULL
-	};
 
 	tvbuff_t *next_tvb;
 
@@ -251,10 +247,12 @@ static int dissect_bat_batman_v5(tvbuff_t *tvb, int offset, packet_info *pinfo, 
 	batman_packeth->gwflags = tvb_get_guint8(tvb, offset+3);
 	batman_packeth->seqno = tvb_get_ntohs(tvb, offset+4);
 	batman_packeth->gwport = tvb_get_ntohs(tvb, offset+6);
+	orig_addr = tvb_get_ptr(tvb, offset+8, 4);
 	orig = tvb_get_ipv4(tvb, offset+8);
-	TVB_SET_ADDRESS(&batman_packeth->orig, AT_IPv4, tvb, offset+8, 4);
+	SET_ADDRESS(&batman_packeth->orig, AT_IPv4, 4, orig_addr);
+	old_orig_addr = tvb_get_ptr(tvb, offset+12, 4);
 	old_orig = tvb_get_ipv4(tvb, offset+12);
-	TVB_SET_ADDRESS(&batman_packeth->old_orig, AT_IPv4, tvb, offset+12, 4);
+	SET_ADDRESS(&batman_packeth->old_orig, AT_IPv4, 4, old_orig_addr);
 	batman_packeth->tq = tvb_get_guint8(tvb, offset+16);
 	batman_packeth->hna_len = tvb_get_guint8(tvb, offset+17);
 
@@ -265,9 +263,13 @@ static int dissect_bat_batman_v5(tvbuff_t *tvb, int offset, packet_info *pinfo, 
 	if (tree) {
 		proto_item *ti;
 
-		ti = proto_tree_add_protocol_format(tree, proto_bat_plugin, tvb, offset, BATMAN_PACKET_V5_SIZE,
+		if (PTREE_DATA(tree)->visible) {
+			ti = proto_tree_add_protocol_format(tree, proto_bat_plugin, tvb, offset, BATMAN_PACKET_V5_SIZE,
 							    "B.A.T.M.A.N., Orig: %s (%s)",
-							    get_hostname(orig), address_to_str(wmem_packet_scope(), &batman_packeth->orig));
+							    get_hostname(orig), ip_to_str((const guint8 *)batman_packeth->orig.data));
+		} else {
+			ti = proto_tree_add_item(tree, proto_bat_plugin, tvb, offset, BATMAN_PACKET_V5_SIZE, ENC_NA);
+		}
 		bat_batman_tree = proto_item_add_subtree(ti, ett_bat_batman);
 	}
 
@@ -275,8 +277,12 @@ static int dissect_bat_batman_v5(tvbuff_t *tvb, int offset, packet_info *pinfo, 
 	proto_tree_add_item(bat_batman_tree, hf_bat_batman_version, tvb, offset, 1, ENC_BIG_ENDIAN);
 	offset += 1;
 
-	proto_tree_add_bitmask(bat_batman_tree, tvb, offset, hf_bat_batman_flags,
-					ett_bat_batman_flags, batman_flags, ENC_NA);
+	tf = proto_tree_add_item(bat_batman_tree, hf_bat_batman_flags, tvb, offset, 1, ENC_BIG_ENDIAN);
+	/* <flags> */
+	flag_tree =  proto_item_add_subtree(tf, ett_bat_batman_flags);
+	proto_tree_add_boolean(flag_tree, hf_bat_batman_flags_unidirectional, tvb, offset, 1, batman_packeth->flags);
+	proto_tree_add_boolean(flag_tree, hf_bat_batman_flags_directlink, tvb, offset, 1, batman_packeth->flags);
+	/* </flags> */
 	offset += 1;
 
 	proto_tree_add_item(bat_batman_tree, hf_bat_batman_ttl, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -307,7 +313,7 @@ static int dissect_bat_batman_v5(tvbuff_t *tvb, int offset, packet_info *pinfo, 
 	tap_queue_packet(bat_tap, pinfo, batman_packeth);
 
 	for (i = 0; i < batman_packeth->hna_len; i++) {
-		next_tvb = tvb_new_subset_length(tvb, offset, 5);
+		next_tvb = tvb_new_subset(tvb, offset, 5, 5);
 
 		if (have_tap_listener(bat_follow_tap)) {
 			tap_queue_packet(bat_follow_tap, pinfo, next_tvb);
@@ -452,6 +458,7 @@ static void dissect_bat_vis(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 static void dissect_bat_vis_v22(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	struct vis_packet_v22 *vis_packeth;
+	const guint8  *sender_ip_addr;
 	guint32 sender_ip;
 	proto_tree *bat_vis_tree = NULL;
 
@@ -461,8 +468,9 @@ static void dissect_bat_vis_v22(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 
 	vis_packeth = wmem_new(wmem_packet_scope(), struct vis_packet_v22);
 
+	sender_ip_addr = tvb_get_ptr(tvb, 0, 4);
 	sender_ip = tvb_get_ipv4(tvb, 0);
-	TVB_SET_ADDRESS(&vis_packeth->sender_ip, AT_IPv4, tvb, 0, 4);
+	SET_ADDRESS(&vis_packeth->sender_ip, AT_IPv4, 4, sender_ip_addr);
 	vis_packeth->version = tvb_get_guint8(tvb, 4);
 	vis_packeth->gw_class = tvb_get_guint8(tvb, 5);
 	vis_packeth->tq_max = tvb_get_ntohs(tvb, 6);
@@ -472,15 +480,19 @@ static void dissect_bat_vis_v22(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 
 	/* Set info column */
 	col_add_fstr(pinfo->cinfo, COL_INFO, "Src: %s (%s)",
-		     get_hostname(sender_ip), address_to_str(wmem_packet_scope(), &vis_packeth->sender_ip));
+		     get_hostname(sender_ip), ip_to_str((const guint8 *)vis_packeth->sender_ip.data));
 
 	/* Set tree info */
 	if (tree) {
 		proto_item *ti;
 
-		ti = proto_tree_add_protocol_format(tree, proto_bat_plugin, tvb, 0, VIS_PACKET_V22_SIZE,
+		if (PTREE_DATA(tree)->visible) {
+			ti = proto_tree_add_protocol_format(tree, proto_bat_plugin, tvb, 0, VIS_PACKET_V22_SIZE,
 							    "B.A.T.M.A.N. Vis, Src: %s (%s)",
-							    get_hostname(sender_ip), address_to_str(wmem_packet_scope(), &vis_packeth->sender_ip));
+							    get_hostname(sender_ip), ip_to_str((const guint8 *)vis_packeth->sender_ip.data));
+		} else {
+			ti = proto_tree_add_item(tree, proto_bat_plugin, tvb, 0, VIS_PACKET_V22_SIZE, ENC_NA);
+		}
 		bat_vis_tree = proto_item_add_subtree(ti, ett_bat_vis);
 
 		/* items */
@@ -505,7 +517,7 @@ static void dissect_bat_vis_v22(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 	length_remaining = tvb_reported_length_remaining(tvb, offset);
 
 	for (i = 0; i < length_remaining; i += VIS_PACKET_V22_DATA_SIZE) {
-		next_tvb = tvb_new_subset_length(tvb, offset, VIS_PACKET_V22_DATA_SIZE);
+		next_tvb = tvb_new_subset(tvb, offset, VIS_PACKET_V22_DATA_SIZE, VIS_PACKET_V22_DATA_SIZE);
 
 		if (have_tap_listener(bat_follow_tap)) {
 			tap_queue_packet(bat_follow_tap, pinfo, next_tvb);
@@ -533,13 +545,15 @@ static void dissect_bat_vis_v22(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 static void dissect_vis_entry_v22(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
 	struct vis_data_v22 *vis_datah;
+	const guint8  *ip_addr;
 	guint32 ip;
 
 	vis_datah = wmem_new(wmem_packet_scope(), struct vis_data_v22);
 	vis_datah->type = tvb_get_guint8(tvb, 0);
 	vis_datah->data = tvb_get_ntohs(tvb, 1);
+	ip_addr = tvb_get_ptr(tvb, 3, 4);
 	ip = tvb_get_ipv4(tvb, 3);
-	TVB_SET_ADDRESS(&vis_datah->ip, AT_IPv4, tvb, 3, 4);
+	SET_ADDRESS(&vis_datah->ip, AT_IPv4, 4, ip_addr);
 
 
 	/* Set tree info */
@@ -547,10 +561,14 @@ static void dissect_vis_entry_v22(tvbuff_t *tvb, packet_info *pinfo _U_, proto_t
 		proto_item *ti;
 		proto_tree *bat_vis_entry_tree;
 
-		ti = proto_tree_add_protocol_format(tree, proto_bat_plugin, tvb, 0, 7,
+		if (PTREE_DATA(tree)->visible) {
+			ti = proto_tree_add_protocol_format(tree, proto_bat_plugin, tvb, 0, 7,
 							    "VIS Entry: [%s] %s (%s)",
 							    val_to_str(vis_datah->type, vis_packettypenames, "Unknown (0x%02x)"),
-							    get_hostname(ip), address_to_str(wmem_packet_scope(), &vis_datah->ip));
+							    get_hostname(ip), ip_to_str((const guint8 *)vis_datah->ip.data));
+		} else {
+			ti = proto_tree_add_item(tree, proto_bat_plugin, tvb, 0, 7, ENC_NA);
+		}
 		bat_vis_entry_tree = proto_item_add_subtree(ti, ett_bat_vis_entry);
 
 		proto_tree_add_item(bat_vis_entry_tree, hf_bat_vis_data_type, tvb, 0, 1, ENC_BIG_ENDIAN);
@@ -573,6 +591,7 @@ static void dissect_vis_entry_v22(tvbuff_t *tvb, packet_info *pinfo _U_, proto_t
 static void dissect_bat_vis_v23(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	struct vis_packet_v23 *vis_packeth;
+	const guint8  *sender_ip_addr;
 	guint32 sender_ip;
 	proto_tree *bat_vis_tree = NULL;
 
@@ -582,8 +601,9 @@ static void dissect_bat_vis_v23(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 
 	vis_packeth = wmem_new(wmem_packet_scope(), struct vis_packet_v23);
 
+	sender_ip_addr = tvb_get_ptr(tvb, 0, 4);
 	sender_ip = tvb_get_ipv4(tvb, 0);
-	TVB_SET_ADDRESS(&vis_packeth->sender_ip, AT_IPv4, tvb, 0, 4);
+	SET_ADDRESS(&vis_packeth->sender_ip, AT_IPv4, 4, sender_ip_addr);
 	vis_packeth->version = tvb_get_guint8(tvb, 4);
 	vis_packeth->gw_class = tvb_get_guint8(tvb, 5);
 	vis_packeth->tq_max = tvb_get_guint8(tvb, 6);
@@ -593,15 +613,19 @@ static void dissect_bat_vis_v23(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 
 	/* Set info column */
 	col_add_fstr(pinfo->cinfo, COL_INFO, "Src: %s (%s)",
-		     get_hostname(sender_ip), address_to_str(wmem_packet_scope(), &vis_packeth->sender_ip));
+		     get_hostname(sender_ip), ip_to_str((const guint8 *)vis_packeth->sender_ip.data));
 
 	/* Set tree info */
 	if (tree) {
 		proto_item *ti;
 
-		ti = proto_tree_add_protocol_format(tree, proto_bat_plugin, tvb, 0, VIS_PACKET_V23_SIZE,
+		if (PTREE_DATA(tree)->visible) {
+			ti = proto_tree_add_protocol_format(tree, proto_bat_plugin, tvb, 0, VIS_PACKET_V23_SIZE,
 							    "B.A.T.M.A.N. Vis, Src: %s (%s)",
-							    get_hostname(sender_ip), address_to_str(wmem_packet_scope(), &vis_packeth->sender_ip));
+							    get_hostname(sender_ip), ip_to_str((const guint8 *)vis_packeth->sender_ip.data));
+		} else {
+			ti = proto_tree_add_item(tree, proto_bat_plugin, tvb, 0, VIS_PACKET_V23_SIZE, ENC_NA);
+		}
 		bat_vis_tree = proto_item_add_subtree(ti, ett_bat_vis);
 
 		/* items */
@@ -626,7 +650,7 @@ static void dissect_bat_vis_v23(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 	length_remaining = tvb_reported_length_remaining(tvb, offset);
 
 	for (i = 0; i < length_remaining; i += VIS_PACKET_V23_DATA_SIZE) {
-		next_tvb = tvb_new_subset_length(tvb, offset, VIS_PACKET_V23_DATA_SIZE);
+		next_tvb = tvb_new_subset(tvb, offset, VIS_PACKET_V23_DATA_SIZE, VIS_PACKET_V23_DATA_SIZE);
 
 		if (have_tap_listener(bat_follow_tap)) {
 			tap_queue_packet(bat_follow_tap, pinfo, next_tvb);
@@ -654,13 +678,15 @@ static void dissect_bat_vis_v23(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 static void dissect_vis_entry_v23(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
 	struct vis_data_v23 *vis_datah;
+	const guint8  *ip_addr;
 	guint32 ip;
 
 	vis_datah = wmem_new(wmem_packet_scope(), struct vis_data_v23);
 	vis_datah->type = tvb_get_guint8(tvb, 0);
 	vis_datah->data = tvb_get_guint8(tvb, 1);
+	ip_addr = tvb_get_ptr(tvb, 2, 4);
 	ip = tvb_get_ipv4(tvb, 2);
-	TVB_SET_ADDRESS(&vis_datah->ip, AT_IPv4, tvb, 2, 4);
+	SET_ADDRESS(&vis_datah->ip, AT_IPv4, 4, ip_addr);
 
 
 	/* Set tree info */
@@ -668,10 +694,14 @@ static void dissect_vis_entry_v23(tvbuff_t *tvb, packet_info *pinfo _U_, proto_t
 		proto_item *ti;
 		proto_tree *bat_vis_entry_tree;
 
-		ti = proto_tree_add_protocol_format(tree, proto_bat_plugin, tvb, 0, 7,
+		if (PTREE_DATA(tree)->visible) {
+			ti = proto_tree_add_protocol_format(tree, proto_bat_plugin, tvb, 0, 7,
 							    "VIS Entry: [%s] %s (%s)",
 							    val_to_str(vis_datah->type, vis_packettypenames, "Unknown (0x%02x)"),
-							    get_hostname(ip), address_to_str(wmem_packet_scope(), &vis_datah->ip));
+							    get_hostname(ip), ip_to_str((const guint8 *)vis_datah->ip.data));
+		} else {
+			ti = proto_tree_add_item(tree, proto_bat_plugin, tvb, 0, 7, ENC_NA);
+		}
 		bat_vis_entry_tree = proto_item_add_subtree(ti, ett_bat_vis_entry);
 
 		proto_tree_add_item(bat_vis_entry_tree, hf_bat_vis_data_type, tvb, 0, 1, ENC_BIG_ENDIAN);
@@ -714,16 +744,6 @@ void proto_register_bat(void)
 		{ &hf_bat_batman_gwflags,
 		  { "Gateway Flags", "bat.batman.gwflags",
 		    FT_UINT8, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_bat_batman_gwflags_dl_speed,
-		  { "Download Speed", "bat.batman.gwflags.dl_speed",
-		    FT_UINT32, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_bat_batman_gwflags_ul_speed,
-		  { "Upload Speed", "bat.batman.gwflags.ul_speed",
-		    FT_UINT32, BASE_DEC, NULL, 0x0,
 		    NULL, HFILL }
 		},
 		{ &hf_bat_batman_seqno,
@@ -910,16 +930,3 @@ void proto_reg_handoff_bat(void)
 	dissector_add_uint("udp.port", gw_udp_port, gw_handle);
 	dissector_add_uint("udp.port", vis_udp_port, vis_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

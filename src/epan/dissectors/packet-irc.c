@@ -40,6 +40,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 
@@ -116,7 +117,7 @@ static void
 dissect_irc_request(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int offset, int linelen)
 {
     proto_tree *request_tree, *command_tree = NULL;
-    proto_item *request_item;
+    proto_item *request_item, *command_item;
     int         start_offset                = offset;
     int         end_offset                  = start_offset+linelen;
     gint        eop_offset                  = -1,
@@ -222,8 +223,8 @@ dissect_irc_request(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int off
         /* Create subtree when the first parameter is found */
         if (first_command_param)
         {
-            command_tree = proto_tree_add_subtree(request_tree, tvb, offset, end_offset-offset,
-                                             ett_irc_request_command, NULL, "Command parameters");
+            command_item = proto_tree_add_text(request_tree, tvb, offset, end_offset-offset, "Command parameters");
+            command_tree = proto_item_add_subtree(command_item, ett_irc_request_command );
             first_command_param = FALSE;
         }
 
@@ -284,7 +285,7 @@ static void
 dissect_irc_response(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int offset, int linelen)
 {
     proto_tree *response_tree, *command_tree = NULL;
-    proto_item *response_item, *hidden_item;
+    proto_item *response_item, *command_item, *hidden_item;
     int         start_offset                 = offset;
     int         end_offset                   = start_offset+linelen;
     gint        eop_offset                   = -1,
@@ -395,8 +396,8 @@ dissect_irc_response(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int of
         /* Create subtree when the first parameter is found */
         if (first_command_param)
         {
-            command_tree = proto_tree_add_subtree(response_tree, tvb, offset, end_offset-offset,
-                                        ett_irc_response_command , NULL, "Command parameters");
+            command_item = proto_tree_add_text(response_tree, tvb, offset, end_offset-offset, "Command parameters");
+            command_tree = proto_item_add_subtree(command_item, ett_irc_response_command );
             first_command_param = FALSE;
         }
 
@@ -469,7 +470,7 @@ dissect_irc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     /*
      * Process the packet data, a line at a time.
      */
-    while (tvb_reported_length_remaining(tvb, offset) > 0)
+    while (tvb_offset_exists(tvb, offset))
     {
         /*
          * Find the end of the line.
@@ -578,16 +579,3 @@ proto_reg_handoff_irc(void)
     dissector_add_uint("tcp.port", TCP_PORT_IRC, irc_handle);
     dissector_add_uint("tcp.port", TCP_PORT_DIRCPROXY, irc_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

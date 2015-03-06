@@ -23,9 +23,13 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 void proto_register_ctdb(void);
 void proto_reg_handoff_ctdb(void);
 
@@ -261,9 +265,9 @@ static int dissect_control_get_recmaster_reply(packet_info *pinfo, proto_tree *t
 }
 
 static const value_string recmode_vals[] = {
-	{0, "NORMAL"},
-	{1, "RECOVERY ACTIVE"},
-	{0, NULL}
+	{0,"NORMAL"},
+	{1,"RECOVERY ACTIVE"},
+	{0,NULL}
 };
 
 static int dissect_control_get_recmode_reply(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int offset, guint32 status, int endianess _U_)
@@ -332,8 +336,8 @@ static int dissect_control_process_exist_request(packet_info *pinfo, proto_tree 
 }
 
 static const true_false_string process_exists_tfs = {
-	"Process does NOT exist",
-	"Process Exists"
+  "Process does NOT exist",
+  "Process Exists"
 };
 
 static int dissect_control_process_exist_reply(packet_info *pinfo _U_, proto_tree *tree, tvbuff_t *tvb, int offset, guint32 status, int endianess _U_)
@@ -860,7 +864,7 @@ dissect_ctdb_reply_control(tvbuff_t *tvb, int offset, packet_info *pinfo _U_, pr
 	/* error */
 	if (errorlen) {
 		proto_tree_add_item(tree, hf_ctdb_error, tvb, offset, errorlen, endianess);
-		offset+=errorlen;
+		offset+=datalen;
 	}
 
 
@@ -1241,20 +1245,7 @@ proto_reg_handoff_ctdb(void)
 	dissector_handle_t ctdb_handle;
 
 	ctdb_handle = new_create_dissector_handle(dissect_ctdb, proto_ctdb);
-	dissector_add_for_decode_as("tcp.port", ctdb_handle);
+	dissector_add_handle("tcp.port", ctdb_handle);
 
 	heur_dissector_add("tcp", dissect_ctdb, proto_ctdb);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

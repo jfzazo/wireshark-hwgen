@@ -1,5 +1,5 @@
 /* export_pdu_dlg.c
- * Dialog for exporting PDUs to file
+ * Routines for exporting PDU:s to file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -27,10 +27,10 @@
 #include "globals.h"
 #include "pcap-encap.h"
 
+#include <epan/tap.h>
 #include <epan/exported_pdu.h>
 
 
-#include "ui/gtk/old-gtk-compat.h"
 #include "ui/gtk/capture_file_dlg.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/gui_utils.h"
@@ -39,6 +39,7 @@
 #include "ui/gtk/filter_autocomplete.h"
 #include "ui/gtk/stock_icons.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 #include "ui/tap_export_pdu.h"
 #include "ui/gtk/export_pdu_dlg.h"

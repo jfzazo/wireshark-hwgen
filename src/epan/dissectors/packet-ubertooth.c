@@ -27,10 +27,11 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 #include <epan/addr_resolv.h>
 
-#include "packet-bluetooth.h"
-#include "packet-ubertooth.h"
+#include "packet-bluetooth-hci.h"
+#include "packet-usb.h"
 
 static int proto_ubertooth = -1;
 
@@ -89,10 +90,6 @@ static int hf_clock_offset = -1;
 static int hf_afh_map = -1;
 static int hf_bdaddr = -1;
 static int hf_usb_rx_packet = -1;
-static int hf_state = -1;
-static int hf_crc_init = -1;
-static int hf_hop_interval = -1;
-static int hf_hop_increment = -1;
 static int hf_usb_rx_packet_channel = -1;
 static int hf_spectrum_entry = -1;
 static int hf_frequency = -1;
@@ -332,7 +329,7 @@ static expert_field ei_unknown_data = EI_INIT;
 static expert_field ei_unexpected_data = EI_INIT;
 
 static dissector_handle_t ubertooth_handle;
-static dissector_handle_t bluetooth_handle;
+static dissector_handle_t btle_handle;
 
 static wmem_tree_t *command_info = NULL;
 
@@ -404,7 +401,6 @@ static const value_string command_vals[] = {
     { 54,  "BTLE Slave" },
     { 55,  "Get Compile Info" },
     { 56,  "BTLE Set Target" },
-    { 57,  "BTLE Phy" },
     { 0x00, NULL }
 };
 static value_string_ext(command_vals_ext) = VALUE_STRING_EXT_INIT(command_vals);
@@ -436,19 +432,9 @@ static const value_string packet_type_vals[] = {
     { 0x01,  "LE" },
     { 0x02,  "Message" },
     { 0x03,  "Keep Alive" },
-    { 0x04,  "Spectrum Analyze"},
-    { 0x05,  "LE Promiscuous" },
     { 0x00, NULL }
 };
 static value_string_ext(packet_type_vals_ext) = VALUE_STRING_EXT_INIT(packet_type_vals);
-
-static const value_string usb_rx_packet_state_vals[] = {
-    { 0x00,  "Access Address" },
-    { 0x01,  "CRC Init" },
-    { 0x02,  "Hop Interval" },
-    { 0x03,  "Hop Increment" },
-    { 0x00, NULL }
-};
 
 static const value_string modulation_vals[] = {
     { 0x00,  "Basic Rate" },
@@ -1181,71 +1167,23 @@ dissect_cc2400_register(proto_tree *tree, tvbuff_t *tvb, gint offset, guint8 reg
 }
 
 static gint
-dissect_usb_rx_packet(proto_tree *main_tree, proto_tree *tree, packet_info *pinfo,
-        tvbuff_t *tvb, gint offset, gint16 command, usb_conv_info_t *usb_conv_info)
+dissect_usb_rx_packet(proto_tree *main_tree, proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, gint16 command)
 {
     proto_item  *sub_item;
-    proto_tree  *sub_tree;
-    proto_item  *p_item;
+    proto_item  *sub_tree;
     proto_item  *data_item;
-    proto_tree  *data_tree;
+    proto_item  *data_tree;
     proto_item  *entry_item;
-    proto_tree  *entry_tree;
+    proto_item  *entry_tree;
     gint         i_spec;
     gint         length;
     tvbuff_t    *next_tvb;
-    guint8       packet_type;
-    guint32      start_offset;
-    guint32      clock_100ns;
-    guint8       channel;
-    ubertooth_data_t  *ubertooth_data;
 
     sub_item = proto_tree_add_item(tree, hf_usb_rx_packet, tvb, offset, 64, ENC_NA);
     sub_tree = proto_item_add_subtree(sub_item, ett_usb_rx_packet);
 
-    start_offset = offset;
-
     proto_tree_add_item(sub_tree, hf_packet_type, tvb, offset, 1, ENC_NA);
-    packet_type = tvb_get_guint8(tvb, offset);
     offset += 1;
-
-    if (packet_type == 0x05) { /* LE_PROMISC */
-        guint8  state;
-
-        proto_tree_add_item(sub_tree, hf_state, tvb, offset, 1, ENC_NA);
-        state = tvb_get_guint8(tvb, offset);
-        col_append_fstr(pinfo->cinfo, COL_INFO, " LE Promiscuous - %s", val_to_str_const(state, usb_rx_packet_state_vals, "Unknown"));
-        offset += 1;
-
-        switch (state) {
-        case 0: /* Access Address */
-            proto_tree_add_item(sub_tree, hf_access_address, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-            col_append_fstr(pinfo->cinfo, COL_INFO, " 0x%04x", tvb_get_letohl(tvb, offset));
-            offset += 4;
-            break;
-        case 1: /* CRC Init */
-            proto_tree_add_item(sub_tree, hf_crc_init, tvb, offset, 3, ENC_LITTLE_ENDIAN);
-            col_append_fstr(pinfo->cinfo, COL_INFO, " 0x%06x", tvb_get_letoh24(tvb, offset));
-            offset += 3;
-            break;
-        case 2: /* Hop Interval */
-            p_item = proto_tree_add_item(sub_tree, hf_hop_interval, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-            proto_item_append_text(p_item, " (%f ms), ", tvb_get_letohs(tvb, offset) * 1.25);
-            col_append_fstr(pinfo->cinfo, COL_INFO, " %f ms", tvb_get_letohs(tvb, offset) * 1.25);
-            offset += 2;
-            break;
-        case 3: /* Hop Increment */
-            proto_tree_add_item(sub_tree, hf_hop_increment, tvb, offset, 1, ENC_NA);
-            col_append_fstr(pinfo->cinfo, COL_INFO, " %u", tvb_get_guint8(tvb, offset));
-            offset += 1;
-            break;
-        }
-
-        proto_tree_add_item(sub_tree, hf_reserved, tvb, offset, 64 - (offset - start_offset), ENC_NA);
-        offset += 64 - (offset - start_offset);
-
-        return offset;
-    }
 
     proto_tree_add_item(sub_tree, hf_chip_status_reserved, tvb, offset, 1, ENC_NA);
     proto_tree_add_item(sub_tree, hf_chip_status_rssi_trigger, tvb, offset, 1, ENC_NA);
@@ -1256,14 +1194,12 @@ dissect_usb_rx_packet(proto_tree *main_tree, proto_tree *tree, packet_info *pinf
     offset += 1;
 
     proto_tree_add_item(sub_tree, hf_usb_rx_packet_channel, tvb, offset, 1, ENC_NA);
-    channel = tvb_get_guint8(tvb, offset);
     offset += 1;
 
     proto_tree_add_item(sub_tree, hf_clock_ns, tvb, offset, 1, ENC_NA);
     offset += 1;
 
     proto_tree_add_item(sub_tree, hf_clock_100ns, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    clock_100ns = tvb_get_letohl(tvb, offset);
     offset += 4;
 
     proto_tree_add_item(sub_tree, hf_rssi_max, tvb, offset, 1, ENC_NA);
@@ -1310,14 +1246,8 @@ dissect_usb_rx_packet(proto_tree *main_tree, proto_tree *tree, packet_info *pinf
         else
             length += tvb_get_guint8(tvb, offset + 5) & 0x1f;
 
-        ubertooth_data = wmem_new(wmem_packet_scope(), ubertooth_data_t);
-        ubertooth_data->bus_id = usb_conv_info->bus_id;
-        ubertooth_data->device_address = usb_conv_info->device_address;
-        ubertooth_data->clock_100ns = clock_100ns;
-        ubertooth_data->channel = channel;
-
         next_tvb = tvb_new_subset_length(tvb, offset, length);
-        call_dissector_with_data(bluetooth_handle, next_tvb, pinfo, main_tree, ubertooth_data);
+        call_dissector(btle_handle, next_tvb, pinfo, main_tree);
         offset += length;
 
         if (tvb_length_remaining(tvb, offset) > 0) {
@@ -1365,7 +1295,7 @@ dissect_ubertooth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "UBERTOOTH");
 
-    if (!usb_conv_info) return offset;
+    DISSECTOR_ASSERT(usb_conv_info);
 
     p2p_dir_save = pinfo->p2p_dir;
     pinfo->p2p_dir = (usb_conv_info->is_request) ? P2P_DIR_SENT : P2P_DIR_RECV;
@@ -1622,7 +1552,7 @@ dissect_ubertooth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
                 break;
             case 51: /* Set AFH Map */
                 proto_tree_add_item(main_tree, hf_afh_map, tvb, offset, 10, ENC_NA);
-                col_append_fstr(pinfo->cinfo, COL_INFO, " - %s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, 10));
+                col_append_fstr(pinfo->cinfo, COL_INFO, " - %s", tvb_bytes_to_ep_str(tvb, offset, 10));
 
                 offset += 10;
                 break;
@@ -1692,7 +1622,7 @@ dissect_ubertooth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
         if (usb_conv_info->transfer_type == URB_BULK) {
 
             while (tvb_length_remaining(tvb, offset) > 0) {
-                offset = dissect_usb_rx_packet(tree, main_tree, pinfo, tvb, offset, command_response, usb_conv_info);
+                offset = dissect_usb_rx_packet(tree, main_tree, pinfo, tvb, offset, command_response);
             }
             break;
         }
@@ -1781,7 +1711,7 @@ dissect_ubertooth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
         proto_tree_add_bytes(main_tree, hf_serial_number, tvb,
                 offset, 16, (guint8 *) serial);
         col_append_fstr(pinfo->cinfo, COL_INFO, " = %s",
-                bytes_to_str(wmem_packet_scope(), (guint8 *) serial, 16));
+                bytes_to_ep_str((guint8 *) serial, 16));
         offset += 16;
 
         break;
@@ -1848,7 +1778,7 @@ dissect_ubertooth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
         offset += 1;
 
         proto_tree_add_item(main_tree, hf_firmware_revision, tvb, offset, length, ENC_NA | ENC_ASCII);
-        col_append_fstr(pinfo->cinfo, COL_INFO, " = %s", tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_ASCII));
+        col_append_fstr(pinfo->cinfo, COL_INFO, " = %s", tvb_get_string(wmem_packet_scope(), tvb, offset, length));
         offset += length;
 
         break;
@@ -1894,7 +1824,7 @@ dissect_ubertooth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
             break;
         }
 
-        offset = dissect_usb_rx_packet(tree, main_tree, pinfo, tvb, offset, command_response, usb_conv_info);
+        offset = dissect_usb_rx_packet(tree, main_tree, pinfo, tvb, offset, command_response);
 
         break;
     case 53: /* Read Register */
@@ -1920,7 +1850,7 @@ dissect_ubertooth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
         offset += 1;
 
         proto_tree_add_item(main_tree, hf_firmware_compile_info, tvb, offset, length, ENC_NA | ENC_ASCII);
-        col_append_fstr(pinfo->cinfo, COL_INFO, " = %s", tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_ASCII));
+        col_append_fstr(pinfo->cinfo, COL_INFO, " = %s", tvb_get_string(wmem_packet_scope(), tvb, offset, length));
         offset += length;
 
         break;
@@ -2041,26 +1971,6 @@ proto_register_ubertooth(void)
         { &hf_packet_type,
             { "Packet Type",                     "ubertooth.packet_type",
             FT_UINT8, BASE_HEX | BASE_EXT_STRING, &packet_type_vals_ext, 0x00,
-            NULL, HFILL }
-        },
-        { &hf_state,
-            { "State",                           "ubertooth.state",
-            FT_UINT8, BASE_HEX, VALS(usb_rx_packet_state_vals), 0x00,
-            NULL, HFILL }
-        },
-        { &hf_crc_init,
-            { "CRC Init",                        "ubertooth.crc_init",
-            FT_UINT24, BASE_HEX, NULL, 0x00,
-            NULL, HFILL }
-        },
-        { &hf_hop_interval,
-            { "Hop Interval",                    "ubertooth.hop_interval",
-            FT_UINT16, BASE_DEC, NULL, 0x00,
-            "Hop Interval in unit 1.25ms", HFILL }
-        },
-        { &hf_hop_increment,
-            { "Hop Increment",                    "ubertooth.hop_increment",
-            FT_UINT8, BASE_DEC, NULL, 0x00,
             NULL, HFILL }
         },
         { &hf_chip_status_reserved,
@@ -3402,13 +3312,13 @@ proto_register_ubertooth(void)
 void
 proto_reg_handoff_ubertooth(void)
 {
-    bluetooth_handle = find_dissector("bluetooth");
+    btle_handle = find_dissector("btle");
 
     dissector_add_uint("usb.product", (0x1d50 << 16) | 0x6000, ubertooth_handle); /* Ubertooth Zero */
     dissector_add_uint("usb.product", (0x1d50 << 16) | 0x6002, ubertooth_handle); /* Ubertooth One */
 
-    dissector_add_for_decode_as("usb.device",   ubertooth_handle);
-    dissector_add_for_decode_as("usb.protocol", ubertooth_handle);
+    dissector_add_handle("usb.device",   ubertooth_handle);
+    dissector_add_handle("usb.protocol", ubertooth_handle);
 }
 
 /*

@@ -39,11 +39,14 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <math.h>
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-rmt-common.h"
 
 void proto_register_norm(void);
@@ -259,7 +262,7 @@ static guint dissect_feccode(proto_tree *tree, tvbuff_t *tvb, guint offset,
 
     proto_tree_add_item(tree, hf_fec_encoding_id, tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
     if (reserved) {
-        proto_tree_add_item(tree, hf_reserved, tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
+        proto_tree_add_item(tree, hf_reserved, tvb, offset, 1, ENC_NA); offset += 1;
     }
     proto_tree_add_item(tree, hf_object_transport_id, tvb, offset, 2, ENC_BIG_ENDIAN); offset+=2;
 
@@ -303,7 +306,8 @@ static guint dissect_nack_data(proto_tree *tree, tvbuff_t *tvb, guint offset,
     proto_tree *nack_tree, *flag_tree;
     guint16     len;
 
-    nack_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_nackdata, &ti, "NACK Data");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "NACK Data");
+    nack_tree = proto_item_add_subtree(ti, ett_nackdata);
     proto_tree_add_item(nack_tree, hf_nack_form, tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
 
     tif = proto_tree_add_item(nack_tree, hf_nack_flags, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -351,7 +355,8 @@ static void dissect_norm_data(proto_tree *tree, packet_info *pinfo,
         offset = dissect_norm_hdrext(tree, pinfo, tvb, offset, hlen);
     }
     if (flags & NORM_FLAG_STREAM) {
-        flag_tree = proto_tree_add_subtree(tree, tvb, offset, 8, ett_streampayload, NULL, "Stream Data");
+        ti = proto_tree_add_text(tree, tvb, offset, 8, "Stream Data");
+        flag_tree = proto_item_add_subtree(ti, ett_streampayload);
         proto_tree_add_item(flag_tree, hf_reserved,       tvb, offset, 2, ENC_BIG_ENDIAN); offset += 2;
         proto_tree_add_item(flag_tree, hf_payload_len,    tvb, offset, 2, ENC_BIG_ENDIAN); offset += 2;
         proto_tree_add_item(flag_tree, hf_payload_offset, tvb, offset, 4, ENC_BIG_ENDIAN); offset += 4;
@@ -413,7 +418,7 @@ static guint dissect_norm_cmd_repairadv(proto_tree *tree, packet_info *pinfo,
                                         tvbuff_t *tvb, guint offset, guint8 hlen)
 {
     proto_tree_add_item(tree, hf_flags,    tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
-    proto_tree_add_item(tree, hf_reserved, tvb, offset, 2, ENC_BIG_ENDIAN); offset += 2;
+    proto_tree_add_item(tree, hf_reserved, tvb, offset, 2, ENC_BIG_ENDIAN); offset +=2;
 
     if (offset < hdrlen2bytes(hlen)) {
         offset = dissect_norm_hdrext(tree, pinfo, tvb, offset, hlen);
@@ -428,7 +433,7 @@ static guint dissect_norm_cmd_repairadv(proto_tree *tree, packet_info *pinfo,
 static guint dissect_norm_cmd_cc(proto_tree *tree, packet_info *pinfo,
                                  tvbuff_t *tvb, guint offset, guint8 hlen)
 {
-    proto_tree_add_item(tree, hf_reserved,    tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
+    proto_tree_add_item(tree, hf_reserved,    tvb, offset, 1, ENC_NA);         offset += 1;
     proto_tree_add_item(tree, hf_cc_sequence, tvb, offset, 2, ENC_BIG_ENDIAN); offset += 2;
 
     proto_tree_add_item(tree, hf_cc_sts, tvb, offset, 4,  ENC_BIG_ENDIAN); offset += 4;
@@ -437,10 +442,11 @@ static guint dissect_norm_cmd_cc(proto_tree *tree, packet_info *pinfo,
         offset = dissect_norm_hdrext(tree, pinfo, tvb, offset, hlen);
     }
     while (offset < hdrlen2bytes(hlen)) {
-        proto_item *tif;
+        proto_item *ti, *tif;
         proto_tree *cc_tree, *flag_tree;
         double grtt;
-        cc_tree = proto_tree_add_subtree(tree, tvb, offset, 8, ett_congestioncontrol, NULL, "Congestion Control");
+        ti = proto_tree_add_text(tree, tvb, offset, 8, "Congestion Control");
+        cc_tree = proto_item_add_subtree(ti, ett_congestioncontrol);
         proto_tree_add_item(cc_tree, hf_cc_node_id, tvb, offset, 4, ENC_BIG_ENDIAN); offset += 4;
         tif = proto_tree_add_item(cc_tree, hf_cc_flags, tvb, offset, 1, ENC_BIG_ENDIAN);
         flag_tree = proto_item_add_subtree(tif, ett_flags);
@@ -474,7 +480,7 @@ static guint dissect_norm_cmd_squelch(proto_tree *tree, packet_info *pinfo,
 static guint dissect_norm_cmd_ackreq(proto_tree *tree, packet_info *pinfo _U_,
                                      tvbuff_t *tvb, guint offset)
 {
-    proto_tree_add_item(tree, hf_reserved, tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
+    proto_tree_add_item(tree, hf_reserved, tvb, offset, 1, ENC_NA);         offset += 1;
     proto_tree_add_item(tree, hf_ack_type, tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
     proto_tree_add_item(tree, hf_ack_id,   tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
     return offset;
@@ -954,7 +960,7 @@ void proto_register_norm(void)
     };
 
     static ei_register_info ei[] = {
-        { &ei_version1_only, { "norm.version1_only", PI_PROTOCOL, PI_WARN, "Sorry, this dissector supports NORM version 1 only", EXPFILL }}
+        { &ei_version1_only, { "alc.version1_only", PI_PROTOCOL, PI_WARN, "Sorry, this dissector supports ALC version 1 only", EXPFILL }}
     };
 
     module_t *module;
@@ -983,7 +989,7 @@ void proto_reg_handoff_norm(void)
     static dissector_handle_t handle;
 
     handle = new_create_dissector_handle(dissect_norm, proto_rmt_norm);
-    dissector_add_for_decode_as("udp.port", handle);
+    dissector_add_handle("udp.port", handle);
     heur_dissector_add("udp", dissect_norm_heur, proto_rmt_norm);
 
     rmt_fec_handle = find_dissector("rmt-fec");

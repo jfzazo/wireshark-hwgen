@@ -23,16 +23,18 @@
 
 #include "config.h"
 
+#include <string.h>
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/exceptions.h>
-#include <epan/conversation_table.h>
 #include <wsutil/pint.h>
 #include "packet-tr.h"
 #include "packet-llc.h"
-#include "packet-sflow.h"
 #include <epan/prefs.h>
 #include <wiretap/wtap.h>
+#include <epan/tap.h>
+#include <epan/wmem/wmem.h>
+
 void proto_register_tr(void);
 void proto_reg_handoff_tr(void);
 
@@ -56,14 +58,10 @@ static int hf_tr_direction = -1;
 static int hf_tr_rif = -1;
 static int hf_tr_rif_ring = -1;
 static int hf_tr_rif_bridge = -1;
-static int hf_tr_extra_rif = -1;
 
 static gint ett_token_ring = -1;
 static gint ett_token_ring_ac = -1;
 static gint ett_token_ring_fc = -1;
-
-static expert_field ei_token_empty_rif = EI_INIT;
-static expert_field ei_token_fake_llc_snap_header = EI_INIT;
 
 static int tr_tap = -1;
 
@@ -128,58 +126,6 @@ static const value_string direction_vals[] = {
 static dissector_handle_t trmac_handle;
 static dissector_handle_t llc_handle;
 static dissector_handle_t data_handle;
-
-static const char* tr_conv_get_filter_type(conv_item_t* conv, conv_filter_type_e filter)
-{
-	if ((filter == CONV_FT_SRC_ADDRESS) && (conv->src_address.type == AT_ETHER))
-		return "tr.src";
-
-	if ((filter == CONV_FT_DST_ADDRESS) && (conv->dst_address.type == AT_ETHER))
-		return "tr.dst";
-
-	if ((filter == CONV_FT_ANY_ADDRESS) && (conv->src_address.type == AT_ETHER))
-		return "tr.addr";
-
-	return CONV_FILTER_INVALID;
-}
-
-static ct_dissector_info_t tr_ct_dissector_info = {&tr_conv_get_filter_type};
-
-static int
-tr_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
-{
-	conv_hash_t *hash = (conv_hash_t*) pct;
-	const tr_hdr *trhdr=(const tr_hdr *)vip;
-
-	add_conversation_table_data(hash, &trhdr->src, &trhdr->dst, 0, 0, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->fd->abs_ts, &tr_ct_dissector_info, PT_NONE);
-
-	return 1;
-}
-
-static const char* tr_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
-{
-	if ((filter == CONV_FT_ANY_ADDRESS) && (host->myaddress.type == AT_ETHER))
-		return "tr.addr";
-
-	return CONV_FILTER_INVALID;
-}
-
-static hostlist_dissector_info_t tr_host_dissector_info = {&tr_host_get_filter_type};
-
-static int
-tr_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
-{
-	conv_hash_t *hash = (conv_hash_t*) pit;
-	const tr_hdr *trhdr=(const tr_hdr *)vip;
-
-	/* Take two "add" passes per packet, adding for each direction, ensures that all
-	packets are counted properly (even if address is sending to itself)
-	XXX - this could probably be done more efficiently inside hostlist_table */
-	add_hostlist_table_data(hash, &trhdr->src, 0, TRUE, 1, pinfo->fd->pkt_len, &tr_host_dissector_info, PT_NONE);
-	add_hostlist_table_data(hash, &trhdr->dst, 0, FALSE, 1, pinfo->fd->pkt_len, &tr_host_dissector_info, PT_NONE);
-
-	return 1;
-}
 
 /*
  * DODGY LINUX HACK DODGY LINUX HACK
@@ -378,7 +324,7 @@ capture_tr(const guchar *pd, int offset, int len, packet_counts *ld) {
 static void
 dissect_tr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	proto_tree	*tr_tree;
+	proto_tree	*tr_tree, *bf_tree;
 	proto_item	*ti, *hidden_item;
 	guint8		 rcf1, rcf2;
 	tvbuff_t	*next_tvb;
@@ -398,7 +344,7 @@ dissect_tr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	tr_hdr *volatile trh;
 
 	/* non-source-routed version of source addr */
-	guint8		*trn_shost_nonsr = (guint8*)wmem_alloc(pinfo->pool, 6);
+	static guint8		trn_shost_nonsr[6]; /* has to be static due to SET_ADDRESS */
 	int			x;
 
 	/* Token-Ring Strings */
@@ -549,30 +495,26 @@ dissect_tr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	/* protocol analysis tree */
 	if (tree) {
-		static const int * ac[] = {
-			&hf_tr_priority,
-			&hf_tr_frame,
-			&hf_tr_monitor_cnt,
-			&hf_tr_priority_reservation,
-			NULL
-		};
-		static const int * fc_flags[] = {
-			&hf_tr_fc_type,
-			&hf_tr_fc_pcf,
-			NULL
-		};
-
 		/* Create Token-Ring Tree */
 		ti = proto_tree_add_item(tree, proto_tr, tr_tvb, 0, TR_MIN_HEADER_LEN + actual_rif_bytes, ENC_NA);
 		tr_tree = proto_item_add_subtree(ti, ett_token_ring);
 
 		/* Create the Access Control bitfield tree */
 		trh->ac = tvb_get_guint8(tr_tvb, 0);
-		proto_tree_add_bitmask(tr_tree, tr_tvb, 0, hf_tr_ac, ett_token_ring_ac, ac, ENC_NA);
+		ti = proto_tree_add_uint(tr_tree, hf_tr_ac, tr_tvb, 0, 1, trh->ac);
+		bf_tree = proto_item_add_subtree(ti, ett_token_ring_ac);
+
+		proto_tree_add_uint(bf_tree, hf_tr_priority, tr_tvb, 0, 1, trh->ac);
+		proto_tree_add_boolean(bf_tree, hf_tr_frame, tr_tvb, 0, 1, trh->ac);
+		proto_tree_add_uint(bf_tree, hf_tr_monitor_cnt, tr_tvb, 0, 1, trh->ac);
+		proto_tree_add_uint(bf_tree, hf_tr_priority_reservation, tr_tvb, 0, 1, trh->ac);
 
 		/* Create the Frame Control bitfield tree */
-		proto_tree_add_bitmask(tr_tree, tr_tvb, 1, hf_tr_fc, ett_token_ring_fc, fc_flags, ENC_NA);
+		ti = proto_tree_add_uint(tr_tree, hf_tr_fc, tr_tvb, 1, 1, trh->fc);
+		bf_tree = proto_item_add_subtree(ti, ett_token_ring_fc);
 
+		proto_tree_add_uint(bf_tree, hf_tr_fc_type, tr_tvb, 1, 1, trh->fc);
+		proto_tree_add_uint(bf_tree, hf_tr_fc_pcf, tr_tvb,  1, 1, trh->fc);
 		proto_tree_add_ether(tr_tree, hf_tr_dst, tr_tvb, 2, 6, (const guint8 *)trh->dst.data);
 		proto_tree_add_ether(tr_tree, hf_tr_src, tr_tvb, 8, 6, (const guint8 *)trh->src.data);
 		hidden_item = proto_tree_add_ether(tr_tree, hf_tr_addr, tr_tvb, 2, 6, (const guint8 *)trh->dst.data);
@@ -614,10 +556,12 @@ dissect_tr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		tcpdump. W/o that, however, I'm guessing that DSAP == SSAP if the
 		frame type is LLC.  It's very much a hack. */
 		if (actual_rif_bytes > trn_rif_bytes) {
-			proto_tree_add_expert(tr_tree, pinfo, &ei_token_empty_rif, tr_tvb, TR_MIN_HEADER_LEN + trn_rif_bytes, actual_rif_bytes - trn_rif_bytes);
+			proto_tree_add_text(tr_tree, tr_tvb, TR_MIN_HEADER_LEN + trn_rif_bytes, actual_rif_bytes - trn_rif_bytes,
+				"Empty RIF from Linux 2.0.x driver. The sniffing NIC "
+				"is also running a protocol stack.");
 		}
 		if (fixoffset) {
-			proto_tree_add_expert(tr_tree, pinfo, &ei_token_fake_llc_snap_header, tr_tvb, TR_MIN_HEADER_LEN + 18, 8);
+			proto_tree_add_text(tr_tree, tr_tvb, TR_MIN_HEADER_LEN + 18,8,"Linux 2.0.x fake LLC and SNAP header");
 		}
 	}
 
@@ -684,7 +628,8 @@ add_ring_bridge_pairs(int rcf_len, tvbuff_t *tvb, proto_tree *tree)
 	proto_tree_add_string(tree, hf_tr_rif, tvb, TR_MIN_HEADER_LEN + 2, rcf_len, wmem_strbuf_get_str(buf));
 
 	if (unprocessed_rif > 0) {
-		proto_tree_add_item(tree, hf_tr_extra_rif, tvb, TR_MIN_HEADER_LEN + RIF_BYTES_TO_PROCESS, unprocessed_rif, ENC_NA);
+		proto_tree_add_text(tree, tvb, TR_MIN_HEADER_LEN + RIF_BYTES_TO_PROCESS, unprocessed_rif,
+				"Extra RIF bytes beyond spec: %d", unprocessed_rif);
 	}
 }
 
@@ -768,30 +713,17 @@ proto_register_tr(void)
 		{ &hf_tr_rif_bridge,
 		{ "RIF Bridge",		"tr.rif.bridge", FT_UINT8, BASE_HEX, NULL, 0x0,
 			NULL, HFILL }},
-
-		{ &hf_tr_extra_rif,
-		{ "Extra RIF bytes beyond spec",	"tr.rif.extra", FT_BYTES, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }},
 	};
-
 	static gint *ett[] = {
 		&ett_token_ring,
 		&ett_token_ring_ac,
 		&ett_token_ring_fc,
 	};
-	static ei_register_info ei[] = {
-		{ &ei_token_empty_rif, { "tr.empty_rif", PI_PROTOCOL, PI_NOTE, "Empty RIF from Linux 2.0.x driver. The sniffing NIC is also running a protocol stack.", EXPFILL }},
-		{ &ei_token_fake_llc_snap_header, { "tr.fake_llc_snap_header", PI_PROTOCOL, PI_NOTE, "Linux 2.0.x fake LLC and SNAP header", EXPFILL }},
-	};
-
 	module_t *tr_module;
-	expert_module_t* expert_tr;
 
 	proto_tr = proto_register_protocol("Token-Ring", "Token-Ring", "tr");
 	proto_register_field_array(proto_tr, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_tr = expert_register_protocol(proto_tr);
-	expert_register_field_array(expert_tr, ei, array_length(ei));
 
 	/* Register configuration options */
 	tr_module = prefs_register_protocol(proto_tr, NULL);
@@ -802,8 +734,6 @@ proto_register_tr(void)
 
 	register_dissector("tr", dissect_tr, proto_tr);
 	tr_tap=register_tap("tr");
-
-	register_conversation_table(proto_tr, TRUE, tr_conversation_packet, tr_hostlist_packet);
 }
 
 void
@@ -820,7 +750,6 @@ proto_reg_handoff_tr(void)
 
 	tr_handle = find_dissector("tr");
 	dissector_add_uint("wtap_encap", WTAP_ENCAP_TOKEN_RING, tr_handle);
-	dissector_add_uint("sflow_245.header_protocol", SFLOW_245_HEADER_TOKENRING, tr_handle);
 }
 
 /*

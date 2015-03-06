@@ -22,7 +22,7 @@
 #ifndef FOLLOW_STREAM_DIALOG_H
 #define FOLLOW_STREAM_DIALOG_H
 
-#include <config.h>
+#include "config.h"
 
 #include <glib.h>
 
@@ -36,8 +36,7 @@
 
 #include "ui/follow.h"
 
-#include "wireshark_dialog.h"
-
+#include <QDialog>
 #include <QFile>
 #include <QMap>
 #include <QPushButton>
@@ -61,18 +60,18 @@ namespace Ui {
 class FollowStreamDialog;
 }
 
-class FollowStreamDialog : public WiresharkDialog
+class FollowStreamDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_type_t type = FOLLOW_TCP);
+    explicit FollowStreamDialog(QWidget *parent = 0, follow_type_t type = FOLLOW_TCP, capture_file *cf = NULL);
     ~FollowStreamDialog();
 
-    bool follow(QString previous_filter = QString(), bool use_stream_index = false);
+    bool follow(QString previous_filter = QString(), bool use_tcp_index = false);
 
 public slots:
-    void captureFileClosing();
+    void setCaptureFile(capture_file *cf);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event);
@@ -103,22 +102,22 @@ signals:
 private:
     void removeStreamControls();
     void resetStream(void);
-    void updateWidgets(bool follow_in_progress);
-    void updateWidgets() { updateWidgets(false); } // Needed for WiresharkDialog?
     frs_return_t
-    showBuffer(char *buffer, size_t nchars, gboolean is_from_server,
+    follow_show(char *buffer, size_t nchars, gboolean is_from_server,
                 guint32 packet_num, guint32 *global_pos);
 
-    frs_return_t readStream();
-    frs_return_t readTcpStream();
-    frs_return_t readUdpStream();
-    frs_return_t readSslStream();
+    frs_return_t follow_read_stream();
+    frs_return_t follow_read_tcp_stream();
+    frs_return_t follow_read_udp_stream();
+    frs_return_t follow_read_ssl_stream();
 
-    void followStream();
-    void addText(QString text, gboolean is_from_server, guint32 packet_num);
+    void follow_stream();
+
+    void add_text(QString text, gboolean is_from_server, guint32 packet_num);
 
     Ui::FollowStreamDialog  *ui;
 
+    capture_file            *cap_file_;
     QPushButton             *b_filter_out_;
     QPushButton             *b_find_;
     QPushButton             *b_print_;
@@ -127,8 +126,6 @@ private:
     follow_type_t           follow_type_;
     follow_info_t           follow_info_;
     QString                 data_out_filename_;
-    static const int        max_document_length_;
-    bool                    truncated_;
     QString                 filter_out_filter_;
     int                     client_buffer_count_;
     int                     server_buffer_count_;

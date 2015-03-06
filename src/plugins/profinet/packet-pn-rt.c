@@ -31,8 +31,8 @@
 #include <epan/strutil.h>
 #include <epan/etypes.h>
 #include <epan/expert.h>
-#include <epan/crc16-tvb.h>
 #include <epan/dissectors/packet-dcerpc.h>
+#include <epan/crc16-tvb.h>
 
 #include <wsutil/crc16.h>
 #include <wsutil/crc16-plain.h>
@@ -154,7 +154,7 @@ dissect_DataStatus(tvbuff_t *tvb, int offset, proto_tree *tree, guint8 u8DataSta
 
 
 static gboolean
-IsDFP_Frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint16 u16FrameID)
+IsDFP_Frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     guint16       u16SFCRC16;
     guint8        u8SFPosition;
@@ -164,6 +164,10 @@ IsDFP_Frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint16 u16Fram
     guint16       crc;
     gint          tvb_len          = 0;
     unsigned char virtualFramebuffer[16];
+    guint16       u16FrameID;
+
+    /* the sub tvb will NOT contain the frame_id here! */
+    u16FrameID = GPOINTER_TO_UINT(pinfo->private_data);
 
     /* try to build a temporaray buffer for generating this CRC */
     if (!pinfo->src.data || !pinfo->dst.data ||
@@ -236,10 +240,9 @@ IsDFP_Frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint16 u16Fram
 
 /* possibly dissect a CSF_SDU related PN-RT packet */
 gboolean
-dissect_CSF_SDU_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+dissect_CSF_SDU_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-    /* the sub tvb will NOT contain the frame_id here! */
-    guint16     u16FrameID = GPOINTER_TO_UINT(data);
+    guint16     u16FrameID;
     guint16     u16SFCRC16;
     guint8      u8SFPosition;
     guint8      u8SFDataLength = 255;
@@ -253,10 +256,13 @@ dissect_CSF_SDU_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
     guint16     crc;
 
 
+    /* the sub tvb will NOT contain the frame_id here! */
+    u16FrameID = GPOINTER_TO_UINT(pinfo->private_data);
+
     /* possible FrameID ranges for DFP */
     if ((u16FrameID < 0x100) || (u16FrameID > 0x0FFF))
         return (FALSE);
-    if (IsDFP_Frame(tvb, pinfo, tree, u16FrameID)) {
+    if (IsDFP_Frame(tvb, pinfo, tree)) {
         /* can't check this CRC, as the checked data bytes are not available */
         u16SFCRC16 = tvb_get_letohs(tvb, offset);
         if (u16SFCRC16 != 0)
@@ -364,12 +370,14 @@ pnio_defragment_init(void)
 
 /* possibly dissect a FRAG_PDU related PN-RT packet */
 static gboolean
-dissect_FRAG_PDU_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+dissect_FRAG_PDU_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-    /* the sub tvb will NOT contain the frame_id here! */
-    guint16 u16FrameID = GPOINTER_TO_UINT(data);
+    guint16 u16FrameID;
     int     offset = 0;
 
+
+    /* the sub tvb will NOT contain the frame_id here! */
+    u16FrameID = GPOINTER_TO_UINT(pinfo->private_data);
 
     /* possible FrameID ranges for FRAG_PDU */
     if (u16FrameID >= 0xFF80 && u16FrameID <= 0xFF8F) {
@@ -793,11 +801,13 @@ dissect_pn_rt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     col_add_str(pinfo->cinfo, COL_INFO, szFieldSummary);
     col_set_str(pinfo->cinfo, COL_PROTOCOL, pszProtShort);
 
+    pinfo->private_data = GUINT_TO_POINTER( (guint32) u16FrameID);
+
     /* get frame user data tvb (without header and footer) */
-    next_tvb = tvb_new_subset_length(tvb, 2, data_len);
+    next_tvb = tvb_new_subset(tvb, 2, data_len, data_len);
 
     /* ask heuristics, if some sub-dissector is interested in this packet payload */
-    if (!dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &hdtbl_entry, GUINT_TO_POINTER( (guint32) u16FrameID))) {
+    if (!dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &hdtbl_entry, NULL)) {
         /*col_set_str(pinfo->cinfo, COL_INFO, "Unknown");*/
 
         /* Oh, well, we don't know this; dissect it as data. */
@@ -987,7 +997,7 @@ proto_register_pn_rt(void)
                                    &pnio_desegment);
 
     /* register heuristics anchor for payload dissectors */
-    heur_subdissector_list = register_heur_dissector_list("pn_rt");
+    register_heur_dissector_list("pn_rt", &heur_subdissector_list);
 
     init_pn (proto_pn_rt);
     register_init_routine(pnio_defragment_init);
@@ -1012,16 +1022,3 @@ proto_reg_handoff_pn_rt(void)
     ethertype_subdissector_table = find_dissector_table("ethertype");
 }
 
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

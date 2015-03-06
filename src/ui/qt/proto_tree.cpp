@@ -26,12 +26,13 @@
 #include <epan/ftypes/ftypes.h>
 #include <epan/prefs.h>
 
-#include <QApplication>
-#include <QContextMenuEvent>
-#include <QDesktopServices>
+#include "wireshark_application.h"
 #include <QHeaderView>
 #include <QTreeWidgetItemIterator>
+#include <QDesktopServices>
 #include <QUrl>
+#include <QContextMenuEvent>
+#include <QMainWindow>
 
 QColor        expert_color_comment    ( 0xb7, 0xf7, 0x74 );        /* Green */
 QColor        expert_color_chat       ( 0x80, 0xb7, 0xf7 );        /* light blue */
@@ -94,8 +95,7 @@ proto_tree_draw_node(proto_node *node, gpointer data)
     QPalette pal = QApplication::palette();
     if (fi && fi->hfinfo) {
         if(fi->hfinfo->type == FT_PROTOCOL) {
-            item->setData(0, Qt::BackgroundRole, pal.window());
-            item->setData(0, Qt::ForegroundRole, pal.windowText());
+            item->setData(0, Qt::BackgroundRole, pal.alternateBase());
         }
 
         if((fi->hfinfo->type == FT_FRAMENUM) ||
@@ -159,7 +159,6 @@ ProtoTree::ProtoTree(QWidget *parent) :
     decode_as_(NULL)
 {
     QMenu *submenu, *subsubmenu;
-    QAction *action;
 
     setAccessibleName(tr("Packet details"));
     setUniformRowHeights(true);
@@ -170,33 +169,26 @@ ProtoTree::ProtoTree(QWidget *parent) :
     ctx_menu_.addAction(window()->findChild<QAction *>("actionViewExpandAll"));
     ctx_menu_.addAction(window()->findChild<QAction *>("actionViewCollapseAll"));
     ctx_menu_.addSeparator();
-//    "     <menuitem name='CreateAColumn' action='/Create a Column'/>\n"
-    action = window()->findChild<QAction *>("actionApply_as_Filter");
-    submenu = new QMenu();
-    action->setMenu(submenu);
-    ctx_menu_.addAction(action);
+//    "     <menuitem name='ApplyasColumn' action='/Apply as Column'/>\n"
+    ctx_menu_.addSeparator();
+    submenu = new QMenu(tr("Apply as Filter"));
+    ctx_menu_.addMenu(submenu);
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFNotSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFAndSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFOrSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFAndNotSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFOrNotSelected"));
-
-    action = window()->findChild<QAction *>("actionPrepare_a_Filter");
-    submenu = new QMenu();
-    action->setMenu(submenu);
-    ctx_menu_.addAction(action);
+    submenu = new QMenu(tr("Prepare a Filter"));
+    ctx_menu_.addMenu(submenu);
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFNotSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFAndSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFOrSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFAndNotSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFOrNotSelected"));
-
-//    action = window()->findChild<QAction *>("actionColorize_with_Filter");
-//    submenu = new QMenu();
-//    action->setMenu(submenu);
-//    ctx_menu_.addAction(action);
+    submenu = new QMenu(tr("Colorize with Filter"));
+    ctx_menu_.addMenu(submenu);
 //    "       <menuitem name='Color1' action='/Colorize with Filter/Color 1'/>\n"
 //    "       <menuitem name='Color2' action='/Colorize with Filter/Color 2'/>\n"
 //    "       <menuitem name='Color3' action='/Colorize with Filter/Color 3'/>\n"
@@ -213,21 +205,15 @@ ProtoTree::ProtoTree(QWidget *parent) :
 //    "     <menuitem name='FollowUDPStream' action='/Follow UDP Stream'/>\n"
 //    "     <menuitem name='FollowSSLStream' action='/Follow SSL Stream'/>\n"
     ctx_menu_.addSeparator();
-
-    action = window()->findChild<QAction *>("actionCopy");
-    submenu = new QMenu();
-    action->setMenu(submenu);
-    ctx_menu_.addAction(action);
+    submenu = new QMenu(tr("Copy"));
+    ctx_menu_.addMenu(submenu);
     submenu->addAction(window()->findChild<QAction *>("actionEditCopyDescription"));
     submenu->addAction(window()->findChild<QAction *>("actionEditCopyFieldName"));
     submenu->addAction(window()->findChild<QAction *>("actionEditCopyValue"));
     submenu->addSeparator();
     submenu->addAction(window()->findChild<QAction *>("actionEditCopyAsFilter"));
-
-    action = window()->findChild<QAction *>("actionBytes");
-    subsubmenu = new QMenu();
-    action->setMenu(subsubmenu);
-    submenu->addAction(action);
+    subsubmenu = new QMenu(tr("Bytes"));
+    submenu->addMenu(subsubmenu);
     subsubmenu->addSeparator();
 //    "        <menu name= 'Bytes' action='/Copy/Bytes'>\n"
 //    "           <menuitem name='OffsetHexText' action='/Copy/Bytes/OffsetHexText'/>\n"
@@ -239,12 +225,12 @@ ProtoTree::ProtoTree(QWidget *parent) :
 //    "        </menu>\n"
 //    "     </menu>\n"
 //    "     <menuitem name='ExportSelectedPacketBytes' action='/ExportSelectedPacketBytes'/>\n"
-//    ctx_menu_.addSeparator();
+    ctx_menu_.addSeparator();
 //    "     <menuitem name='WikiProtocolPage' action='/WikiProtocolPage'/>\n"
 //    "     <menuitem name='FilterFieldReference' action='/FilterFieldReference'/>\n"
 //    "     <menuitem name='ProtocolHelp' action='/ProtocolHelp'/>\n"
 //    "     <menuitem name='ProtocolPreferences' action='/ProtocolPreferences'/>\n"
-//    ctx_menu_.addSeparator();
+    ctx_menu_.addSeparator();
     decode_as_ = window()->findChild<QAction *>("actionAnalyzeDecodeAs");
     ctx_menu_.addAction(decode_as_);
 //    "     <menuitem name='DisableProtocol' action='/DisableProtocol'/>\n"
@@ -271,16 +257,9 @@ void ProtoTree::contextMenuEvent(QContextMenuEvent *event)
     decode_as_->setData(QVariant());
 }
 
-void ProtoTree::setMonospaceFont(const QFont &mono_font)
-{
-    mono_font_ = mono_font;
-    setFont(mono_font_);
-    update();
-}
-
 void ProtoTree::fillProtocolTree(proto_tree *protocol_tree) {
     clear();
-    setFont(mono_font_);
+    setFont(wsApp->monospaceFont());
 
     proto_tree_children_foreach(protocol_tree, proto_tree_draw_node, invisibleRootItem());
 }
@@ -451,7 +430,7 @@ void ProtoTree::itemDoubleClick(QTreeWidgetItem *item, int column) {
 
     if(FI_GET_FLAG(fi, FI_URL) && IS_FT_STRING(fi->hfinfo->type)) {
         gchar *url;
-        url = fvalue_to_string_repr(&fi->value, FTREPR_DISPLAY, fi->hfinfo->display, NULL);
+        url = fvalue_to_string_repr(&fi->value, FTREPR_DISPLAY, NULL);
         if(url){
 //            browser_open_url(url);
             QDesktopServices::openUrl(QUrl(url));

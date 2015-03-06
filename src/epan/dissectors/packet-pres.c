@@ -32,12 +32,16 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/prefs.h>
 #include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
 #include <epan/uat.h>
+
+#include <string.h>
 
 #include <epan/asn1.h>
 #include <epan/oids.h>
@@ -176,7 +180,7 @@ static int hf_pres_User_session_requirements_symmetric_synchronize = -1;
 static int hf_pres_User_session_requirements_data_separation = -1;
 
 /*--- End of included file: packet-pres-hf.c ---*/
-#line 89 "../../asn1/pres/packet-pres-template.c"
+#line 93 "../../asn1/pres/packet-pres-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_pres           = -1;
@@ -222,11 +226,9 @@ static gint ett_pres_User_session_requirements = -1;
 static gint ett_pres_UD_type = -1;
 
 /*--- End of included file: packet-pres-ett.c ---*/
-#line 94 "../../asn1/pres/packet-pres-template.c"
+#line 98 "../../asn1/pres/packet-pres-template.c"
 
 static expert_field ei_pres_dissector_not_available = EI_INIT;
-static expert_field ei_pres_wrong_spdu_type = EI_INIT;
-static expert_field ei_pres_invalid_offset = EI_INIT;
 
 UAT_DEC_CB_DEF(pres_users, ctx_id, pres_user_t)
 UAT_CSTRING_CB_DEF(pres_users, oid, pres_user_t)
@@ -445,7 +447,7 @@ dissect_pres_Presentation_context_identifier(gboolean implicit_tag _U_, tvbuff_t
 
   oid = find_oid_by_pres_ctx_id(actx->pinfo, presentation_context_identifier);
 
-  if(oid && (name = oid_resolved_from_string(wmem_packet_scope(), oid))) {
+  if(oid && (name = oid_resolved_from_string(oid))) {
 	proto_item_append_text(actx->created_item, " (%s)", name);
   }
 
@@ -1348,17 +1350,15 @@ dissect_pres_UD_type(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U
 
 /*--- PDUs ---*/
 
-static int dissect_UD_type_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_UD_type_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_pres_UD_type(FALSE, tvb, offset, &asn1_ctx, tree, hf_pres_UD_type_PDU);
-  return offset;
+  dissect_pres_UD_type(FALSE, tvb, 0, &asn1_ctx, tree, hf_pres_UD_type_PDU);
 }
 
 
 /*--- End of included file: packet-pres-fn.c ---*/
-#line 223 "../../asn1/pres/packet-pres-template.c"
+#line 225 "../../asn1/pres/packet-pres-template.c"
 
 
 /*
@@ -1375,20 +1375,21 @@ dissect_ppdu(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree, st
 
 	/* do we have spdu type from the session dissector?  */
 	if( local_session == NULL ){
-		proto_tree_add_expert(tree, pinfo, &ei_pres_wrong_spdu_type, tvb, offset, -1);
+		proto_tree_add_text(tree, tvb, offset, -1,
+				"Internal error:can't get spdu type from session dissector.");
 		return 0;
 	}
 
 	session = local_session;
 	if(session->spdu_type == 0 ){
-		proto_tree_add_expert_format(tree, pinfo, &ei_pres_wrong_spdu_type, tvb, offset, -1,
+		proto_tree_add_text(tree, tvb, offset, -1,
 			"Internal error:wrong spdu type %x from session dissector.",session->spdu_type);
 		return 0;
 	}
 
 	/*  set up type of PPDU */
 	col_add_str(pinfo->cinfo, COL_INFO,
-		    val_to_str_ext(session->spdu_type, &ses_vals_ext, "Unknown PPDU type (0x%02x)"));
+		    val_to_str(session->spdu_type, ses_vals, "Unknown PPDU type (0x%02x)"));
 
 	asn1_ctx.private_data = session;
 
@@ -1441,8 +1442,8 @@ dissect_pres(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 	/* do we have at least 4 bytes  */
 	if (!tvb_bytes_exist(tvb, 0, 4)){
 		if (session && session->spdu_type != SES_MAJOR_SYNC_POINT) {
-			proto_tree_add_item(parent_tree, hf_pres_user_data, tvb, offset,
-					    tvb_reported_length_remaining(tvb,offset), ENC_NA);
+			proto_tree_add_text(parent_tree, tvb, offset,
+					    tvb_reported_length_remaining(tvb,offset),"User data");
 			return 0;  /* no, it isn't a presentation PDU */
 		}
 	}
@@ -1468,8 +1469,8 @@ dissect_pres(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 		}
 
 		/* dissect the packet */
-		dissect_UD_type_PDU(tvb, pinfo, clpres_tree, NULL);
-		return tvb_captured_length(tvb);
+		dissect_UD_type_PDU(tvb, pinfo, clpres_tree);
+		return tvb_length(tvb);
 	}
 
 	/*  we can't make any additional checking here   */
@@ -1484,22 +1485,22 @@ dissect_pres(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 		if (oid) {
 			call_ber_oid_callback (oid, tvb, offset, pinfo, parent_tree, session);
 		} else {
-			proto_tree_add_item(parent_tree, hf_pres_user_data, tvb, offset,
-					    tvb_reported_length_remaining(tvb,offset), ENC_NA);
+			proto_tree_add_text(parent_tree, tvb, offset,
+					    tvb_reported_length_remaining(tvb,offset),"User data");
 		}
-		return tvb_captured_length(tvb);
+		return tvb_length(tvb);
 	}
 
 	while (tvb_reported_length_remaining(tvb, offset) > 0){
 		old_offset = offset;
 		offset = dissect_ppdu(tvb, offset, pinfo, parent_tree, session);
 		if(offset <= old_offset){
-            proto_tree_add_expert(parent_tree, pinfo, &ei_pres_invalid_offset, tvb, offset, -1);
-            break;
+			proto_tree_add_text(parent_tree, tvb, offset, -1,"Invalid offset");
+			THROW(ReportedBoundsError);
 		}
 	}
 
-	return tvb_captured_length(tvb);
+	return tvb_length(tvb);
 }
 
 
@@ -1528,6 +1529,7 @@ void proto_register_pres(void) {
       { "Typed data type", "pres.Typed_data_type",
         FT_UINT32, BASE_DEC, VALS(pres_Typed_data_type_vals), 0,
         NULL, HFILL }},
+
 
 
 /*--- Included file: packet-pres-hfarr.c ---*/
@@ -1842,7 +1844,7 @@ void proto_register_pres(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-pres-hfarr.c ---*/
-#line 394 "../../asn1/pres/packet-pres-template.c"
+#line 398 "../../asn1/pres/packet-pres-template.c"
   };
 
   /* List of subtrees */
@@ -1889,13 +1891,11 @@ void proto_register_pres(void) {
     &ett_pres_UD_type,
 
 /*--- End of included file: packet-pres-ettarr.c ---*/
-#line 400 "../../asn1/pres/packet-pres-template.c"
+#line 404 "../../asn1/pres/packet-pres-template.c"
   };
 
   static ei_register_info ei[] = {
      { &ei_pres_dissector_not_available, { "pres.dissector_not_available", PI_UNDECODED, PI_WARN, "Dissector is not available", EXPFILL }},
-     { &ei_pres_wrong_spdu_type, { "pres.wrong_spdu_type", PI_PROTOCOL, PI_WARN, "Internal error:can't get spdu type from session dissector", EXPFILL }},
-     { &ei_pres_invalid_offset, { "pres.invalid_offset", PI_MALFORMED, PI_ERROR, "Internal error:can't get spdu type from session dissector", EXPFILL }},
   };
 
   static uat_field_t users_flds[] = {

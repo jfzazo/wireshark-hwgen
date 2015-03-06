@@ -27,9 +27,14 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
+#include <epan/wmem/wmem.h>
+
 void proto_register_sita(void);
 void proto_reg_handoff_sita(void);
 
@@ -138,18 +143,18 @@ dissect_sita(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         proto_tree_add_uint(sita_tree, hf_proto, tvb, 0, 0, proto);
 
         flags_string = format_flags_string(flags, flags_str);
-        sita_flags_tree = proto_tree_add_subtree_format(sita_tree, tvb, 0, 0,
-                ett_sita_flags, NULL, "Flags: 0x%02x (From %s)%s%s",
+        ti = proto_tree_add_text(sita_tree, tvb, 0, 0, "Flags: 0x%02x (From %s)%s%s",
                 flags,
                 ((flags & SITA_FRAME_DIR) == SITA_FRAME_DIR_TXED) ? IOP : REMOTE,
                 strlen(flags_string) ? ", " : "",
                 flags_string);
+        sita_flags_tree = proto_item_add_subtree(ti, ett_sita_flags);
         proto_tree_add_boolean(sita_flags_tree, hf_droppedframe,    tvb, 0, 0, flags);
         proto_tree_add_boolean(sita_flags_tree, hf_dir,             tvb, 0, 0, flags);
 
         signals_string = format_flags_string(signals, signals_str);
-        sita_signals_tree = proto_tree_add_subtree_format(sita_tree, tvb, 0, 0,
-                    ett_sita_signals, NULL, "Signals: 0x%02x %s", signals, signals_string);
+        ti = proto_tree_add_text(sita_tree, tvb, 0, 0, "Signals: 0x%02x %s", signals, signals_string);
+        sita_signals_tree = proto_item_add_subtree(ti, ett_sita_signals);
         proto_tree_add_boolean(sita_signals_tree, hf_dcd,       tvb, 0, 0, signals);
         proto_tree_add_boolean(sita_signals_tree, hf_rts,       tvb, 0, 0, signals);
         proto_tree_add_boolean(sita_signals_tree, hf_cts,       tvb, 0, 0, signals);
@@ -158,8 +163,8 @@ dissect_sita(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         if ((flags & SITA_FRAME_DIR) == SITA_FRAME_DIR_RXED) {
             errors1_string = format_flags_string(errors1, rx_errors1_str);
-            sita_errors1_tree = proto_tree_add_subtree_format(sita_tree, tvb, 0, 0,
-                ett_sita_errors1, NULL, "Receive Status: 0x%02x %s", errors1, errors1_string);
+            ti = proto_tree_add_text(sita_tree, tvb, 0, 0, "Receive Status: 0x%02x %s", errors1, errors1_string);
+            sita_errors1_tree = proto_item_add_subtree(ti, ett_sita_errors1);
             proto_tree_add_boolean(sita_errors1_tree, hf_shortframe,    tvb, 0, 0, errors1);
             proto_tree_add_boolean(sita_errors1_tree, hf_longframe,     tvb, 0, 0, errors1);
             proto_tree_add_boolean(sita_errors1_tree, hf_collision,     tvb, 0, 0, errors1);
@@ -167,8 +172,8 @@ dissect_sita(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             proto_tree_add_boolean(sita_errors1_tree, hf_framing,       tvb, 0, 0, errors1);
 
             errors2_string = format_flags_string(errors2, rx_errors2_str);
-            sita_errors2_tree = proto_tree_add_subtree_format(sita_tree, tvb, 0, 0,
-                ett_sita_errors2, NULL, "Receive Status: 0x%02x %s", errors2, errors2_string);
+            ti = proto_tree_add_text(sita_tree, tvb, 0, 0, "Receive Status: 0x%02x %s", errors2, errors2_string);
+            sita_errors2_tree = proto_item_add_subtree(ti, ett_sita_errors2);
             proto_tree_add_boolean(sita_errors2_tree, hf_break,         tvb, 0, 0, errors2);
             proto_tree_add_boolean(sita_errors2_tree, hf_crc,           tvb, 0, 0, errors2);
             proto_tree_add_boolean(sita_errors2_tree, hf_length,        tvb, 0, 0, errors2);
@@ -179,8 +184,8 @@ dissect_sita(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             proto_tree_add_boolean(sita_errors2_tree, hf_nonaligned,    tvb, 0, 0, errors2);
         } else {
             errors2_string = format_flags_string(errors2, tx_errors2_str);
-            sita_errors1_tree = proto_tree_add_subtree_format(sita_tree, tvb, 0, 0,
-                ett_sita_errors1, NULL, "Transmit Status: 0x%02x %s", errors2, errors2_string);
+            ti = proto_tree_add_text(sita_tree, tvb, 0, 0, "Transmit Status: 0x%02x %s", errors2, errors2_string);
+            sita_errors1_tree = proto_item_add_subtree(ti, ett_sita_errors1);
             proto_tree_add_boolean(sita_errors1_tree, hf_rtxlimit,      tvb, 0, 0, errors2);
             proto_tree_add_boolean(sita_errors1_tree, hf_uarterror,     tvb, 0, 0, errors2);
             proto_tree_add_boolean(sita_errors1_tree, hf_lostcts,       tvb, 0, 0, errors2);
@@ -396,16 +401,3 @@ proto_reg_handoff_sita(void)
     dissector_add_uint("sita.proto", SITA_PROTO_ALC,        ipars_handle);
     dissector_add_uint("wtap_encap", WTAP_ENCAP_SITA,       sita_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

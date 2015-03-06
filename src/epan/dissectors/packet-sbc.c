@@ -28,8 +28,6 @@
 #include <epan/expert.h>
 #include <epan/prefs.h>
 
-#include "packet-btavdtp.h"
-
 #define CHANNELS_MONO          0x00
 #define CHANNELS_JOINT_STEREO  0x03
 
@@ -56,14 +54,6 @@ static int hf_sbc_allocation_method                                        = -1;
 static int hf_sbc_subbands                                                 = -1;
 static int hf_sbc_bitpool                                                  = -1;
 static int hf_sbc_crc_check                                                = -1;
-static int hf_sbc_expected_data_speed                                      = -1;
-static int hf_sbc_frame_duration                                           = -1;
-static int hf_sbc_cummulative_frame_duration                               = -1;
-static int hf_sbc_delta_time                                               = -1;
-static int hf_sbc_delta_time_from_the_beginning                            = -1;
-static int hf_sbc_cummulative_duration                                     = -1;
-static int hf_sbc_avrcp_song_position                                      = -1;
-static int hf_sbc_diff                                                     = -1;
 
 static int hf_sbc_data                                                     = -1;
 
@@ -112,11 +102,12 @@ static const value_string subbands_vals[] = {
 
 
 static gint
-dissect_sbc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+dissect_sbc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
     proto_item  *ti;
     proto_tree  *sbc_tree;
     proto_item  *pitem;
+    proto_item  *ritem;
     proto_tree  *rtree;
     gint        offset = 0;
     guint8      number_of_frames;
@@ -134,13 +125,8 @@ dissect_sbc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     gint        counter = 1;
     gint        frame_length;
     gint        expected_speed_data;
-    gdouble     frame_duration;
-    gdouble     cummulative_frame_duration = 0;
-    bta2dp_codec_info_t  *info;
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "SBC");
-
-    info = (bta2dp_codec_info_t *) data;
 
     ti = proto_tree_add_item(tree, proto_sbc, tvb, offset, -1, ENC_NA);
     sbc_tree = proto_item_add_subtree(ti, ett_sbc);
@@ -199,8 +185,9 @@ dissect_sbc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 
         expected_speed_data = (frame_length * frequency) / (sbc_subbands * sbc_blocks);
 
-        rtree = proto_tree_add_subtree_format(sbc_tree, tvb, offset, 4 + frame_length,
-                ett_sbc_list, NULL, "Frame: %3u/%3u", counter, number_of_frames);
+        ritem = proto_tree_add_text(sbc_tree, tvb, offset, 4 + frame_length,
+                "Frame: %3u/%3u", counter, number_of_frames);
+        rtree = proto_item_add_subtree(ritem, ett_sbc_list);
 
         pitem = proto_tree_add_item(rtree, hf_sbc_syncword, tvb, offset, 1, ENC_BIG_ENDIAN);
         syncword = tvb_get_guint8(tvb, offset);
@@ -209,75 +196,28 @@ dissect_sbc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         }
         offset += 1;
 
-        proto_tree_add_item(rtree, hf_sbc_sampling_frequency, tvb, offset, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(rtree, hf_sbc_blocks,             tvb, offset, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(rtree, hf_sbc_channel_mode,       tvb, offset, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(rtree, hf_sbc_allocation_method,  tvb, offset, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(rtree, hf_sbc_subbands,           tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(ritem, hf_sbc_sampling_frequency, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(ritem, hf_sbc_blocks,             tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(ritem, hf_sbc_channel_mode,       tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(ritem, hf_sbc_allocation_method,  tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(ritem, hf_sbc_subbands,           tvb, offset, 1, ENC_BIG_ENDIAN);
         offset += 1;
 
-        proto_tree_add_item(rtree, hf_sbc_bitpool,            tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(ritem, hf_sbc_bitpool,            tvb, offset, 1, ENC_BIG_ENDIAN);
         offset += 1;
 
-        proto_tree_add_item(rtree, hf_sbc_crc_check,          tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(ritem, hf_sbc_crc_check,          tvb, offset, 1, ENC_BIG_ENDIAN);
         offset += 1;
 
-        proto_tree_add_item(rtree, hf_sbc_data,  tvb, offset, frame_length, ENC_NA);
+        proto_tree_add_item(ritem, hf_sbc_data,  tvb, offset, frame_length, ENC_NA);
         offset += frame_length;
 
-/* TODO: expert_info for invalid CRC */
+/* TODO: expert_info for invalid CRC*/
 
-        pitem = proto_tree_add_uint(rtree, hf_sbc_expected_data_speed, tvb, offset, 0, expected_speed_data / 1024);
-        proto_item_append_text(pitem, " KiB/s");
-        PROTO_ITEM_SET_GENERATED(pitem);
-
-        frame_duration = (((double) frame_length / (double) expected_speed_data) * 1000.0);
-        cummulative_frame_duration += frame_duration;
-
-        pitem = proto_tree_add_double(rtree, hf_sbc_frame_duration, tvb, offset, 0, frame_duration);
-        proto_item_append_text(pitem, " ms");
+        pitem = proto_tree_add_text(ritem, tvb, offset, 0, "Expected speed data: %u KiB/s", expected_speed_data / 1024);
         PROTO_ITEM_SET_GENERATED(pitem);
 
         counter += 1;
-    }
-
-    pitem = proto_tree_add_double(sbc_tree, hf_sbc_cummulative_frame_duration, tvb, offset, 0, cummulative_frame_duration);
-    proto_item_append_text(pitem, " ms");
-    PROTO_ITEM_SET_GENERATED(pitem);
-
-    if (info && info->configuration && info->configuration_length > 0) {
-/* TODO: display current codec configuration */
-    }
-
-    if (info && info->previous_media_packet_info && info->current_media_packet_info) {
-        nstime_t  delta;
-
-        nstime_delta(&delta, &pinfo->fd->abs_ts, &info->previous_media_packet_info->abs_ts);
-        pitem = proto_tree_add_double(sbc_tree, hf_sbc_delta_time, tvb, offset, 0, nstime_to_msec(&delta));
-        proto_item_append_text(pitem, " ms");
-        PROTO_ITEM_SET_GENERATED(pitem);
-
-        pitem = proto_tree_add_double(sbc_tree, hf_sbc_avrcp_song_position, tvb, offset, 0, info->previous_media_packet_info->avrcp_song_position);
-        proto_item_append_text(pitem, " ms");
-        PROTO_ITEM_SET_GENERATED(pitem);
-
-        nstime_delta(&delta, &pinfo->fd->abs_ts, &info->previous_media_packet_info->first_abs_ts);
-        pitem = proto_tree_add_double(sbc_tree, hf_sbc_delta_time_from_the_beginning, tvb, offset, 0,  nstime_to_msec(&delta));
-        proto_item_append_text(pitem, " ms");
-        PROTO_ITEM_SET_GENERATED(pitem);
-
-        if (!pinfo->fd->flags.visited) {
-            info->current_media_packet_info->cummulative_frame_duration += cummulative_frame_duration;
-            info->current_media_packet_info->avrcp_song_position        += cummulative_frame_duration;
-        }
-
-        pitem = proto_tree_add_double(sbc_tree, hf_sbc_cummulative_duration, tvb, offset, 0, info->previous_media_packet_info->cummulative_frame_duration);
-        proto_item_append_text(pitem, " ms");
-        PROTO_ITEM_SET_GENERATED(pitem);
-
-        pitem = proto_tree_add_double(sbc_tree, hf_sbc_diff, tvb, offset, 0, info->previous_media_packet_info->cummulative_frame_duration - nstime_to_msec(&delta));
-        proto_item_append_text(pitem, " ms");
-        PROTO_ITEM_SET_GENERATED(pitem);
     }
 
 /* TODO: more precise dissection: blocks, channels, subbands, padding  */
@@ -359,48 +299,9 @@ proto_register_sbc(void)
             FT_UINT8, BASE_HEX, NULL, 0x00,
             NULL, HFILL }
         },
-        { &hf_sbc_expected_data_speed,
-            { "Expected data speed",             "sbc.expected_speed_data",
-            FT_UINT32, BASE_DEC, NULL, 0x00,
-            NULL, HFILL }
-        },
-        { &hf_sbc_frame_duration,
-            { "Frame Duration",                  "sbc.frame_duration",
-            FT_DOUBLE, BASE_NONE, NULL, 0x00,
-            NULL, HFILL }
-        },
-        { &hf_sbc_cummulative_frame_duration,
-            { "Cummulative Frame Duration",      "sbc.cummulative_frame_duration",
-            FT_DOUBLE, BASE_NONE, NULL, 0x00,
-            NULL, HFILL }
-        },
-        { &hf_sbc_delta_time,
-            { "Delta time",                      "sbc.delta_time",
-            FT_DOUBLE, BASE_NONE, NULL, 0x00,
-            NULL, HFILL }
-        },
-        { &hf_sbc_delta_time_from_the_beginning,
-            { "Delta time from the beginning",   "sbc.delta_time_from_the_beginning",
-            FT_DOUBLE, BASE_NONE, NULL, 0x00,
-            NULL, HFILL }
-        },
-        { &hf_sbc_cummulative_duration,
-            { "Cummulative Music Duration",      "sbc.cummulative_music_duration",
-            FT_DOUBLE, BASE_NONE, NULL, 0x00,
-            NULL, HFILL }
-        },
-        { &hf_sbc_avrcp_song_position,
-            { "AVRCP Song Position",             "sbc.avrcp_song_position",
-            FT_DOUBLE, BASE_NONE, NULL, 0x00,
-            NULL, HFILL }
-        },
-        { &hf_sbc_diff,
-            { "Diff",            "sbc.diff",
-            FT_DOUBLE, BASE_NONE, NULL, 0x00,
-            NULL, HFILL }
-        },
+
         { &hf_sbc_data,
-            { "Frame Data",                      "sbc.data",
+            { "Data",                            "sbc.data",
             FT_NONE, BASE_NONE, NULL, 0x00,
             NULL, HFILL }
         },

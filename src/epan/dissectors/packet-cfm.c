@@ -24,21 +24,19 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-/* This code is based on the following documents;
- * - IEEE P802.1ag/D8.1
- * - ITU-T Rec. G.8031/Y.1342 (06/2011) - Ethernet linear protection switching
- * - ITU-T Rec. G.8032/Y.1344 (02/2012) - Ethernet ring protection switching
- * - ITU-T Y.1731 recommendation (05/2006,) which is not formally released
- *    at the time of this dissector development.
- *    Any updates to these documents may require additional modifications to this code.
- *    ITU-T G.8013/Y.1731 (11/2013) is the current version (as of Sep 11, 2014)
- *    ToDo: Update dissector to reflect this document.
+/* This code is based on the IEEE P802.1ag/D8.1 document,
+ * the ITU-T Rec. G.8031/Y.1342 (06/2011) - Ethernet linear protection switching document,
+ * the ITU-T Rec. G.8032/Y.1344 (02/2012) - Ethernet ring protection switching document,
+ * and on the ITU-T Y.1731 recommendation (05/2006,) which is not formally released
+ * at the time of this dissector development.
+ * Any updates to these documents may require additional modifications to this code.
  */
 
 
 #include "config.h"
 
 #include <epan/packet.h>
+#include <glib.h>
 #include <epan/etypes.h>
 
 /** Value declarations for CFM EOAM (IEEE 802.1ag) dissection */
@@ -1331,6 +1329,7 @@ static void dissect_cfm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			{
 				guint16 cfm_tlv_length;
 				gint tlv_header_modifier;
+				proto_item *fi;
 				proto_tree *cfm_tlv_tree;
 				cfm_tlv_type = tvb_get_guint8(tvb, cfm_tlv_offset);
 
@@ -1342,9 +1341,10 @@ static void dissect_cfm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 					cfm_tlv_length = tvb_get_ntohs(tvb, cfm_tlv_offset+1);
 				}
 
-				cfm_tlv_tree = proto_tree_add_subtree_format(cfm_all_tlvs_tree, tvb, cfm_tlv_offset, cfm_tlv_length+tlv_header_modifier,
-					       ett_cfm_tlv, NULL, "TLV: %s (t=%d,l=%d)", val_to_str(cfm_tlv_type, tlvtypefieldvalues, "Unknown (0x%02x)"),
+				fi = proto_tree_add_text(cfm_all_tlvs_tree, tvb, cfm_tlv_offset, cfm_tlv_length+tlv_header_modifier,
+					       "TLV: %s (t=%d,l=%d)", val_to_str(cfm_tlv_type, tlvtypefieldvalues, "Unknown (0x%02x)"),
 					       cfm_tlv_type, cfm_tlv_length);
+				cfm_tlv_tree = proto_item_add_subtree(fi, ett_cfm_tlv);
 
 				proto_tree_add_item(cfm_tlv_tree, hf_cfm_tlv_type, tvb, cfm_tlv_offset, 1, ENC_BIG_ENDIAN);
 				cfm_tlv_offset += 1;
@@ -1517,6 +1517,11 @@ static void dissect_cfm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 							tlv_data_offset += cfm_tlv_length;
 							break;
 						case TEST_TLV:
+							/* There is a discrepancy in the recommendation ITU-T Y.1731
+							 * where the test pattern type may or may not be included in
+							 * the TLV length.  Going to assume that it is included in the
+							 * length which corresponds with the typical format for TLV's
+							 * until the recommendation is more clear in this regard. */
 							proto_tree_add_item(cfm_tlv_tree, hf_tlv_tst_test_pattern_type,
 								       	tvb, tlv_data_offset, 1, ENC_BIG_ENDIAN);
 							tlv_tst_test_pattern_type = tvb_get_guint8(tvb,tlv_data_offset);
@@ -2159,18 +2164,5 @@ void proto_register_cfm(void)
 void proto_reg_handoff_cfm(void)
 {
 	dissector_add_uint("ethertype", ETHERTYPE_CFM, cfm_handle);
-	dissector_add_for_decode_as("pwach.channel_type", cfm_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

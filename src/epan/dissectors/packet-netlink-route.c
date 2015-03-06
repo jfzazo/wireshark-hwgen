@@ -25,6 +25,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/aftypes.h>
 
@@ -984,16 +986,3 @@ proto_reg_handoff_netlink_route(void)
 {
 	dissector_add_uint("netlink.protocol", WS_NETLINK_ROUTE, netlink_route_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

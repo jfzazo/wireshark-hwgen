@@ -26,6 +26,7 @@
 #ifndef _WIMAX_TLV_H_
 #define _WIMAX_TLV_H_
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #define	WIMAX_TLV_EXTENDED_LENGTH_MASK 0x80

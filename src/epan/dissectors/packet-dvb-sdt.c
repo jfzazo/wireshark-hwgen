@@ -23,8 +23,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include "packet-mpeg-sect.h"
+#include <epan/dissectors/packet-mpeg-sect.h>
+
 #include "packet-mpeg-descriptor.h"
 
 void proto_register_dvb_sdt(void);
@@ -100,6 +103,7 @@ dissect_dvb_sdt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     proto_item *ti;
     proto_tree *dvb_sdt_tree;
+    proto_item *si;
     proto_tree *dvb_sdt_service_tree;
 
     /* The TVB should start right after the section_length in the Section packet */
@@ -140,8 +144,8 @@ dissect_dvb_sdt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     while (offset < length) {
 
         svc_id = tvb_get_ntohs(tvb, offset);
-        dvb_sdt_service_tree = proto_tree_add_subtree_format(dvb_sdt_tree, tvb, offset, 5,
-                    ett_dvb_sdt_service, NULL, "Service 0x%04hx", svc_id);
+        si = proto_tree_add_text(dvb_sdt_tree, tvb, offset, 5, "Service 0x%04hx", svc_id);
+        dvb_sdt_service_tree = proto_item_add_subtree(si, ett_dvb_sdt_service);
 
         proto_tree_add_item(dvb_sdt_service_tree, hf_dvb_sdt_service_id,                 tvb, offset, 2, ENC_BIG_ENDIAN);
         offset += 2;

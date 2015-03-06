@@ -28,9 +28,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "crc.h"
-#include "wimax_utils.h"
 
 extern gint proto_wimax;
 
@@ -41,6 +41,11 @@ static dissector_handle_t mac_generic_decoder_handle = NULL;
 static dissector_handle_t mac_header_type1_handle = NULL;
 static dissector_handle_t mac_header_type2_handle = NULL;
 static dissector_handle_t wimax_harq_map_handle = NULL;
+
+/* MAC Header dissector prototypes */
+extern gboolean is_down_link(packet_info *pinfo);
+extern gint wimax_decode_dlmap_reduced_aas(tvbuff_t *tvb, packet_info *pinfo, proto_tree *base_tree);
+extern gint wimax_decode_dlmapc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdu_tree);
 
 #define WIMAX_PDU_PADDING_MASK           0xFF
 #define WIMAX_INVALID_PDU_MASK           0xF0
@@ -251,16 +256,3 @@ proto_reg_handoff_wimax_pdu(void)
 	mac_header_type2_handle = find_dissector("mac_header_type_2_handler");
 	wimax_harq_map_handle = find_dissector("wimax_harq_map_handler");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

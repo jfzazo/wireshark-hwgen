@@ -255,7 +255,7 @@ WSLUA_CONSTRUCTOR Int64_fromhex(lua_State* L) {
     size_t len = 0;
     const gchar *s = luaL_checklstring(L,WSLUA_ARG_Int64_fromhex_HEX,&len);
 
-    if (len > 0) {
+    if (s && len > 0) {
         sscanf(s, "%" G_GINT64_MODIFIER "x", &result);
     }
     pushInt64(L,(gint64)result);
@@ -269,10 +269,10 @@ WSLUA_METHOD Int64_tohex(lua_State* L) {
 #define WSLUA_OPTARG_Int64_new_NUMBYTES 2 /* The number of hex-chars/nibbles to generate,
                                              negative means uppercase (default=16). */
     gint64 b = getInt64(L,1);
-    lua_Integer n = luaL_optinteger(L, WSLUA_OPTARG_Int64_new_NUMBYTES, 16);
+    gint n = luaL_optint(L, WSLUA_OPTARG_Int64_new_NUMBYTES, 16);
     const gchar *hexdigits = "0123456789abcdef";
     gchar buf[16];
-    lua_Integer i;
+    gint i;
     if (n < 0) { n = -n; hexdigits = "0123456789ABCDEF"; }
     if (n > 16) n = 16;
     for (i = n-1; i >= 0; --i) { buf[i] = hexdigits[b & 15]; b >>= 4; }
@@ -607,7 +607,7 @@ LUALIB_API int Int64_register(lua_State* L) {
 WSLUA_CLASS_DEFINE_BASE(UInt64,NOP,NOP,0);
 /* `UInt64` represents a 64 bit unsigned integer, similar to `Int64`.
 
-   For details, see: [[http://wiki.wireshark.org/LuaAPI/Int64]].
+   For details, see: http://wiki.wireshark.org/LuaAPI/`Int64`.
 */
 
 /* A checkUInt64 but that also auto-converts numbers, strings, and `Int64` to a guint64. */
@@ -815,7 +815,7 @@ WSLUA_CONSTRUCTOR UInt64_fromhex(lua_State* L) {
     size_t len = 0;
     const gchar *s = luaL_checklstring(L,WSLUA_ARG_UInt64_fromhex_HEX,&len);
 
-    if (len > 0) {
+    if (s && len > 0) {
         sscanf(s, "%" G_GINT64_MODIFIER "x", &result);
     }
     pushUInt64(L,result);
@@ -829,10 +829,10 @@ WSLUA_METHOD UInt64_tohex(lua_State* L) {
 #define WSLUA_OPTARG_UInt64_new_NUMBYTES 2 /* The number of hex-chars/nibbles to generate,
                                               negative means uppercase (default=16). */
     guint64 b = getUInt64(L,1);
-    lua_Integer n = luaL_optinteger(L, WSLUA_OPTARG_UInt64_new_NUMBYTES, 16);
+    gint n = luaL_optint(L, WSLUA_OPTARG_UInt64_new_NUMBYTES, 16);
     const gchar *hexdigits = "0123456789abcdef";
     gchar buf[16];
-    lua_Integer i;
+    gint i;
     if (n < 0) { n = -n; hexdigits = "0123456789ABCDEF"; }
     if (n > 16) n = 16;
     for (i = n-1; i >= 0; --i) { buf[i] = hexdigits[b & 15]; b >>= 4; }

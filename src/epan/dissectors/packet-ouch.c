@@ -49,6 +49,9 @@
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
+
+#include "packet-tcp.h"
 
 void proto_register_ouch(void);
 void proto_reg_handoff_ouch(void);
@@ -1253,7 +1256,7 @@ dissect_ouch(
             /* Unknown */
             proto_tree_add_item(tree,
                                 hf_ouch_message,
-                                tvb, offset, -1, ENC_NA);
+                                tvb, offset, -1, ENC_ASCII|ENC_NA);
             offset += reported_len - 1;
             break;
         }

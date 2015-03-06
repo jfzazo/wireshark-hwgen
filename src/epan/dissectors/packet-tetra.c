@@ -36,14 +36,18 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
 #include <epan/expert.h>
+#include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/oids.h>
 #include <epan/conversation.h>
 #include <epan/asn1.h>
 
-#include "packet-per.h"
+#include <stdio.h>
+#include <string.h>
+
+#include <epan/dissectors/packet-per.h>
 #include "packet-tetra.h"
 
 #define PROTO_TAG_tetra	"TETRA"
@@ -684,7 +688,7 @@ static int hf_tetra_proprietary_element_owner_extension = -1;  /* BIT_STRING */
 static int hf_tetra_simplex_duplex_selection_06 = -1;  /* T_simplex_duplex_selection_05 */
 
 /*--- End of included file: packet-tetra-hf.c ---*/
-#line 83 "../../asn1/tetra/packet-tetra-template.c"
+#line 87 "../../asn1/tetra/packet-tetra-template.c"
 
 /* Initialize the subtree pointers */
 /* These are the ids of the subtrees that we may be creating */
@@ -969,7 +973,7 @@ static gint ett_tetra_Type2 = -1;
 static gint ett_tetra_Modify_type = -1;
 
 /*--- End of included file: packet-tetra-ett.c ---*/
-#line 93 "../../asn1/tetra/packet-tetra-template.c"
+#line 97 "../../asn1/tetra/packet-tetra-template.c"
 
 static expert_field ei_tetra_channels_incorrect = EI_INIT;
 
@@ -8700,122 +8704,80 @@ dissect_tetra_MAC_ACCESS_DEFINE(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *a
 
 /*--- PDUs ---*/
 
-static int dissect_AACH_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_AACH_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_AACH(tvb, offset, &asn1_ctx, tree, hf_tetra_AACH_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_AACH(tvb, 0, &asn1_ctx, tree, hf_tetra_AACH_PDU);
 }
-static int dissect_BSCH_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_BSCH_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_BSCH(tvb, offset, &asn1_ctx, tree, hf_tetra_BSCH_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_BSCH(tvb, 0, &asn1_ctx, tree, hf_tetra_BSCH_PDU);
 }
-static int dissect_BNCH_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_BNCH_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_BNCH(tvb, offset, &asn1_ctx, tree, hf_tetra_BNCH_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_BNCH(tvb, 0, &asn1_ctx, tree, hf_tetra_BNCH_PDU);
 }
-static int dissect_MAC_ACCESS_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_ACCESS_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_ACCESS(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_ACCESS_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_ACCESS(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_ACCESS_PDU);
 }
-static int dissect_MAC_DATA_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_DATA_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_DATA(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_DATA_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_DATA(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_DATA_PDU);
 }
-static int dissect_MAC_FRAG_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_FRAG_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_FRAG(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_FRAG_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_FRAG(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_FRAG_PDU);
 }
-static int dissect_MAC_FRAG120_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_FRAG120_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_FRAG120(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_FRAG120_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_FRAG120(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_FRAG120_PDU);
 }
-static int dissect_MAC_END_UPLINK_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_END_UPLINK_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_END_UPLINK(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_END_UPLINK_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_END_UPLINK(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_END_UPLINK_PDU);
 }
-static int dissect_MAC_END_UP114_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_END_UP114_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_END_UP114(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_END_UP114_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_END_UP114(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_END_UP114_PDU);
 }
-static int dissect_MAC_END_HU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_END_HU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_END_HU(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_END_HU_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_END_HU(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_END_HU_PDU);
 }
-static int dissect_MAC_END_DOWNLINK_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_END_DOWNLINK_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_END_DOWNLINK(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_END_DOWNLINK_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_END_DOWNLINK(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_END_DOWNLINK_PDU);
 }
-static int dissect_MAC_END_DOWN111_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_END_DOWN111_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_END_DOWN111(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_END_DOWN111_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_END_DOWN111(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_END_DOWN111_PDU);
 }
-static int dissect_MAC_RESOURCE_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_RESOURCE_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_RESOURCE(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_RESOURCE_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_RESOURCE(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_RESOURCE_PDU);
 }
-static int dissect_MAC_ACCESS_DEFINE_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MAC_ACCESS_DEFINE_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_tetra_MAC_ACCESS_DEFINE(tvb, offset, &asn1_ctx, tree, hf_tetra_MAC_ACCESS_DEFINE_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_tetra_MAC_ACCESS_DEFINE(tvb, 0, &asn1_ctx, tree, hf_tetra_MAC_ACCESS_DEFINE_PDU);
 }
 
 
 /*--- End of included file: packet-tetra-fn.c ---*/
-#line 97 "../../asn1/tetra/packet-tetra-template.c"
+#line 101 "../../asn1/tetra/packet-tetra-template.c"
 
 static const value_string channeltypenames[] = {
 	{ 0, "Reserved" },
@@ -8945,35 +8907,35 @@ void tetra_dissect_pdu(int channel_type, int dir, tvbuff_t *pdu, proto_tree *tre
 	guint8 p;
 
 	tetra_sub_item = proto_tree_add_item(tree, hf_tetra_pdu,
-					     pdu, 0, tvb_captured_length(pdu), ENC_NA);
+					     pdu, 0, tvb_length(pdu), ENC_NA);
 
 	tetra_sub_tree = proto_item_add_subtree(tetra_sub_item, ett_tetra);
 
 	switch(channel_type) {
 	case TETRA_CHAN_AACH:
-		dissect_AACH_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+		dissect_AACH_PDU(pdu, pinfo, tetra_sub_tree );
 		break;
 	case TETRA_CHAN_SCH_F:
 		p = tvb_get_guint8(pdu, 0);
 		switch(p >> 6) {
 		case 0:
 			if (dir == TETRA_DOWNLINK)
-				dissect_MAC_RESOURCE_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+				dissect_MAC_RESOURCE_PDU(pdu, pinfo, tetra_sub_tree );
 			else
-				dissect_MAC_DATA_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+				dissect_MAC_DATA_PDU(pdu, pinfo, tetra_sub_tree );
 			break;
 		case 1: /* MAC-FRAG or MAC-END */
 			if((p >> 5) == 3) {
 				if (dir == TETRA_DOWNLINK)
-					dissect_MAC_END_DOWNLINK_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+					dissect_MAC_END_DOWNLINK_PDU(pdu, pinfo, tetra_sub_tree );
 				else
-					dissect_MAC_END_UPLINK_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+					dissect_MAC_END_UPLINK_PDU(pdu, pinfo, tetra_sub_tree);
 
 			} else
-				dissect_MAC_FRAG_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+				dissect_MAC_FRAG_PDU(pdu, pinfo, tetra_sub_tree );
 			break;
 		case 2:
-			dissect_MAC_ACCESS_DEFINE_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+			dissect_MAC_ACCESS_DEFINE_PDU(pdu, pinfo, tetra_sub_tree );
 			break;
 		}
 		break;
@@ -8981,16 +8943,16 @@ void tetra_dissect_pdu(int channel_type, int dir, tvbuff_t *pdu, proto_tree *tre
 		p = tvb_get_guint8(pdu, 0);
 		switch(p >> 6) {
 		case 0:
-			dissect_MAC_RESOURCE_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+			dissect_MAC_RESOURCE_PDU(pdu, pinfo, tetra_sub_tree );
 			break;
 		case 1: /* MAC-FRAG or MAC-END */
 			if((p >> 5) == 3)
-				dissect_MAC_END_DOWN111_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+				dissect_MAC_END_DOWN111_PDU(pdu, pinfo, tetra_sub_tree );
 			else
-				dissect_MAC_FRAG120_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+				dissect_MAC_FRAG120_PDU(pdu, pinfo, tetra_sub_tree );
 		break;
 		case 2:
-			dissect_MAC_ACCESS_DEFINE_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+			dissect_MAC_ACCESS_DEFINE_PDU(pdu, pinfo, tetra_sub_tree );
 			break;
 		}
 		break;
@@ -8998,38 +8960,38 @@ void tetra_dissect_pdu(int channel_type, int dir, tvbuff_t *pdu, proto_tree *tre
 		p = tvb_get_guint8(pdu, 0);
 		switch(p >> 7) {
 		case 0: /* MAC-ACCESS */
-			dissect_MAC_ACCESS_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+			dissect_MAC_ACCESS_PDU(pdu, pinfo, tetra_sub_tree);
 			break;
 		case 1: /* MAC-END-HU */
-			dissect_MAC_END_HU_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+			dissect_MAC_END_HU_PDU(pdu, pinfo, tetra_sub_tree);
 			break;
 		}
 		break;
 	case TETRA_CHAN_BSCH:
 		col_append_sep_str(pinfo->cinfo, COL_INFO, NULL, "BSCH");
-		dissect_BSCH_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+		dissect_BSCH_PDU(pdu, pinfo, tetra_sub_tree );
 		break;
 	case TETRA_CHAN_BNCH:
 		col_append_sep_str(pinfo->cinfo, COL_INFO, NULL, "BNCH");
-		dissect_BNCH_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+		dissect_BNCH_PDU(pdu, pinfo, tetra_sub_tree );
 		break;
 	case TETRA_CHAN_STCH:
 		p = tvb_get_guint8(pdu, 0);
 		switch(p >> 6) {
 		case 0:
-			dissect_MAC_RESOURCE_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+			dissect_MAC_RESOURCE_PDU(pdu, pinfo, tetra_sub_tree );
 			break;
 		case 1: /* MAC-FRAG or MAC-END */
 			if((p >> 5) == 3) {
 				if (dir == TETRA_DOWNLINK)
-					dissect_MAC_END_DOWN111_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+					dissect_MAC_END_DOWN111_PDU(pdu, pinfo, tetra_sub_tree );
 				else
-					dissect_MAC_END_UP114_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+					dissect_MAC_END_UP114_PDU(pdu, pinfo, tetra_sub_tree);
 			} else
-				dissect_MAC_FRAG120_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+				dissect_MAC_FRAG120_PDU(pdu, pinfo, tetra_sub_tree );
 			break;
 		case 2:
-			dissect_MAC_ACCESS_DEFINE_PDU(pdu, pinfo, tetra_sub_tree, NULL);
+			dissect_MAC_ACCESS_DEFINE_PDU(pdu, pinfo, tetra_sub_tree );
 			break;
 		}
 		break;
@@ -9090,7 +9052,7 @@ static void dissect_tetra_UNITDATA_IND(tvbuff_t *tvb, packet_info *pinfo, proto_
 		if ((remaining_bits)!=0)
 			byte_len++;
 
-		payload_tvb = tvb_new_subset_length(tvb, pdu_offset, byte_len);
+		payload_tvb = tvb_new_subset(tvb, pdu_offset, byte_len, byte_len);
 		tetra_dissect_pdu(channel_type, TETRA_UPLINK, payload_tvb, tetra_header_tree, pinfo);
 
 		if ((remaining_bits)!=0)
@@ -9146,7 +9108,7 @@ static void dissect_tetra_UNITDATA_REQ(tvbuff_t *tvb, packet_info *pinfo, proto_
 		if ((remaining_bits)!=0)
 				byte_len++;
 
-		payload_tvb = tvb_new_subset_length(tvb, pdu_offset, byte_len);
+		payload_tvb = tvb_new_subset(tvb, pdu_offset, byte_len, byte_len);
 		tetra_dissect_pdu(channel_type, TETRA_DOWNLINK, payload_tvb, tetra_header_tree, pinfo);
 		pdu_offset += byte_len;
 	}
@@ -11718,7 +11680,7 @@ void proto_register_tetra (void)
         "T_simplex_duplex_selection_05", HFILL }},
 
 /*--- End of included file: packet-tetra-hfarr.c ---*/
-#line 627 "../../asn1/tetra/packet-tetra-template.c"
+#line 631 "../../asn1/tetra/packet-tetra-template.c"
  	};
 
 	/* List of subtrees */
@@ -12003,7 +11965,7 @@ void proto_register_tetra (void)
     &ett_tetra_Modify_type,
 
 /*--- End of included file: packet-tetra-ettarr.c ---*/
-#line 637 "../../asn1/tetra/packet-tetra-template.c"
+#line 641 "../../asn1/tetra/packet-tetra-template.c"
 	};
 
 	static ei_register_info ei[] = {

@@ -31,6 +31,9 @@
 #include <epan/prefs.h>
 #include <epan/asn1.h>
 
+#include <stdio.h>
+#include <string.h>
+
 #include <epan/dissectors/packet-ber.h>
 #include <epan/dissectors/packet-q931.h>
 #include <epan/dissectors/packet-mtp3.h>
@@ -103,7 +106,7 @@ typedef struct _gcp_msg_t {
     guint32 framenum;
     nstime_t time;
     struct _gcp_trx_msg_t* trxs;
-    gboolean committed;
+    gboolean commited;
 } gcp_msg_t;
 
 typedef struct _gcp_trx_msg_t {
@@ -209,16 +212,3 @@ extern const gchar* gcp_msg_to_str(gcp_msg_t* m, gboolean persistent);
   { &(gi.hf.ctx_cmd), { "Command in Frame", n ".ctx.cmd", FT_FRAMENUM, BASE_NONE, NULL, 0, NULL, HFILL }}
 
 #endif
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

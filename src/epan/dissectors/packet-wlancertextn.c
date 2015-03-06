@@ -31,6 +31,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
@@ -57,7 +58,7 @@ static int hf_wlancertextn_SSIDList_PDU = -1;     /* SSIDList */
 static int hf_wlancertextn_SSIDList_item = -1;    /* SSID */
 
 /*--- End of included file: packet-wlancertextn-hf.c ---*/
-#line 46 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
+#line 47 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
 
 /* Initialize the subtree pointers */
 
@@ -66,7 +67,7 @@ static int hf_wlancertextn_SSIDList_item = -1;    /* SSID */
 static gint ett_wlancertextn_SSIDList = -1;
 
 /*--- End of included file: packet-wlancertextn-ett.c ---*/
-#line 49 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
+#line 50 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
 
 
 /*--- Included file: packet-wlancertextn-fn.c ---*/
@@ -96,17 +97,15 @@ dissect_wlancertextn_SSIDList(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int 
 
 /*--- PDUs ---*/
 
-static int dissect_SSIDList_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SSIDList_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_wlancertextn_SSIDList(FALSE, tvb, offset, &asn1_ctx, tree, hf_wlancertextn_SSIDList_PDU);
-  return offset;
+  dissect_wlancertextn_SSIDList(FALSE, tvb, 0, &asn1_ctx, tree, hf_wlancertextn_SSIDList_PDU);
 }
 
 
 /*--- End of included file: packet-wlancertextn-fn.c ---*/
-#line 51 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
+#line 52 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
 
 
 /*--- proto_register_wlancertextn ----------------------------------------------*/
@@ -127,7 +126,7 @@ void proto_register_wlancertextn(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-wlancertextn-hfarr.c ---*/
-#line 59 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
+#line 60 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
   };
 
   /* List of subtrees */
@@ -138,7 +137,7 @@ void proto_register_wlancertextn(void) {
     &ett_wlancertextn_SSIDList,
 
 /*--- End of included file: packet-wlancertextn-ettarr.c ---*/
-#line 64 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
+#line 65 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
   };
 
   /* Register protocol */
@@ -156,12 +155,12 @@ void proto_reg_handoff_wlancertextn(void) {
 
 /*--- Included file: packet-wlancertextn-dis-tab.c ---*/
 #line 1 "../../asn1/wlancertextn/packet-wlancertextn-dis-tab.c"
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.1.13", dissect_SSIDList_PDU, proto_wlancertextn, "id-pe-wlanSSID");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.10.6", dissect_SSIDList_PDU, proto_wlancertextn, "id-aca-wlanSSID");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.1.13", dissect_SSIDList_PDU, proto_wlancertextn, "id-pe-wlanSSID");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.10.6", dissect_SSIDList_PDU, proto_wlancertextn, "id-aca-wlanSSID");
 
 
 /*--- End of included file: packet-wlancertextn-dis-tab.c ---*/
-#line 79 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
+#line 80 "../../asn1/wlancertextn/packet-wlancertextn-template.c"
   oid_add_from_string("id-kp-eapOverPPP","1.3.6.1.5.5.7.3.13");
   oid_add_from_string("id-kp-eapOverLAN","1.3.6.1.5.5.7.3.14");
 }

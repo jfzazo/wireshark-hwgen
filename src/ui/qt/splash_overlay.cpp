@@ -35,7 +35,7 @@
 /*
  * Update frequency for the splash screen, given in milliseconds.
  */
-int info_update_freq_ = 100;
+int info_update_freq_ = 15;
 
 void splash_update(register_action_e action, const char *message, void *dummy) {
     Q_UNUSED(dummy);
@@ -59,6 +59,9 @@ SplashOverlay::SplashOverlay(QWidget *parent) :
     int register_add = 6;
 #ifdef HAVE_LUA
       register_add++;   /* additional one for lua plugins */
+#endif
+#ifdef HAVE_PYTHON
+      register_add += 2;   /* additional 2 for python register and handoff */
 #endif
     so_ui_->progressBar->setMaximum((int)register_count() + register_add);
     time_.start();
@@ -134,16 +137,22 @@ void SplashOverlay::splashUpdate(register_action_e action, const char *message)
         action_msg = tr("Initializing tap listeners");
         break;
     case RA_REGISTER:
-        action_msg = tr("Registering dissectors");
+        action_msg = tr("Registering dissector");
         break;
     case RA_PLUGIN_REGISTER:
         action_msg = tr("Registering plugins");
         break;
+    case RA_PYTHON_REGISTER:
+        action_msg = tr("Registering Python dissectors");
+        break;
     case RA_HANDOFF:
-        action_msg = tr("Handing off dissectors");
+        action_msg = tr("Handing off dissector");
         break;
     case RA_PLUGIN_HANDOFF:
         action_msg = tr("Handing off plugins");
+        break;
+    case RA_PYTHON_HANDOFF:
+        action_msg = tr("Handing off Python dissectors");
         break;
     case RA_LUA_PLUGINS:
         action_msg = tr("Loading Lua plugins");

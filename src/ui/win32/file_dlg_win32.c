@@ -22,11 +22,16 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <tchar.h>
+#include <wchar.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <io.h>
 #include <fcntl.h>
 
 #include <windows.h>
+#include <windowsx.h>
 #include <commdlg.h>
 #include <richedit.h>
 #include <strsafe.h>
@@ -36,15 +41,19 @@
 #include "wsutil/file_util.h"
 #include "wsutil/unicode-utils.h"
 
+#include "wiretap/merge.h"
 
 #include "wsutil/filesystem.h"
 #include "epan/addr_resolv.h"
 #include "epan/prefs.h"
+#include "epan/print.h"
 
+#include "color.h"
 #include "color_filters.h"
 
 #include "ui/alert_box.h"
 #include "ui/help_url.h"
+#include "ui/file_dialog.h"
 #include "ui/last_open_dir.h"
 #include "ui/simple_dialog.h"
 #include "ui/ssl_key_export.h"
@@ -346,6 +355,7 @@ win32_save_as_file(HWND h_wnd, capture_file *cf, GString *file_name, int *file_t
     TCHAR  file_name16[MAX_PATH] = _T("");
     int    ofnsize;
     gboolean gsfn_ok;
+    gboolean discard_comments = FALSE;
 
     if (!file_name || !file_type || !compressed)
         return FALSE;
@@ -1103,6 +1113,7 @@ static gboolean
 preview_set_file_info(HWND of_hwnd, gchar *preview_file) {
     HWND        cur_ctrl;
     int         i;
+    gboolean    enable = FALSE;
     wtap       *wth;
     const struct wtap_pkthdr *phdr;
     int         err = 0;
@@ -1306,7 +1317,7 @@ filter_tb_syntax_check(HWND hwnd, TCHAR *filter_text) {
         /* Default window background */
         SendMessage(hwnd, EM_SETBKGNDCOLOR, (WPARAM) 1, COLOR_WINDOW);
         return;
-    } else if (dfilter_compile(utf_16to8(strval), &dfp, NULL)) { /* colorize filter string entry */
+    } else if (dfilter_compile(utf_16to8(strval), &dfp)) { /* colorize filter string entry */
         if (dfp != NULL)
             dfilter_free(dfp);
         /* Valid (light green) */
@@ -1711,7 +1722,7 @@ save_as_file_hook_proc(HWND sf_hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
                                 }
                                 g_filetype = new_filetype;
                                 cur_ctrl = GetDlgItem(sf_hwnd, EWFD_GZIP_CB);
-                                if (wtap_dump_can_compress(file_type)) {
+                                if (wtap_dump_can_compress(file_type) {
                                     EnableWindow(cur_ctrl);
                                 } else {
                                     g_compressed = FALSE;
@@ -2102,11 +2113,8 @@ range_handle_wm_initdialog(HWND dlg_hwnd, packet_range_t *range) {
 
     /* Retain the filter text, and fill it in. */
     if(range->user_range != NULL) {
-        char* tmp_str;
         cur_ctrl = GetDlgItem(dlg_hwnd, EWFD_RANGE_EDIT);
-        tmp_str = range_convert_range(NULL, range->user_range);
-        SetWindowText(cur_ctrl, utf_8to16(tmp_str));
-        wmem_free(NULL, tmp_str);
+        SetWindowText(cur_ctrl, utf_8to16(range_convert_range(range->user_range)));
     }
 
     /* dynamic values in the range frame */

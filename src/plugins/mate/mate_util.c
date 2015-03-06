@@ -96,7 +96,7 @@ struct _scs_collection {
  *         scs_collection to be destroyed.
  */
 static void destroy_scs_collection(SCS_collection* c) {
-	if (c->hash) g_hash_table_destroy(c->hash);
+    if (c->hash) g_hash_table_destroy(c->hash);
 }
 
 static SCS_collection* scs_init(void) {
@@ -148,7 +148,7 @@ gchar* scs_subscribe(SCS_collection* c, const gchar* s) {
 			g_warning("mate SCS: string truncated due to huge size");
 		}
 
-		orig = (gchar *)g_slice_alloc(len);
+                orig = (gchar *)g_slice_alloc(len);
 		g_strlcpy(orig,s,len);
 
 		g_hash_table_insert(c->hash,orig,ip);
@@ -313,7 +313,7 @@ extern AVP* new_avp_from_finfo(const gchar* name, field_info* finfo) {
 
 	new_avp_val->n = scs_subscribe(avp_strings, name);
 
-	repr = fvalue_to_string_repr(&finfo->value,FTREPR_DISPLAY,finfo->hfinfo->display,NULL);
+	repr = fvalue_to_string_repr(&finfo->value,FTREPR_DISPLAY,NULL);
 
 	if (repr) {
 		value = scs_subscribe(avp_strings, repr);
@@ -752,7 +752,8 @@ gchar* avpl_to_str(AVPL* avpl) {
 		g_free(avp_s);
 	}
 
-	r = g_string_free(s,FALSE);
+	r = s->str;
+	g_string_free(s,FALSE);
 
 	/* g_strchug(r); ? */
 	return r;
@@ -770,7 +771,8 @@ extern gchar* avpl_to_dotstr(AVPL* avpl) {
 		g_free(avp_s);
 	}
 
-	r = g_string_free(s,FALSE);
+	r = s->str;
+	g_string_free(s,FALSE);
 
 	/* g_strchug(r); ? */
 	return r;
@@ -847,9 +849,9 @@ extern void merge_avpl(AVPL* dst, AVPL* src, gboolean copy_avps) {
 
 /**
  * merge_avpl:
- * @param name the name of the new avpl.
- * @param avpl the avpl from which to get the avps.
- * @param copy_avps whether avps should be copied instead of referenced.
+ * @name: the name of the new avpl.
+ * @avpl: the avpl from which to get the avps.
+ * @copy_avps: whether avps should be copied instead of referenced.
  *
  * Creates a new avpl containing the same avps as the given avpl
  * It will either reference or copie the avps.
@@ -1747,16 +1749,3 @@ extern LoAL* loal_from_file(gchar* filename) {
 		return load_loal_error(NULL,loal,NULL,0,"Cannot Open file '%s'",filename);
 	}
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

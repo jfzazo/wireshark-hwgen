@@ -26,9 +26,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/asn1.h>
 #include <epan/prefs.h>
-#include <epan/expert.h>
 
 #include "packet-gsm_a_common.h"
 #include "packet-e212.h"
@@ -67,14 +68,8 @@ static int hf_sgsap_lcs_indic = -1;
 static int hf_sgsap_mme_name = -1;
 static int hf_sgsap_vlr_name = -1;
 static int hf_sgsap_imeisv = -1;
-static int hf_sgsap_unknown_msg = -1;
-static int hf_sgsap_message_elements = -1;
-static int hf_sgsap_csri = -1;
 
 static int ett_sgsap = -1;
-
-static expert_field ei_sgsap_extraneous_data = EI_INIT;
-static expert_field ei_sgsap_missing_mandatory_element = EI_INIT;
 
 /*
  * 9.4  Information elements
@@ -150,7 +145,7 @@ de_sgsap_ecgi(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offse
 
     curr_offset = offset;
 
-    dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_NONE, TRUE);
+    dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, TRUE);
     curr_offset += 3;
 
     proto_tree_add_item(tree, hf_sgsap_eci, tvb, curr_offset, 4, ENC_BIG_ENDIAN);
@@ -175,7 +170,7 @@ de_sgsap_g_cn_id(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 of
 
     curr_offset = offset;
 
-    dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_NONE, TRUE);
+    dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, TRUE);
     curr_offset += 3;
 
     proto_tree_add_item(tree, hf_sgsap_cn_id, tvb, curr_offset, 2, ENC_BIG_ENDIAN);
@@ -338,7 +333,7 @@ de_sgsap_mme_name(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
         name_len = tvb_get_guint8(tvb, offset);
 
         if (name_len < 0x20) {
-            fqdn = tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 1, len - 1, ENC_ASCII);
+            fqdn = tvb_get_string(wmem_packet_scope(), tvb, offset + 1, len - 1);
             for (;;) {
                 if (name_len >= len - 1)
                     break;
@@ -347,7 +342,7 @@ de_sgsap_mme_name(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
                 fqdn[tmp] = '.';
             }
         } else{
-            fqdn = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII);
+            fqdn = tvb_get_string(wmem_packet_scope(), tvb, offset, len);
         }
         proto_tree_add_string(tree, hf_sgsap_mme_name, tvb, offset, len, fqdn);
         if (add_string)
@@ -383,7 +378,7 @@ de_sgsap_nas_msg_container(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, 
     /* Octets 3 to 253 contain the SMS message (i.e. CP DATA, CP ACK or CP ERROR)
      * as defined in subclause 7.2 of 3GPP TS 24.011 [10]
      */
-    new_tvb = tvb_new_subset_length(tvb, curr_offset, len);
+    new_tvb = tvb_new_subset(tvb, curr_offset, len, len);
     if (gsm_a_dtap_handle) {
         call_dissector(gsm_a_dtap_handle, new_tvb, pinfo, tree);
     }
@@ -538,7 +533,7 @@ de_sgsap_vlr_name(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
         name_len = tvb_get_guint8(tvb, offset);
 
         if (name_len < 0x20) {
-            fqdn = tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 1, len - 1, ENC_ASCII);
+            fqdn = tvb_get_string(wmem_packet_scope(), tvb, offset + 1, len - 1);
             for (;;) {
                 if (name_len >= len - 1)
                     break;
@@ -547,7 +542,7 @@ de_sgsap_vlr_name(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
                 fqdn[tmp] = '.';
             }
         } else{
-            fqdn = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII);
+            fqdn = tvb_get_string(wmem_packet_scope(), tvb, offset, len);
         }
         proto_tree_add_string(tree, hf_sgsap_vlr_name, tvb, offset, len, fqdn);
         if (add_string)
@@ -572,19 +567,6 @@ de_sgsap_vlr_name(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
  * 3GPP TS 48.008 IEI and 3GPP TS 48.008 length indicator).
  * (packet-gsm_a_bssmap.c)
  */
-
-/*
- *
- */
-static guint16
-de_sgsap_add_paging_ind(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offset, guint len _U_, gchar *add_string _U_, int string_len _U_)
-{
-
-    /* Octet 3 0 0 0 0 0 0 0 CSRI */
-    proto_tree_add_item(tree, hf_sgsap_csri, tvb, offset, 1, ENC_BIG_ENDIAN);
-
-    return(len);
-}
 
 static const value_string sgsap_elem_strings[] = {
     { DE_SGSAP_IMSI, "IMSI" },                                              /* 9.4.6 */
@@ -626,8 +608,7 @@ static const value_string sgsap_elem_strings[] = {
     { DE_SGSAP_TAID, "Tracking Area Identity" },                            /* 9.4.21a */
     { DE_SGSAP_ECGI, "E-UTRAN Cell Global Identity" },                      /* 9.4.3a */
     { DE_SGSAP_UE_EMM_MODE, "UE EMM mode" },                                /* 9.4.21c */
-    { DE_SGSAP_ADD_PAGING_IND, "Additional paging indicators" },            /* 9.4.25 */
-    { DE_SGSAP_TMSI_BASED_NRI_CONT, "TMSI based NRI container" },           /* 9.4.26 */
+
     { 0, NULL }
 };
 value_string_ext sgsap_elem_strings_ext = VALUE_STRING_EXT_INIT(sgsap_elem_strings);
@@ -684,8 +665,6 @@ typedef enum
     DE_SGSAP_TAID,                                  /. 9.4.21a Tracking Area Identity ./
     DE_SGSAP_ECGI,                                  /. 9.4.3a E-UTRAN Cell Global Identity ./
     DE_SGSAP_UE_EMM_MODE,                           /. 9.4.21c UE EMM mode./
-    DE_SGSAP_ADD_PAGING_IND,                        /. 9.4.25 Additional paging indicators ./
-    DE_SGSAP_TMSI_BASED_NRI_CONT,                   /. 9.4.26 TMSI based NRI container ./
 
     DE_SGAP_NONE                            /. NONE ./
 }
@@ -731,9 +710,7 @@ guint16 (*sgsap_elem_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo 
     NULL/*DE_SGSAP_MSC_2*/,                                 /* 9.4.14a Mobile Station Classmark 2 */
     NULL/*DE_SGSAP_TAID*/,                                  /* 9.4.21a Tracking Area Identity */
     de_sgsap_ecgi,                                          /* 9.4.3a E-UTRAN Cell Global Identity */
-    de_sgsap_ue_emm_mode,                                   /* 9.4.21c UE EMM mode*/
-    de_sgsap_add_paging_ind,                                /* 9.4.25 Additional paging indicators */
-    NULL/*DE_SGSAP_TMSI_BASED_NRI_CONT*/,                   /* 9.4.26 TMSI based NRI container */
+    de_sgsap_ue_emm_mode        ,                           /* 9.4.21c UE EMM mode*/
 
     NULL,   /* NONE */
 };
@@ -754,9 +731,9 @@ sgsap_alert_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -773,11 +750,11 @@ sgsap_alert_rej(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* SGs Cause    SGs cause  9.4.18   M   TLV 3 */
-    ELEM_MAND_TLV(0x08, SGSAP_PDU_TYPE, DE_SGSAP_SGS_CAUSE, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x08, SGSAP_PDU_TYPE, DE_SGSAP_SGS_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -794,9 +771,9 @@ sgsap_alert_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -814,11 +791,11 @@ sgsap_dl_unitdata(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
 
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* NAS message container    NAS message container 9.4.15    M   TLV 4-253 */
-    ELEM_MAND_TLV(0x16, SGSAP_PDU_TYPE, DE_SGSAP_NAS_MSG_CONTAINER, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x16, SGSAP_PDU_TYPE, DE_SGSAP_NAS_MSG_CONTAINER, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -836,9 +813,9 @@ sgsap_eps_det_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 /*
  * 8.6  SGsAP-EPS-DETACH-INDICATION message
@@ -855,13 +832,13 @@ sgsap_eps_det_ind(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* MME name MME name 9.4.13 M   TLV 57 */
-    ELEM_MAND_TLV(0x09, SGSAP_PDU_TYPE, DE_SGSAP_MME_NAME, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x09, SGSAP_PDU_TYPE, DE_SGSAP_MME_NAME, NULL);
     /* IMSI detach from EPS service type    IMSI detach from EPS service type 9.4.7 M   TLV 3 */
-    ELEM_MAND_TLV(0x10, SGSAP_PDU_TYPE, DE_SGSAP_IMSI_DET_EPS, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x10, SGSAP_PDU_TYPE, DE_SGSAP_IMSI_DET_EPS, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -878,9 +855,9 @@ sgsap_imsi_det_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guin
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 /*
  * 8.8  SGsAP-IMSI-DETACH-INDICATION message
@@ -896,13 +873,13 @@ sgsap_imsi_det_ind(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guin
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* MME name MME name 9.4.13 M   TLV 57 */
-    ELEM_MAND_TLV(0x09, SGSAP_PDU_TYPE, DE_SGSAP_MME_NAME, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x09, SGSAP_PDU_TYPE, DE_SGSAP_MME_NAME, NULL);
     /* IMSI Detach from non-EPS service type    IMSI detach from non-EPS service type 9.4.8 M   TLV 3 */
-    ELEM_MAND_TLV(0x11, SGSAP_PDU_TYPE, DE_SGSAP_IMSI_DET_NON_EPS, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x11, SGSAP_PDU_TYPE, DE_SGSAP_IMSI_DET_NON_EPS, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -919,13 +896,13 @@ sgsap_imsi_loc_update_acc(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* Location area identifier Location area identifier 9.4.11 M   TLV 7 */
-    ELEM_MAND_TLV(0x04, GSM_A_PDU_TYPE_COMMON, DE_LAI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x04, GSM_A_PDU_TYPE_COMMON, DE_LAI, NULL);
     /* New TMSI, or IMSI    Mobile identity 9.4.14  O   TLV 6-10 */
     ELEM_OPT_TLV(0x0e, GSM_A_PDU_TYPE_COMMON, DE_MID, " - New TMSI, or IMSI");
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -942,13 +919,13 @@ sgsap_imsi_loc_update_rej(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* Reject cause Reject cause 9.4.16 M   TLV 3 */
-    ELEM_MAND_TLV(0x0f, GSM_A_PDU_TYPE_DTAP, DE_REJ_CAUSE, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x0f, GSM_A_PDU_TYPE_DTAP, DE_REJ_CAUSE, NULL);
     /* Location area identifier Location area identifier 9.4.11 O   TLV 7 */
     ELEM_OPT_TLV(0x04, GSM_A_PDU_TYPE_COMMON, DE_LAI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -966,26 +943,21 @@ sgsap_imsi_loc_update_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* MME name MME name 9.4.13 M   TLV 57 */
-    ELEM_MAND_TLV(0x09, SGSAP_PDU_TYPE, DE_SGSAP_MME_NAME, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x09, SGSAP_PDU_TYPE, DE_SGSAP_MME_NAME, NULL);
     /* EPS location update type EPS location update type 9.4.2  M   TLV 3 */
-    ELEM_MAND_TLV(0x0a, SGSAP_PDU_TYPE, DE_SGSAP_EPS_LOC_UPD_TYPE, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x0a, SGSAP_PDU_TYPE, DE_SGSAP_EPS_LOC_UPD_TYPE, NULL);
     /* New location area identifier Location area identifier 9.4.11 M   TLV 7 */
-    ELEM_MAND_TLV(0x04, GSM_A_PDU_TYPE_COMMON, DE_LAI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x04, GSM_A_PDU_TYPE_COMMON, DE_LAI, NULL);
     /* Old location area identifier Location area identifier 9.4.11 O   TLV 7 */
     ELEM_OPT_TLV(0x04, GSM_A_PDU_TYPE_COMMON, DE_LAI, " - Old location area identifier");
     /* TMSI status  TMSI status 9.4.21  O   TLV 3 */
     ELEM_OPT_TLV( 0x07 , GSM_A_PDU_TYPE_GM, DE_TMSI_STAT , NULL );
     /* IMEISV   IMEISV 9.4.5    O   TLV 10 */
     ELEM_OPT_TLV(0x15, SGSAP_PDU_TYPE, DE_SGSAP_IMEISV, NULL);
-    /* TAI Tracking Area Identity 9.4.21a O TLV 7 */
-    ELEM_OPT_TLV(0x23, NAS_PDU_TYPE_EMM, DE_EMM_TRAC_AREA_ID, NULL);
-    /* E-CGI E-UTRAN Cell Global Identity 9.4.3a O TLV 9 */
-    ELEM_OPT_TLV(0x24, SGSAP_PDU_TYPE, DE_SGSAP_ECGI, NULL);
-    /* TMSI based NRI container TMSI based NRI container 9.4.26 O TLV 4 */
-    /* Selected CS domain operator Selected CS domain operator 9.4.27 O TLV 5 */
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -1002,11 +974,11 @@ sgsap_mm_info_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* MM information   MM information 9.4.12   M   TLV 3-n */
-    ELEM_MAND_TLV(0x17, SGSAP_PDU_TYPE, DE_SGSAP_MM_INFO, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x17, SGSAP_PDU_TYPE, DE_SGSAP_MM_INFO, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -1023,11 +995,11 @@ sgsap_paging_rej(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint3
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* SGs Cause    SGs Cause 9.4.18    M   TLV 3 */
-    ELEM_MAND_TLV(0x08, SGSAP_PDU_TYPE, DE_SGSAP_SGS_CAUSE, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x08, SGSAP_PDU_TYPE, DE_SGSAP_SGS_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 /*
  * 8.14 SGsAP-PAGING-REQUEST message
@@ -1043,11 +1015,11 @@ sgsap_paging_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint3
     curr_len    = len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* VLR name VLR name 9.4.22 M   TLV 3-n */
-    ELEM_MAND_TLV(0x02, SGSAP_PDU_TYPE, DE_SGSAP_VLR_NAME, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x02, SGSAP_PDU_TYPE, DE_SGSAP_VLR_NAME, NULL);
     /* Service indicator    Service indicator 9.4.17    M   TLV 3 */
-    ELEM_MAND_TLV(0x20, SGSAP_PDU_TYPE, DE_SGSAP_SERV_INDIC, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x20, SGSAP_PDU_TYPE, DE_SGSAP_SERV_INDIC, NULL);
     /* TMSI TMSI 9.4.20 O   TLV 6 */
     ELEM_OPT_TLV(0x03, GSM_A_PDU_TYPE_BSSMAP, BE_TMSI, NULL);
     /* CLI  CLI 9.4.1   O   TLV 3-14 */
@@ -1066,10 +1038,8 @@ sgsap_paging_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint3
     ELEM_OPT_TLV(0x05, GSM_A_PDU_TYPE_BSSMAP, BE_CHAN_NEEDED, NULL);
     /* eMLPP Priority   eMLPP Priority 9.4.24   O   TLV 3 */
     ELEM_OPT_TLV(0x06, GSM_A_PDU_TYPE_BSSMAP, BE_EMLPP_PRIO, NULL);
-    /* Additional paging indicators Additional paging indicators 9.4.25 O TLV 3 */
-    ELEM_OPT_TLV(0x26, SGSAP_PDU_TYPE, DE_SGSAP_ADD_PAGING_IND, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 /*
  * 8.15 SGsAP-RESET-ACK message
@@ -1089,7 +1059,7 @@ sgsap_reset_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
     /* VLR name VLR name 9.4.22 C   TLV 3-n */
     ELEM_OPT_TLV(0x02, SGSAP_PDU_TYPE, DE_SGSAP_VLR_NAME, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -1110,7 +1080,7 @@ sgsap_reset_ind(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
     /* VLR name VLR name 9.4.22 C   TLV 3-n */
     ELEM_OPT_TLV(0x02, SGSAP_PDU_TYPE, DE_SGSAP_VLR_NAME, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 /*
  * 8.17 SGsAP-SERVICE-REQUEST message
@@ -1126,9 +1096,9 @@ sgsap_service_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
     curr_len    = len;
 
     /*IMSI  IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* Service indicator    Service indicator 9.4.17    M   TLV 3 */
-    ELEM_MAND_TLV(0x20, SGSAP_PDU_TYPE, DE_SGSAP_SERV_INDIC, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x20, SGSAP_PDU_TYPE, DE_SGSAP_SERV_INDIC, NULL);
     /* IMEISV   IMEISV 9.4.5    O   TLV 10 */
     ELEM_OPT_TLV(0x15, SGSAP_PDU_TYPE, DE_SGSAP_IMEISV, NULL);
     /* UE Time Zone UE Time Zone 9.4.21b    O   TLV 3 */
@@ -1142,7 +1112,7 @@ sgsap_service_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
     /* UE EMM Mode  UE EMM mode 9.4.21c O   TLV 3 */
     ELEM_OPT_TLV(0x25, SGSAP_PDU_TYPE, DE_SGSAP_UE_EMM_MODE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -1156,16 +1126,16 @@ sgsap_status(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 of
     guint   curr_len;
 
     curr_offset = offset;
-    curr_len    = len;
+    curr_len	= len;
 
     /* IMSI IMSI 9.4.6  O   TLV 6-10 */
     ELEM_OPT_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* SGs cause    SGs cause 9.4.18    M   TLV 3 */
-    ELEM_MAND_TLV(0x08, SGSAP_PDU_TYPE, DE_SGSAP_SGS_CAUSE, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x08, SGSAP_PDU_TYPE, DE_SGSAP_SGS_CAUSE, NULL);
     /* Erroneous message    Erroneous message 9.4.3 M   TLV 3-n */
     ELEM_OPT_TLV(0x1e, SGSAP_PDU_TYPE, DE_SGSAP_ERR_MSG, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -1182,9 +1152,9 @@ sgsap_tmsi_realloc_comp(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_,
     curr_len    = len;
 
     /*IMSI  IMSI 9.4.6  M   TLV 6-10  */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -1198,12 +1168,12 @@ sgsap_ue_act_ind(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint3
     guint   curr_len;
 
     curr_offset = offset;
-    curr_len    = len;
+    curr_len	= len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -1217,15 +1187,15 @@ sgsap_ue_unreachable(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, gu
     guint   curr_len;
 
     curr_offset = offset;
-    curr_len    = len;
+    curr_len	= len;
 
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* SGs cause    SGs cause 9.4.18    M   TLV 3 */
-    ELEM_MAND_TLV(0x08, SGSAP_PDU_TYPE, DE_SGSAP_SGS_CAUSE, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x08, SGSAP_PDU_TYPE, DE_SGSAP_SGS_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 /*
  * 8.22 SGsAP-UPLINK-UNITDATA message
@@ -1238,12 +1208,12 @@ sgsap_ue_ul_unitdata(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, gu
     guint   curr_len;
 
     curr_offset = offset;
-    curr_len    = len;
+    curr_len	= len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* NAS message container    NAS message container 9.4.15    M   TLV 4-253 */
-    ELEM_MAND_TLV(0x16, SGSAP_PDU_TYPE, DE_SGSAP_NAS_MSG_CONTAINER, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x16, SGSAP_PDU_TYPE, DE_SGSAP_NAS_MSG_CONTAINER, NULL);
     /* IMEISV   IMEISV 9.4.5    O   TLV 10 */
     ELEM_OPT_TLV(0x15, SGSAP_PDU_TYPE, DE_SGSAP_IMEISV, NULL);
     /* UE Time Zone UE Time Zone 9.4.21b    O   TLV 3 */
@@ -1255,7 +1225,7 @@ sgsap_ue_ul_unitdata(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, gu
     /* E-CGI    E-UTRAN Cell Global Identity 9.4.3a O   TLV 9 */
     ELEM_OPT_TLV(0x24, SGSAP_PDU_TYPE, DE_SGSAP_ECGI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 /*
  * 8.23 SGsAP-RELEASE-REQUEST message
@@ -1268,14 +1238,14 @@ sgsap_release_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
     guint   curr_len;
 
     curr_offset = offset;
-    curr_len    = len;
+    curr_len	= len;
 
     /* IMSI IMSI 9.4.6  M   TLV 6-10 */
-    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x01, GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
     /* SGs cause    SGs cause 9.4.18    O   TLV 3 */
-    ELEM_MAND_TLV(0x08, SGSAP_PDU_TYPE, DE_SGSAP_SGS_CAUSE, NULL, ei_sgsap_missing_mandatory_element);
+    ELEM_MAND_TLV(0x08, SGSAP_PDU_TYPE, DE_SGSAP_SGS_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
+    EXTRANEOUS_DATA_CHECK(curr_len, 0);
 }
 
 /*
@@ -1283,28 +1253,6 @@ sgsap_release_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
  */
 /* No IE's */
 
-/*
- * 8.25 SGsAP-MO-CSFB-INDICATION message
- */
-static void
-sgsap_mo_csfb_ind(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offset, guint len)
-{
-    guint32 curr_offset;
-    guint32 consumed;
-    guint   curr_len;
-
-    curr_offset = offset;
-    curr_len    = len;
-
-    /* IMSI IMSI 9.4.6 M LV 6-10 */
-    ELEM_MAND_LV(GSM_A_PDU_TYPE_BSSMAP, BE_IMSI, NULL);
-    /* TAI Tracking Area Identity 9.4.21a O TLV 7 */
-    ELEM_OPT_TLV(0x23, NAS_PDU_TYPE_EMM, DE_EMM_TRAC_AREA_ID, NULL);
-    /* E-CGI E-UTRAN Cell Global Identity 9.4.3a O TLV 9 */
-    ELEM_OPT_TLV(0x24, SGSAP_PDU_TYPE, DE_SGSAP_ECGI, NULL);
-
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_sgsap_extraneous_data);
-}
 /*
  * 9.2  Message type
  */
@@ -1339,13 +1287,13 @@ static const value_string sgsap_msg_strings[] = {
     { 0x15, "SGsAP-RESET-INDICATION"},              /* 8.16 */
     { 0x16, "SGsAP-RESET-ACK"},                     /* 8.15 */
     { 0x17, "SGsAP-SERVICE-ABORT-REQUEST"},         /* 8.24 */
-    { 0x18, "SGsAP-MO-CSFB-INDICATION"},            /* 8.25 */
 /*
  * 0 0 0 1 1 0 0 0
  * to
  * 0 0 0 1 1 0 0 1
  * Unassigned: treated as an unknown Message type
  */
+    { 0x18, "Unassigned"},
     { 0x19, "Unassigned"},
 
     { 0x1a, "SGsAP-MM-INFORMATION-REQUEST"},        /* 8.12 */
@@ -1395,13 +1343,13 @@ static void (*sgsap_msg_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pin
     sgsap_reset_ind,                /* 0x15,    "SGsAP-RESET-INDICATION" 8.16 */
     sgsap_reset_ack,                /* 0x16,    "SGsAP-RESET-ACK" 8.15 */
     NULL,/* No IE's */              /* 0x17,    "SGsAP-SERVICE-ABORT-REQUEST" 8.24 */
-    sgsap_mo_csfb_ind,              /* 0x18,    "SGsAP-MO-CSFB-INDICATION" 8.25 */
 /*
- * 0 0 0 1 1 0 0 1
+ * 0 0 0 1 1 0 0 0
  * to
  * 0 0 0 1 1 0 0 1
  * Unassigned: treated as an unknown Message type
  */
+    NULL,                           /* 0x18,    "Unassigned" */
     NULL,                           /* 0x19,    "Unassigned" */
 
     sgsap_mm_info_req,              /* 0x1a,    "SGsAP-MM-INFORMATION-REQUEST" 8.12 */
@@ -1446,7 +1394,8 @@ dissect_sgsap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     void            (*msg_fcn_p)(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, guint len);
     guint8          oct;
 
-    len = tvb_reported_length(tvb);
+    /* Save pinfo */
+    len	   = tvb_length(tvb);
 
     /* Make entry in the Protocol column on summary display */
     col_set_str(pinfo->cinfo, COL_PROTOCOL, PSNAME);
@@ -1466,7 +1415,7 @@ dissect_sgsap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     if (msg_str) {
         col_add_fstr(pinfo->cinfo, COL_INFO, "%s", msg_str);
     }else{
-        proto_tree_add_item(tree, hf_sgsap_unknown_msg, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_text(tree, tvb, offset, 1, "Unknown message 0x%x", oct);
         return;
     }
 
@@ -1482,7 +1431,8 @@ dissect_sgsap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
      */
     if (msg_fcn_p == NULL)
     {
-        proto_tree_add_item(sgsap_tree, hf_sgsap_message_elements, tvb, offset, len - offset, ENC_NA);
+        proto_tree_add_text(sgsap_tree, tvb, offset, len - offset,
+            "Message Elements");
     }
     else
     {
@@ -1496,7 +1446,7 @@ dissect_sgsap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 void proto_register_sgsap(void) {
     guint        i;
     guint        last_offset;
-    module_t    *sgsap_module;
+	module_t    *sgsap_module;
 
     /* List of fields */
 
@@ -1571,29 +1521,7 @@ void proto_register_sgsap(void) {
         FT_STRING, BASE_NONE, NULL, 0x0,
         NULL, HFILL}
     },
-    { &hf_sgsap_unknown_msg,
-        { "Unknown message",    "sgsap.unknown_msg",
-        FT_UINT8, BASE_HEX, NULL, 0x0,
-        NULL, HFILL }
-    },
-    { &hf_sgsap_message_elements,
-        {"Message Elements", "sgsap.message_elements",
-        FT_BYTES, BASE_NONE, NULL, 0x0,
-        NULL, HFILL}
-    },
-    { &hf_sgsap_csri,
-        {"CS restoration indicator (CSRI)", "sgsap.csri",
-        FT_BOOLEAN, 8, TFS(&tfs_set_notset), 0x01,
-        NULL, HFILL }},
-
   };
-
-    static ei_register_info ei[] = {
-        { &ei_sgsap_extraneous_data, { "sgsap.extraneous_data", PI_PROTOCOL, PI_NOTE, "Extraneous Data, dissector bug or later version spec(report to wireshark.org)", EXPFILL }},
-        { &ei_sgsap_missing_mandatory_element, { "sgsap.missing_mandatory_element", PI_PROTOCOL, PI_WARN, "Missing Mandatory element, rest of dissection is suspect", EXPFILL }},
-    };
-
-   expert_module_t* expert_sgsap;
 
     /* Setup protocol subtree array */
 #define NUM_INDIVIDUAL_ELEMS    1
@@ -1622,8 +1550,6 @@ void proto_register_sgsap(void) {
     /* Register fields and subtrees */
     proto_register_field_array(proto_sgsap, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-    expert_sgsap = expert_register_protocol(proto_sgsap);
-    expert_register_field_array(expert_sgsap, ei, array_length(ei));
 
     /* Register dissector */
     register_dissector(PFNAME, dissect_sgsap, proto_sgsap);
@@ -1631,7 +1557,7 @@ void proto_register_sgsap(void) {
    /* Set default SCTP ports */
     range_convert_str(&global_sgsap_port_range, SGSAP_SCTP_PORT_RANGE, MAX_SCTP_PORT);
 
-    sgsap_module = prefs_register_protocol(proto_sgsap, proto_reg_handoff_sgsap);
+	sgsap_module = prefs_register_protocol(proto_sgsap, proto_reg_handoff_sgsap);
 
     prefs_register_range_preference(sgsap_module, "sctp_ports",
                                   "SGsAP SCTP port numbers",
@@ -1654,7 +1580,7 @@ proto_reg_handoff_sgsap(void)
     gsm_a_dtap_handle = find_dissector("gsm_a_dtap");
 
     if (!Initialized) {
-        dissector_add_for_decode_as("sctp.port", sgsap_handle);
+        dissector_add_handle("sctp.port", sgsap_handle);   /* for "decode-as"  */
         Initialized=TRUE;
     } else {
         dissector_delete_uint_range("sctp.port", sgsap_port_range, sgsap_handle);
@@ -1665,15 +1591,3 @@ proto_reg_handoff_sgsap(void)
     dissector_add_uint_range("sctp.port", sgsap_port_range, sgsap_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

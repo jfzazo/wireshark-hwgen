@@ -27,18 +27,25 @@
 #include <gtk/gtk.h>
 
 #include <epan/packet.h>
+#include <epan/dfilter/dfilter.h>
 #include <epan/prefs.h>
 
+#include "../color.h"
 #include "../color_filters.h"
+#include "../file.h"
 
-#include "simple_dialog.h"
+#include "ui/simple_dialog.h"
 
 #include "ui/gtk/main.h"
 #include "ui/gtk/color_utils.h"
 #include "ui/gtk/color_dlg.h"
 #include "ui/gtk/dlg_utils.h"
+#include "ui/gtk/gui_utils.h"
+#include "ui/gtk/dfilter_expr_dlg.h"
 #include "ui/gtk/stock_icons.h"
+#include "ui/gtk/filter_dlg.h"
 #include "ui/gtk/capture_file_dlg.h"
+#include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/help_dlg.h"
 #include "ui/gtk/color_edit_dlg.h"
 #include "ui/gtk/packet_list.h"
@@ -1013,20 +1020,20 @@ color_clear_cb(GtkWidget *widget, gpointer data _U_) {
 static void
 overwrite_existing_colorfilters_cb(gpointer dialog _U_, gint btn, gpointer data _U_)
 {
-  switch (btn) {
-  case(ESD_BTN_SAVE):
-    /* overwrite the file*/
-    if (!color_filters_write(color_filter_edit_list))
-      simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK,
-                    "Could not open colorfilter file: %s", g_strerror(errno));
-    else
-      prefs.unknown_colorfilters = FALSE;
-    break;
-  case(ESD_BTN_DONT_SAVE):
-    break;
-  default:
-    g_assert_not_reached();
-  }
+	switch (btn) {
+	case(ESD_BTN_SAVE):
+	    /* overwrite the file*/
+        if (!color_filters_write(color_filter_edit_list))
+            simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK,
+                "Could not open colorfilter file: %s", g_strerror(errno));
+        else
+            prefs.unknown_colorfilters = FALSE;
+	    break;
+	case(ESD_BTN_DONT_SAVE):
+	    break;
+	default:
+	    g_assert_not_reached();
+	}
 }
 
 static void

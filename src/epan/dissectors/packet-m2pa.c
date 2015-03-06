@@ -75,7 +75,6 @@ static gint ett_m2pa       = -1;
 static gint ett_m2pa_li    = -1;
 
 static expert_field ei_undecode_data = EI_INIT;
-static expert_field ei_length = EI_INIT;
 
 static dissector_handle_t mtp3_handle;
 
@@ -225,12 +224,14 @@ dissect_header(tvbuff_t *header_tvb, packet_info *pinfo, proto_tree *m2pa_tree)
 static void
 dissect_v2_user_data_message(tvbuff_t *message_data_tvb, packet_info *pinfo, proto_item *m2pa_item, proto_tree *m2pa_tree, proto_tree *tree)
 {
+  proto_item *m2pa_li_item;
   proto_tree *m2pa_li_tree;
   tvbuff_t *payload_tvb;
 
-  if (tvb_reported_length(message_data_tvb) > 0) {
+  if (tvb_length(message_data_tvb) > 0) {
     if (m2pa_tree) {
-      m2pa_li_tree = proto_tree_add_subtree(m2pa_tree, message_data_tvb, LI_OFFSET, LI_LENGTH, ett_m2pa_li, NULL, "Length Indicator");
+      m2pa_li_item = proto_tree_add_text(m2pa_tree, message_data_tvb, LI_OFFSET, LI_LENGTH, "Length Indicator");
+      m2pa_li_tree = proto_item_add_subtree(m2pa_li_item, ett_m2pa_li);
 
       proto_tree_add_item(m2pa_li_tree, hf_v2_li_spare, message_data_tvb, LI_OFFSET, LI_LENGTH, ENC_BIG_ENDIAN);
       proto_tree_add_item(m2pa_li_tree, hf_v2_li_prio,  message_data_tvb, LI_OFFSET, LI_LENGTH, ENC_BIG_ENDIAN);
@@ -250,12 +251,14 @@ dissect_v2_user_data_message(tvbuff_t *message_data_tvb, packet_info *pinfo, pro
 static void
 dissect_v8_user_data_message(tvbuff_t *message_data_tvb, packet_info *pinfo, proto_item *m2pa_item, proto_tree *m2pa_tree, proto_tree *tree)
 {
+  proto_item *m2pa_li_item;
   proto_tree *m2pa_li_tree;
   tvbuff_t *payload_tvb;
 
-  if (tvb_reported_length(message_data_tvb) > 0) {
+  if (tvb_length(message_data_tvb) > 0) {
     if (m2pa_tree) {
-      m2pa_li_tree = proto_tree_add_subtree(m2pa_tree, message_data_tvb, LI_OFFSET, LI_LENGTH, ett_m2pa_li, NULL, "Length Indicator");
+      m2pa_li_item = proto_tree_add_text(m2pa_tree, message_data_tvb, LI_OFFSET, LI_LENGTH, "Length Indicator");
+      m2pa_li_tree = proto_item_add_subtree(m2pa_li_item, ett_m2pa_li);
       proto_tree_add_item(m2pa_li_tree, hf_v8_li_prio,  message_data_tvb, LI_OFFSET, LI_LENGTH, ENC_BIG_ENDIAN);
       proto_tree_add_item(m2pa_li_tree, hf_v8_li_spare, message_data_tvb, LI_OFFSET, LI_LENGTH, ENC_BIG_ENDIAN);
 
@@ -277,12 +280,14 @@ dissect_v8_user_data_message(tvbuff_t *message_data_tvb, packet_info *pinfo, pro
 static void
 dissect_user_data_message(tvbuff_t *message_data_tvb, packet_info *pinfo, proto_item *m2pa_item, proto_tree *m2pa_tree, proto_tree *tree)
 {
+  proto_item *m2pa_li_item;
   proto_tree *m2pa_li_tree;
   tvbuff_t *payload_tvb;
 
-  if (tvb_reported_length(message_data_tvb) > 0) {
+  if (tvb_length(message_data_tvb) > 0) {
     if (m2pa_tree) {
-      m2pa_li_tree = proto_tree_add_subtree(m2pa_tree, message_data_tvb, PRI_OFFSET, PRI_LENGTH, ett_m2pa_li, NULL, "Priority");
+      m2pa_li_item = proto_tree_add_text(m2pa_tree, message_data_tvb, PRI_OFFSET, PRI_LENGTH, "Priority");
+      m2pa_li_tree = proto_item_add_subtree(m2pa_li_item, ett_m2pa_li);
       proto_tree_add_item(m2pa_li_tree, hf_pri_prio,  message_data_tvb, PRI_OFFSET, PRI_LENGTH, ENC_BIG_ENDIAN);
       proto_tree_add_item(m2pa_li_tree, hf_pri_spare, message_data_tvb, PRI_OFFSET, PRI_LENGTH, ENC_BIG_ENDIAN);
 
@@ -333,7 +338,7 @@ dissect_v8_link_status_message(tvbuff_t *message_data_tvb, packet_info *pinfo, p
 
   col_append_fstr(pinfo->cinfo, COL_INFO, "(%s) ", val_to_str_const(tvb_get_ntohl(message_data_tvb, STATUS_OFFSET), v8_link_status_values, "Unknown"));
 
-  filler_length = tvb_reported_length(message_data_tvb) - STATUS_LENGTH;
+  filler_length = tvb_length(message_data_tvb) - STATUS_LENGTH;
 
   proto_tree_add_item(m2pa_tree, hf_v8_status, message_data_tvb, STATUS_OFFSET, STATUS_LENGTH, ENC_BIG_ENDIAN);
   if (filler_length > 0)
@@ -359,7 +364,7 @@ dissect_link_status_message(tvbuff_t *message_data_tvb, packet_info *pinfo, prot
 
   col_append_fstr(pinfo->cinfo, COL_INFO, "(%s) ", val_to_str_const(tvb_get_ntohl(message_data_tvb, STATUS_OFFSET), link_status_values, "Unknown"));
 
-  filler_length = tvb_reported_length(message_data_tvb) - STATUS_LENGTH;
+  filler_length = tvb_length(message_data_tvb) - STATUS_LENGTH;
 
   proto_tree_add_item(m2pa_tree, hf_status, message_data_tvb, STATUS_OFFSET, STATUS_LENGTH, ENC_BIG_ENDIAN);
   if (filler_length > 0)
@@ -371,7 +376,7 @@ dissect_unknown_message(tvbuff_t *message_data_tvb, proto_tree *m2pa_tree)
 {
   guint length;
 
-  length = tvb_reported_length(message_data_tvb);
+  length = tvb_length(message_data_tvb);
   if ((m2pa_tree) && (length > 0))
     proto_tree_add_item(m2pa_tree, hf_unknown_data, message_data_tvb, 0, length, ENC_NA);
 }
@@ -387,14 +392,13 @@ dissect_v2_message_data(tvbuff_t *message_tvb, packet_info *pinfo, proto_item *m
 
   message_data_length = (gint) tvb_get_ntohl(message_tvb, V2_LENGTH_OFFSET);
   if ((gint) message_data_length < 1) {
-    proto_tree_add_expert_format(m2pa_tree, pinfo, &ei_length, message_tvb, V2_LENGTH_OFFSET, 4,
+    if (m2pa_tree)
+      proto_tree_add_text(m2pa_tree, message_tvb, V2_LENGTH_OFFSET, 4,
         "Invalid message data length: %u", message_data_length);
-    /* XXX - is this really necessary?  Can we just return since the expert info can
-       still find the "malformed" packet? */
     THROW(ReportedBoundsError);
   }
 
-  message_data_tvb    = tvb_new_subset_length(message_tvb, V2_MESSAGE_DATA_OFFSET, message_data_length);
+  message_data_tvb    = tvb_new_subset(message_tvb, V2_MESSAGE_DATA_OFFSET, message_data_length, message_data_length);
   type                = tvb_get_ntohs(message_tvb, V2_TYPE_OFFSET);
 
   switch(type) {
@@ -420,13 +424,12 @@ dissect_v8_message_data(tvbuff_t *message_tvb, packet_info *pinfo, proto_item *m
 
   message_data_length = tvb_get_ntohl(message_tvb, V8_LENGTH_OFFSET) - V8_HEADER_LENGTH;
   if ((gint) message_data_length < 1) {
-    proto_tree_add_expert_format(m2pa_tree, pinfo, &ei_length, message_tvb, V8_LENGTH_OFFSET, 4,
+    if (m2pa_tree)
+      proto_tree_add_text(m2pa_tree, message_tvb, V8_LENGTH_OFFSET, 4,
         "Invalid message data length: %u", message_data_length);
-    /* XXX - is this really necessary?  Can we just return since the expert info can
-       still find the "malformed" packet? */
     THROW(ReportedBoundsError);
   }
-  message_data_tvb    = tvb_new_subset_length(message_tvb, V8_MESSAGE_DATA_OFFSET, message_data_length);
+  message_data_tvb    = tvb_new_subset(message_tvb, V8_MESSAGE_DATA_OFFSET, message_data_length, message_data_length);
   type                = tvb_get_guint8(message_tvb, V8_TYPE_OFFSET);
 
 
@@ -453,7 +456,7 @@ dissect_message_data(tvbuff_t *message_tvb, packet_info *pinfo, proto_item *m2pa
 
   length              = tvb_get_ntohl(message_tvb, LENGTH_OFFSET);
   message_data_length = length - HEADER_LENGTH;
-  message_data_tvb    = tvb_new_subset_length(message_tvb, MESSAGE_DATA_OFFSET, message_data_length);
+  message_data_tvb    = tvb_new_subset(message_tvb, MESSAGE_DATA_OFFSET, message_data_length, message_data_length);
   type                = tvb_get_guint8(message_tvb, TYPE_OFFSET);
 
 
@@ -476,8 +479,8 @@ dissect_message_data(tvbuff_t *message_tvb, packet_info *pinfo, proto_item *m2pa
 
     pi = proto_tree_add_item(m2pa_tree, hf_undecode_data, message_tvb, length, (actual_length - length), ENC_NA);
     expert_add_info_format(pinfo, pi, &ei_undecode_data,
-                           "There are %d bytes of data which is greater than M2PA's length parameter (%d)",
-                           actual_length, length);
+			   "There are %d bytes of data which is greater than M2PA's length parameter (%d)",
+			   actual_length, length);
   }
 }
 
@@ -578,7 +581,6 @@ proto_register_m2pa(void)
 
   static ei_register_info ei[] = {
      { &ei_undecode_data, { "m2pa.undecoded_data.expert", PI_MALFORMED, PI_WARN, "There are bytes of data which is greater than M2PA's length parameter", EXPFILL }},
-     { &ei_length, { "m2pa.length.invalid", PI_MALFORMED, PI_ERROR, "Invalid message data length", EXPFILL }},
   };
 
   expert_module_t* expert_m2pa;
@@ -626,16 +628,3 @@ proto_reg_handoff_m2pa(void)
 
   dissector_add_uint("sctp.port", sctp_port, m2pa_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

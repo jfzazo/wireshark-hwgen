@@ -25,7 +25,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/xdlc.h>
+#include <epan/etypes.h>
 #include <epan/llcsaps.h>
 #include "packet-hpext.h"
 
@@ -57,10 +60,6 @@ static header_field_info hfi_hpext_sxsap HPEXT_HFI_INIT =
 		{ "SXSAP", "hpext.sxsap", FT_UINT16, BASE_HEX,
 			VALS(xsap_vals), 0x0, NULL, HFILL };
 
-static header_field_info hfi_hpext_reserved HPEXT_HFI_INIT =
-		{ "Reserved", "hpext.reserved", FT_UINT24, BASE_HEX,
-			NULL, 0x0, NULL, HFILL };
-
 
 static gint ett_hpext = -1;
 
@@ -82,7 +81,7 @@ dissect_hpext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	if (tree) {
 		ti = proto_tree_add_item(tree, hfi_hpext, tvb, 0, 7, ENC_NA);
 		hpext_tree = proto_item_add_subtree(ti, ett_hpext);
-		proto_tree_add_item(hpext_tree, &hfi_hpext_reserved, tvb, 0, 3, ENC_NA);
+		proto_tree_add_text(hpext_tree, tvb, 0, 3, "Reserved");
 		proto_tree_add_uint(hpext_tree, &hfi_hpext_dxsap, tvb, 3,
 			2, dxsap);
 		proto_tree_add_uint(hpext_tree, &hfi_hpext_sxsap, tvb, 5,
@@ -108,7 +107,6 @@ proto_register_hpext(void)
 {
 #ifndef HAVE_HFI_SECTION_INIT
 	static header_field_info *hfi[] = {
-		&hfi_hpext_reserved,
 		&hfi_hpext_dxsap,
 		&hfi_hpext_sxsap,
 	};
@@ -141,16 +139,3 @@ proto_reg_handoff_hpext(void)
 
 	dissector_add_uint("llc.dsap", SAP_HPEXT, hpext_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

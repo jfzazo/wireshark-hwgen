@@ -21,24 +21,20 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-/*
- * (A short description of the protocol including links to specifications,
- *  detailed documentation, etc.)
- */
-
 #include "config.h"
 
 #if 0
-/* "System" includes used only as needed */
+/* Include only as needed */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-...
 #endif
 
-#include <epan/packet.h>   /* Should be first Wireshark include (other than config.h)
-#include <epan/expert.h>   /* Include only as needed */
-#include <epan/prefs.h>    /* Include only as needed */
+#include <glib.h>
+
+#include <epan/packet.h>
+#include <epan/expert.h>
+#include <epan/prefs.h>
 
 #if 0
 /* IF AND ONLY IF your protocol dissector exposes code to other dissectors
@@ -49,8 +45,9 @@
 #include "packet-PROTOABBREV.h"
 #endif
 
-/* Prototypes */
-/* (Required to prevent [-Wmissing-prototypes] warnings */
+/* Forward declaration that is needed below if using the
+ * proto_reg_handoff_PROTOABBREV function as a callback for when protocol
+ * preferences get changed. */
 void proto_reg_handoff_PROTOABBREV(void);
 void proto_register_PROTOABBREV(void);
 
@@ -60,12 +57,11 @@ static int hf_PROTOABBREV_FIELDABBREV = -1;
 static expert_field ei_PROTOABBREV_EXPERTABBREV = EI_INIT;
 
 /* Global sample preference ("controls" display of numbers) */
-static gboolean pref_hex = FALSE;
+static gboolean gPREF_HEX = FALSE;
 /* Global sample port preference - real port preferences should generally
  * default to 0 unless there is an IANA-registered (or equivalent) port for your
  * protocol. */
-#define PROTOABBREV_TCP_PORT 1234
-static guint tcp_port_pref = PROTOABBREV_TCP_PORT;
+static guint gPORT_PREF = 1234;
 
 /* Initialize the subtree pointers */
 static gint ett_PROTOABBREV = -1;
@@ -84,8 +80,8 @@ dissect_PROTOABBREV(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     proto_item *ti, *expert_ti;
     proto_tree *PROTOABBREV_tree;
     /* Other misc. local variables. */
-    guint       offset = 0;
-    int         len    = 0;
+    guint offset = 0;
+    int len = 0;
 
     /*** HEURISTICS ***/
 
@@ -205,16 +201,16 @@ dissect_PROTOABBREV(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 void
 proto_register_PROTOABBREV(void)
 {
-    module_t        *PROTOABBREV_module;
-    expert_module_t *expert_PROTOABBREV;
+    module_t *PROTOABBREV_module;
+    expert_module_t* expert_PROTOABBREV;
 
     /* Setup list of header fields  See Section 1.5 of README.dissector for
      * details. */
     static hf_register_info hf[] = {
         { &hf_PROTOABBREV_FIELDABBREV,
-          { "FIELDNAME", "PROTOABBREV.FIELDABBREV",
-            FT_FIELDTYPE, FIELDDISPLAY, FIELDCONVERT, BITMASK,
-            "FIELDDESCR", HFILL }
+            { "FIELDNAME", "PROTOABBREV.FIELDABBREV",
+               FIELDTYPE, FIELDDISPLAY, FIELDCONVERT, BITMASK,
+              "FIELDDESCR", HFILL }
         }
     };
 
@@ -225,10 +221,7 @@ proto_register_PROTOABBREV(void)
 
     /* Setup protocol expert items */
     static ei_register_info ei[] = {
-        { &ei_PROTOABBREV_EXPERTABBREV,
-          { "PROTOABBREV.EXPERTABBREV", PI_SEVERITY, PI_GROUP,
-            "EXPERTDESCR", EXPFILL }
-        }
+        { &ei_PROTOABBREV_EXPERTABBREV, { "PROTOABBREV.EXPERTABBREV", PI_SEVERITY, PI_GROUP, "EXPERTDESCR", EXPFILL }},
     };
 
     /* Register the protocol name and description */
@@ -238,7 +231,6 @@ proto_register_PROTOABBREV(void)
     /* Required function calls to register the header fields and subtrees */
     proto_register_field_array(proto_PROTOABBREV, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-
     /* Required function calls to register expert items */
     expert_PROTOABBREV = expert_register_protocol(proto_PROTOABBREV);
     expert_register_field_array(expert_PROTOABBREV, ei, array_length(ei));
@@ -257,7 +249,7 @@ proto_register_PROTOABBREV(void)
      * Only use this function instead of prefs_register_protocol (above) if you
      * want to group preferences of several protocols under one preferences
      * subtree.
-     *
+     * 
      * Argument subtree identifies grouping tree node name, several subnodes can
      * be specified using slash '/' (e.g. "OSI/X.500" - protocol preferences
      * will be accessible under Protocols->OSI->X.500-><PROTOSHORTNAME>
@@ -270,12 +262,12 @@ proto_register_PROTOABBREV(void)
     prefs_register_bool_preference(PROTOABBREV_module, "show_hex",
             "Display numbers in Hex",
             "Enable to display numerical values in hexadecimal.",
-            &pref_hex);
+            &gPREF_HEX);
 
     /* Register an example port preference */
     prefs_register_uint_preference(PROTOABBREV_module, "tcp.port", "PROTOABBREV TCP Port",
             " PROTOABBREV TCP port if other than the default",
-            10, &tcp_port_pref);
+            10, &gPORT_PREF);
 }
 
 /* If this dissector uses sub-dissector registration add a registration routine.
@@ -298,7 +290,7 @@ proto_reg_handoff_PROTOABBREV(void)
 {
     static gboolean initialized = FALSE;
     static dissector_handle_t PROTOABBREV_handle;
-    static int current_port;
+    static int currentPort;
 
     if (!initialized) {
         /* Use new_create_dissector_handle() to indicate that
@@ -319,16 +311,15 @@ proto_reg_handoff_PROTOABBREV(void)
          * preference can be saved using local statics in this
          * function (proto_reg_handoff).
          */
-        dissector_delete_uint("tcp.port", current_port, PROTOABBREV_handle);
+        dissector_delete_uint("tcp.port", currentPort, PROTOABBREV_handle);
     }
 
-    current_port = tcp_port_pref;
+    currentPort = gPORT_PREF;
 
-    dissector_add_uint("tcp.port", current_port, PROTOABBREV_handle);
+    dissector_add_uint("tcp.port", currentPort, PROTOABBREV_handle);
 }
 
 #if 0
-
 /* Simpler form of proto_reg_handoff_PROTOABBREV which can be used if there are
  * no prefs-dependent registration function calls. */
 void
@@ -342,7 +333,7 @@ proto_reg_handoff_PROTOABBREV(void)
      */
     PROTOABBREV_handle = new_create_dissector_handle(dissect_PROTOABBREV,
             proto_PROTOABBREV);
-    dissector_add_uint("tcp.port", PROTOABBREV_TCP_PORT, PROTOABBREV_handle);
+    dissector_add_uint("PARENT_SUBFIELD", ID_VALUE, PROTOABBREV_handle);
 }
 #endif
 

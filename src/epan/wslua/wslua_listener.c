@@ -28,6 +28,8 @@
 
 #include "config.h"
 
+#include <epan/emem.h>
+
 /* WSLUA_MODULE Listener Post-dissection packet analysis */
 
 #include "wslua.h"
@@ -45,8 +47,9 @@ static int tap_packet_cb_error_handler(lua_State* L) {
     static int repeated = 0;
     static int next = 2;
     const gchar* where =  (lua_pinfo) ?
-        wmem_strdup_printf(NULL, "Lua: on packet %i Error During execution of Listener Packet Callback",lua_pinfo->fd->num) :
-        wmem_strdup_printf(NULL, "Lua: Error During execution of Listener Packet Callback") ;
+
+    ep_strdup_printf("Lua: on packet %i Error During execution of Listener Packet Callback",lua_pinfo->fd->num) :
+    ep_strdup_printf("Lua: Error During execution of Listener Packet Callback") ;
 
     /* show the error the 1st, 3rd, 5th, 9th, 17th, 33th... time it appears to avoid window flooding */
     /* XXX the last series of identical errors won't be shown (the user however gets at least one message) */
@@ -56,8 +59,6 @@ static int tap_packet_cb_error_handler(lua_State* L) {
         last_error = g_strdup(error);
         repeated = 0;
         next = 2;
-        wmem_free(NULL, (void*) where);
-        where = NULL;
         return 0;
     }
 
@@ -76,7 +77,6 @@ static int tap_packet_cb_error_handler(lua_State* L) {
         report_failure("%s:\n %s",where,error);
     }
 
-    wmem_free(NULL, (void*) where);
     return 0;
 }
 
@@ -103,11 +103,14 @@ static int lua_tap_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt
 
     lua_pinfo = pinfo;
     lua_tvb = edt->tvb;
-    lua_tree = create_TreeItem(edt->tree, NULL);
+    lua_tree = (struct _wslua_treeitem *)g_malloc(sizeof(struct _wslua_treeitem));
+    lua_tree->tree = edt->tree;
+    lua_tree->item = NULL;
+    lua_tree->expired = FALSE;
 
     switch ( lua_pcall(tap->L,3,1,1) ) {
         case 0:
-            retval = (int)luaL_optinteger(tap->L,-1,1);
+            retval = luaL_optint(tap->L,-1,1);
             break;
         case LUA_ERRRUN:
             break;
@@ -285,8 +288,10 @@ WSLUA_METHOD Listener_remove(lua_State* L) {
 WSLUA_METAMETHOD Listener__tostring(lua_State* L) {
     /* Generates a string of debug info for the tap `Listener`. */
     Listener tap = checkListener(L,1);
+    gchar* str;
 
-    lua_pushfstring(L,"Listener(%s) filter: %s",tap->name, tap->filter ? tap->filter : "NONE");
+    str = ep_strdup_printf("Listener(%s) filter: %s",tap->name, tap->filter ? tap->filter : "NONE");
+    lua_pushstring(L,str);
 
     return 1;
 }

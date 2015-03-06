@@ -52,9 +52,14 @@ MAINTAINERCLEANFILES = \
 # The first argument is the directory in which the source files live.
 # All subsequent arguments are the files to scan.
 #
-wireshark-tap-register.c: $(WIRESHARK_TAP_SRC) $(top_srcdir)/tools/make-tap-reg.py
-	@echo Making wireshark-tap-register.c
-	@$(PYTHON) $(top_srcdir)/tools/make-tap-reg.py $(srcdir) taps $(WIRESHARK_TAP_SRC)
+wireshark-tap-register.c: $(WIRESHARK_TAP_SRC) $(top_srcdir)/tools/make-tapreg-dotc $(top_srcdir)/tools/make-tap-reg.py
+	@if test -n "$(PYTHON)"; then \
+		echo Making wireshark-tap-register.c with python ; \
+		$(PYTHON) $(top_srcdir)/tools/make-tap-reg.py $(srcdir) taps $(WIRESHARK_TAP_SRC); \
+	else \
+		echo Making wireshark-tap-register.c; \
+		$(top_srcdir)/tools/make-tapreg-dotc wireshark-tap-register.c $(srcdir) $(WIRESHARK_TAP_SRC); \
+	fi
 
 WIRESHARK_CLEAN_LIBGTKUI_SRC = \
  	$(WIRESHARK_GTK_SRC) \
@@ -129,7 +134,12 @@ pipe_icon.h:
 
 TOOLBAR_COMMON_ICONS = \
 	capture_interfaces \
-	gnome_emblem_web
+	capture_options_alt1 \
+	capture_restart \
+	capture_start \
+	capture_stop \
+	gnome_emblem_web \
+	toolbar_wireshark_file
 
 toolbar_icons.h:
 	echo "/* This file was automatically generated. DO NOT EDIT. */" > $@
@@ -139,13 +149,6 @@ toolbar_icons.h:
 	done
 	for icon24 in $(TOOLBAR_COMMON_ICONS) ; do \
 		gdk-pixbuf-csource --raw --name=$${icon24}_24_pb_data $(top_srcdir)/image/toolbar/$${icon24}_24.png >> $@ ;\
-	done
-	for icon_size in 16 24 ; do \
-		gdk-pixbuf-csource --raw --name=toolbar_wireshark_file_$${icon_size}_pb_data $(top_srcdir)/image/toolbar/$${icon_size}x$${icon_size}/x-capture-file-save.png >> $@ ;\
-		gdk-pixbuf-csource --raw --name=capture_options_alt1_$${icon_size}_pb_data $(top_srcdir)/image/toolbar/$${icon_size}x$${icon_size}/x-capture-options.png >> $@ ;\
-		gdk-pixbuf-csource --raw --name=capture_restart_$${icon_size}_pb_data $(top_srcdir)/image/toolbar/$${icon_size}x$${icon_size}/x-capture-restart.png >> $@ ;\
-		gdk-pixbuf-csource --raw --name=capture_start_$${icon_size}_pb_data $(top_srcdir)/image/toolbar/$${icon_size}x$${icon_size}/x-capture-start.png >> $@ ;\
-		gdk-pixbuf-csource --raw --name=capture_stop_$${icon_size}_pb_data $(top_srcdir)/image/toolbar/$${icon_size}x$${icon_size}/x-capture-stop.png >> $@ ;\
 	done
 
 layouts.h:
@@ -172,7 +175,7 @@ wsiconcap.h:
 wssplash.h:
 	echo "/* This file was automatically generated. DO NOT EDIT. */" > $@
 	echo >> $@
-	gdk-pixbuf-csource --raw --name=wssplash_pb_data $(top_srcdir)/image/wssplash_dev.png >> $@
+	gdk-pixbuf-csource --raw --name=wssplash_pb_data $(top_srcdir)/image/wssplash.png >> $@
 
 clean-pixbufs:
 	rm expert_indicators.h capture_comment_icons.h network_icons.h remote_icons.h pipe_icon.h \

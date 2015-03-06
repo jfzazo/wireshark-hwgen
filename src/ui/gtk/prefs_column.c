@@ -28,18 +28,21 @@
 #include <gtk/gtk.h>
 
 #include <epan/prefs.h>
+#include <epan/column-info.h>
 #include <epan/column.h>
+#include <epan/strutil.h>
 
 #include "globals.h"
 
 #include "ui/preference_utils.h"
 
-#include "ui/gtk/old-gtk-compat.h"
 #include "ui/gtk/prefs_column.h"
+#include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/packet_list.h"
 #include "ui/gtk/filter_dlg.h"
 #include "ui/gtk/filter_autocomplete.h"
+#include "ui/gtk/old-gtk-compat.h"
 #include "ui/gtk/stock_icons.h"
 
 static GtkWidget *remove_bt, *field_te, *field_lb, *occurrence_te, *occurrence_lb, *fmt_cmb;
@@ -268,7 +271,7 @@ column_prefs_show(GtkWidget *prefs_window) {
     gtk_widget_show(field_lb);
 
     field_te = gtk_entry_new();
-    g_object_set_data (G_OBJECT(field_te), E_FILT_MULTI_FIELD_NAME_ONLY_KEY, (gpointer)"");
+    g_object_set_data (G_OBJECT(field_te), E_FILT_FIELD_NAME_ONLY_KEY, (gpointer)"");
     g_signal_connect(field_te, "changed", G_CALLBACK(filter_te_syntax_check_cb), NULL);
 
     /* XXX: column_field_changed_cb will be called for every character entered in the entry box.      */

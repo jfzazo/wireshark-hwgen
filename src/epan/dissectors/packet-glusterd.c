@@ -35,6 +35,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include "packet-rpc.h"
@@ -865,16 +866,3 @@ proto_reg_handoff_gluster_gd_mgmt(void)
 	rpc_init_proc_table(GD_FRIEND_PROGRAM, 2,glusterd_friend_proc,
 						hf_glusterd_friend_proc);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

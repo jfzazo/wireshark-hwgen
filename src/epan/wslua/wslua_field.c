@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <epan/emem.h>
 #include <epan/dfilter/dfilter.h>
 #include <epan/ftypes/ftypes-int.h>
 
@@ -140,14 +141,6 @@ WSLUA_METAMETHOD FieldInfo__call(lua_State* L) {
                 pushAddress(L,ipv6);
                 return 1;
             }
-        case FT_FCWWN: {
-                Address fcwwn = (Address)g_malloc(sizeof(address));
-                fcwwn->type = AT_FCWWN;
-                fcwwn->len = fi->ws_fi->length;
-                fcwwn->data = tvb_memdup(NULL,fi->ws_fi->ds_tvb,fi->ws_fi->start,fi->ws_fi->length);
-                pushAddress(L,fcwwn);
-                return 1;
-            }
         case FT_IPXNET:{
                 Address ipx = (Address)g_malloc(sizeof(address));
                 ipx->type = AT_IPX;
@@ -165,7 +158,7 @@ WSLUA_METAMETHOD FieldInfo__call(lua_State* L) {
             }
         case FT_STRING:
         case FT_STRINGZ: {
-                gchar* repr = fvalue_to_string_repr(&fi->ws_fi->value,FTREPR_DISPLAY,BASE_NONE,NULL);
+                gchar* repr = fvalue_to_string_repr(&fi->ws_fi->value,FTREPR_DISPLAY,NULL);
                 if (repr)
                     lua_pushstring(L,repr);
                 else
@@ -219,10 +212,10 @@ WSLUA_METAMETHOD FieldInfo__tostring(lua_State* L) {
         gchar* repr = NULL;
 
         if (fi->ws_fi->hfinfo->type == FT_PROTOCOL || fi->ws_fi->hfinfo->type == FT_PCRE) {
-            repr = fvalue_to_string_repr(&fi->ws_fi->value,FTREPR_DFILTER,BASE_NONE,NULL);
+            repr = fvalue_to_string_repr(&fi->ws_fi->value,FTREPR_DFILTER,NULL);
         }
         else {
-            repr = fvalue_to_string_repr(&fi->ws_fi->value,FTREPR_DISPLAY,fi->ws_fi->hfinfo->display,NULL);
+            repr = fvalue_to_string_repr(&fi->ws_fi->value,FTREPR_DISPLAY,NULL);
         }
 
         if (repr) {
@@ -326,7 +319,7 @@ WSLUA_METAMETHOD FieldInfo__le(lua_State* L) {
     if (l->ws_fi->ds_tvb != r->ws_fi->ds_tvb)
         WSLUA_ERROR(FieldInfo__le,"Data source must be the same for both fields");
 
-    if (r->ws_fi->start + r->ws_fi->length <= l->ws_fi->start + l->ws_fi->length) {
+    if (r->ws_fi->start + r->ws_fi->length <= l->ws_fi->start + r->ws_fi->length) {
         lua_pushboolean(L,1);
     } else {
         lua_pushboolean(L,0);
@@ -475,7 +468,6 @@ void lua_prime_all_fields(proto_tree* tree _U_) {
     GString* fake_tap_filter = g_string_new("frame");
     guint i;
     static gboolean fake_tap = FALSE;
-    gchar *err_msg;
 
     for(i=0; i < wanted_fields->len; i++) {
         Field f = (Field)g_ptr_array_index(wanted_fields,i);
@@ -510,15 +502,9 @@ void lua_prime_all_fields(proto_tree* tree _U_) {
         if (error) {
             report_failure("while registering lua_fake_tap:\n%s",error->str);
             g_string_free(error,TRUE);
-        } else {
-            if (wslua_dfilter) {
-                dfilter_free(wslua_dfilter);
-                wslua_dfilter = NULL;
-            }
-            if (!dfilter_compile(fake_tap_filter->str, &wslua_dfilter, &err_msg)) {
-                report_failure("while compiling dfilter \"%s\" for wslua: %s", fake_tap_filter->str, err_msg);
-                g_free(err_msg);
-            }
+        }
+        else if (!dfilter_compile(fake_tap_filter->str, &wslua_dfilter)) {
+            report_failure("while compiling dfilter for wslua: '%s'", fake_tap_filter->str);
         }
     }
 
@@ -531,6 +517,8 @@ WSLUA_CONSTRUCTOR Field_new(lua_State *L) {
 #define WSLUA_ARG_Field_new_FIELDNAME 1 /* The filter name of the field (e.g. ip.addr) */
     const gchar* name = luaL_checkstring(L,WSLUA_ARG_Field_new_FIELDNAME);
     Field f;
+
+    if (!name) return 0;
 
     if (!proto_registrar_get_byname(name) && !wslua_is_field_available(L, name)) {
         WSLUA_ARG_ERROR(Field_new,FIELDNAME,"a field with this name must exist");
@@ -612,14 +600,14 @@ WSLUA_METAMETHOD Field__call (lua_State* L) {
                 items_found++;
             }
         }
-        in = (in->same_name_prev_id != -1) ? proto_registrar_get_nth(in->same_name_prev_id) : NULL;
+	in = (in->same_name_prev_id != -1) ? proto_registrar_get_nth(in->same_name_prev_id) : NULL;
     }
 
     WSLUA_RETURN(items_found); /* All the values of this field */
 }
 
 WSLUA_METAMETHOD Field__tostring(lua_State* L) {
-    /* Obtain a string with the field name. */
+	/* Obtain a string with the field name. */
     Field f = checkField(L,1);
 
     if (wanted_fields) {

@@ -10,6 +10,10 @@
 SetCompressor /SOLID lzma
 SetCompressorDictSize 64 ; MB
 
+; As of 1.12.2 we no longer ship the Wireshark 2 Preview.
+!ifdef QT_DIR
+!undef QT_DIR
+!endif
 !include "common.nsh"
 !include 'LogicLib.nsh'
 
@@ -50,7 +54,7 @@ BrandingText "Wireshark Installer (tm)"
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\NEWS.txt"
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Show News"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
-!define MUI_FINISHPAGE_RUN "$INSTDIR\${PROGRAM_NAME_PATH_QT}"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${PROGRAM_NAME_PATH_GTK}"
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
 
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW myShowCallback
@@ -318,6 +322,7 @@ Section "-Required"
 ;
 SetShellVarContext all
 
+
 SetOutPath $INSTDIR
 File "${STAGING_DIR}\${UNINSTALLER_NAME}"
 File "${STAGING_DIR}\wiretap-${WTAP_VERSION}.dll"
@@ -325,9 +330,59 @@ File "${STAGING_DIR}\wiretap-${WTAP_VERSION}.dll"
 File "${STAGING_DIR}\libwireshark.dll"
 !endif
 File "${STAGING_DIR}\libwsutil.dll"
-
-!include all-manifest.nsh
-
+File "${STAGING_DIR}\libgio-2.0-0.dll"
+File "${STAGING_DIR}\libglib-2.0-0.dll"
+File "${STAGING_DIR}\libgobject-2.0-0.dll"
+File "${STAGING_DIR}\libgmodule-2.0-0.dll"
+File "${STAGING_DIR}\libgthread-2.0-0.dll"
+!ifdef ICONV_DIR
+File "${STAGING_DIR}\iconv.dll"
+!endif
+File "${STAGING_DIR}\${INTL_DLL}"
+!ifdef ZLIB_DIR
+File "${STAGING_DIR}\zlib1.dll"
+!endif
+!ifdef C_ARES_DIR
+File "${STAGING_DIR}\libcares-2.dll"
+!endif
+!ifdef ADNS_DIR
+File "${STAGING_DIR}\adns_dll.dll"
+!endif
+!ifdef KFW_DIR
+File "${STAGING_DIR}\comerr32.dll"
+File "${STAGING_DIR}\krb5_32.dll"
+File "${STAGING_DIR}\k5sprt32.dll"
+!endif
+!ifdef GNUTLS_DIR
+File "${STAGING_DIR}\libffi-6.dll"
+File "${STAGING_DIR}\${GCC_DLL}"
+File "${STAGING_DIR}\libgcrypt-20.dll"
+File "${STAGING_DIR}\libgmp-10.dll"
+File "${STAGING_DIR}\libgnutls-28.dll"
+File "${STAGING_DIR}\${GPGERROR_DLL}"
+File "${STAGING_DIR}\libhogweed-2-4.dll"
+File "${STAGING_DIR}\libnettle-4-6.dll"
+File "${STAGING_DIR}\libp11-kit-0.dll"
+File "${STAGING_DIR}\libtasn1-6.dll"
+StrCmp "${INTL_DLL}" "libintl-8.dll" SkipLibIntl8
+File "${STAGING_DIR}\libintl-8.dll"
+SkipLibIntl8:
+!endif
+!ifdef LUA_DIR
+File "${STAGING_DIR}\lua52.dll"
+File "..\..\epan\wslua\init.lua"
+File "..\..\epan\wslua\console.lua"
+File "..\..\epan\wslua\dtd_gen.lua"
+!endif
+!ifdef SMI_DIR
+File "${STAGING_DIR}\libsmi-2.dll"
+!endif
+!ifdef GEOIP_DIR
+File "${STAGING_DIR}\libGeoIP-1.dll"
+!endif
+!ifdef WINSPARKLE_DIR
+File "${STAGING_DIR}\WinSparkle.dll"
+!endif
 File "${STAGING_DIR}\COPYING.txt"
 File "${STAGING_DIR}\NEWS.txt"
 File "${STAGING_DIR}\README.txt"
@@ -345,7 +400,7 @@ File "..\..\ipmap.html"
 
 ; C-runtime redistributable
 !ifdef VCREDIST_EXE
-; vcredist_x64.exe - copy and execute the redistributable installer
+; vcredist_x86.exe (MSVC V8) - copy and execute the redistributable installer
 File "${VCREDIST_EXE}"
 ; If the user already has the redistributable installed they will see a
 ; Big Ugly Dialog by default, asking if they want to uninstall or repair.
@@ -354,18 +409,13 @@ File "${VCREDIST_EXE}"
 ; "silent" install otherwise.
 
 ; http://blogs.msdn.com/b/astebner/archive/2010/10/20/10078468.aspx
-; http://allthingsconfigmgr.wordpress.com/2013/12/17/visual-c-redistributables-made-simple/
 ; "!if ${MSVC_VER_REQUIRED} >= 1600" doesn't work.
-!searchparse /noerrors ${MSVC_VER_REQUIRED} "1400" VCREDIST_FLAGS_Q "1500" VCREDIST_FLAGS_Q "1600" VCREDIST_FLAGS_Q_NORESTART
-!ifdef VCREDIST_FLAGS_Q
+!searchparse /noerrors ${MSVC_VER_REQUIRED} "1400" VCREDIST_OLD_FLAGS "1500" VCREDIST_OLD_FLAGS
+!ifdef VCREDIST_OLD_FLAGS
 StrCpy $VCREDIST_FLAGS "/q"
-!else ; VCREDIST_FLAGS_Q
-!ifdef VCREDIST_FLAGS_Q_NORESTART
+!else ; VCREDIST_OLD_FLAGS
 StrCpy $VCREDIST_FLAGS "/q /norestart"
-!else ; VCREDIST_FLAGS_Q_NORESTART
-StrCpy $VCREDIST_FLAGS "/quiet /norestart"
-!endif ; VCREDIST_FLAGS_Q_NORESTART
-!endif ; VCREDIST_FLAGS_Q
+!endif ; VCREDIST_OLD_FLAGS
 
 ExecWait '"$INSTDIR\vcredist_${TARGET_MACHINE}.exe" $VCREDIST_FLAGS' $0
 DetailPrint "vcredist_${TARGET_MACHINE} returned $0"
@@ -417,18 +467,21 @@ File "..\..\diameter\dictionary.xml"
 File "..\..\diameter\eap.xml"
 File "..\..\diameter\Ericsson.xml"
 File "..\..\diameter\etsie2e4.xml"
+File "..\..\diameter\gqpolicy.xml"
+File "..\..\diameter\imscxdx.xml"
 File "..\..\diameter\SKT.xml"
-File "..\..\diameter\HP.xml"
 File "..\..\diameter\mobileipv4.xml"
 File "..\..\diameter\mobileipv6.xml"
 File "..\..\diameter\nasreq.xml"
 File "..\..\diameter\Nokia.xml"
-File "..\..\diameter\NokiaSolutionsAndNetworks.xml"
+File "..\..\diameter\NokiaSiemensNetworks.xml"
 File "..\..\diameter\sip.xml"
 File "..\..\diameter\Starent.xml"
 File "..\..\diameter\sunping.xml"
-File "..\..\diameter\TGPP.xml"
-File "..\..\diameter\TGPP2.xml"
+File "..\..\diameter\TGPPGmb.xml"
+File "..\..\diameter\TGPPRx.xml"
+File "..\..\diameter\TGPPS9.xml"
+File "..\..\diameter\TGPPSh.xml"
 File "..\..\diameter\VerizonWireless.xml"
 File "..\..\diameter\Vodafone.xml"
 !include "custom_diameter_xmls.txt"
@@ -448,68 +501,46 @@ File "..\..\radius\dictionary.3gpp2"
 File "..\..\radius\dictionary.acc"
 File "..\..\radius\dictionary.acme"
 File "..\..\radius\dictionary.airespace"
-File "..\..\radius\dictionary.actelis"
-File "..\..\radius\dictionary.aerohive"
 File "..\..\radius\dictionary.alcatel"
 File "..\..\radius\dictionary.alcatel.esam"
 File "..\..\radius\dictionary.alcatel.sr"
 File "..\..\radius\dictionary.alcatel-lucent.aaa"
+File "..\..\radius\dictionary.alcatel-lucent.xylan"
 File "..\..\radius\dictionary.alteon"
 File "..\..\radius\dictionary.altiga"
 File "..\..\radius\dictionary.alvarion"
-File "..\..\radius\dictionary.alvarion.wimax.v2_2"
 File "..\..\radius\dictionary.apc"
 File "..\..\radius\dictionary.aptis"
 File "..\..\radius\dictionary.aruba"
-File "..\..\radius\dictionary.arbor"
 File "..\..\radius\dictionary.ascend"
 File "..\..\radius\dictionary.asn"
 File "..\..\radius\dictionary.audiocodes"
 File "..\..\radius\dictionary.avaya"
 File "..\..\radius\dictionary.azaire"
 File "..\..\radius\dictionary.bay"
-File "..\..\radius\dictionary.bluecoat"
 File "..\..\radius\dictionary.bintec"
-File "..\..\radius\dictionary.broadsoft"
-File "..\..\radius\dictionary.brocade"
-File "..\..\radius\dictionary.bskyb"
 File "..\..\radius\dictionary.bristol"
-File "..\..\radius\dictionary.bt"
-File "..\..\radius\dictionary.camiant"
 File "..\..\radius\dictionary.cablelabs"
 File "..\..\radius\dictionary.cabletron"
 File "..\..\radius\dictionary.chillispot"
 File "..\..\radius\dictionary.cisco"
-File "..\..\radius\dictionary.cisco.asa"
 File "..\..\radius\dictionary.cisco.bbsm"
 File "..\..\radius\dictionary.cisco.vpn3000"
 File "..\..\radius\dictionary.cisco.vpn5000"
-File "..\..\radius\dictionary.citrix"
 File "..\..\radius\dictionary.clavister"
 File "..\..\radius\dictionary.colubris"
 File "..\..\radius\dictionary.columbia_university"
-File "..\..\radius\dictionary.compatible"
 File "..\..\radius\dictionary.compat"
 File "..\..\radius\dictionary.cosine"
-File "..\..\radius\dictionary.dante"
 File "..\..\radius\dictionary.dhcp"
-File "..\..\radius\dictionary.dlink"
 File "..\..\radius\dictionary.digium"
-File "..\..\radius\dictionary.dragonwave"
-File "..\..\radius\dictionary.efficientip"
 File "..\..\radius\dictionary.eltex"
 File "..\..\radius\dictionary.epygi"
-File "..\..\radius\dictionary.equallogic"
 File "..\..\radius\dictionary.ericsson"
-File "..\..\radius\dictionary.ericsson.ab"
-File "..\..\radius\dictionary.ericsson.packet.core.networks"
 File "..\..\radius\dictionary.erx"
 File "..\..\radius\dictionary.extreme"
-File "..\..\radius\dictionary.f5"
-File "..\..\radius\dictionary.fdxtended"
 File "..\..\radius\dictionary.fortinet"
 File "..\..\radius\dictionary.foundry"
-File "..\..\radius\dictionary.freedhcp"
 File "..\..\radius\dictionary.freeradius"
 File "..\..\radius\dictionary.freeradius.internal"
 File "..\..\radius\dictionary.freeswitch"
@@ -519,25 +550,20 @@ File "..\..\radius\dictionary.gemtek"
 File "..\..\radius\dictionary.h3c"
 File "..\..\radius\dictionary.hp"
 File "..\..\radius\dictionary.huawei"
-File "..\..\radius\dictionary.iana"
 File "..\..\radius\dictionary.iea"
-File "..\..\radius\dictionary.infoblox"
 File "..\..\radius\dictionary.infonet"
 File "..\..\radius\dictionary.ipunplugged"
 File "..\..\radius\dictionary.issanni"
 File "..\..\radius\dictionary.itk"
 File "..\..\radius\dictionary.jradius"
 File "..\..\radius\dictionary.juniper"
-File "..\..\radius\dictionary.kineto"
 File "..\..\radius\dictionary.karlnet"
 File "..\..\radius\dictionary.lancom"
 File "..\..\radius\dictionary.livingston"
 File "..\..\radius\dictionary.localweb"
 File "..\..\radius\dictionary.lucent"
 File "..\..\radius\dictionary.manzara"
-File "..\..\radius\dictionary.meinberg"
 File "..\..\radius\dictionary.merit"
-File "..\..\radius\dictionary.meru"
 File "..\..\radius\dictionary.microsoft"
 File "..\..\radius\dictionary.mikrotik"
 File "..\..\radius\dictionary.motorola"
@@ -553,15 +579,12 @@ File "..\..\radius\dictionary.nortel"
 File "..\..\radius\dictionary.ntua"
 File "..\..\radius\dictionary.openser"
 File "..\..\radius\dictionary.packeteer"
-File "..\..\radius\dictionary.paloalto"
 File "..\..\radius\dictionary.patton"
-File "..\..\radius\dictionary.perle"
 File "..\..\radius\dictionary.propel"
 File "..\..\radius\dictionary.prosoft"
-File "..\..\radius\dictionary.proxim"
-File "..\..\radius\dictionary.purewave"
 File "..\..\radius\dictionary.quiconnect"
 File "..\..\radius\dictionary.quintum"
+File "..\..\radius\dictionary.redback"
 File "..\..\radius\dictionary.redcreek"
 File "..\..\radius\dictionary.rfc2865"
 File "..\..\radius\dictionary.rfc2866"
@@ -586,35 +609,19 @@ File "..\..\radius\dictionary.rfc5607"
 File "..\..\radius\dictionary.rfc5904"
 File "..\..\radius\dictionary.rfc6519"
 File "..\..\radius\dictionary.rfc6572"
-File "..\..\radius\dictionary.rfc6677"
-File "..\..\radius\dictionary.rfc6911"
-File "..\..\radius\dictionary.rfc6929"
-File "..\..\radius\dictionary.rfc6930"
-File "..\..\radius\dictionary.rfc7055"
-File "..\..\radius\dictionary.rfc7155"
-File "..\..\radius\dictionary.rfc7268"
-File "..\..\radius\dictionary.riverbed"
 File "..\..\radius\dictionary.riverstone"
-File "..\..\radius\dictionary.ruckus"
 File "..\..\radius\dictionary.roaringpenguin"
-File "..\..\radius\dictionary.sg"
 File "..\..\radius\dictionary.shasta"
 File "..\..\radius\dictionary.shiva"
-File "..\..\radius\dictionary.siemens"
 File "..\..\radius\dictionary.slipstream"
 File "..\..\radius\dictionary.sofaware"
 File "..\..\radius\dictionary.sonicwall"
 File "..\..\radius\dictionary.springtide"
 File "..\..\radius\dictionary.starent"
-File "..\..\radius\dictionary.starent.vsa1"
-File "..\..\radius\dictionary.surfnet"
-File "..\..\radius\dictionary.symbol"
 File "..\..\radius\dictionary.t_systems_nova"
 File "..\..\radius\dictionary.telebit"
 File "..\..\radius\dictionary.telkom"
-File "..\..\radius\dictionary.terena"
 File "..\..\radius\dictionary.trapeze"
-File "..\..\radius\dictionary.travelping"
 File "..\..\radius\dictionary.tropos"
 File "..\..\radius\dictionary.ukerna"
 File "..\..\radius\dictionary.unix"
@@ -627,14 +634,9 @@ File "..\..\radius\dictionary.walabi"
 File "..\..\radius\dictionary.waverider"
 File "..\..\radius\dictionary.wichorus"
 File "..\..\radius\dictionary.wimax"
-File "..\..\radius\dictionary.wimax.alvarion"
 File "..\..\radius\dictionary.wimax.wichorus"
 File "..\..\radius\dictionary.wispr"
 File "..\..\radius\dictionary.xedia"
-File "..\..\radius\dictionary.xylan"
-File "..\..\radius\dictionary.yubico"
-File "..\..\radius\dictionary.zeus"
-File "..\..\radius\dictionary.zte"
 File "..\..\radius\dictionary.zyxel"
 !include "custom_radius_dict.txt"
 SetOutPath $INSTDIR
@@ -712,7 +714,7 @@ WriteRegStr HKEY_LOCAL_MACHINE "Software\Microsoft\Windows\CurrentVersion\App Pa
 !endif
 
 ; Create start menu entries (depending on additional tasks page)
-ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 5" "State"
+ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 2" "State"
 StrCmp $0 "0" SecRequired_skip_StartMenu
 SetOutPath $PROFILE
 ;CreateDirectory "$SMPROGRAMS\${PROGRAM_NAME}"
@@ -733,7 +735,7 @@ StrCmp $R1 "no" SecRequired_skip_DesktopIcon
 StrCmp $R1 "yes" SecRequired_install_DesktopIcon
 
 ; Create desktop icon (depending on additional tasks page and command line option)
-ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "State"
+ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 3" "State"
 StrCmp $0 "0" SecRequired_skip_DesktopIcon
 SecRequired_install_DesktopIcon:
 CreateShortCut "$DESKTOP\${PROGRAM_NAME_GTK}.lnk" "$INSTDIR\${PROGRAM_NAME_PATH_GTK}" "" "$INSTDIR\${PROGRAM_NAME_PATH_GTK}" 0 "" "" "${PROGRAM_FULL_NAME_GTK}"
@@ -746,7 +748,7 @@ StrCmp $R1 "no" SecRequired_skip_QuickLaunchIcon
 StrCmp $R1 "yes" SecRequired_install_QuickLaunchIcon
 
 ; Create quick launch icon (depending on additional tasks page and command line option)
-ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 7" "State"
+ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 4" "State"
 StrCmp $0 "0" SecRequired_skip_QuickLaunchIcon
 SecRequired_install_QuickLaunchIcon:
 CreateShortCut "$QUICKLAUNCH\${PROGRAM_NAME_GTK}.lnk" "$INSTDIR\${PROGRAM_NAME_PATH_GTK}" "" "$INSTDIR\${PROGRAM_NAME_PATH_GTK}" 0 "" "" "${PROGRAM_FULL_NAME_GTK}"
@@ -757,10 +759,10 @@ SecRequired_skip_QuickLaunchIcon:
 ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 11" "State"
 StrCmp $0 "1" SecRequired_skip_FileExtensions
 ; GTK+ Associate
-ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 10" "State"
+ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 9" "State"
 StrCmp $0 "1" SecRequired_GTK_FileExtensions
 ; Qt Associate
-ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 9" "State"
+ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 10" "State"
 StrCmp $0 "1" SecRequired_QT_FileExtensions
 
 SecRequired_GTK_FileExtensions:
@@ -816,14 +818,116 @@ SetShellVarContext all
 
 SectionEnd ; "Required"
 
-!ifdef QT_DIR
-Section "${PROGRAM_NAME}" SecWiresharkQt
+!ifdef GTK_DIR
+Section "${PROGRAM_NAME}" SecWiresharkGtk
 ;-------------------------------------------
-; by default, Wireshark is installed but file is always associate with Wireshark GTK+
+SetOutPath $INSTDIR
+File "${STAGING_DIR}\${PROGRAM_NAME_PATH_GTK}"
+File "${STAGING_DIR}\${GDK_DLL}"
+File "${STAGING_DIR}\libgdk_pixbuf-2.0-0.dll"
+File "${STAGING_DIR}\${GTK_DLL}"
+File "${STAGING_DIR}\libatk-1.0-0.dll"
+File "${STAGING_DIR}\libpango-1.0-0.dll"
+File "${STAGING_DIR}\libpangowin32-1.0-0.dll"
+!ifdef NEED_CAIRO_GOBJECT_DLL
+File "${STAGING_DIR}\libcairo-gobject-2.dll"
+!endif
+!ifdef NEED_CAIRO_DLL
+File "${STAGING_DIR}\libcairo-2.dll"
+File "${STAGING_DIR}\libpangocairo-1.0-0.dll"
+!endif
+!ifdef NEED_EXPAT_DLL
+File "${STAGING_DIR}\${EXPAT_DLL}"
+!endif
+!ifdef NEED_FFI_DLL
+File "${STAGING_DIR}\${FFI_DLL}"
+!endif
+!ifdef NEED_FONTCONFIG_DLL
+File "${STAGING_DIR}\${FONTCONFIG_DLL}"
+!endif
+!ifdef NEED_FREETYPE_DLL
+File "${STAGING_DIR}\libpangoft2-1.0-0.dll"
+File "${STAGING_DIR}\${FREETYPE_DLL}"
+!endif
+!ifdef NEED_HARFBUZZ_DLL
+File "${STAGING_DIR}\${HARFBUZZ_DLL}"
+!endif
+!ifdef NEED_JASPER_DLL
+File "${STAGING_DIR}\${JASPER_DLL}"
+!endif
+!ifdef NEED_JPEG_DLL
+File "${STAGING_DIR}\${JPEG_DLL}"
+!endif
+!ifdef NEED_LZMA_DLL
+File "${STAGING_DIR}\${LZMA_DLL}"
+!endif
+!ifdef NEED_PIXMAN_DLL
+File "${STAGING_DIR}\${PIXMAN_DLL}"
+!endif
+!ifdef NEED_PNG_DLL
+File "${STAGING_DIR}\${PNG_DLL}"
+!endif
+!ifdef NEED_SEH_DLL
+File "${STAGING_DIR}\${SEH_DLL}"
+!endif
+!ifdef NEED_SJLJ_DLL
+File "${STAGING_DIR}\${SJLJ_DLL}"
+!endif
+!ifdef NEED_TIFF_DLL
+File "${STAGING_DIR}\${TIFF_DLL}"
+!endif
+!ifdef NEED_XML_DLL
+File "${STAGING_DIR}\${XML_DLL}"
+!endif
+
+SetOutPath $INSTDIR\${GTK_ETC_DIR}
+File "${GTK_DIR}\${GTK_ETC_DIR}\*.*"
+
+!ifdef GTK_ENGINES_DIR
+SetOutPath $INSTDIR\${GTK_ENGINES_DIR}
+File "${STAGING_DIR}\${GTK_ENGINES_DIR}\libpixmap.dll"
+File "${STAGING_DIR}\${GTK_ENGINES_DIR}\libwimp.dll"
+!endif
+
+!ifdef GTK_MODULES_DIR
+SetOutPath $INSTDIR\${GTK_MODULES_DIR}
+File "${STAGING_DIR}\${GTK_MODULES_DIR}\libgail.dll"
+!endif
+
+!ifdef GTK_SCHEMAS_DIR
+SetOutPath $INSTDIR\${GTK_SCHEMAS_DIR}
+File "${STAGING_DIR}\${GTK_SCHEMAS_DIR}\*.*"
+!endif
+
+SectionEnd ; "Wireshark"
+!endif
+
+
+Section "TShark" SecTShark
+;-------------------------------------------
+SetOutPath $INSTDIR
+File "${STAGING_DIR}\tshark.exe"
+File "..\..\doc\tshark.html"
+SectionEnd
+
+!ifdef QT_DIR
+Section "${PROGRAM_NAME} 2 Preview" SecWiresharkQt
+;-------------------------------------------
+; by default, QtShark is installed but file is always associate with Wireshark GTK+
 SetOutPath $INSTDIR
 File "${QT_DIR}\${PROGRAM_NAME_PATH_QT}"
-!include qt-dll-manifest.nsh
-File "${QT_DIR}\*.qm"
+!ifdef NEED_QT4_DLL
+File "${QT_DIR}\QtCore4.dll"
+File "${QT_DIR}\QtGui4.dll"
+!endif
+!ifdef NEED_QT5_DLL
+File "${QT_DIR}\Qt5Core.dll"
+File "${QT_DIR}\Qt5Gui.dll"
+File "${QT_DIR}\Qt5Widgets.dll"
+File "${QT_DIR}\Qt5PrintSupport.dll"
+SetOutPath $INSTDIR\platforms
+File "${QT_DIR}\platforms\qwindows.dll"
+!endif
 
 Push $0
 ;SectionGetFlags ${SecWiresharkQt} $0
@@ -831,10 +935,11 @@ Push $0
 ;CreateShortCut "$SMPROGRAMS\${PROGRAM_NAME_QT}.lnk" "$INSTDIR\${PROGRAM_NAME_PATH_QT}" "" "$INSTDIR\${PROGRAM_NAME_PATH_QT}" 0 "" "" "${PROGRAM_FULL_NAME_QT}"
 
 ; Create start menu entries (depending on additional tasks page)
-ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 2" "State"
+ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 5" "State"
 StrCmp $0 "0" SecRequired_skip_StartMenuQt
 CreateShortCut "$SMPROGRAMS\${PROGRAM_NAME_QT}.lnk" "$INSTDIR\${PROGRAM_NAME_PATH_QT}" "" "$INSTDIR\${PROGRAM_NAME_PATH_QT}" 0 "" "" "${PROGRAM_FULL_NAME_QT}"
 SecRequired_skip_StartMenuQt:
+
 
 ; is command line option "/desktopicon" set?
 ${GetParameters} $R0
@@ -843,7 +948,7 @@ StrCmp $R1 "no" SecRequired_skip_DesktopIconQt
 StrCmp $R1 "yes" SecRequired_install_DesktopIconQt
 
 ; Create desktop icon (depending on additional tasks page and command line option)
-ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 3" "State"
+ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "State"
 StrCmp $0 "0" SecRequired_skip_DesktopIconQt
 SecRequired_install_DesktopIconQt:
 CreateShortCut "$DESKTOP\${PROGRAM_NAME_QT}.lnk" "$INSTDIR\${PROGRAM_NAME_PATH_QT}" "" "$INSTDIR\${PROGRAM_NAME_PATH_QT}" 0 "" "" "${PROGRAM_FULL_NAME_QT}"
@@ -856,38 +961,17 @@ StrCmp $R1 "no" SecRequired_skip_QuickLaunchIconQt
 StrCmp $R1 "yes" SecRequired_install_QuickLaunchIconQt
 
 ; Create quick launch icon (depending on additional tasks page and command line option)
-ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 4" "State"
+ReadINIStr $0 "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 7" "State"
 StrCmp $0 "0" SecRequired_skip_QuickLaunchIconQt
 SecRequired_install_QuickLaunchIconQt:
 CreateShortCut "$QUICKLAUNCH\${PROGRAM_NAME_QT}.lnk" "$INSTDIR\${PROGRAM_NAME_PATH_QT}" "" "$INSTDIR\${PROGRAM_NAME_PATH_QT}" 0 "" "" "${PROGRAM_FULL_NAME_QT}"
 SecRequired_skip_QuickLaunchIconQt:
 
 Pop $0
-SectionEnd ; "SecWiresharkQt"
-!endif
-
-
-Section "TShark" SecTShark
-;-------------------------------------------
-SetOutPath $INSTDIR
-File "${STAGING_DIR}\tshark.exe"
-File "..\..\doc\tshark.html"
 SectionEnd
-
-
-!ifdef GTK_DIR
-Section "${PROGRAM_NAME} 1" SecWiresharkGtk
-;-------------------------------------------
-SetOutPath $INSTDIR
-File "${STAGING_DIR}\${PROGRAM_NAME_PATH_GTK}"
-
-!include gtk-dll-manifest.nsh
-
-SectionEnd ; "SecWiresharkGtk"
 !endif
 
-
-SectionGroup "Plugins & Extensions" SecPluginsGroup
+SectionGroup "Plugins / Extensions" SecPluginsGroup
 
 Section "Dissector Plugins" SecPlugins
 ;-------------------------------------------
@@ -1008,16 +1092,17 @@ WriteRegDWORD HKEY_LOCAL_MACHINE "${UNINSTALL_PATH}" "EstimatedSize" "$0"
 
 SectionEnd
 
+
 ; ============================================================================
 ; PLEASE MAKE SURE, THAT THE DESCRIPTIVE TEXT FITS INTO THE DESCRIPTION FIELD!
 ; ============================================================================
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
-!ifdef QT_DIR
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecWiresharkQt} "The main network protocol analyzer application."
+!ifdef GTK_DIR
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecWiresharkGtk} "The main network protocol analyzer application."
 !endif
   !insertmacro MUI_DESCRIPTION_TEXT ${SecTShark} "Text based network protocol analyzer."
-!ifdef GTK_DIR
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecWiresharkGtk} "The classic user interface."
+!ifdef QT_DIR
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecWiresharkQt} "Preview of the next major release."
 !endif
 
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPluginsGroup} "Plugins and extensions for both ${PROGRAM_NAME} and TShark."
@@ -1047,83 +1132,83 @@ SectionEnd
 ; ============================================================================
 ; Callback functions
 ; ============================================================================
-!ifdef QT_DIR
-; Disable File extensions and icon if Wireshark (Qt / GTK+) isn't selected
+!ifdef GTK_DIR
+; Disable File extensions and icon if Wireshark (GTK+ / QT ) isn't selected
 Function .onSelChange
     Push $0
+    Goto onSelChange.checkgtk
+
+;Check Wireshark GTK+ and after check Qt
+onSelChange.checkgtk:
+    SectionGetFlags ${SecWiresharkGtk} $0
+    IntOp  $0 $0 & 1
+    IntCmp $0 0 onSelChange.unselectgtk
+    IntCmp $0 1 onSelChange.selectgtk
     Goto onSelChange.checkqt
 
-;Check Wireshark Qt and after check GTK+
-onSelChange.checkqt:
-    SectionGetFlags ${SecWiresharkQt} $0
-    IntOp  $0 $0 & ${SF_SELECTED}
-    IntCmp $0 0 onSelChange.unselectqt
-    IntCmp $0 ${SF_SELECTED} onSelChange.selectqt
-    Goto onSelChange.checkqt
-
-onSelChange.unselectqt:
-    ; Qt Icon
+onSelChange.unselectgtk:
+    ;GTK Icon
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 2" "Flags" "DISABLED"
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 2" "State" 0
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 3" "Flags" "DISABLED"
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 3" "State" 0
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 4" "Flags" "DISABLED"
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 4" "State" 0
-    ; Qt Association
+    ;GTK Association
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 9" "State" 0
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 9" "Flags" "DISABLED"
     ; Select "None Association"
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 11" "State" 1
-    Goto onSelChange.checkgtk
+    Goto onSelChange.checkqt
 
-onSelChange.selectqt:
-    ; Qt Icon
+onSelChange.selectgtk:
+    ;GTK Icon
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 2" "Flags" ""
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 2" "State" 1
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 3" "Flags" ""
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 3" "State" 0
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 4" "Flags" ""
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 4" "State" 1
-    ;Qt Association
+    ;GTK Association
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 9" "State" 1
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 9" "Flags" ""
-    ; Force None and GTK+ Association to no selected
+    ; Force None and Qt Association to no selected
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 11" "State" 0
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 10" "State" 0
-    Goto onSelChange.checkgtk
+    Goto onSelChange.checkqt
 
-;Check Wireshark GTK+
-onSelChange.checkgtk:
-!ifdef GTK_DIR
-    SectionGetFlags ${SecWiresharkGtk} $0
-    IntOp  $0 $0 & ${SF_SELECTED}
-    IntCmp $0 0 onSelChange.unselectgtk
-    IntCmp $0 ${SF_SELECTED} onSelChange.selectgtk
+;Check Wireshark Qt+
+onSelChange.checkqt:
+!ifdef QT_DIR
+    SectionGetFlags ${SecWiresharkQt} $0
+    IntOp  $0 $0 & 1
+    IntCmp $0 0 onSelChange.unselectqt
+    IntCmp $0 1 onSelChange.selectqt
 !endif
     Goto onSelChange.end
 
-!ifdef GTK_DIR
-onSelChange.unselectgtk:
-    ;GTK+ Icon
+!ifdef QT_DIR
+onSelChange.unselectqt:
+    ;Qt Icon
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 5" "Flags" "DISABLED"
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 5" "State" 0
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "Flags" "DISABLED"
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "State" 0
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 7" "Flags" "DISABLED"
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 7" "State" 0
-    ;GTK+ Association
+    ;Qt Association
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 10" "Flags" "DISABLED"
     Goto onSelChange.end
 
-onSelChange.selectgtk:
-    ;GTK+ Icon
+onSelChange.selectqt:
+    ;Qt Icon
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 5" "Flags" ""
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 5" "State" 1
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "Flags" ""
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "State" 0
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 7" "Flags" ""
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 7" "State" 1
-    ;GTK+ Association
+    ;Qt Association
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 10" "Flags" ""
     Goto onSelChange.end
 !endif
@@ -1143,9 +1228,9 @@ Var WINWINPCAP_VERSION ; DisplayVersion from WinPcap installation
 
 Function myShowCallback
 
-!ifdef GTK_DIR
-    ; If GTK+ is available enable icon and associate from additional tasks
-    ; GTK+ Icon
+!ifdef QT_DIR
+    ; if Qt is available enable icon and associate from additional tasks
+    ;Qt Icon
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 5" "Flags" ""
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 5" "State" 1
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "Flags" ""
@@ -1204,41 +1289,41 @@ lbl_winpcap_done:
     SetShellVarContext all
 
     ;Set State=1 to Desktop icon (no enable by default)
-    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "State" "1"
-!ifdef QT_DIR
     WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 3" "State" "1"
+!ifdef QT_DIR
+    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "State" "1"
 !endif
     IfFileExists "$SMPROGRAMS\${PROGRAM_NAME}\${PROGRAM_NAME}.lnk" lbl_have_gtk_startmenu
     IfFileExists "$SMPROGRAMS\${PROGRAM_NAME}.lnk" lbl_have_gtk_startmenu
     IfFileExists "$SMPROGRAMS\${PROGRAM_NAME_GTK}.lnk" lbl_have_gtk_startmenu
-    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 5" "State" "0"
+    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 2" "State" "0"
 lbl_have_gtk_startmenu:
 
     ; only select Desktop Icon, if previously installed
     IfFileExists "$DESKTOP\${PROGRAM_NAME}.lnk" lbl_have_gtk_desktopicon
     IfFileExists "$DESKTOP\${PROGRAM_NAME_GTK}.lnk" lbl_have_gtk_desktopicon
-    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "State" "0"
+    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 3" "State" "0"
 lbl_have_gtk_desktopicon:
 
     ; only select Quick Launch Icon, if previously installed
     IfFileExists "$QUICKLAUNCH\${PROGRAM_NAME}.lnk" lbl_have_gtk_quicklaunchicon
     IfFileExists "$QUICKLAUNCH\${PROGRAM_NAME_GTK}.lnk" lbl_have_gtk_quicklaunchicon
-    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 7" "State" "0"
+    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 4" "State" "0"
 lbl_have_gtk_quicklaunchicon:
 
 !ifdef QT_DIR
     IfFileExists "$SMPROGRAMS\${PROGRAM_NAME_QT}.lnk" lbl_have_qt_startmenu
-    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 2" "State" "0"
+    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 5" "State" "0"
 lbl_have_qt_startmenu:
 
     ; only select Desktop Icon, if previously installed
     IfFileExists "$DESKTOP\${PROGRAM_NAME_QT}.lnk" lbl_have_qt_desktopicon
-    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 3" "State" "0"
+    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 6" "State" "0"
 lbl_have_qt_desktopicon:
 
     ; only select Quick Launch Icon, if previously installed
     IfFileExists "$QUICKLAUNCH\${PROGRAM_NAME_QT}.lnk" lbl_have_qt_quicklaunchicon
-    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 4" "State" "0"
+    WriteINIStr "$PLUGINSDIR\AdditionalTasksPage.ini" "Field 7" "State" "0"
 lbl_have_qt_quicklaunchicon:
 !endif
 

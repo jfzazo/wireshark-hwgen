@@ -32,11 +32,16 @@
 
 #include "config.h"
 
+#include <glib.h>
+
+#include <wsutil/sha1.h>
+#include <wsutil/md5.h>
+
 #include <epan/packet.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
-#include <wsutil/sha1.h>
-#include <wsutil/md5.h>
+
+#include <string.h>
 
 #include "packet-ber.h"
 #include "packet-cms.h"
@@ -184,7 +189,7 @@ static int hf_cms_issuerUniqueID = -1;            /* UniqueIdentifier */
 static int hf_cms_extensions = -1;                /* Extensions */
 
 /*--- End of included file: packet-cms-hf.c ---*/
-#line 52 "../../asn1/cms/packet-cms-template.c"
+#line 57 "../../asn1/cms/packet-cms-template.c"
 
 /* Initialize the subtree pointers */
 
@@ -246,7 +251,7 @@ static gint ett_cms_T_subject = -1;
 static gint ett_cms_SEQUENCE_OF_Attribute = -1;
 
 /*--- End of included file: packet-cms-ett.c ---*/
-#line 55 "../../asn1/cms/packet-cms-template.c"
+#line 60 "../../asn1/cms/packet-cms-template.c"
 
 static int dissect_cms_OCTET_STRING(gboolean implicit_tag _U_, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index _U_) ; /* XXX kill a compiler warning until asn2wrs stops generating these silly wrappers */
 
@@ -286,8 +291,8 @@ cms_verify_msg_digest(proto_item *pi, tvbuff_t *content, const char *alg, tvbuff
 
     sha1_starts(&sha1_ctx);
 
-    sha1_update(&sha1_ctx, tvb_get_ptr(content, 0, tvb_captured_length(content)),
-		tvb_captured_length(content));
+    sha1_update(&sha1_ctx, tvb_get_ptr(content, 0, tvb_length(content)),
+		tvb_length(content));
 
     sha1_finish(&sha1_ctx, digest_buf);
 
@@ -297,8 +302,8 @@ cms_verify_msg_digest(proto_item *pi, tvbuff_t *content, const char *alg, tvbuff
 
     md5_init(&md5_ctx);
 
-    md5_append(&md5_ctx, tvb_get_ptr(content, 0, tvb_captured_length(content)),
-	       tvb_captured_length(content));
+    md5_append(&md5_ctx, tvb_get_ptr(content, 0, tvb_length(content)),
+	       tvb_length(content));
 
     md5_finish(&md5_ctx, digest_buf);
 
@@ -338,7 +343,7 @@ dissect_cms_ContentType(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset
 
 
 	if(object_identifier_id) {
-		name = oid_resolved_from_string(wmem_packet_scope(), object_identifier_id);
+		name = oid_resolved_from_string(object_identifier_id);
 		proto_item_append_text(tree, " (%s)", name ? name : object_identifier_id);
 	}
 
@@ -466,7 +471,7 @@ dissect_cms_T_attrType(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset 
 
 
   if(object_identifier_id) {
-    name = oid_resolved_from_string(wmem_packet_scope(), object_identifier_id);
+    name = oid_resolved_from_string(object_identifier_id);
     proto_item_append_text(tree, " (%s)", name ? name : object_identifier_id);
   }
 
@@ -1643,7 +1648,7 @@ dissect_cms_T_capability(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offse
 
 
   if(object_identifier_id) {
-    name = oid_resolved_from_string(wmem_packet_scope(), object_identifier_id);
+    name = oid_resolved_from_string(object_identifier_id);
     proto_item_append_text(tree, " %s", name ? name : object_identifier_id);
     cap_tree = tree;
   }
@@ -1742,115 +1747,85 @@ dissect_cms_RC2CBCParameters(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int o
 
 /*--- PDUs ---*/
 
-static int dissect_ContentInfo_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ContentInfo_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_ContentInfo(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_ContentInfo_PDU);
-  return offset;
+  dissect_cms_ContentInfo(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_ContentInfo_PDU);
 }
-static int dissect_ContentType_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ContentType_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_ContentType(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_ContentType_PDU);
-  return offset;
+  dissect_cms_ContentType(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_ContentType_PDU);
 }
-static int dissect_SignedData_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SignedData_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_SignedData(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_SignedData_PDU);
-  return offset;
+  dissect_cms_SignedData(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_SignedData_PDU);
 }
-static int dissect_EnvelopedData_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_EnvelopedData_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_EnvelopedData(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_EnvelopedData_PDU);
-  return offset;
+  dissect_cms_EnvelopedData(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_EnvelopedData_PDU);
 }
-static int dissect_DigestedData_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_DigestedData_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_DigestedData(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_DigestedData_PDU);
-  return offset;
+  dissect_cms_DigestedData(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_DigestedData_PDU);
 }
-static int dissect_EncryptedData_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_EncryptedData_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_EncryptedData(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_EncryptedData_PDU);
-  return offset;
+  dissect_cms_EncryptedData(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_EncryptedData_PDU);
 }
-static int dissect_AuthenticatedData_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_AuthenticatedData_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_AuthenticatedData(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_AuthenticatedData_PDU);
-  return offset;
+  dissect_cms_AuthenticatedData(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_AuthenticatedData_PDU);
 }
-static int dissect_IssuerAndSerialNumber_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_IssuerAndSerialNumber_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_IssuerAndSerialNumber(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_IssuerAndSerialNumber_PDU);
-  return offset;
+  dissect_cms_IssuerAndSerialNumber(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_IssuerAndSerialNumber_PDU);
 }
-static int dissect_MessageDigest_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MessageDigest_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_MessageDigest(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_MessageDigest_PDU);
-  return offset;
+  dissect_cms_MessageDigest(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_MessageDigest_PDU);
 }
-static int dissect_SigningTime_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SigningTime_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_SigningTime(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_SigningTime_PDU);
-  return offset;
+  dissect_cms_SigningTime(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_SigningTime_PDU);
 }
-static int dissect_Countersignature_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_Countersignature_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_Countersignature(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_Countersignature_PDU);
-  return offset;
+  dissect_cms_Countersignature(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_Countersignature_PDU);
 }
-static int dissect_RC2WrapParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_RC2WrapParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_RC2WrapParameter(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_RC2WrapParameter_PDU);
-  return offset;
+  dissect_cms_RC2WrapParameter(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_RC2WrapParameter_PDU);
 }
-static int dissect_SMIMECapabilities_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SMIMECapabilities_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_SMIMECapabilities(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_SMIMECapabilities_PDU);
-  return offset;
+  dissect_cms_SMIMECapabilities(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_SMIMECapabilities_PDU);
 }
-static int dissect_SMIMEEncryptionKeyPreference_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SMIMEEncryptionKeyPreference_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_SMIMEEncryptionKeyPreference(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_SMIMEEncryptionKeyPreference_PDU);
-  return offset;
+  dissect_cms_SMIMEEncryptionKeyPreference(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_SMIMEEncryptionKeyPreference_PDU);
 }
-static int dissect_RC2CBCParameters_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_RC2CBCParameters_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cms_RC2CBCParameters(FALSE, tvb, offset, &asn1_ctx, tree, hf_cms_RC2CBCParameters_PDU);
-  return offset;
+  dissect_cms_RC2CBCParameters(FALSE, tvb, 0, &asn1_ctx, tree, hf_cms_RC2CBCParameters_PDU);
 }
 
 
 /*--- End of included file: packet-cms-fn.c ---*/
-#line 133 "../../asn1/cms/packet-cms-template.c"
+#line 138 "../../asn1/cms/packet-cms-template.c"
 
 /*--- proto_register_cms ----------------------------------------------*/
 void proto_register_cms(void) {
@@ -2358,7 +2333,7 @@ void proto_register_cms(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-cms-hfarr.c ---*/
-#line 144 "../../asn1/cms/packet-cms-template.c"
+#line 149 "../../asn1/cms/packet-cms-template.c"
   };
 
   /* List of subtrees */
@@ -2422,7 +2397,7 @@ void proto_register_cms(void) {
     &ett_cms_SEQUENCE_OF_Attribute,
 
 /*--- End of included file: packet-cms-ettarr.c ---*/
-#line 149 "../../asn1/cms/packet-cms-template.c"
+#line 154 "../../asn1/cms/packet-cms-template.c"
   };
 
   /* Register protocol */
@@ -2432,8 +2407,8 @@ void proto_register_cms(void) {
   proto_register_field_array(proto_cms, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
 
-  new_register_ber_syntax_dissector("ContentInfo", proto_cms, dissect_ContentInfo_PDU);
-  new_register_ber_syntax_dissector("SignedData", proto_cms, dissect_SignedData_PDU);
+  register_ber_syntax_dissector("ContentInfo", proto_cms, dissect_ContentInfo_PDU);
+  register_ber_syntax_dissector("SignedData", proto_cms, dissect_SignedData_PDU);
   register_ber_oid_syntax(".p7s", NULL, "ContentInfo");
   register_ber_oid_syntax(".p7m", NULL, "ContentInfo");
   register_ber_oid_syntax(".p7c", NULL, "ContentInfo");
@@ -2444,39 +2419,35 @@ void proto_register_cms(void) {
 
 /*--- proto_reg_handoff_cms -------------------------------------------*/
 void proto_reg_handoff_cms(void) {
-  dissector_handle_t content_info_handle;
 
 /*--- Included file: packet-cms-dis-tab.c ---*/
 #line 1 "../../asn1/cms/packet-cms-dis-tab.c"
-  new_register_ber_oid_dissector("1.2.840.113549.1.9.16.1.6", dissect_ContentInfo_PDU, proto_cms, "id-ct-contentInfo");
-  new_register_ber_oid_dissector("1.2.840.113549.1.7.2", dissect_SignedData_PDU, proto_cms, "id-signedData");
-  new_register_ber_oid_dissector("1.2.840.113549.1.7.3", dissect_EnvelopedData_PDU, proto_cms, "id-envelopedData");
-  new_register_ber_oid_dissector("1.2.840.113549.1.7.5", dissect_DigestedData_PDU, proto_cms, "id-digestedData");
-  new_register_ber_oid_dissector("1.2.840.113549.1.7.6", dissect_EncryptedData_PDU, proto_cms, "id-encryptedData");
-  new_register_ber_oid_dissector("1.2.840.113549.1.9.16.1.2", dissect_AuthenticatedData_PDU, proto_cms, "id-ct-authenticatedData");
-  new_register_ber_oid_dissector("1.2.840.113549.1.9.3", dissect_ContentType_PDU, proto_cms, "id-contentType");
-  new_register_ber_oid_dissector("1.2.840.113549.1.9.4", dissect_MessageDigest_PDU, proto_cms, "id-messageDigest");
-  new_register_ber_oid_dissector("1.2.840.113549.1.9.5", dissect_SigningTime_PDU, proto_cms, "id-signingTime");
-  new_register_ber_oid_dissector("1.2.840.113549.1.9.6", dissect_Countersignature_PDU, proto_cms, "id-counterSignature");
-  new_register_ber_oid_dissector("2.6.1.4.18", dissect_ContentInfo_PDU, proto_cms, "id-et-pkcs7");
-  new_register_ber_oid_dissector("1.3.6.1.4.1.311.16.4", dissect_IssuerAndSerialNumber_PDU, proto_cms, "ms-oe-encryption-key-preference");
-  new_register_ber_oid_dissector("1.2.840.113549.1.9.15", dissect_SMIMECapabilities_PDU, proto_cms, "id-smime-capabilities");
-  new_register_ber_oid_dissector("1.2.840.113549.1.9.16.2.11", dissect_SMIMEEncryptionKeyPreference_PDU, proto_cms, "id-encryption-key-preference");
-  new_register_ber_oid_dissector("1.2.840.113549.3.2", dissect_RC2CBCParameters_PDU, proto_cms, "id-alg-rc2-cbc");
-  new_register_ber_oid_dissector("1.2.840.113549.3.4", dissect_RC2CBCParameters_PDU, proto_cms, "id-alg-rc4");
-  new_register_ber_oid_dissector("1.2.840.113549.1.9.16.3.7", dissect_RC2WrapParameter_PDU, proto_cms, "id-alg-cmsrc2-wrap");
-  new_register_ber_oid_dissector("2.16.840.1.113730.3.1.40", dissect_SignedData_PDU, proto_cms, "userSMIMECertificate");
+  register_ber_oid_dissector("1.2.840.113549.1.9.16.1.6", dissect_ContentInfo_PDU, proto_cms, "id-ct-contentInfo");
+  register_ber_oid_dissector("1.2.840.113549.1.7.2", dissect_SignedData_PDU, proto_cms, "id-signedData");
+  register_ber_oid_dissector("1.2.840.113549.1.7.3", dissect_EnvelopedData_PDU, proto_cms, "id-envelopedData");
+  register_ber_oid_dissector("1.2.840.113549.1.7.5", dissect_DigestedData_PDU, proto_cms, "id-digestedData");
+  register_ber_oid_dissector("1.2.840.113549.1.7.6", dissect_EncryptedData_PDU, proto_cms, "id-encryptedData");
+  register_ber_oid_dissector("1.2.840.113549.1.9.16.1.2", dissect_AuthenticatedData_PDU, proto_cms, "id-ct-authenticatedData");
+  register_ber_oid_dissector("1.2.840.113549.1.9.3", dissect_ContentType_PDU, proto_cms, "id-contentType");
+  register_ber_oid_dissector("1.2.840.113549.1.9.4", dissect_MessageDigest_PDU, proto_cms, "id-messageDigest");
+  register_ber_oid_dissector("1.2.840.113549.1.9.5", dissect_SigningTime_PDU, proto_cms, "id-signingTime");
+  register_ber_oid_dissector("1.2.840.113549.1.9.6", dissect_Countersignature_PDU, proto_cms, "id-counterSignature");
+  register_ber_oid_dissector("2.6.1.4.18", dissect_ContentInfo_PDU, proto_cms, "id-et-pkcs7");
+  register_ber_oid_dissector("1.3.6.1.4.1.311.16.4", dissect_IssuerAndSerialNumber_PDU, proto_cms, "ms-oe-encryption-key-preference");
+  register_ber_oid_dissector("1.2.840.113549.1.9.15", dissect_SMIMECapabilities_PDU, proto_cms, "id-smime-capabilities");
+  register_ber_oid_dissector("1.2.840.113549.1.9.16.2.11", dissect_SMIMEEncryptionKeyPreference_PDU, proto_cms, "id-encryption-key-preference");
+  register_ber_oid_dissector("1.2.840.113549.3.2", dissect_RC2CBCParameters_PDU, proto_cms, "id-alg-rc2-cbc");
+  register_ber_oid_dissector("1.2.840.113549.3.4", dissect_RC2CBCParameters_PDU, proto_cms, "id-alg-rc4");
+  register_ber_oid_dissector("1.2.840.113549.1.9.16.3.7", dissect_RC2WrapParameter_PDU, proto_cms, "id-alg-cmsrc2-wrap");
+  register_ber_oid_dissector("2.16.840.1.113730.3.1.40", dissect_SignedData_PDU, proto_cms, "userSMIMECertificate");
 
 
 /*--- End of included file: packet-cms-dis-tab.c ---*/
-#line 172 "../../asn1/cms/packet-cms-template.c"
+#line 176 "../../asn1/cms/packet-cms-template.c"
 
   oid_add_from_string("id-data","1.2.840.113549.1.7.1");
   oid_add_from_string("id-alg-des-ede3-cbc","1.2.840.113549.3.7");
   oid_add_from_string("id-alg-des-cbc","1.3.14.3.2.7");
 
-  content_info_handle = new_create_dissector_handle (dissect_ContentInfo_PDU, proto_cms);
-  dissector_add_string("media_type", "application/pkcs7-mime", content_info_handle);
-  dissector_add_string("media_type", "application/pkcs7-signature", content_info_handle);
 }
 

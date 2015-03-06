@@ -265,7 +265,7 @@ extern "C" {
 #define WTAP_ENCAP_PKTAP                        172
 #define WTAP_ENCAP_EPON                         173
 #define WTAP_ENCAP_IPMI_TRACE                   174
-#define WTAP_ENCAP_HW_GENERATOR          		175
+#define WTAP_ENCAP_HW_GENERATOR          	175
 /* After adding new item here, please also add new item to encap_table_base array */
 
 #define WTAP_NUM_ENCAP_TYPES                    wtap_get_num_encap_types()
@@ -350,21 +350,16 @@ extern "C" {
 #define WTAP_FILE_TYPE_SUBTYPE_LOGCAT_TIME                   72
 #define WTAP_FILE_TYPE_SUBTYPE_LOGCAT_THREADTIME             73
 #define WTAP_FILE_TYPE_SUBTYPE_LOGCAT_LONG                   74
-#define WTAP_FILE_TYPE_SUBTYPE_COLASOFT_CAPSA                75
-#define WTAP_FILE_TYPE_SUBTYPE_COLASOFT_PACKET_BUILDER       76
-#define WTAP_FILE_TYPE_SUBTYPE_HWGEN_V1						 77
-
+#define WTAP_FILE_TYPE_SUBTYPE_HWGEN_V1			     77
 #define WTAP_NUM_FILE_TYPES_SUBTYPES  wtap_get_num_file_types_subtypes()
 
 /* timestamp precision (currently only these values are supported) */
-#define WTAP_TSPREC_UNKNOWN    -2
-#define WTAP_TSPREC_PER_PACKET -1  /* as a per-file value, means per-packet */
-#define WTAP_TSPREC_SEC         0
-#define WTAP_TSPREC_DSEC        1
-#define WTAP_TSPREC_CSEC        2
-#define WTAP_TSPREC_MSEC        3
-#define WTAP_TSPREC_USEC        6
-#define WTAP_TSPREC_NSEC        9
+#define WTAP_FILE_TSPREC_SEC        0
+#define WTAP_FILE_TSPREC_DSEC       1
+#define WTAP_FILE_TSPREC_CSEC       2
+#define WTAP_FILE_TSPREC_MSEC       3
+#define WTAP_FILE_TSPREC_USEC       6
+#define WTAP_FILE_TSPREC_NSEC       9
 
 /*
  * Maximum packet size we'll support.
@@ -563,10 +558,7 @@ struct p2p_phdr {
 
 /*
  * Packet "pseudo-header" information for 802.11.
- * Radio information is only present in this form for
- * WTAP_ENCAP_IEEE_802_11_WITH_RADIO.  This is used for file formats in
- * which the radio information isn't provided as a pseudo-header in the
- * packet data.
+ * Radio information is only present for WTAP_ENCAP_IEEE_802_11_WITH_RADIO.
  *
  * Signal strength, etc. information:
  *
@@ -583,48 +575,12 @@ struct p2p_phdr {
  * times the ratio of the RSSI and the maximum RSSI.
  */
 struct ieee_802_11_phdr {
-    guint32  presence_flags; /* Flags indicating presence of certain fields */
-    guint32  flags_11n;      /* Various flags for 802.11n traffic */
-    gint     fcs_len;        /* Number of bytes of FCS - -1 means "unknown" */
-    gboolean decrypted;      /* TRUE if frame is decrypted even if "protected" bit is set */
-    guint16  channel;        /* Channel number */
-    guint16  data_rate;      /* Data rate, in .5 Mb/s units */
-    guint16  mcs_index;      /* MCS index */
-    guint    bandwidth:2;    /* Bandwidth = 20 MHz, 40 MHz, 20+20L, 20+20U */
-    guint    short_gi:1;     /* True for short guard interval */
-    guint    greenfield:1;   /* True for greenfield, short for mixed */
-    guint    ldpc:1;         /* Tue for LDPC FEC */
-    guint    stbc_streams:2; /* Number of STBC streams */
-    guint    ness:1;         /* Number of extension spatial streams */
-    guint16  mcs_info;       /* 11n flags and bandwidth */
-    guint32  frequency;      /* Channel center frequency */
-    guint8   signal_percent; /* Signal level, as a percentage */
-    guint8   noise_percent;  /* Noise level, as a percentage */
-    gint8    signal_dbm;     /* Signal level, in dBm */
-    gint8    noise_dbm;      /* Noise level, in dBm */
-    guint64  tsf_timestamp;
+    gint     fcs_len;       /* Number of bytes of FCS - -1 means "unknown" */
+    gboolean decrypted;     /* TRUE if frame is decrypted even if "protected" bit is set */
+    guint8   channel;       /* Channel number */
+    guint16  data_rate;     /* in .5 Mb/s units */
+    guint8   signal_level;  /* percentage */
 };
-
-#define PHDR_802_11_HAS_CHANNEL        0x00000001 /* channel */
-#define PHDR_802_11_HAS_DATA_RATE      0x00000002 /* data_rate */
-#define PHDR_802_11_HAS_MCS_INDEX      0x00000004 /* mcs */
-#define PHDR_802_11_HAS_BANDWIDTH      0x00000008 /* bandwidth */
-#define PHDR_802_11_HAS_SHORT_GI       0x00000010 /* short_gi */
-#define PHDR_802_11_HAS_GREENFIELD     0x00000020 /* greenfield */
-#define PHDR_802_11_HAS_LDPC           0x00000040 /* ldpc */
-#define PHDR_802_11_HAS_STBC_STREAMS   0x00000080 /* stbc_streams */
-#define PHDR_802_11_HAS_NESS           0x00000100 /* ness */
-#define PHDR_802_11_HAS_FREQUENCY      0x00000200 /* frequency */
-#define PHDR_802_11_HAS_SIGNAL_PERCENT 0x00000400 /* signal_percent */
-#define PHDR_802_11_HAS_NOISE_PERCENT  0x00000800 /* noise_percent */
-#define PHDR_802_11_HAS_SIGNAL_DBM     0x00001000 /* signal_dbm */
-#define PHDR_802_11_HAS_NOISE_DBM      0x00002000 /* noise_dbm */
-#define PHDR_802_11_HAS_TSF_TIMESTAMP  0x00004000 /* tsf_timestamp */
-
-#define PHDR_802_11_BANDWIDTH_20_MHZ   0 /* 20 MHz */
-#define PHDR_802_11_BANDWIDTH_40_MHZ   1 /* 40 MHz */
-#define PHDR_802_11_BANDWIDTH_20_20L   2 /* 20 + 20L */
-#define PHDR_802_11_BANDWIDTH_20_20U   3 /* 20 + 20U */
 
 /* Packet "pseudo-header" for the output from CoSine L2 debug output. */
 
@@ -1009,21 +965,19 @@ union wtap_pseudo_header {
 #define REC_TYPE_FT_SPECIFIC_REPORT   2    /**< file-type-specific report */
 
 struct wtap_pkthdr {
-    guint     rec_type;         /* what type of record is this? */
-    guint32   presence_flags;   /* what stuff do we have? */
-    nstime_t  ts;               /* time stamp */
-    guint32   caplen;           /* data length in the file */
-    guint32   len;              /* data length on the wire */
-    int       pkt_encap;        /* WTAP_ENCAP_ value for this packet */
-    int       pkt_tsprec;       /* WTAP_TSPREC_ value for this packet */
-                                /* pcapng variables */
-    guint32   interface_id;     /* identifier of the interface. */
-                                /* options */
-    gchar     *opt_comment;     /* NULL if not available */
-    guint64   drop_count;       /* number of packets lost (by the interface and the
-                                   operating system) between this packet and the preceding one. */
-    guint32   pack_flags;       /* XXX - 0 for now (any value for "we don't have it"?) */
-    Buffer    ft_specific_data; /* file-type specific data */
+    guint               rec_type;       /* what type of record is this? */
+    guint32             presence_flags; /* what stuff do we have? */
+    nstime_t            ts;
+    guint32             caplen;         /* data length in the file */
+    guint32             len;            /* data length on the wire */
+    int                 pkt_encap;
+                                        /* pcapng variables */
+    guint32             interface_id;   /* identifier of the interface. */
+                                        /* options */
+    gchar              *opt_comment;    /* NULL if not available */
+    guint64             drop_count;     /* number of packets lost (by the interface and the
+                                           operating system) between this packet and the preceding one. */
+    guint32             pack_flags;     /* XXX - 0 for now (any value for "we don't have it"?) */
 
     union wtap_pseudo_header  pseudo_header;
 };
@@ -1074,7 +1028,7 @@ typedef struct wtapng_section_s {
     gchar               *shb_os;        /**< NULL if not available, UTF-8 string containing the
                                          *     name of the operating system used to create this section.
                                          */
-    gchar         *shb_user_appl;       /**< NULL if not available, UTF-8 string containing the
+    const gchar         *shb_user_appl; /**< NULL if not available, UTF-8 string containing the
                                          *     name of the application used to create this section.
                                          */
 } wtapng_section_t;
@@ -1159,7 +1113,6 @@ typedef struct wtapng_iface_descriptions_s {
 typedef struct wtapng_if_descr_s {
     int                    wtap_encap;            /**< link_type translated to wtap_encap */
     guint64                time_units_per_second;
-    int                    tsprecision;           /**< WTAP_TSPREC_ value for this interface */
 
     /* mandatory */
     guint16                link_type;
@@ -1299,13 +1252,11 @@ struct file_extension_info {
  *
  * The open routine should return:
  *
- *      WTAP_OPEN_ERROR on an I/O error;
+ *	-1 on an I/O error;
  *
- *      WTAP_OPEN_MINE if the file it's reading is one of the types
- *      it handles;
+ *	1 if the file it's reading is one of the types it handles;
  *
- *      WTAP_OPEN_NOT_MINE if the file it's reading isn't one of the
- *      types it handles.
+ *	0 if the file it's reading isn't the type it handles.
  *
  * If the routine handles this type of file, it should set the "file_type"
  * field in the "struct wtap" to the type of the file.
@@ -1315,17 +1266,9 @@ struct file_extension_info {
  * (See https://bugs.wireshark.org/bugzilla/show_bug.cgi?id=8518)
  *
  * However, the caller does have to free the private data pointer when
- * returning WTAP_OPEN_NOT_MINE, since the next file type will be called
- * and will likely just overwrite the pointer.
+ * returning 0, since the next file type will be called and will likely
+ * just overwrite the pointer.
  */
-typedef enum {
-	WTAP_OPEN_NOT_MINE = 0,
-	WTAP_OPEN_MINE = 1,
-	WTAP_OPEN_ERROR = -1
-} wtap_open_return_val;
-
-typedef wtap_open_return_val (*wtap_open_routine_t)(struct wtap*, int *,
-    char **);
 
 /*
  * Some file formats have defined magic numbers at fixed offsets from
@@ -1336,8 +1279,11 @@ typedef wtap_open_return_val (*wtap_open_routine_t)(struct wtap*, int *,
  * Those file formats do not require a file name extension in order
  * to recognize them or to avoid recognizing other file types as that
  * type, and have no extensions specified for them.
- *
- * Other file formats don't have defined magic numbers at fixed offsets,
+ */
+typedef int (*wtap_open_routine_t)(struct wtap*, int *, char **);
+
+/*
+ * Some file formats don't have defined magic numbers at fixed offsets,
  * so a heuristic is required.  If that file format has any file name
  * extensions used for it, a list of those extensions should be
  * specified, so that, if the name of the file being opened has an
@@ -1345,17 +1291,19 @@ typedef wtap_open_return_val (*wtap_open_routine_t)(struct wtap*, int *,
  * the ones that don't, to handle the case where a file of one type
  * might be recognized by the heuristics for a different file type.
  */
-
-typedef enum {
-	OPEN_INFO_MAGIC = 0,
-	OPEN_INFO_HEURISTIC = 1
-} wtap_open_type;
+/*struct heuristic_open_info {
+	wtap_open_routine_t open_routine;
+	const char *extensions;
+};
+*/
+#define OPEN_INFO_MAGIC      0
+#define OPEN_INFO_HEURISTIC  1
 
 WS_DLL_PUBLIC void init_open_routines(void);
 
 struct open_info {
     const char *name;
-    wtap_open_type type;
+    int type;
     wtap_open_routine_t open_routine;
     const char *extensions;
     gchar **extensions_set; /* populated using extensions member during initialization */
@@ -1366,9 +1314,9 @@ WS_DLL_PUBLIC struct open_info *open_routines;
 /*
  * Types of comments.
  */
-#define WTAP_COMMENT_PER_SECTION        0x00000001      /* per-file/per-file-section */
-#define WTAP_COMMENT_PER_INTERFACE      0x00000002      /* per-interface */
-#define WTAP_COMMENT_PER_PACKET         0x00000004      /* per-packet */
+#define WTAP_COMMENT_PER_SECTION	0x00000001	/* per-file/per-file-section */
+#define WTAP_COMMENT_PER_INTERFACE	0x00000002	/* per-interface */
+#define WTAP_COMMENT_PER_PACKET		0x00000004	/* per-packet */
 
 struct file_type_subtype_info {
     /* the file type name */
@@ -1459,21 +1407,13 @@ gboolean wtap_read(wtap *wth, int *err, gchar **err_info,
 
 WS_DLL_PUBLIC
 gboolean wtap_seek_read (wtap *wth, gint64 seek_off,
-        struct wtap_pkthdr *phdr, Buffer *buf, int *err, gchar **err_info);
+	struct wtap_pkthdr *phdr, Buffer *buf, int *err, gchar **err_info);
 
 /*** get various information snippets about the current packet ***/
 WS_DLL_PUBLIC
 struct wtap_pkthdr *wtap_phdr(wtap *wth);
 WS_DLL_PUBLIC
 guint8 *wtap_buf_ptr(wtap *wth);
-
-/*** initialize a wtap_pkthdr structure ***/
-WS_DLL_PUBLIC
-void wtap_phdr_init(struct wtap_pkthdr *phdr);
-
-/*** clean up a wtap_pkthdr structure, freeing what wtap_phdr_init() allocated */
-WS_DLL_PUBLIC
-void wtap_phdr_cleanup(struct wtap_pkthdr *phdr);
 
 /*** get various information snippets about the current file ***/
 
@@ -1492,7 +1432,7 @@ int wtap_file_type_subtype(wtap *wth);
 WS_DLL_PUBLIC
 int wtap_file_encap(wtap *wth);
 WS_DLL_PUBLIC
-int wtap_file_tsprec(wtap *wth);
+int wtap_file_tsprecision(wtap *wth);
 WS_DLL_PUBLIC
 wtapng_section_t* wtap_file_get_shb_info(wtap *wth);
 WS_DLL_PUBLIC
@@ -1564,8 +1504,7 @@ wtap_dumper* wtap_dump_fdopen_ng(int fd, int filetype, int encap, int snaplen,
 
 
 WS_DLL_PUBLIC
-gboolean wtap_dump(wtap_dumper *, const struct wtap_pkthdr *, const guint8 *,
-     int *err, gchar **err_info);
+gboolean wtap_dump(wtap_dumper *, const struct wtap_pkthdr *, const guint8 *, int *err);
 WS_DLL_PUBLIC
 void wtap_dump_flush(wtap_dumper *);
 WS_DLL_PUBLIC
@@ -1684,21 +1623,21 @@ int wtap_register_encap_type(const char* name, const char* short_name);
 #define WTAP_ERR_CANT_OPEN                     -6
     /** The file couldn't be opened, reason unknown */
 
-#define WTAP_ERR_UNWRITABLE_FILE_TYPE          -7
+#define WTAP_ERR_UNSUPPORTED_FILE_TYPE         -7
     /** Wiretap can't save files in the specified format */
 
-#define WTAP_ERR_UNWRITABLE_ENCAP              -8
+#define WTAP_ERR_UNSUPPORTED_ENCAP             -8
     /** Wiretap can't read or save files in the specified format with the
        specified encapsulation */
 
 #define WTAP_ERR_ENCAP_PER_PACKET_UNSUPPORTED  -9
     /** The specified format doesn't support per-packet encapsulations */
 
-#define WTAP_ERR_CANT_WRITE                   -10
-    /** An attempt to read failed, reason unknown */
-
-#define WTAP_ERR_CANT_CLOSE                   -11
+#define WTAP_ERR_CANT_CLOSE                   -10
     /** The file couldn't be closed, reason unknown */
+
+#define WTAP_ERR_CANT_READ                    -11
+    /** An attempt to read failed, reason unknown */
 
 #define WTAP_ERR_SHORT_READ                   -12
     /** An attempt to read read less data than it should have */
@@ -1709,40 +1648,43 @@ int wtap_register_encap_type(const char* name, const char* short_name);
 #define WTAP_ERR_SHORT_WRITE                  -14
     /** An attempt to write wrote less data than it should have */
 
-#define WTAP_ERR_UNC_OVERFLOW                 -15
+#define WTAP_ERR_UNC_TRUNCATED                -15
+    /** Sniffer compressed data was oddly truncated */
+
+#define WTAP_ERR_UNC_OVERFLOW                 -16
     /** Uncompressing Sniffer data would overflow buffer */
 
-#define WTAP_ERR_RANDOM_OPEN_STDIN            -16
+#define WTAP_ERR_UNC_BAD_OFFSET               -17
+    /** LZ77 compressed data has bad offset to string */
+
+#define WTAP_ERR_RANDOM_OPEN_STDIN            -18
     /** We're trying to open the standard input for random access */
 
-#define WTAP_ERR_COMPRESSION_NOT_SUPPORTED    -17
+#define WTAP_ERR_COMPRESSION_NOT_SUPPORTED    -19
     /* The filetype doesn't support output compression */
 
-#define WTAP_ERR_CANT_SEEK                    -18
+#define WTAP_ERR_CANT_SEEK                    -20
     /** An attempt to seek failed, reason unknown */
 
-#define WTAP_ERR_CANT_SEEK_COMPRESSED         -19
+#define WTAP_ERR_CANT_SEEK_COMPRESSED         -21
     /** An attempt to seek on a compressed stream */
 
-#define WTAP_ERR_DECOMPRESS                   -20
+#define WTAP_ERR_DECOMPRESS                   -22
     /** Error decompressing */
 
-#define WTAP_ERR_INTERNAL                     -21
+#define WTAP_ERR_INTERNAL                     -23
     /** "Shouldn't happen" internal errors */
 
-#define WTAP_ERR_PACKET_TOO_LARGE             -22
+#define WTAP_ERR_PACKET_TOO_LARGE             -24
     /** Packet being written is larger than we support; do not use when
         reading, use WTAP_ERR_BAD_FILE instead */
 
-#define WTAP_ERR_CHECK_WSLUA                  -23
+#define WTAP_ERR_CHECK_WSLUA                  -25
     /** Not really an error: the file type being checked is from a Lua
         plugin, so that the code will call wslua_can_write_encap() instead if it gets this */
 
-#define WTAP_ERR_UNWRITABLE_REC_TYPE          -24
+#define WTAP_ERR_REC_TYPE_UNSUPPORTED         -26
     /** Specified record type can't be written to that file type */
-
-#define WTAP_ERR_UNWRITABLE_REC_DATA          -25
-    /** Something in the record data can't be written to that file type */
 
 #ifdef __cplusplus
 }

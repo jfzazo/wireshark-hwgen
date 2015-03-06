@@ -20,7 +20,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -33,6 +33,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <signal.h>
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
@@ -41,7 +42,6 @@
 #include <wsutil/tempfile.h>
 #include <wsutil/file_util.h>
 #include <wsutil/filesystem.h>
-#include <wsutil/ws_version_info.h>
 
 #include <wiretap/merge.h>
 
@@ -76,6 +76,8 @@
 #include "ui/progress_dlg.h"
 #include "ui/ui_util.h"
 
+#include "version_info.h"
+
 /* Needed for addrinfo */
 #ifdef HAVE_SYS_TYPES_H
 # include <sys/types.h>
@@ -104,6 +106,8 @@
 #ifdef HAVE_LIBPCAP
 gboolean auto_scroll_live;
 #endif
+
+static void cf_reset_state(capture_file *cf);
 
 static int read_packet(capture_file *cf, dfilter_t *dfcode, epan_dissect_t *edt,
     column_info *cinfo, gint64 offset);
@@ -194,14 +198,14 @@ cf_callback_add(cf_callback_t func, gpointer user_data)
 }
 
 void
-cf_callback_remove(cf_callback_t func, gpointer user_data)
+cf_callback_remove(cf_callback_t func)
 {
   cf_callback_data_t *cb;
   GList              *cb_item = cf_callbacks;
 
   while (cb_item != NULL) {
     cb = (cf_callback_data_t *)cb_item->data;
-    if (cb->cb_fct == func && cb->user_data == user_data) {
+    if (cb->cb_fct == func) {
       cf_callbacks = g_list_remove(cf_callbacks, cb);
       g_free(cb);
       return;
@@ -216,12 +220,46 @@ void
 cf_timestamp_auto_precision(capture_file *cf)
 {
   int i;
+  int prec = timestamp_get_precision();
+
 
   /* don't try to get the file's precision if none is opened */
   if (cf->state == FILE_CLOSED) {
     return;
   }
 
+  /* if we are in auto mode, set precision of current file */
+  if (prec == TS_PREC_AUTO ||
+     prec == TS_PREC_AUTO_SEC ||
+     prec == TS_PREC_AUTO_DSEC ||
+     prec == TS_PREC_AUTO_CSEC ||
+     prec == TS_PREC_AUTO_MSEC ||
+     prec == TS_PREC_AUTO_USEC ||
+     prec == TS_PREC_AUTO_NSEC)
+  {
+    switch(wtap_file_tsprecision(cf->wth)) {
+    case(WTAP_FILE_TSPREC_SEC):
+      timestamp_set_precision(TS_PREC_AUTO_SEC);
+      break;
+    case(WTAP_FILE_TSPREC_DSEC):
+      timestamp_set_precision(TS_PREC_AUTO_DSEC);
+      break;
+    case(WTAP_FILE_TSPREC_CSEC):
+      timestamp_set_precision(TS_PREC_AUTO_CSEC);
+      break;
+    case(WTAP_FILE_TSPREC_MSEC):
+      timestamp_set_precision(TS_PREC_AUTO_MSEC);
+      break;
+    case(WTAP_FILE_TSPREC_USEC):
+      timestamp_set_precision(TS_PREC_AUTO_USEC);
+      break;
+    case(WTAP_FILE_TSPREC_NSEC):
+      timestamp_set_precision(TS_PREC_AUTO_NSEC);
+      break;
+    default:
+      g_assert_not_reached();
+    }
+  }
   /* Set the column widths of those columns that show the time in
      "command-line-specified" format. */
   for (i = 0; i < cf->cinfo.num_cols; i++) {
@@ -309,12 +347,9 @@ cf_open(capture_file *cf, const char *fname, unsigned int type, gboolean is_temp
      and fill in the information for this file. */
   cf_close(cf);
 
-  /* Initialize the packet header. */
-  wtap_phdr_init(&cf->phdr);
-
   /* XXX - we really want to initialize this after we've read all
      the packets, so we know how much we'll ultimately need. */
-  ws_buffer_init(&cf->buf, 1500);
+  buffer_init(&cf->buf, 1500);
 
   /* Create new epan session for dissection.
    * (The old one was freed in cf_close().)
@@ -405,20 +440,21 @@ cf_add_encapsulation_type(capture_file *cf, int encap)
   g_array_append_val(cf->linktypes, encap);
 }
 
-/* Reset everything to a pristine state */
-void
-cf_close(capture_file *cf)
+/*
+ * Reset the state for the currently closed file, but don't do the
+ * UI callbacks; this is for use in "cf_open()", where we don't
+ * want the UI to go from "file open" to "file closed" back to
+ * "file open", we want it to go from "old file open" to "new file
+ * open and being read".
+ *
+ * XXX - currently, cf_open() calls cf_close(), rather than
+ * cf_reset_state().
+ */
+static void
+cf_reset_state(capture_file *cf)
 {
-  if (cf->state == FILE_CLOSED)
-    return; /* Nothing to do */
-
   /* Die if we're in the middle of reading a file. */
   g_assert(cf->state != FILE_READ_IN_PROGRESS);
-
-  cf_callback_invoke(cf_cb_file_closing, cf);
-
-  /* close things, if not already closed before */
-  color_filters_cleanup();
 
   if (cf->wth) {
     wtap_close(cf->wth);
@@ -438,11 +474,8 @@ cf_close(capture_file *cf)
   /* no open_routine type */
   cf->open_type = WTAP_TYPE_AUTO;
 
-  /* Clean up the packet header. */
-  wtap_phdr_cleanup(&cf->phdr);
-
   /* Free up the packet buffer. */
-  ws_buffer_free(&cf->buf);
+  buffer_free(&cf->buf);
 
   dfilter_free(cf->rfcode);
   cf->rfcode = NULL;
@@ -486,13 +519,25 @@ cf_close(capture_file *cf)
 
   reset_tap_listeners();
 
-  epan_free(cf->epan);
-  cf->epan = NULL;
-
   /* We have no file open. */
   cf->state = FILE_CLOSED;
+}
 
-  cf_callback_invoke(cf_cb_file_closed, cf);
+/* Reset everything to a pristine state */
+void
+cf_close(capture_file *cf)
+{
+  if (cf->state != FILE_CLOSED) {
+    cf_callback_invoke(cf_cb_file_closing, cf);
+
+  /* close things, if not already closed before */
+    color_filters_cleanup();
+    cf_reset_state(cf);
+    epan_free(cf->epan);
+    cf->epan = NULL;
+
+    cf_callback_invoke(cf_cb_file_closed, cf);
+  }
 }
 
 static float
@@ -546,7 +591,7 @@ cf_read(capture_file *cf, gboolean reloading)
    * We assume this will not fail since cf->dfilter is only set in
    * cf_filter IFF the filter was valid.
    */
-  compiled = dfilter_compile(cf->dfilter, &dfcode, NULL);
+  compiled = dfilter_compile(cf->dfilter, &dfcode);
   g_assert(!cf->dfilter || (compiled && dfcode));
 
   /* Get the union of the flags for all tap listeners. */
@@ -663,9 +708,9 @@ cf_read(capture_file *cf, gboolean reloading)
   }
   CATCH(OutOfMemoryError) {
     simple_message_box(ESD_TYPE_ERROR, NULL,
-                   "More information and workarounds can be found at\n"
+                   "Some infos / workarounds can be found at:\n"
                    "http://wiki.wireshark.org/KnownBugs/OutOfMemory",
-                   "Sorry, but Wireshark has run out of memory and has to terminate now.");
+                   "Sorry, but Wireshark has run out of memory and has to terminate now!");
 #if 0
     /* Could we close the current capture and free up memory from that? */
 #else
@@ -729,7 +774,7 @@ cf_read(capture_file *cf, gboolean reloading)
                   "\n"
                   "As a lot of packets from the original file will be missing,\n"
                   "remember to be careful when saving the current content to a file.\n",
-                  "File loading was cancelled.");
+                  "File loading was cancelled!");
     return CF_READ_ERROR;
   }
 
@@ -742,8 +787,21 @@ cf_read(capture_file *cf, gboolean reloading)
     case WTAP_ERR_UNSUPPORTED:
       simple_error_message_box(
                  "The capture file contains record data that Wireshark doesn't support.\n(%s)",
-                 err_info != NULL ? err_info : "no information supplied");
+                 err_info);
       g_free(err_info);
+      break;
+
+    case WTAP_ERR_UNSUPPORTED_ENCAP:
+      simple_error_message_box(
+                 "The capture file has a packet with a network type that Wireshark doesn't support.\n(%s)",
+                 err_info);
+      g_free(err_info);
+      break;
+
+    case WTAP_ERR_CANT_READ:
+      simple_error_message_box(
+                 "An attempt to read from the capture file failed for"
+                 " some unknown reason.");
       break;
 
     case WTAP_ERR_SHORT_READ:
@@ -755,14 +813,14 @@ cf_read(capture_file *cf, gboolean reloading)
     case WTAP_ERR_BAD_FILE:
       simple_error_message_box(
                  "The capture file appears to be damaged or corrupt.\n(%s)",
-                 err_info != NULL ? err_info : "no information supplied");
+                 err_info);
       g_free(err_info);
       break;
 
     case WTAP_ERR_DECOMPRESS:
       simple_error_message_box(
-                 "The compressed capture file appears to be damaged or corrupt.\n",
-                 err_info != NULL ? err_info : "no information supplied");
+                 "The compressed capture file appears to be damaged or corrupt.\n"
+                 "(%s)", err_info);
       g_free(err_info);
       break;
 
@@ -793,7 +851,7 @@ cf_continue_tail(capture_file *cf, volatile int to_read, int *err)
    * We assume this will not fail since cf->dfilter is only set in
    * cf_filter IFF the filter was valid.
    */
-  compiled = dfilter_compile(cf->dfilter, &dfcode, NULL);
+  compiled = dfilter_compile(cf->dfilter, &dfcode);
   g_assert(!cf->dfilter || (compiled && dfcode));
 
   /* Get the union of the flags for all tap listeners. */
@@ -836,9 +894,9 @@ cf_continue_tail(capture_file *cf, volatile int to_read, int *err)
   }
   CATCH(OutOfMemoryError) {
     simple_message_box(ESD_TYPE_ERROR, NULL,
-                   "More information and workarounds can be found at\n"
+                   "Some infos / workarounds can be found at:\n"
                    "http://wiki.wireshark.org/KnownBugs/OutOfMemory",
-                   "Sorry, but Wireshark has run out of memory and has to terminate now.");
+                   "Sorry, but Wireshark has run out of memory and has to terminate now!");
 #if 0
     /* Could we close the current capture and free up memory from that? */
     return CF_READ_ABORTED;
@@ -886,14 +944,10 @@ cf_continue_tail(capture_file *cf, volatile int to_read, int *err)
   } else if (*err != 0) {
     /* We got an error reading the capture file.
        XXX - pop up a dialog box instead? */
-    if (err_info != NULL) {
-      g_warning("Error \"%s\" while reading \"%s\" (\"%s\")",
-                wtap_strerror(*err), cf->filename, err_info);
-      g_free(err_info);
-    } else {
-      g_warning("Error \"%s\" while reading \"%s\"",
-                wtap_strerror(*err), cf->filename);
-    }
+    g_warning("Error \"%s\" while reading: \"%s\" (\"%s\")",
+        wtap_strerror(*err), err_info, cf->filename);
+    g_free(err_info);
+
     return CF_READ_ERROR;
   } else
     return CF_READ_OK;
@@ -920,7 +974,7 @@ cf_finish_tail(capture_file *cf, int *err)
    * We assume this will not fail since cf->dfilter is only set in
    * cf_filter IFF the filter was valid.
    */
-  compiled = dfilter_compile(cf->dfilter, &dfcode, NULL);
+  compiled = dfilter_compile(cf->dfilter, &dfcode);
   g_assert(!cf->dfilter || (compiled && dfcode));
 
   /* Get the union of the flags for all tap listeners. */
@@ -995,14 +1049,10 @@ cf_finish_tail(capture_file *cf, int *err)
   if (*err != 0) {
     /* We got an error reading the capture file.
        XXX - pop up a dialog box? */
-    if (err_info != NULL) {
-      g_warning("Error \"%s\" while reading \"%s\" (\"%s\")",
-                wtap_strerror(*err), cf->filename, err_info);
-      g_free(err_info);
-    } else {
-      g_warning("Error \"%s\" while reading \"%s\"",
-                wtap_strerror(*err), cf->filename);
-    }
+
+    g_warning("Error \"%s\" while reading: \"%s\" (\"%s\")",
+        wtap_strerror(*err), err_info, cf->filename);
+    g_free(err_info);
     return CF_READ_ERROR;
   } else {
     return CF_READ_OK;
@@ -1248,7 +1298,7 @@ cf_merge_files(char **out_filenamep, int in_file_count,
   int              out_fd;
   wtap_dumper     *pdh;
   int              open_err, read_err, write_err, close_err;
-  gchar           *err_info, *write_err_info = NULL;
+  gchar           *err_info;
   int              err_fileno;
   int              i;
   gboolean         got_read_error     = FALSE, got_write_error = FALSE;
@@ -1329,7 +1379,7 @@ cf_merge_files(char **out_filenamep, int in_file_count,
                                           /*  description of the hardware used to create this section. */
     shb_hdr->shb_os        = NULL;        /* NULL if not available, UTF-8 string containing the name   */
                                           /*  of the operating system used to create this section.     */
-    shb_hdr->shb_user_appl = g_strdup("Wireshark"); /* NULL if not available, UTF-8 string containing the name   */
+    shb_hdr->shb_user_appl = "Wireshark"; /* NULL if not available, UTF-8 string containing the name   */
                                           /*  of the application used to create this section.          */
 
     /* create fake IDB info */
@@ -1491,7 +1541,7 @@ cf_merge_files(char **out_filenamep, int in_file_count,
       phdr->presence_flags = phdr->presence_flags | WTAP_HAS_INTERFACE_ID;
     }
     if (!wtap_dump(pdh, wtap_phdr(in_file->wth),
-                   wtap_buf_ptr(in_file->wth), &write_err, &write_err_info)) {
+                   wtap_buf_ptr(in_file->wth), &write_err)) {
       got_write_error = TRUE;
       break;
     }
@@ -1526,6 +1576,19 @@ cf_merge_files(char **out_filenamep, int in_file_count,
         display_basename = g_filename_display_basename(in_files[i].filename);
         switch (read_err) {
 
+        case WTAP_ERR_UNSUPPORTED_ENCAP:
+          simple_error_message_box(
+                     "The capture file %s has a packet with a network type that Wireshark doesn't support.\n(%s)",
+                     display_basename, err_info);
+          g_free(err_info);
+          break;
+
+        case WTAP_ERR_CANT_READ:
+          simple_error_message_box(
+                     "An attempt to read from the capture file %s failed for"
+                     " some unknown reason.", display_basename);
+          break;
+
         case WTAP_ERR_SHORT_READ:
           simple_error_message_box(
                      "The capture file %s appears to have been cut short"
@@ -1542,8 +1605,7 @@ cf_merge_files(char **out_filenamep, int in_file_count,
         case WTAP_ERR_DECOMPRESS:
           simple_error_message_box(
                      "The compressed capture file %s appears to be damaged or corrupt.\n"
-                     "(%s)", display_basename,
-                     err_info != NULL ? err_info : "no information supplied");
+                     "(%s)", display_basename, err_info);
           g_free(err_info);
           break;
 
@@ -1565,7 +1627,7 @@ cf_merge_files(char **out_filenamep, int in_file_count,
       /* Wiretap error. */
       switch (write_err) {
 
-      case WTAP_ERR_UNWRITABLE_ENCAP:
+      case WTAP_ERR_UNSUPPORTED_ENCAP:
         /*
          * This is a problem with the particular frame we're writing and
          * the file type and subtype we're writing; note that, and report
@@ -1590,36 +1652,6 @@ cf_merge_files(char **out_filenamep, int in_file_count,
                       "Frame %u of \"%s\" is too large for a \"%s\" file.",
                       in_file ? in_file->packet_num : 0, display_basename,
                       wtap_file_type_subtype_string(file_type));
-        g_free(display_basename);
-        break;
-
-      case WTAP_ERR_UNWRITABLE_REC_TYPE:
-        /*
-         * This is a problem with the particular record we're writing and
-         * the file type and subtype we're writing; note that, and report
-         * the record number and file type/subtype.
-         */
-        display_basename = g_filename_display_basename(in_file ? in_file->filename : "UNKNOWN");
-        simple_error_message_box(
-                      "Record %u of \"%s\" has a record type that can't be saved in a \"%s\" file.",
-                      in_file ? in_file->packet_num : 0, display_basename,
-                      wtap_file_type_subtype_string(file_type));
-        g_free(display_basename);
-        break;
-
-      case WTAP_ERR_UNWRITABLE_REC_DATA:
-        /*
-         * This is a problem with the particular record we're writing and
-         * the file type and subtype we're writing; note that, and report
-         * the frame number and file type/subtype.
-         */
-        display_basename = g_filename_display_basename(in_file ? in_file->filename : "UNKNOWN");
-        simple_error_message_box(
-                      "Record %u of \"%s\" has data that can't be saved in a \"%s\" file.\n(%s)",
-                      in_file ? in_file->packet_num : 0, display_basename,
-                      wtap_file_type_subtype_string(file_type),
-                      write_err_info != NULL ? write_err_info : "no information supplied");
-        g_free(write_err_info);
         g_free(display_basename);
         break;
 
@@ -1652,7 +1684,6 @@ cf_filter_packets(capture_file *cf, gchar *dftext, gboolean force)
   const char *filter_new = dftext ? dftext : "";
   const char *filter_old = cf->dfilter ? cf->dfilter : "";
   dfilter_t  *dfcode;
-  gchar      *err_msg;
   GTimeVal    start_time;
 
   /* if new filter equals old one, do nothing unless told to do so */
@@ -1672,13 +1703,12 @@ cf_filter_packets(capture_file *cf, gchar *dftext, gboolean force)
      * and try to compile it.
      */
     dftext = g_strdup(dftext);
-    if (!dfilter_compile(dftext, &dfcode, &err_msg)) {
+    if (!dfilter_compile(dftext, &dfcode)) {
       /* The attempt failed; report an error. */
       simple_message_box(ESD_TYPE_ERROR, NULL,
           "See the help for a description of the display filter syntax.",
           "\"%s\" isn't a valid display filter: %s",
-          dftext, err_msg);
-      g_free(err_msg);
+          dftext, dfilter_error_msg);
       g_free(dftext);
       return CF_ERROR;
     }
@@ -1739,13 +1769,13 @@ cf_read_record_r(capture_file *cf, const frame_data *fdata,
     const modified_frame_data *frame = (const modified_frame_data *) g_tree_lookup(cf->edited_frames, GINT_TO_POINTER(fdata->num));
 
     if (!frame) {
-      simple_error_message_box("fdata->file_off == -1, but can't find modified frame.");
+      simple_error_message_box("fdata->file_off == -1, but can't find modified frame!");
       return FALSE;
     }
 
     *phdr = frame->phdr;
-    ws_buffer_assure_space(buf, frame->phdr.caplen);
-    memcpy(ws_buffer_start_ptr(buf), frame->pd, frame->phdr.caplen);
+    buffer_assure_space(buf, frame->phdr.caplen);
+    memcpy(buffer_start_ptr(buf), frame->pd, frame->phdr.caplen);
     return TRUE;
   }
 #endif
@@ -1754,10 +1784,15 @@ cf_read_record_r(capture_file *cf, const frame_data *fdata,
     display_basename = g_filename_display_basename(cf->filename);
     switch (err) {
 
+    case WTAP_ERR_UNSUPPORTED_ENCAP:
+      simple_error_message_box("The file \"%s\" has a packet with a network type that Wireshark doesn't support.\n(%s)",
+                 display_basename, err_info);
+      g_free(err_info);
+      break;
+
     case WTAP_ERR_BAD_FILE:
       simple_error_message_box("An error occurred while reading from the file \"%s\": %s.\n(%s)",
-                 display_basename, wtap_strerror(err),
-                 err_info != NULL ? err_info : "no information supplied");
+                 display_basename, wtap_strerror(err), err_info);
       g_free(err_info);
       break;
 
@@ -1821,7 +1856,7 @@ rescan_packets(capture_file *cf, const char *action, const char *action_item, gb
    * We assume this will not fail since cf->dfilter is only set in
    * cf_filter IFF the filter was valid.
    */
-  compiled = dfilter_compile(cf->dfilter, &dfcode, NULL);
+  compiled = dfilter_compile(cf->dfilter, &dfcode);
   g_assert(!cf->dfilter || (compiled && dfcode));
 
   /* Get the union of the flags for all tap listeners. */
@@ -1985,7 +2020,7 @@ rescan_packets(capture_file *cf, const char *action, const char *action_item, gb
 
     add_packet_to_packet_list(fdata, cf, &edt, dfcode,
                                     cinfo, &cf->phdr,
-                                    ws_buffer_start_ptr(&cf->buf),
+                                    buffer_start_ptr(&cf->buf),
                                     add_to_packet_list);
 
     /* If this frame is displayed, and this is the first frame we've
@@ -2098,7 +2133,7 @@ rescan_packets(capture_file *cf, const char *action, const char *action_item, gb
            so we can't select it. */
         simple_message_box(ESD_TYPE_INFO, NULL,
                            "The capture file is probably not fully dissected.",
-                           "End of capture exceeded.");
+                           "End of capture exceeded!");
       }
     }
   }
@@ -2177,7 +2212,7 @@ ref_time_packets(capture_file *cf)
     if ( (fdata->flags.passed_dfilter) || (fdata->flags.ref_time) ) {
         /* This frame either passed the display filter list or is marked as
         a time reference frame.  All time reference frames are displayed
-        even if they don't pass the display filter */
+        even if they dont pass the display filter */
         if (fdata->flags.ref_time) {
             /* if this was a TIME REF frame we should reset the cum_bytes field */
             cf->cum_bytes = fdata->pkt_len;
@@ -2219,8 +2254,8 @@ process_specified_records(capture_file *cf, packet_range_t *range,
   range_process_e  process_this;
   struct wtap_pkthdr phdr;
 
-  wtap_phdr_init(&phdr);
-  ws_buffer_init(&buf, 1500);
+  memset(&phdr, 0, sizeof(struct wtap_pkthdr));
+  buffer_init(&buf, 1500);
 
   /* Update the progress bar when it gets to this value. */
   progbar_nextstep = 0;
@@ -2305,7 +2340,7 @@ process_specified_records(capture_file *cf, packet_range_t *range,
       break;
     }
     /* Process the packet */
-    if (!callback(cf, fdata, &phdr, ws_buffer_start_ptr(&buf), callback_args)) {
+    if (!callback(cf, fdata, &phdr, buffer_start_ptr(&buf), callback_args)) {
       /* Callback failed.  We assume it reported the error appropriately. */
       ret = PSP_FAILED;
       break;
@@ -2317,8 +2352,7 @@ process_specified_records(capture_file *cf, packet_range_t *range,
   if (progbar != NULL)
     destroy_progress_dlg(progbar);
 
-  wtap_phdr_cleanup(&phdr);
-  ws_buffer_free(&buf);
+  buffer_free(&buf);
 
   return ret;
 }
@@ -2355,7 +2389,7 @@ cf_retap_packets(capture_file *cf)
   if (cf == NULL) {
     return CF_READ_ABORTED;
   }
-
+  
   /* Do we have any tap listeners with filters? */
   filtering_tap_listeners = have_filtering_tap_listeners();
 
@@ -2523,7 +2557,7 @@ print_packet(capture_file *cf, frame_data *fdata,
     }
 
     /* Print the information in that tree. */
-    if (!proto_tree_print(args->print_args, &args->edt, NULL, args->print_args->stream))
+    if (!proto_tree_print(args->print_args, &args->edt, args->print_args->stream))
       goto fail;
 
     /* Print a blank line if we print anything after this (aka more than one packet). */
@@ -2590,7 +2624,7 @@ cf_print_packets(capture_file *cf, print_args_t *print_args)
   callback_args.num_visible_cols = 0;
   callback_args.visible_cols = NULL;
 
-  if (!print_preamble(print_args->stream, cf->filename, get_ws_vcs_version_info())) {
+  if (!print_preamble(print_args->stream, cf->filename, wireshark_gitversion)) {
     destroy_print_stream(print_args->stream);
     return CF_PRINT_WRITE_ERROR;
   }
@@ -2754,7 +2788,7 @@ write_pdml_packet(capture_file *cf, frame_data *fdata,
   epan_dissect_run(&args->edt, cf->cd_t, phdr, frame_tvbuff_new(fdata, pd), fdata, NULL);
 
   /* Write out the information in that tree. */
-  write_pdml_proto_tree(&args->edt, args->fh);
+  proto_tree_write_pdml(&args->edt, args->fh);
 
   epan_dissect_reset(&args->edt);
 
@@ -2824,13 +2858,12 @@ write_psml_packet(capture_file *cf, frame_data *fdata,
 {
   write_packet_callback_args_t *args = (write_packet_callback_args_t *)argsp;
 
-  /* Fill in the column information */
   col_custom_prime_edt(&args->edt, &cf->cinfo);
   epan_dissect_run(&args->edt, cf->cd_t, phdr, frame_tvbuff_new(fdata, pd), fdata, &cf->cinfo);
   epan_dissect_fill_in_columns(&args->edt, FALSE, TRUE);
 
-  /* Write out the column information. */
-  write_psml_columns(&args->edt, args->fh);
+  /* Write out the information in that tree. */
+  proto_tree_write_psml(&args->edt, args->fh);
 
   epan_dissect_reset(&args->edt);
 
@@ -2850,7 +2883,7 @@ cf_write_psml_packets(capture_file *cf, print_args_t *print_args)
   if (fh == NULL)
     return CF_PRINT_OPEN_ERROR; /* attempt to open destination failed */
 
-  write_psml_preamble(&cf->cinfo, fh);
+  write_psml_preamble(fh);
   if (ferror(fh)) {
     fclose(fh);
     return CF_PRINT_WRITE_ERROR;
@@ -2911,8 +2944,8 @@ write_csv_packet(capture_file *cf, frame_data *fdata,
   epan_dissect_run(&args->edt, cf->cd_t, phdr, frame_tvbuff_new(fdata, pd), fdata, &cf->cinfo);
   epan_dissect_fill_in_columns(&args->edt, FALSE, TRUE);
 
-  /* Write out the column information. */
-  write_csv_columns(&args->edt, args->fh);
+  /* Write out the information in that tree. */
+  proto_tree_write_csv(&args->edt, args->fh);
 
   epan_dissect_reset(&args->edt);
 
@@ -2931,7 +2964,7 @@ cf_write_csv_packets(capture_file *cf, print_args_t *print_args)
   if (fh == NULL)
     return CF_PRINT_OPEN_ERROR; /* attempt to open destination failed */
 
-  write_csv_column_titles(&cf->cinfo, fh);
+  write_csv_preamble(fh);
   if (ferror(fh)) {
     fclose(fh);
     return CF_PRINT_WRITE_ERROR;
@@ -2967,6 +3000,12 @@ cf_write_csv_packets(capture_file *cf, print_args_t *print_args)
     return CF_PRINT_WRITE_ERROR;
   }
 
+  write_csv_finale(fh);
+  if (ferror(fh)) {
+    fclose(fh);
+    return CF_PRINT_WRITE_ERROR;
+  }
+
   /* XXX - check for an error */
   fclose(fh);
 
@@ -2974,14 +3013,14 @@ cf_write_csv_packets(capture_file *cf, print_args_t *print_args)
 }
 
 static gboolean
-carrays_write_packet(capture_file *cf, frame_data *fdata,
+write_carrays_packet(capture_file *cf, frame_data *fdata,
              struct wtap_pkthdr *phdr,
              const guint8 *pd, void *argsp)
 {
   write_packet_callback_args_t *args = (write_packet_callback_args_t *)argsp;
 
   epan_dissect_run(&args->edt, cf->cd_t, phdr, frame_tvbuff_new(fdata, pd), fdata, NULL);
-  write_carrays_hex_data(fdata->num, args->fh, &args->edt);
+  proto_tree_write_carrays(fdata->num, args->fh, &args->edt);
   epan_dissect_reset(&args->edt);
 
   return !ferror(args->fh);
@@ -2999,6 +3038,8 @@ cf_write_carrays_packets(capture_file *cf, print_args_t *print_args)
   if (fh == NULL)
     return CF_PRINT_OPEN_ERROR; /* attempt to open destination failed */
 
+  write_carrays_preamble(fh);
+
   if (ferror(fh)) {
     fclose(fh);
     return CF_PRINT_WRITE_ERROR;
@@ -3012,7 +3053,7 @@ cf_write_carrays_packets(capture_file *cf, print_args_t *print_args)
   ret = process_specified_records(cf, &print_args->range,
                   "Writing C Arrays",
                   "selected packets", TRUE,
-                                  carrays_write_packet, &callback_args);
+                                  write_carrays_packet, &callback_args);
 
   epan_dissect_cleanup(&callback_args.edt);
 
@@ -3025,6 +3066,13 @@ cf_write_carrays_packets(capture_file *cf, print_args_t *print_args)
     break;
   case PSP_FAILED:
     /* Error while printing. */
+    fclose(fh);
+    return CF_PRINT_WRITE_ERROR;
+  }
+
+  write_carrays_finale(fh);
+
+  if (ferror(fh)) {
     fclose(fh);
     return CF_PRINT_WRITE_ERROR;
   }
@@ -3272,7 +3320,7 @@ match_narrow_and_wide(capture_file *cf, frame_data *fdata, void *criterion)
 
   result = MR_NOTMATCHED;
   buf_len = fdata->cap_len;
-  pd = ws_buffer_start_ptr(&cf->buf);
+  pd = buffer_start_ptr(&cf->buf);
   i = 0;
   while (i < buf_len) {
     c_char = pd[i];
@@ -3320,7 +3368,7 @@ match_narrow(capture_file *cf, frame_data *fdata, void *criterion)
 
   result = MR_NOTMATCHED;
   buf_len = fdata->cap_len;
-  pd = ws_buffer_start_ptr(&cf->buf);
+  pd = buffer_start_ptr(&cf->buf);
   i = 0;
   while (i < buf_len) {
     c_char = pd[i];
@@ -3367,7 +3415,7 @@ match_wide(capture_file *cf, frame_data *fdata, void *criterion)
 
   result = MR_NOTMATCHED;
   buf_len = fdata->cap_len;
-  pd = ws_buffer_start_ptr(&cf->buf);
+  pd = buffer_start_ptr(&cf->buf);
   i = 0;
   while (i < buf_len) {
     c_char = pd[i];
@@ -3413,7 +3461,7 @@ match_binary(capture_file *cf, frame_data *fdata, void *criterion)
 
   result = MR_NOTMATCHED;
   buf_len = fdata->cap_len;
-  pd = ws_buffer_start_ptr(&cf->buf);
+  pd = buffer_start_ptr(&cf->buf);
   i = 0;
   while (i < buf_len) {
     if (pd[i] == binary_data[c_match]) {
@@ -3449,7 +3497,7 @@ cf_find_packet_dfilter_string(capture_file *cf, const char *filter,
   dfilter_t *sfcode;
   gboolean   result;
 
-  if (!dfilter_compile(filter, &sfcode, NULL)) {
+  if (!dfilter_compile(filter, &sfcode)) {
      /*
       * XXX - this shouldn't happen, as the filter string is machine
       * generated
@@ -3678,7 +3726,7 @@ find_packet(capture_file *cf,
          so we can't select it. */
       simple_message_box(ESD_TYPE_INFO, NULL,
                          "The capture file is probably not fully dissected.",
-                         "End of capture exceeded.");
+                         "End of capture exceeded!");
       return FALSE;
     }
     return TRUE;    /* success */
@@ -3711,7 +3759,7 @@ cf_goto_frame(capture_file *cf, guint fnumber)
        so we can't select it. */
     simple_message_box(ESD_TYPE_INFO, NULL,
                        "The capture file is probably not fully dissected.",
-                       "End of capture exceeded.");
+                       "End of capture exceeded!");
     return FALSE;
   }
   return TRUE;  /* we got to that packet */
@@ -3970,8 +4018,6 @@ cf_get_user_packet_comment(capture_file *cf, const frame_data *fd)
 char *
 cf_get_comment(capture_file *cf, const frame_data *fd)
 {
-  char *comment;
-
   /* fetch user comment */
   if (fd->flags.has_user_comment)
     return g_strdup(cf_get_user_packet_comment(cf, fd));
@@ -3981,16 +4027,14 @@ cf_get_comment(capture_file *cf, const frame_data *fd)
     struct wtap_pkthdr phdr; /* Packet header */
     Buffer buf; /* Packet data */
 
-    wtap_phdr_init(&phdr);
-    ws_buffer_init(&buf, 1500);
+    memset(&phdr, 0, sizeof(struct wtap_pkthdr));
 
+    buffer_init(&buf, 1500);
     if (!cf_read_record_r(cf, fd, &phdr, &buf))
       { /* XXX, what we can do here? */ }
 
-    comment = phdr.opt_comment;
-    wtap_phdr_cleanup(&phdr);
-    ws_buffer_free(&buf);
-    return comment;
+    buffer_free(&buf);
+    return phdr.opt_comment;
   }
   return NULL;
 }
@@ -4054,50 +4098,6 @@ cf_comment_types(capture_file *cf)
   return comment_types;
 }
 
-#ifdef WANT_PACKET_EDITOR
-static gint
-g_direct_compare_func(gconstpointer a, gconstpointer b, gpointer user_data _U_)
-{
-  if (a > b)
-    return 1;
-  else if (a < b)
-    return -1;
-  else
-    return 0;
-}
-
-static void
-modified_frame_data_free(gpointer data)
-{
-  modified_frame_data *mfd = (modified_frame_data *)data;
-
-  g_free(mfd->pd);
-  g_free(mfd);
-}
-
-/*
- * Give a frame new, edited data.
- */
-void
-cf_set_frame_edited(capture_file *cf, frame_data *fd,
-                    struct wtap_pkthdr *phdr, guint8 *pd)
-{
-  modified_frame_data *mfd = (modified_frame_data *)g_malloc(sizeof(modified_frame_data));
-
-  mfd->phdr = *phdr;
-  mfd->pd = pd;
-
-  if (cf->edited_frames == NULL)
-    cf->edited_frames = g_tree_new_full(g_direct_compare_func, NULL, NULL,
-                                        modified_frame_data_free);
-  g_tree_insert(cf->edited_frames, GINT_TO_POINTER(fd->num), mfd);
-  fd->file_off = -1;
-
-  /* Mark the file as having unsaved changes */
-  cf->unsaved_changes = TRUE;
-}
-#endif
-
 typedef struct {
   wtap_dumper *pdh;
   const char  *fname;
@@ -4112,14 +4112,13 @@ typedef struct {
  * up a message box for the failure.
  */
 static gboolean
-save_record(capture_file *cf, frame_data *fdata,
+save_record(capture_file *cf _U_, frame_data *fdata,
             struct wtap_pkthdr *phdr, const guint8 *pd,
             void *argsp)
 {
   save_callback_args_t *args = (save_callback_args_t *)argsp;
   struct wtap_pkthdr    hdr;
   int           err;
-  gchar        *err_info;
   gchar        *display_basename;
   const char   *pkt_comment;
 
@@ -4167,12 +4166,12 @@ save_record(capture_file *cf, frame_data *fdata,
   hdr.pack_flags   =     /* XXX - 0 for now (any value for "we don't have it"?) */
 #endif
   /* and save the packet */
-  if (!wtap_dump(args->pdh, &hdr, pd, &err, &err_info)) {
+  if (!wtap_dump(args->pdh, &hdr, pd, &err)) {
     if (err < 0) {
       /* Wiretap error. */
       switch (err) {
 
-      case WTAP_ERR_UNWRITABLE_ENCAP:
+      case WTAP_ERR_UNSUPPORTED_ENCAP:
         /*
          * This is a problem with the particular frame we're writing and
          * the file type and subtype we're writing; note that, and report
@@ -4192,30 +4191,6 @@ save_record(capture_file *cf, frame_data *fdata,
         simple_error_message_box(
                       "Frame %u is larger than Wireshark supports in a \"%s\" file.",
                       fdata->num, wtap_file_type_subtype_string(args->file_type));
-        break;
-
-      case WTAP_ERR_UNWRITABLE_REC_TYPE:
-        /*
-         * This is a problem with the particular record we're writing and
-         * the file type and subtype we're writing; note that, and report
-         * the record number and file type/subtype.
-         */
-        simple_error_message_box(
-                      "Record %u has a record type that can't be saved in a \"%s\" file.",
-                      fdata->num, wtap_file_type_subtype_string(args->file_type));
-        break;
-
-      case WTAP_ERR_UNWRITABLE_REC_DATA:
-        /*
-         * This is a problem with the particular frame we're writing and
-         * the file type and subtype we're writing; note that, and report
-         * the frame number and file type/subtype.
-         */
-        simple_error_message_box(
-                      "Record %u has data that can't be saved in a \"%s\" file.\n(%s)",
-                      fdata->num, wtap_file_type_subtype_string(args->file_type),
-                      err_info != NULL ? err_info : "no information supplied");
-        g_free(err_info);
         break;
 
       default:
@@ -4530,8 +4505,21 @@ rescan_file(capture_file *cf, const char *fname, gboolean is_tempfile, int *err)
     case WTAP_ERR_UNSUPPORTED:
       simple_error_message_box(
                  "The capture file contains record data that Wireshark doesn't support.\n(%s)",
-                 err_info != NULL ? err_info : "no information supplied");
+                 err_info);
       g_free(err_info);
+      break;
+
+    case WTAP_ERR_UNSUPPORTED_ENCAP:
+      simple_error_message_box(
+                 "The capture file has a packet with a network type that Wireshark doesn't support.\n(%s)",
+                 err_info);
+      g_free(err_info);
+      break;
+
+    case WTAP_ERR_CANT_READ:
+      simple_error_message_box(
+                 "An attempt to read from the capture file failed for"
+                 " some unknown reason.");
       break;
 
     case WTAP_ERR_SHORT_READ:
@@ -4543,15 +4531,14 @@ rescan_file(capture_file *cf, const char *fname, gboolean is_tempfile, int *err)
     case WTAP_ERR_BAD_FILE:
       simple_error_message_box(
                  "The capture file appears to be damaged or corrupt.\n(%s)",
-                 err_info != NULL ? err_info : "no information supplied");
+                 err_info);
       g_free(err_info);
       break;
 
     case WTAP_ERR_DECOMPRESS:
       simple_error_message_box(
                  "The compressed capture file appears to be damaged or corrupt.\n"
-                 "(%s)",
-                 err_info != NULL ? err_info : "no information supplied");
+                 "(%s)", err_info);
       g_free(err_info);
       break;
 
@@ -5048,8 +5035,7 @@ cf_open_failure_alert_box(const char *filename, int err, gchar *err_info,
       simple_error_message_box(
             "The file \"%s\" contains record data that Wireshark doesn't support.\n",
             "(%s)",
-            display_basename,
-            err_info != NULL ? err_info : "no information supplied");
+            display_basename, err_info);
       g_free(err_info);
       break;
 
@@ -5061,15 +5047,22 @@ cf_open_failure_alert_box(const char *filename, int err, gchar *err_info,
             display_basename, wtap_file_type_subtype_string(file_type));
       break;
 
-    case WTAP_ERR_UNWRITABLE_FILE_TYPE:
+    case WTAP_ERR_UNSUPPORTED_FILE_TYPE:
       /* Seen only when opening a capture file for writing. */
       simple_error_message_box(
             "Wireshark doesn't support writing capture files in that format.");
       break;
 
-    case WTAP_ERR_UNWRITABLE_ENCAP:
-      /* Seen only when opening a capture file for writing. */
-      simple_error_message_box("Wireshark can't save this capture in that format.");
+    case WTAP_ERR_UNSUPPORTED_ENCAP:
+      if (for_writing) {
+        simple_error_message_box("Wireshark can't save this capture in that format.");
+      } else {
+        simple_error_message_box(
+              "The file \"%s\" is a capture for a network type that Wireshark doesn't support.\n"
+              "(%s)",
+              display_basename, err_info);
+        g_free(err_info);
+      }
       break;
 
     case WTAP_ERR_ENCAP_PER_PACKET_UNSUPPORTED:
@@ -5088,8 +5081,7 @@ cf_open_failure_alert_box(const char *filename, int err, gchar *err_info,
       simple_error_message_box(
             "The file \"%s\" appears to be damaged or corrupt.\n"
             "(%s)",
-            display_basename,
-            err_info != NULL ? err_info : "no information supplied");
+            display_basename, err_info);
       g_free(err_info);
       break;
 
@@ -5126,8 +5118,7 @@ cf_open_failure_alert_box(const char *filename, int err, gchar *err_info,
     case WTAP_ERR_DECOMPRESS:
       simple_error_message_box(
             "The compressed file \"%s\" appears to be damaged or corrupt.\n"
-            "(%s)", display_basename,
-            err_info != NULL ? err_info : "no information supplied");
+            "(%s)", display_basename, err_info);
       g_free(err_info);
       break;
 

@@ -59,9 +59,14 @@ MAINTAINERCLEANFILES = \
 # The first argument is the directory in which the source files live.
 # All subsequent arguments are the files to scan.
 #
-wireshark-tap-register.c: $(WIRESHARK_QT_TAP_SRC) $(top_srcdir)/tools/make-tap-reg.py
-	@echo Making wireshark-tap-register.c
-	@$(PYTHON) $(top_srcdir)/tools/make-tap-reg.py $(srcdir) taps $(WIRESHARK_QT_TAP_SRC)
+wireshark-tap-register.c: $(WIRESHARK_QT_TAP_SRC) $(top_srcdir)/tools/make-tapreg-dotc $(top_srcdir)/tools/make-tap-reg.py
+	@if test -n "$(PYTHON)"; then \
+		echo Making wireshark-tap-register.c with python ; \
+		$(PYTHON) $(top_srcdir)/tools/make-tap-reg.py $(srcdir) taps $(WIRESHARK_QT_TAP_SRC); \
+	else \
+		echo Making wireshark-tap-register.c; \
+		$(top_srcdir)/tools/make-tapreg-dotc wireshark-tap-register.c $(srcdir) $(WIRESHARK_QT_TAP_SRC); \
+	fi
 
 RUNLEX=$(top_srcdir)/tools/runlex.sh
 
@@ -111,7 +116,7 @@ SUFFIXES = .moc.cpp .qrc .rcc.cpp
 
 .qrc.rcc.cpp:
 	$(MKDIR_P) $(@D)
-	$(AM_V_RCC)$(RCC) -name `basename $< .qrc` -o $@ $<
+	$(AM_V_RCC)rcc -name `basename $< .qrc` -o $@ $<
 
 ui_%.h: %.ui
 	$(AM_V_UIC)$(UIC) $< -o $@
@@ -122,17 +127,11 @@ ui_%.h: %.ui
 
 about_dialog.cpp about_dialog.h: ui_about_dialog.h
 
-capture_file_properties_dialog.cpp capture_file_properties_dialog.h: ui_capture_file_properties_dialog.h
-
 capture_interfaces_dialog.cpp capture_interfaces_dialog.h: ui_capture_interfaces_dialog.h
 
 capture_preferences_frame.cpp capture_preferences_frame.h: ui_capture_preferences_frame.h
 
-column_editor_frame.cpp column_editor_frame.h: ui_column_editor_frame.h
-
 column_preferences_frame.cpp column_preferences_frame.h: ui_column_preferences_frame.h
-
-compiled_filter_output.cpp compiled_filter_output.h: ui_compiled_filter_output.h
 
 decode_as_dialog.cpp decode_as_dialog.h: ui_decode_as_dialog.h
 
@@ -168,8 +167,6 @@ main_window.cpp main_window_slots.cpp main_window.h: ui_main_window.h
 
 main_window_preferences_frame.cpp main_window_preferences_frame.h: ui_main_window_preferences_frame.h
 
-manage_interfaces_dialog.cpp manage_interfaces_dialog.h: ui_manage_interfaces_dialog.h
-
 module_preferences_scroll_area.cpp module_preferences_scroll_area.h: ui_module_preferences_scroll_area.h
 
 packet_comment_dialog.cpp packet_comment_dialog.h: ui_packet_comment_dialog.h
@@ -183,14 +180,6 @@ preferences_dialog.cpp preferences_dialog.h: ui_preferences_dialog.h
 print_dialog.cpp print_dialog.h: ui_print_dialog.h
 
 profile_dialog.cpp profile_dialog.h: ui_profile_dialog.h
-
-protocol_hierarchy_dialog.cpp protocol_hierarchy_dialog.h: ui_protocol_hierarchy_dialog.h
-
-remote_capture_dialog.cpp remote_capture_dialog.h: ui_remote_capture_dialog.h
-
-remote_settings_dialog.cpp remote_settings_dialog.h: ui_remote_settings_dialog.h
-
-rtp_stream_dialog.cpp rtp_stream_dialog.h: ui_rtp_stream_dialog.h
 
 search_frame.cpp search_frame.h: ui_search_frame.h
 
@@ -212,15 +201,13 @@ splash_overlay.cpp splash_overlay.h: ui_splash_overlay.h
 
 stats_tree_dialog.cpp stats_tree_dialog.h: ui_stats_tree_dialog.h
 
+summary_dialog.cpp summary_dialog.h: ui_summary_dialog.h
+
 tcp_stream_dialog.cpp: ui_tcp_stream_dialog.h
 
 time_shift_dialog.cpp time_shift_dialog.h: ui_time_shift_dialog.h
 
-traffic_table_dialog.cpp traffic_table_dialog.h: ui_traffic_table_dialog.h
-
 uat_dialog.cpp uat_dialog.h: ui_uat_dialog.h
-
-voip_calls_dialog.cpp voip_calls_dialog.h: ui_voip_calls_dialog.h
 
 doxygen:
 if HAVE_DOXYGEN
@@ -274,8 +261,9 @@ EXTRA_DIST = \
 	$(QM_FILES)			\
 	CMakeLists.txt			\
 	doxygen.cfg.in			\
+	main.cpp			\
 	Makefile.common			\
 	Makefile_custom.common		\
-	Wireshark.pro			\
+	QtShark.pro			\
 	display_filter_16.svg		\
 	gpl-template.txt

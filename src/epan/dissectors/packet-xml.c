@@ -34,14 +34,18 @@
 #include <string.h>
 #include <errno.h>
 
+#include <glib.h>
+
+#include <wsutil/str_util.h>
+#include <wsutil/report_err.h>
+
+#include <epan/wmem/wmem.h>
 #include <epan/packet.h>
 #include <epan/tvbparse.h>
 #include <epan/dtd.h>
 #include <wsutil/filesystem.h>
 #include <epan/prefs.h>
 #include <epan/garrayfix.h>
-#include <wsutil/str_util.h>
-#include <wsutil/report_err.h>
 
 #include "packet-xml.h"
 
@@ -178,8 +182,8 @@ static void insert_xml_frame(xml_frame_t *parent, xml_frame_t *new_child)
     parent->last_child = new_child;
 }
 
-static int
-dissect_xml(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
+static void
+dissect_xml(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     tvbparse_t       *tt;
     static GPtrArray *stack;
@@ -226,16 +230,13 @@ dissect_xml(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
     while(tvbparse_get(tt, want)) ;
 
-    /* Save XML structure in case it is useful for the caller (only XMPP for now) */
-    p_add_proto_data(pinfo->pool, pinfo, xml_ns.hf_tag, 0, current_frame);
-
-    return tvb_captured_length(tvb);
+    pinfo->private_data = current_frame;  /* pass XML structure to the dissector calling XML */
 }
 
-static gboolean dissect_xml_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+static gboolean dissect_xml_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
     if (tvbparse_peek(tvbparse_init(tvb, 0, -1, NULL, want_ignore), want_heur)) {
-        dissect_xml(tvb, pinfo, tree, data);
+        dissect_xml(tvb, pinfo, tree);
         return TRUE;
     } else if (pref_heuristic_unicode) {
         /* XXX - UCS-2, or UTF-16? */
@@ -244,7 +245,7 @@ static gboolean dissect_xml_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
         tvb_set_free_cb(unicode_tvb, g_free);
         if (tvbparse_peek(tvbparse_init(unicode_tvb, 0, -1, NULL, want_ignore), want_heur)) {
             add_new_data_source(pinfo, unicode_tvb, "UTF8");
-            dissect_xml(unicode_tvb, pinfo, tree, data);
+            dissect_xml(unicode_tvb, pinfo, tree);
             return TRUE;
         }
     }
@@ -333,7 +334,7 @@ static void after_token(void *tvbparse_data, const void *wanted_data _U_, tvbpar
         new_frame->type           = XML_FRAME_CDATA;
         new_frame->name           = NULL;
         new_frame->name_orig_case = NULL;
-        new_frame->value          = tvb_new_subset_length(tok->tvb, tok->offset, tok->len);
+        new_frame->value          = tvb_new_subset(tok->tvb, tok->offset, tok->len, tok->len);
         insert_xml_frame(current_frame, new_frame);
         new_frame->item           = pi;
         new_frame->last_item      = pi;
@@ -350,7 +351,7 @@ static void before_xmpli(void *tvbparse_data, const void *wanted_data _U_, tvbpa
     proto_item      *pi;
     proto_tree      *pt;
     tvbparse_elem_t *name_tok      = tok->sub->next;
-    gchar           *name          = tvb_get_string_enc(wmem_packet_scope(), name_tok->tvb, name_tok->offset, name_tok->len, ENC_ASCII);
+    gchar           *name          = tvb_get_string(wmem_packet_scope(), name_tok->tvb, name_tok->offset, name_tok->len);
     xml_ns_t        *ns            = (xml_ns_t *)g_hash_table_lookup(xmpli_names, name);
     xml_frame_t     *new_frame;
 
@@ -420,8 +421,8 @@ static void before_tag(void *tvbparse_data, const void *wanted_data _U_, tvbpars
         tvbparse_elem_t *leaf_tok = name_tok->sub->sub->next->next;
         xml_ns_t        *nameroot_ns;
 
-        root_name      = (gchar *)tvb_get_string_enc(wmem_packet_scope(), root_tok->tvb, root_tok->offset, root_tok->len, ENC_ASCII);
-        name           = (gchar *)tvb_get_string_enc(wmem_packet_scope(), leaf_tok->tvb, leaf_tok->offset, leaf_tok->len, ENC_ASCII);
+        root_name      = (gchar *)tvb_get_string(wmem_packet_scope(), root_tok->tvb, root_tok->offset, root_tok->len);
+        name           = (gchar *)tvb_get_string(wmem_packet_scope(), leaf_tok->tvb, leaf_tok->offset, leaf_tok->len);
         name_orig_case = name;
 
         nameroot_ns = (xml_ns_t *)g_hash_table_lookup(xml_ns.elements, root_name);
@@ -436,7 +437,7 @@ static void before_tag(void *tvbparse_data, const void *wanted_data _U_, tvbpars
         }
 
     } else {
-        name = tvb_get_string_enc(wmem_packet_scope(), name_tok->tvb, name_tok->offset, name_tok->len, ENC_ASCII);
+        name = tvb_get_string(wmem_packet_scope(), name_tok->tvb, name_tok->offset, name_tok->len);
         name_orig_case = wmem_strdup(wmem_packet_scope(), name);
         ascii_strdown_inplace(name);
 
@@ -529,9 +530,9 @@ static void before_dtd_doctype(void *tvbparse_data, const void *wanted_data _U_,
 
     new_frame = (xml_frame_t *)wmem_alloc(wmem_packet_scope(), sizeof(xml_frame_t));
     new_frame->type           = XML_FRAME_DTD_DOCTYPE;
-    new_frame->name           = (gchar *)tvb_get_string_enc(wmem_packet_scope(), name_tok->tvb,
+    new_frame->name           = (gchar *)tvb_get_string(wmem_packet_scope(), name_tok->tvb,
                                                                   name_tok->offset,
-                                                                  name_tok->len, ENC_ASCII);
+                                                                  name_tok->len);
     new_frame->name_orig_case = new_frame->name;
     new_frame->value          = NULL;
     insert_xml_frame(current_frame, new_frame);
@@ -562,7 +563,8 @@ static void after_dtd_close(void *tvbparse_data, const void *wanted_data _U_, tv
     GPtrArray   *stack         = (GPtrArray *)tvbparse_data;
     xml_frame_t *current_frame = (xml_frame_t *)g_ptr_array_index(stack, stack->len - 1);
 
-    proto_tree_add_format_text(current_frame->tree, tok->tvb, tok->offset, tok->len);
+    proto_tree_add_text(current_frame->tree, tok->tvb, tok->offset, tok->len, "%s",
+                        tvb_format_text(tok->tvb, tok->offset, tok->len));
     if (stack->len > 1) {
         g_ptr_array_remove_index_fast(stack, stack->len - 1);
     } else {
@@ -587,7 +589,7 @@ static void after_attrib(void *tvbparse_data, const void *wanted_data _U_, tvbpa
     proto_item      *pi;
     xml_frame_t     *new_frame;
 
-    name           = tvb_get_string_enc(wmem_packet_scope(), tok->sub->tvb, tok->sub->offset, tok->sub->len, ENC_ASCII);
+    name           = tvb_get_string(wmem_packet_scope(), tok->sub->tvb, tok->sub->offset, tok->sub->len);
     name_orig_case = wmem_strdup(wmem_packet_scope(), name);
     ascii_strdown_inplace(name);
 
@@ -608,8 +610,8 @@ static void after_attrib(void *tvbparse_data, const void *wanted_data _U_, tvbpa
     new_frame->type           = XML_FRAME_ATTRIB;
     new_frame->name           = name;
     new_frame->name_orig_case = name_orig_case;
-    new_frame->value          = tvb_new_subset_length(value_part->tvb, value_part->offset,
-                           value_part->len);
+    new_frame->value          = tvb_new_subset(value_part->tvb, value_part->offset,
+                           value_part->len, value_part->len);
     insert_xml_frame(current_frame, new_frame);
     new_frame->item           = pi;
     new_frame->last_item      = pi;
@@ -922,6 +924,7 @@ static gchar *fully_qualified_name(GPtrArray *hier, gchar *name, gchar *proto_na
 {
     guint    i;
     GString *s = g_string_new(proto_name);
+    gchar   *str;
 
     g_string_append(s, ".");
 
@@ -930,8 +933,10 @@ static gchar *fully_qualified_name(GPtrArray *hier, gchar *name, gchar *proto_na
     }
 
     g_string_append(s, name);
+    str = s->str;
+    g_string_free(s, FALSE);
 
-    return g_string_free(s, FALSE);
+    return str;
 }
 
 
@@ -1051,13 +1056,13 @@ static void register_dtd(dtd_build_data_t *dtd_data, GString *errors)
         if (root_name == NULL)
             root_name = g_strdup(nl->name);
 
-        element->name          = nl->name;
+        element->name		   = nl->name;
         element->element_names = nl->list;
-        element->hf_tag        = -1;
-        element->hf_cdata      = -1;
-        element->ett           = -1;
-        element->attributes    = g_hash_table_new(g_str_hash, g_str_equal);
-        element->elements      = g_hash_table_new(g_str_hash, g_str_equal);
+        element->hf_tag		   = -1;
+        element->hf_cdata	   = -1;
+        element->ett		   = -1;
+        element->attributes	   = g_hash_table_new(g_str_hash, g_str_equal);
+        element->elements	   = g_hash_table_new(g_str_hash, g_str_equal);
 
         if( g_hash_table_lookup(elements, element->name) ) {
             g_string_append_printf(errors, "element %s defined more than once\n", element->name);
@@ -1384,10 +1389,10 @@ static void apply_prefs(void)
         }
     }
 
-    dissector_delete_uint_range("tcp.port", xml_tcp_range, xml_handle);
+	dissector_delete_uint_range("tcp.port", xml_tcp_range, xml_handle);
     g_free(xml_tcp_range);
     xml_tcp_range = range_copy(global_xml_tcp_range);
-    dissector_add_uint_range("tcp.port", xml_tcp_range, xml_handle);
+	dissector_add_uint_range("tcp.port", xml_tcp_range, xml_handle);
 }
 
 void
@@ -1477,7 +1482,7 @@ proto_register_xml(void)
 
     g_array_free(ett_arr, TRUE);
 
-    new_register_dissector("xml", dissect_xml, xml_ns.hf_tag);
+    register_dissector("xml", dissect_xml, xml_ns.hf_tag);
 
     init_xml_parser();
 
@@ -1501,16 +1506,3 @@ proto_reg_handoff_xml(void)
     heur_dissector_add("wtap_file", dissect_xml_heur, xml_ns.hf_tag);
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

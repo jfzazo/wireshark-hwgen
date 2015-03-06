@@ -23,6 +23,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 void proto_register_qllc(void);
@@ -74,11 +75,11 @@ static const value_string qllc_control_vals[] = {
 static int
 dissect_qllc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
-    proto_tree *qllc_tree;
-    proto_item *qllc_ti;
-    gboolean   *q_bit_set;
-    guint8      addr, ctrl;
-    gboolean    command = FALSE;
+    proto_tree	*qllc_tree;
+    proto_item	*qllc_ti;
+    gboolean    *q_bit_set;
+    guint8	addr, ctrl;
+    gboolean	command = FALSE;
 
     /* Reject the packet if data is NULL */
     if (data == NULL)
@@ -103,7 +104,7 @@ dissect_qllc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
     /* Get the address; we need it to determine if this is a
      * COMMAND or a RESPONSE */
     addr = tvb_get_guint8(tvb, 0);
-    proto_tree_add_item(qllc_tree, hf_qllc_address, tvb, 0, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_item(qllc_tree, hf_qllc_address, tvb, 0, 1, ENC_BIG_ENDIAN);
 
     /* The address field equals X'FF' in commands (except QRR)
      * and anything in responses. */
@@ -117,14 +118,26 @@ dissect_qllc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
      * a COMMAND or RESPONSE. */
     if (ctrl == QRD_QDISC_VALUE) {
         if (command) {
-            col_set_str(pinfo->cinfo, COL_INFO, QDISC_TEXT);
-            proto_tree_add_uint_format_value(qllc_tree, hf_qllc_control, tvb,
-                    1, 1, ctrl, "%s (0x%02x)", QDISC_TEXT, ctrl);
+        col_set_str(pinfo->cinfo, COL_INFO, QDISC_TEXT);
+            if (tree) {
+                proto_tree_add_text(qllc_tree, tvb,
+                        1, 1, "Control Field: %s (0x%02x)", QDISC_TEXT, ctrl);
+            }
         }
         else {
-            col_set_str(pinfo->cinfo, COL_INFO, QRD_TEXT);
-            proto_tree_add_uint_format_value(qllc_tree, hf_qllc_control, tvb,
-                    1, 1, ctrl, "%s (0x%02x)", QRD_TEXT, ctrl);
+        col_set_str(pinfo->cinfo, COL_INFO, QRD_TEXT);
+            if (tree) {
+                proto_tree_add_text(qllc_tree, tvb,
+                        1, 1, "Control Field: %s (0x%02x)", QRD_TEXT, ctrl);
+            }
+        }
+
+        /* Add the field for filtering purposes */
+        if (tree) {
+            proto_item *hidden_item;
+            hidden_item = proto_tree_add_uint(qllc_tree, hf_qllc_control, tvb,
+                    1, 1, ctrl);
+            PROTO_ITEM_SET_HIDDEN(hidden_item);
         }
     }
     else {
@@ -150,41 +163,28 @@ dissect_qllc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 void
 proto_register_qllc(void)
 {
-    static hf_register_info hf[] = {
-        { &hf_qllc_address,
-          { "Address Field", "qllc.address", FT_UINT8, BASE_HEX, NULL, 0x0,
-            NULL, HFILL }},
+	static hf_register_info hf[] = {
+	    { &hf_qllc_address,
+		{ "Address Field",	"qllc.address", FT_UINT8, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }},
 
-        { &hf_qllc_control,
-          { "Control Field", "qllc.control", FT_UINT8, BASE_HEX,
-            VALS(qllc_control_vals), 0x0, NULL, HFILL }},
-    };
+		{ &hf_qllc_control,
+		{ "Control Field",	"qllc.control", FT_UINT8, BASE_HEX,
+		  VALS(qllc_control_vals), 0x0, NULL, HFILL }},
+	};
 
-    static gint *ett[] = {
-        &ett_qllc,
-    };
+	static gint *ett[] = {
+		&ett_qllc,
+	};
 
-    proto_qllc = proto_register_protocol("Qualified Logical Link Control", "QLLC", "qllc");
-    proto_register_field_array(proto_qllc, hf, array_length(hf));
-    proto_register_subtree_array(ett, array_length(ett));
-    new_register_dissector("qllc", dissect_qllc, proto_qllc);
+	proto_qllc = proto_register_protocol("Qualified Logical Link Control", "QLLC", "qllc");
+	proto_register_field_array(proto_qllc, hf, array_length(hf));
+	proto_register_subtree_array(ett, array_length(ett));
+	new_register_dissector("qllc", dissect_qllc, proto_qllc);
 }
 
 void
 proto_reg_handoff_qllc(void)
 {
-    sna_handle = find_dissector("sna");
+	sna_handle = find_dissector("sna");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

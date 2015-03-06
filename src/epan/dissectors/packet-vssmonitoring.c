@@ -186,12 +186,12 @@ dissect_vssmonitoring(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
     if ( trailer_len & 1) {
       vssmonitoring_srcport = (guint16)tvb_get_guint8(tvb, offset);
       if (tree)
-        proto_tree_add_item(vssmonitoring_tree, hf_vssmonitoring_srcport, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(vssmonitoring_tree, hf_vssmonitoring_srcport, tvb, offset, 1, ENC_NA);
       offset++;
     } else if ( trailer_len & 2) {
       vssmonitoring_srcport = tvb_get_ntohs(tvb, offset);
       if (tree)
-        proto_tree_add_item(vssmonitoring_tree, hf_vssmonitoring_srcport, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_item(vssmonitoring_tree, hf_vssmonitoring_srcport, tvb, offset, 2, ENC_NA);
       offset += 2;
     }
     if (tree)
@@ -217,7 +217,7 @@ proto_register_vssmonitoring(void)
 
     { &hf_vssmonitoring_srcport, {
         "Src Port", "vssmonitoring.srcport",
-        FT_UINT16, BASE_DEC, NULL, 0x0,
+        FT_UINT8, BASE_DEC, NULL, 0x0,
         "VSS-Monitoring Source Port", HFILL }}
   };
 
@@ -245,16 +245,3 @@ proto_reg_handoff_vssmonitoring(void)
 {
   heur_dissector_add("eth.trailer", dissect_vssmonitoring, proto_vssmonitoring);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

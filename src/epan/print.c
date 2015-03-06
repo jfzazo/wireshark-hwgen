@@ -27,19 +27,27 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <epan/packet.h>
+#include <glib.h>
+#include <glib/gprintf.h>
+
 #include <epan/epan.h>
 #include <epan/epan_dissect.h>
 #include <epan/to_str.h>
+#include <epan/tvbuff.h>
+#include <epan/packet.h>
+#include <ftypes/ftypes-int.h>
+#include <epan/emem.h>
 #include <epan/expert.h>
+
 #include <epan/packet-range.h>
-#include <epan/print.h>
+#include "print.h"
+#include "ps.h"
+#include "version_info.h"
+#include <wsutil/file_util.h>
 #include <epan/charsets.h>
 #include <epan/dissectors/packet-data.h>
 #include <epan/dissectors/packet-frame.h>
 #include <wsutil/filesystem.h>
-#include <wsutil/ws_version_info.h>
-#include <ftypes/ftypes-int.h>
 
 #define PDML_VERSION "0"
 #define PSML_VERSION "0"
@@ -53,7 +61,6 @@ typedef struct {
     gboolean             print_hex_for_data;
     packet_char_enc      encoding;
     epan_dissect_t      *edt;
-    GHashTable          *output_only_tables; /* output only these protocols */
 } print_data;
 
 typedef struct {
@@ -80,22 +87,54 @@ struct _output_fields {
     gboolean     includes_col_fields;
 };
 
+GHashTable *output_only_tables = NULL;
+
+static gboolean write_headers = FALSE;
+
 static gchar *get_field_hex_value(GSList *src_list, field_info *fi);
 static void proto_tree_print_node(proto_node *node, gpointer data);
 static void proto_tree_write_node_pdml(proto_node *node, gpointer data);
 static const guint8 *get_field_data(GSList *src_list, field_info *fi);
-static void pdml_write_field_hex_value(write_pdml_data *pdata, field_info *fi);
+static void write_pdml_field_hex_value(write_pdml_data *pdata, field_info *fi);
 static gboolean print_hex_data_buffer(print_stream_t *stream, const guchar *cp,
                                       guint length, packet_char_enc encoding);
+static void ps_clean_string(char *out, const char *in,
+                            int outbuf_size);
 static void print_escaped_xml(FILE *fh, const char *unescaped_string);
 
 static void print_pdml_geninfo(proto_tree *tree, FILE *fh);
 
 static void proto_tree_get_node_field_values(proto_node *node, gpointer data);
 
+static FILE *
+open_print_dest(gboolean to_file, const char *dest)
+{
+    FILE *fh;
+
+    /* Open the file or command for output */
+    if (to_file)
+        fh = ws_fopen(dest, "w");
+    else
+        fh = popen(dest, "w");
+
+    return fh;
+}
+
+static gboolean
+close_print_dest(gboolean to_file, FILE *fh)
+{
+    /* Close the file or command */
+    if (to_file)
+        return (fclose(fh) == 0);
+    else
+        return (pclose(fh) == 0);
+}
+
+#define MAX_PS_LINE_LENGTH 256
+
 gboolean
 proto_tree_print(print_args_t *print_args, epan_dissect_t *edt,
-                 GHashTable *output_only_tables, print_stream_t *stream)
+                 print_stream_t *stream)
 {
     print_data data;
 
@@ -110,11 +149,12 @@ proto_tree_print(print_args_t *print_args, epan_dissect_t *edt,
        print uninterpreted data fields in hex as well. */
     data.print_hex_for_data = !print_args->print_hex;
     data.edt                = edt;
-    data.output_only_tables = output_only_tables;
 
     proto_tree_children_foreach(edt->tree, proto_tree_print_node, &data);
     return data.success;
 }
+
+#define MAX_INDENT    160
 
 /* Print a tree's data, and any child nodes. */
 static void
@@ -164,8 +204,8 @@ proto_tree_print_node(proto_node *node, gpointer data)
      * subitems whose abbreviation doesn't match the protocol--for example
      * text items (whose abbreviation is simply "text").
      */
-    if ((pdata->output_only_tables != NULL) && (pdata->level == 0)
-        && (g_hash_table_lookup(pdata->output_only_tables, fi->hfinfo->abbrev) == NULL)) {
+    if ((output_only_tables != NULL) && (pdata->level == 0)
+        && (g_hash_table_lookup(output_only_tables, fi->hfinfo->abbrev) == NULL)) {
         return;
     }
 
@@ -224,7 +264,7 @@ write_pdml_preamble(FILE *fh, const gchar *filename)
 }
 
 void
-write_pdml_proto_tree(epan_dissect_t *edt, FILE *fh)
+proto_tree_write_pdml(epan_dissect_t *edt, FILE *fh)
 {
     write_pdml_data data;
 
@@ -307,7 +347,7 @@ proto_tree_write_node_pdml(proto_node *node, gpointer data)
 
         if (fi->length > 0) {
             fputs("\" value=\"", pdata->fh);
-            pdml_write_field_hex_value(pdata, fi);
+            write_pdml_field_hex_value(pdata, fi);
         }
 
         if (node->first_child != NULL) {
@@ -324,7 +364,7 @@ proto_tree_write_node_pdml(proto_node *node, gpointer data)
 
         /* Write out field with data */
         fputs("<field name=\"data\" value=\"", pdata->fh);
-        pdml_write_field_hex_value(pdata, fi);
+        write_pdml_field_hex_value(pdata, fi);
         fputs("\">\n", pdata->fh);
     }
     /* Normal protocols and fields */
@@ -386,7 +426,7 @@ proto_tree_write_node_pdml(proto_node *node, gpointer data)
             fputs("\" show=\"\" value=\"",  pdata->fh);
             break;
         default:
-            dfilter_string = fvalue_to_string_repr(&fi->value, FTREPR_DISPLAY, fi->hfinfo->display, NULL);
+            dfilter_string = fvalue_to_string_repr(&fi->value, FTREPR_DISPLAY, NULL);
             if (dfilter_string != NULL) {
 
                 fputs("\" show=\"", pdata->fh);
@@ -428,10 +468,10 @@ proto_tree_write_node_pdml(proto_node *node, gpointer data)
                             g_assert_not_reached();
                     }
                     fputs("\" unmaskedvalue=\"", pdata->fh);
-                    pdml_write_field_hex_value(pdata, fi);
+                    write_pdml_field_hex_value(pdata, fi);
                 }
                 else {
-                    pdml_write_field_hex_value(pdata, fi);
+                    write_pdml_field_hex_value(pdata, fi);
                 }
             }
         }
@@ -496,7 +536,6 @@ print_pdml_geninfo(proto_tree *tree, FILE *fh)
     nstime_t   *timestamp;
     GPtrArray  *finfo_array;
     field_info *frame_finfo;
-    gchar      *tmp;
 
     /* Get frame protocol's finfo. */
     finfo_array = proto_find_finfo(tree, proto_frame);
@@ -558,14 +597,10 @@ print_pdml_geninfo(proto_tree *tree, FILE *fh)
             "    <field name=\"caplen\" pos=\"0\" show=\"%u\" showname=\"Captured Length\" value=\"%x\" size=\"%u\"/>\n",
             caplen, caplen, frame_finfo->length);
 
-    tmp = abs_time_to_str(NULL, timestamp, ABSOLUTE_TIME_LOCAL, TRUE);
-
     /* Print geninfo.timestamp */
     fprintf(fh,
             "    <field name=\"timestamp\" pos=\"0\" show=\"%s\" showname=\"Captured Time\" value=\"%d.%09d\" size=\"%u\"/>\n",
-            tmp, (int) timestamp->secs, timestamp->nsecs, frame_finfo->length);
-
-    wmem_free(NULL, tmp);
+            abs_time_to_ep_str(timestamp, ABSOLUTE_TIME_LOCAL, TRUE), (int) timestamp->secs, timestamp->nsecs, frame_finfo->length);
 
     /* Print geninfo end */
     fprintf(fh,
@@ -579,28 +614,33 @@ write_pdml_finale(FILE *fh)
 }
 
 void
-write_psml_preamble(column_info *cinfo, FILE *fh)
+write_psml_preamble(FILE *fh)
 {
-    gint i;
-
     fputs("<?xml version=\"1.0\"?>\n", fh);
     fputs("<psml version=\"" PSML_VERSION "\" ", fh);
     fprintf(fh, "creator=\"%s/%s\">\n", PACKAGE, VERSION);
-    fprintf(fh, "<structure>\n");
-
-    for (i = 0; i < cinfo->num_cols; i++) {
-        fprintf(fh, "<section>");
-        print_escaped_xml(fh, cinfo->col_title[i]);
-        fprintf(fh, "</section>\n");
-    }
-
-    fprintf(fh, "</structure>\n\n");
+    write_headers = TRUE;
 }
 
 void
-write_psml_columns(epan_dissect_t *edt, FILE *fh)
+proto_tree_write_psml(epan_dissect_t *edt, FILE *fh)
 {
     gint i;
+
+    /* if this is the first packet, we have to create the PSML structure output */
+    if (write_headers) {
+        fprintf(fh, "<structure>\n");
+
+        for (i = 0; i < edt->pi.cinfo->num_cols; i++) {
+            fprintf(fh, "<section>");
+            print_escaped_xml(fh, edt->pi.cinfo->col_title[i]);
+            fprintf(fh, "</section>\n");
+        }
+
+        fprintf(fh, "</structure>\n\n");
+
+        write_headers = FALSE;
+    }
 
     fprintf(fh, "<packet>\n");
 
@@ -617,6 +657,12 @@ void
 write_psml_finale(FILE *fh)
 {
     fputs("</psml>\n", fh);
+}
+
+void
+write_csv_preamble(FILE *fh _U_)
+{
+    write_headers = TRUE;
 }
 
 static gchar *csv_massage_str(const gchar *source, const gchar *exceptions)
@@ -652,19 +698,17 @@ static void csv_write_str(const char *str, char sep, FILE *fh)
 }
 
 void
-write_csv_column_titles(column_info *cinfo, FILE *fh)
+proto_tree_write_csv(epan_dissect_t *edt, FILE *fh)
 {
     gint i;
 
-    for (i = 0; i < cinfo->num_cols - 1; i++)
-        csv_write_str(cinfo->col_title[i], ',', fh);
-    csv_write_str(cinfo->col_title[i], '\n', fh);
-}
-
-void
-write_csv_columns(epan_dissect_t *edt, FILE *fh)
-{
-    gint i;
+    /* if this is the first packet, we have to write the CSV header */
+    if (write_headers) {
+        for (i = 0; i < edt->pi.cinfo->num_cols - 1; i++)
+            csv_write_str(edt->pi.cinfo->col_title[i], ',', fh);
+        csv_write_str(edt->pi.cinfo->col_title[i], '\n', fh);
+        write_headers = FALSE;
+    }
 
     for (i = 0; i < edt->pi.cinfo->num_cols - 1; i++)
         csv_write_str(edt->pi.cinfo->col_data[i], ',', fh);
@@ -672,12 +716,24 @@ write_csv_columns(epan_dissect_t *edt, FILE *fh)
 }
 
 void
-write_carrays_hex_data(guint32 num, FILE *fh, epan_dissect_t *edt)
+write_csv_finale(FILE *fh _U_)
+{
+
+}
+
+void
+write_carrays_preamble(FILE *fh _U_)
+{
+
+}
+
+void
+proto_tree_write_carrays(guint32 num, FILE *fh, epan_dissect_t *edt)
 {
     guint32       i = 0, src_num = 0;
     GSList       *src_le;
     tvbuff_t     *tvb;
-    char         *name;
+    const char   *name;
     const guchar *cp;
     guint         length;
     char          ascii[9];
@@ -694,10 +750,8 @@ write_carrays_hex_data(guint32 num, FILE *fh, epan_dissect_t *edt)
         cp = tvb_get_ptr(tvb, 0, length);
 
         name = get_data_source_name(src);
-        if (name) {
+        if (name)
             fprintf(fh, "/* %s */\n", name);
-            wmem_free(NULL, name);
-        }
         if (src_num) {
             fprintf(fh, "static const unsigned char pkt%u_%u[%u] = {\n",
                     num, src_num, length);
@@ -732,6 +786,12 @@ write_carrays_hex_data(guint32 num, FILE *fh, epan_dissect_t *edt)
             }
         }
     }
+}
+
+void
+write_carrays_finale(FILE *fh _U_)
+{
+
 }
 
 /*
@@ -804,7 +864,7 @@ print_escaped_xml(FILE *fh, const char *unescaped_string)
             fputs("&quot;", fh);
             break;
         case '\'':
-            fputs("&#x27;", fh);
+            fputs("&apos;", fh);
             break;
         default:
             if (g_ascii_isprint(*p))
@@ -818,7 +878,7 @@ print_escaped_xml(FILE *fh, const char *unescaped_string)
 }
 
 static void
-pdml_write_field_hex_value(write_pdml_data *pdata, field_info *fi)
+write_pdml_field_hex_value(write_pdml_data *pdata, field_info *fi)
 {
     int           i;
     const guint8 *pd;
@@ -848,7 +908,8 @@ print_hex_data(print_stream_t *stream, epan_dissect_t *edt)
     gboolean      multiple_sources;
     GSList       *src_le;
     tvbuff_t     *tvb;
-    char         *line, *name;
+    const char   *name;
+    char         *line;
     const guchar *cp;
     guint         length;
     struct data_source *src;
@@ -868,7 +929,6 @@ print_hex_data(print_stream_t *stream, epan_dissect_t *edt)
         if (multiple_sources) {
             name = get_data_source_name(src);
             line = g_strdup_printf("%s:", name);
-            wmem_free(NULL, name);
             print_line(stream, 0, line);
             g_free(line);
         }
@@ -982,6 +1042,325 @@ print_hex_data_buffer(print_stream_t *stream, const guchar *cp,
         }
     }
     return TRUE;
+}
+
+static
+void ps_clean_string(char *out, const char *in, int outbuf_size)
+{
+    int  rd, wr;
+    char c;
+
+    if (in == NULL) {
+        out[0] = '\0';
+        return;
+    }
+
+    for (rd = 0, wr = 0 ; wr < outbuf_size; rd++, wr++ ) {
+        c = in[rd];
+        switch (c) {
+        case '(':
+        case ')':
+        case '\\':
+            out[wr] = '\\';
+            out[++wr] = c;
+            break;
+
+        default:
+            out[wr] = c;
+            break;
+        }
+
+        if (c == 0) {
+            break;
+        }
+    }
+}
+
+/* Some formats need stuff at the beginning of the output */
+gboolean
+print_preamble(print_stream_t *self, gchar *filename, const char *version_string)
+{
+    return self->ops->print_preamble ? (self->ops->print_preamble)(self, filename, version_string) : TRUE;
+}
+
+gboolean
+print_line(print_stream_t *self, int indent, const char *line)
+{
+    return (self->ops->print_line)(self, indent, line);
+}
+
+/* Insert bookmark */
+gboolean
+print_bookmark(print_stream_t *self, const gchar *name, const gchar *title)
+{
+    return self->ops->print_bookmark ? (self->ops->print_bookmark)(self, name, title) : TRUE;
+}
+
+gboolean
+new_page(print_stream_t *self)
+{
+    return self->ops->new_page ? (self->ops->new_page)(self) : TRUE;
+}
+
+/* Some formats need stuff at the end of the output */
+gboolean
+print_finale(print_stream_t *self)
+{
+    return self->ops->print_finale ? (self->ops->print_finale)(self) : TRUE;
+}
+
+gboolean
+destroy_print_stream(print_stream_t *self)
+{
+    return self->ops->destroy ? (self->ops->destroy)(self) : TRUE;
+}
+
+typedef struct {
+    gboolean  to_file;
+    FILE     *fh;
+} output_text;
+
+static gboolean
+print_line_text(print_stream_t *self, int indent, const char *line)
+{
+    static char  spaces[MAX_INDENT];
+    size_t ret;
+
+    output_text *output = (output_text *)self->data;
+    unsigned int num_spaces;
+
+    /* should be space, if NUL -> initialize */
+    if (!spaces[0]) {
+        int i;
+
+        for (i = 0; i < MAX_INDENT; i++)
+            spaces[i] = ' ';
+    }
+
+    /* Prepare the tabs for printing, depending on tree level */
+    num_spaces = indent * 4;
+    if (num_spaces > MAX_INDENT)
+        num_spaces = MAX_INDENT;
+
+    ret = fwrite(spaces, 1, num_spaces, output->fh);
+    if (ret == num_spaces) {
+        fputs(line, output->fh);
+        putc('\n', output->fh);
+    }
+    return !ferror(output->fh);
+}
+
+static gboolean
+new_page_text(print_stream_t *self)
+{
+    output_text *output = (output_text *)self->data;
+
+    fputs("\f", output->fh);
+    return !ferror(output->fh);
+}
+
+static gboolean
+destroy_text(print_stream_t *self)
+{
+    output_text *output = (output_text *)self->data;
+    gboolean     ret;
+
+    ret = close_print_dest(output->to_file, output->fh);
+    g_free(output);
+    g_free(self);
+    return ret;
+}
+
+static const print_stream_ops_t print_text_ops = {
+    NULL,            /* preamble */
+    print_line_text,
+    NULL,            /* bookmark */
+    new_page_text,
+    NULL,            /* finale */
+    destroy_text
+};
+
+static print_stream_t *
+print_stream_text_alloc(gboolean to_file, FILE *fh)
+{
+    print_stream_t *stream;
+    output_text    *output;
+
+    output          = (output_text *)g_malloc(sizeof *output);
+    output->to_file = to_file;
+    output->fh      = fh;
+    stream          = (print_stream_t *)g_malloc(sizeof (print_stream_t));
+    stream->ops     = &print_text_ops;
+    stream->data    = output;
+
+    return stream;
+}
+
+print_stream_t *
+print_stream_text_new(gboolean to_file, const char *dest)
+{
+    FILE *fh;
+
+    fh = open_print_dest(to_file, dest);
+    if (fh == NULL)
+        return NULL;
+
+    return print_stream_text_alloc(to_file, fh);
+}
+
+print_stream_t *
+print_stream_text_stdio_new(FILE *fh)
+{
+    return print_stream_text_alloc(TRUE, fh);
+}
+
+typedef struct {
+    gboolean  to_file;
+    FILE     *fh;
+} output_ps;
+
+static gboolean
+print_preamble_ps(print_stream_t *self, gchar *filename, const char *version_string)
+{
+    output_ps *output = (output_ps *)self->data;
+    char       psbuffer[MAX_PS_LINE_LENGTH]; /* static sized buffer! */
+
+    print_ps_preamble(output->fh);
+
+    fputs("%% the page title\n", output->fh);
+    ps_clean_string(psbuffer, filename, MAX_PS_LINE_LENGTH);
+    fprintf(output->fh, "/ws_pagetitle (%s - Wireshark " VERSION "%s) def\n", psbuffer, version_string);
+    fputs("\n", output->fh);
+    return !ferror(output->fh);
+}
+
+static gboolean
+print_line_ps(print_stream_t *self, int indent, const char *line)
+{
+    output_ps *output = (output_ps *)self->data;
+    char       psbuffer[MAX_PS_LINE_LENGTH]; /* static sized buffer! */
+
+    ps_clean_string(psbuffer, line, MAX_PS_LINE_LENGTH);
+    fprintf(output->fh, "%d (%s) putline\n", indent, psbuffer);
+    return !ferror(output->fh);
+}
+
+static gboolean
+print_bookmark_ps(print_stream_t *self, const gchar *name, const gchar *title)
+{
+    output_ps *output = (output_ps *)self->data;
+    char       psbuffer[MAX_PS_LINE_LENGTH]; /* static sized buffer! */
+
+    /*
+     * See the Adobe "pdfmark reference":
+     *
+     *  http://partners.adobe.com/asn/acrobat/docs/pdfmark.pdf
+     *
+     * The pdfmark stuff tells code that turns PostScript into PDF
+     * things that it should do.
+     *
+     * The /OUT stuff creates a bookmark that goes to the
+     * destination with "name" as the name and "title" as the title.
+     *
+     * The "/DEST" creates the destination.
+     */
+    ps_clean_string(psbuffer, title, MAX_PS_LINE_LENGTH);
+    fprintf(output->fh, "[/Dest /%s /Title (%s)   /OUT pdfmark\n", name,
+          psbuffer);
+    fputs("[/View [/XYZ -4 currentpoint matrix currentmatrix matrix defaultmatrix\n",
+          output->fh);
+    fputs("matrix invertmatrix matrix concatmatrix transform exch pop 20 add null]\n",
+          output->fh);
+    fprintf(output->fh, "/Dest /%s /DEST pdfmark\n", name);
+    return !ferror(output->fh);
+}
+
+static gboolean
+new_page_ps(print_stream_t *self)
+{
+    output_ps *output = (output_ps *)self->data;
+
+    fputs("formfeed\n", output->fh);
+    return !ferror(output->fh);
+}
+
+static gboolean
+print_finale_ps(print_stream_t *self)
+{
+    output_ps *output = (output_ps *)self->data;
+
+    print_ps_finale(output->fh);
+    return !ferror(output->fh);
+}
+
+static gboolean
+destroy_ps(print_stream_t *self)
+{
+    output_ps *output = (output_ps *)self->data;
+    gboolean   ret;
+
+    ret = close_print_dest(output->to_file, output->fh);
+    g_free(output);
+    g_free(self);
+    return ret;
+}
+
+static const print_stream_ops_t print_ps_ops = {
+    print_preamble_ps,
+    print_line_ps,
+    print_bookmark_ps,
+    new_page_ps,
+    print_finale_ps,
+    destroy_ps
+};
+
+static print_stream_t *
+print_stream_ps_alloc(gboolean to_file, FILE *fh)
+{
+    print_stream_t *stream;
+    output_ps      *output;
+
+    output          = (output_ps *)g_malloc(sizeof *output);
+    output->to_file = to_file;
+    output->fh      = fh;
+    stream          = (print_stream_t *)g_malloc(sizeof (print_stream_t));
+    stream->ops     = &print_ps_ops;
+    stream->data    = output;
+
+    return stream;
+}
+
+print_stream_t *
+print_stream_ps_new(gboolean to_file, const char *dest)
+{
+    FILE *fh;
+
+    fh = open_print_dest(to_file, dest);
+    if (fh == NULL)
+        return NULL;
+
+    return print_stream_ps_alloc(to_file, fh);
+}
+
+print_stream_t *
+print_stream_ps_stdio_new(FILE *fh)
+{
+    return print_stream_ps_alloc(TRUE, fh);
+}
+
+output_fields_t* output_fields_new(void)
+{
+    output_fields_t* fields     = g_new(output_fields_t, 1);
+    fields->print_header        = FALSE;
+    fields->separator           = '\t';
+    fields->occurrence          = 'a';
+    fields->aggregator          = ',';
+    fields->fields              = NULL; /*Do lazy initialisation */
+    fields->field_indicies      = NULL;
+    fields->field_values        = NULL;
+    fields->quote               ='\0';
+    fields->includes_col_fields = FALSE;
+    return fields;
 }
 
 gsize output_fields_num_fields(output_fields_t* fields)
@@ -1294,7 +1673,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
     }
 }
 
-void write_fields_proto_tree(output_fields_t *fields, epan_dissect_t *edt, column_info *cinfo, FILE *fh)
+void proto_tree_write_fields(output_fields_t *fields, epan_dissect_t *edt, column_info *cinfo, FILE *fh)
 {
     gsize     i;
     gint      col;
@@ -1341,9 +1720,8 @@ void write_fields_proto_tree(output_fields_t *fields, epan_dissect_t *edt, colum
     if (fields->includes_col_fields) {
         for (col = 0; col < cinfo->num_cols; col++) {
             /* Prepend COLUMN_FIELD_FILTER as the field name */
-            col_name = g_strdup_printf("%s%s", COLUMN_FIELD_FILTER, cinfo->col_title[col]);
+            col_name = ep_strdup_printf("%s%s", COLUMN_FIELD_FILTER, cinfo->col_title[col]);
             field_index = g_hash_table_lookup(fields->field_indicies, col_name);
-            g_free(col_name);
 
             if (NULL != field_index) {
                 format_field_values(fields, field_index, g_strdup(cinfo->col_data[col]));
@@ -1421,7 +1799,7 @@ gchar* get_node_field_value(field_info* fi, epan_dissect_t* edt)
              * FT_NONE can be checked when using -T fields */
             return g_strdup("1");
         default:
-            dfilter_string = fvalue_to_string_repr(&fi->value, FTREPR_DISPLAY, fi->hfinfo->display, NULL);
+            dfilter_string = fvalue_to_string_repr(&fi->value, FTREPR_DISPLAY, NULL);
             if (dfilter_string != NULL) {
                 return dfilter_string;
             } else {
@@ -1468,30 +1846,3 @@ get_field_hex_value(GSList *src_list, field_info *fi)
     }
 }
 
-output_fields_t* output_fields_new(void)
-{
-    output_fields_t* fields     = g_new(output_fields_t, 1);
-    fields->print_header        = FALSE;
-    fields->separator           = '\t';
-    fields->occurrence          = 'a';
-    fields->aggregator          = ',';
-    fields->fields              = NULL; /*Do lazy initialisation */
-    fields->field_indicies      = NULL;
-    fields->field_values        = NULL;
-    fields->quote               ='\0';
-    fields->includes_col_fields = FALSE;
-    return fields;
-}
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

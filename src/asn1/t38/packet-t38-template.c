@@ -44,19 +44,23 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/reassemble.h>
 #include <epan/conversation.h>
 #include <epan/tap.h>
 #include <epan/expert.h>
-#include <epan/strutil.h>
+
+#include <string.h>
+
+#include "packet-t38.h"
 #include <epan/prefs.h>
 #include <epan/ipproto.h>
 #include <epan/asn1.h>
-
-#include "packet-t38.h"
 #include "packet-per.h"
 #include "packet-tpkt.h"
+#include <epan/wmem/wmem.h>
+#include <epan/strutil.h>
 
 void proto_register_t38(void);
 
@@ -139,8 +143,6 @@ static gint ett_t38_setup = -1;
 
 static gint ett_data_fragment = -1;
 static gint ett_data_fragments = -1;
-
-static expert_field ei_t38_malformed = EI_INIT;
 
 static gboolean primary_part = TRUE;
 static guint32 seq_number = 0;
@@ -539,8 +541,10 @@ dissect_t38_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	offset = dissect_UDPTLPacket_PDU(tvb, pinfo, tr, NULL);
 
 	if (tvb_length_remaining(tvb,offset)>0){
-		proto_tree_add_expert_format(tr, pinfo, &ei_t38_malformed, tvb, offset, tvb_reported_length_remaining(tvb, offset),
+		if (tr){
+			proto_tree_add_text(tr, tvb, offset, tvb_reported_length_remaining(tvb, offset),
 				"[MALFORMED PACKET or wrong preference settings]");
+		}
 		col_append_str(pinfo->cinfo, COL_INFO, " [Malformed?]");
 	}
 }
@@ -583,8 +587,10 @@ dissect_t38_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 		if(tvb_length_remaining(tvb,offset)>0){
 			if(t38_tpkt_usage == T38_TPKT_ALWAYS){
-				proto_tree_add_expert_format(tr, pinfo, &ei_t38_malformed, tvb, offset, tvb_reported_length_remaining(tvb, offset),
+				if(tr){
+					proto_tree_add_text(tr, tvb, offset, tvb_reported_length_remaining(tvb, offset),
 						"[MALFORMED PACKET or wrong preference settings]");
+				}
 				col_append_str(pinfo->cinfo, COL_INFO, " [Malformed?]");
 				break;
 			}else {
@@ -608,6 +614,19 @@ dissect_t38_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	}
 	else {
 		dissect_tpkt_encap(tvb,pinfo,tree,t38_tpkt_reassembly,t38_tcp_pdu_handle);
+	}
+}
+
+static void
+dissect_t38(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
+{
+	if(pinfo->ipproto == IP_PROTO_TCP)
+	{
+		dissect_t38_tcp(tvb, pinfo, tree);
+	}
+	else if(pinfo->ipproto == IP_PROTO_UDP)
+	{
+		dissect_t38_udp(tvb, pinfo, tree);
 	}
 }
 
@@ -703,19 +722,12 @@ proto_register_t38(void)
 		&ett_data_fragments
 	};
 
-	static ei_register_info ei[] = {
-		{ &ei_t38_malformed, { "t38.malformed", PI_MALFORMED, PI_ERROR, "Malformed packet", EXPFILL }},
-	};
-
 	module_t *t38_module;
-	expert_module_t* expert_t38;
 
 	proto_t38 = proto_register_protocol("T.38", "T.38", "t38");
 	proto_register_field_array(proto_t38, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_t38 = expert_register_protocol(proto_t38);
-	expert_register_field_array(expert_t38, ei, array_length(ei));
-	register_dissector("t38_udp", dissect_t38_udp, proto_t38);
+	register_dissector("t38", dissect_t38, proto_t38);
 
 	/* Init reassemble tables for HDLC */
 	register_init_routine(t38_defragment_init);

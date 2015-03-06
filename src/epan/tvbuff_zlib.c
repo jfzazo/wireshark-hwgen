@@ -47,20 +47,20 @@
 tvbuff_t *
 tvb_uncompress(tvbuff_t *tvb, const int offset, int comprlen)
 {
-	gint       err;
+	gint       err            = Z_OK;
 	guint      bytes_out      = 0;
-	guint8    *compr;
+	guint8    *compr          = NULL;
 	guint8    *uncompr        = NULL;
 	tvbuff_t  *uncompr_tvb    = NULL;
-	z_streamp  strm;
-	Bytef     *strmbuf;
+	z_streamp  strm           = NULL;
+	Bytef     *strmbuf        = NULL;
 	guint      inits_done     = 0;
 	gint       wbits          = MAX_WBITS;
-	guint8    *next;
-	guint      bufsiz;
+	guint8    *next           = NULL;
+	guint      bufsiz         = TVB_Z_MIN_BUFSIZ;
 #ifdef TVB_Z_DEBUG
 	guint      inflate_passes = 0;
-	guint      bytes_in       = tvb_captured_length_remaining(tvb, offset);
+	guint      bytes_in       = tvb_length_remaining(tvb, offset);
 #endif
 
 	if (tvb == NULL) {
@@ -76,7 +76,7 @@ tvb_uncompress(tvbuff_t *tvb, const int offset, int comprlen)
 	 * Assume that the uncompressed data is at least twice as big as
 	 * the compressed size.
 	 */
-	bufsiz = tvb_captured_length_remaining(tvb, offset) * 2;
+	bufsiz = tvb_length_remaining(tvb, offset) * 2;
 	bufsiz = CLAMP(bufsiz, TVB_Z_MIN_BUFSIZ, TVB_Z_MAX_BUFSIZ);
 
 #ifdef TVB_Z_DEBUG
@@ -165,8 +165,8 @@ tvb_uncompress(tvbuff_t *tvb, const int offset, int comprlen)
 			}
 
 		} else if (err == Z_DATA_ERROR && inits_done == 1
-			&& uncompr == NULL && comprlen >= 2 &&
-			(*compr  == 0x1f) && (*(compr + 1) == 0x8b)) {
+			&& uncompr == NULL && (*compr  == 0x1f) &&
+			(*(compr + 1) == 0x8b)) {
 			/*
 			 * inflate() is supposed to handle both gzip and deflate
 			 * streams automatically, but in reality it doesn't
@@ -181,13 +181,12 @@ tvb_uncompress(tvbuff_t *tvb, const int offset, int comprlen)
 			 * fix to make it work (setting windowBits to 31)
 			 * doesn't work with all versions of the library.
 			 */
-			Bytef *c = compr + 2;
+			Bytef *c     = compr + 2;
 			Bytef  flags = 0;
 
-			/* we read two bytes already (0x1f, 0x8b) and
-			   need at least Z_DEFLATED, 1 byte flags, 4
-			   bytes MTIME, 1 byte XFL, 1 byte OS */
-			if (comprlen < 10 || *c != Z_DEFLATED) {
+			if (*c == Z_DEFLATED) {
+				c++;
+			} else {
 				inflateEnd(strm);
 				g_free(strm);
 				g_free(compr);
@@ -195,32 +194,15 @@ tvb_uncompress(tvbuff_t *tvb, const int offset, int comprlen)
 				return NULL;
 			}
 
-			c++;
 			flags = *c;
-			c++;
 
-			/* Skip past the MTIME (4 bytes),
-			   XFL, and OS fields (1 byte each). */
-			c += 6;
+			/* Skip past the MTIME, XFL, and OS fields. */
+			c += 7;
 
 			if (flags & (1 << 2)) {
-				/* An Extra field is present. It
-				   consists of 2 bytes xsize and xsize
-				   bytes of data.
-				   Read byte-by-byte (least significant
-				   byte first) to make sure we abort
-				   cleanly when the xsize is truncated
-				   after the first byte. */
-				guint16 xsize = 0;
-
-				if (c-compr < comprlen) {
-					xsize += *c;
-					c++;
-				}
-				if (c-compr < comprlen) {
-					xsize += *c << 8;
-					c++;
-				}
+				/* An Extra field is present. */
+				gint xsize = (gint)(*c |
+					(*(c + 1) << 8));
 
 				c += xsize;
 			}
@@ -337,16 +319,3 @@ tvb_child_uncompress(tvbuff_t *parent, tvbuff_t *tvb, const int offset, int comp
 		tvb_set_child_real_data_tvbuff (parent, new_tvb);
 	return new_tvb;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -24,6 +24,9 @@
 #ifndef __PACKET_HDMI_H__
 #define __PACKET_HDMI_H__
 
+#include <glib.h>
+#include <epan/packet.h>
+
 gboolean sub_check_hdmi(packet_info *pinfo _U_);
 
 #endif

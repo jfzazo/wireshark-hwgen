@@ -24,7 +24,11 @@
 
 #include "config.h"
 
+#include <ctype.h>
+
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
+
 #define PNAME  "Canon BJNP"
 #define PSNAME "BJNP"
 #define PFNAME "bjnp"

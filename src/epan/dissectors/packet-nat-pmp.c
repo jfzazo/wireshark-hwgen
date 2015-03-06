@@ -367,7 +367,8 @@ dissect_portcontrol_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gui
   start_opcode_offset = offset;
   if(try_val_to_str(ropcode, pcp_ropcode_vals) != NULL)
   {
-    opcode_tree = proto_tree_add_subtree(pcp_tree, tvb, offset, 0, ett_opcode, &opcode_ti, op_str);
+    opcode_ti = proto_tree_add_text(pcp_tree, tvb, offset, 0, "%s", op_str);
+    opcode_tree = proto_item_add_subtree(opcode_ti, ett_opcode);
   }
 
   switch(ropcode) {
@@ -806,7 +807,7 @@ void proto_reg_handoff_nat_pmp(void)
      NAT-PMP, but it backwards compatible.  However, still let NAT-PMP
      use Decode As
    */
-  dissector_add_for_decode_as("udp.port", nat_pmp_handle);
+  dissector_add_handle("udp.port", nat_pmp_handle);
 }
 
 /*

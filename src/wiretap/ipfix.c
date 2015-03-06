@@ -65,6 +65,10 @@
 #include <errno.h>
 #include "wtap-int.h"
 #include "file_wrappers.h"
+#include <wsutil/buffer.h>
+#include "libpcap.h"
+#include "pcap-common.h"
+#include "pcap-encap.h"
 #include "ipfix.h"
 
 #if 0
@@ -87,6 +91,8 @@ ipfix_read(wtap *wth, int *err, gchar **err_info,
 static gboolean
 ipfix_seek_read(wtap *wth, gint64 seek_off,
     struct wtap_pkthdr *phdr, Buffer *buf, int *err, gchar **err_info);
+static void
+ipfix_close(wtap *wth);
 
 #define IPFIX_VERSION 10
 
@@ -117,8 +123,7 @@ typedef struct ipfix_set_header_s {
 static gboolean
 ipfix_read_message_header(ipfix_message_header_t *pfx_hdr, FILE_T fh, int *err, gchar **err_info)
 {
-    if (!wtap_read_bytes_or_eof(fh, pfx_hdr, IPFIX_MSG_HDR_SIZE, err, err_info))
-        return FALSE;
+    wtap_file_read_expected_bytes(pfx_hdr, IPFIX_MSG_HDR_SIZE, fh, err, err_info);  /* macro which does a return if read fails */
 
     /* fix endianess, because IPFIX files are always big-endian */
     pfx_hdr->version = g_ntohs(pfx_hdr->version);
@@ -176,11 +181,10 @@ ipfix_read_message(FILE_T fh, struct wtap_pkthdr *phdr, Buffer *buf, int *err, g
 
 
 
-/* classic wtap: open capture file.  Return WTAP_OPEN_MINE on success,
- * WTAP_OPEN_NOT_MINE on normal failure like malformed format,
- * WTAP_OPEN_ERROR on bad error like file system
+/* classic wtap: open capture file.  Return 1 on success, 0 on normal failure
+ * like malformed format, -1 on bad error like file system
  */
-wtap_open_return_val
+int
 ipfix_open(wtap *wth, int *err, gchar **err_info)
 {
     gint i, n, records_for_ipfix_check = RECORDS_FOR_IPFIX_CHECK;
@@ -212,14 +216,14 @@ ipfix_open(wtap *wth, int *err, gchar **err_info)
                 *err = 0;            /* not actually an error in this case */
                 g_free(*err_info);
                 *err_info = NULL;
-                return WTAP_OPEN_NOT_MINE;
+                return 0;
             }
             if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-                return WTAP_OPEN_ERROR; /* real failure */
+                return -1; /* real failure */
             /* else it's EOF */
             if (i < 1) {
                 /* we haven't seen enough to prove this is a ipfix file */
-                return WTAP_OPEN_NOT_MINE;
+                return 0;
             }
             /*
              * If we got here, it's EOF and we haven't yet seen anything
@@ -232,29 +236,19 @@ ipfix_open(wtap *wth, int *err, gchar **err_info)
         if (file_seek(wth->fh, IPFIX_MSG_HDR_SIZE, SEEK_CUR, err) == -1) {
             ipfix_debug1("ipfix_open: failed seek to next message in file, %d bytes away",
                          msg_hdr.message_length);
-            return WTAP_OPEN_NOT_MINE;
+            return 0;
         }
         checked_len = IPFIX_MSG_HDR_SIZE;
 
         /* check each Set in IPFIX Message for sanity */
         while (checked_len < msg_hdr.message_length) {
-            if (!wtap_read_bytes(wth->fh, &set_hdr, IPFIX_SET_HDR_SIZE,
-                                 err, err_info)) {
-                if (*err == WTAP_ERR_SHORT_READ) {
-                    /* Not a valid IPFIX Set, so not an IPFIX file. */
-                    ipfix_debug1("ipfix_open: error %d reading set", *err);
-                    return WTAP_OPEN_NOT_MINE;
-                }
-
-                /* A real I/O error; fail. */
-                return WTAP_OPEN_ERROR;
-            }
+            wtap_file_read_expected_bytes(&set_hdr, IPFIX_SET_HDR_SIZE, wth->fh, err, err_info);
             set_hdr.set_length = g_ntohs(set_hdr.set_length);
             if ((set_hdr.set_length < IPFIX_SET_HDR_SIZE) ||
                 ((set_hdr.set_length + checked_len) > msg_hdr.message_length))  {
                 ipfix_debug1("ipfix_open: found invalid set_length of %d",
                              set_hdr.set_length);
-                return WTAP_OPEN_NOT_MINE;
+                return 0;
             }
 
             if (file_seek(wth->fh, set_hdr.set_length - IPFIX_SET_HDR_SIZE,
@@ -262,27 +256,27 @@ ipfix_open(wtap *wth, int *err, gchar **err_info)
             {
                 ipfix_debug1("ipfix_open: failed seek to next set in file, %d bytes away",
                              set_hdr.set_length - IPFIX_SET_HDR_SIZE);
-                return WTAP_OPEN_ERROR;
+                return 0;
             }
             checked_len += set_hdr.set_length;
         }
     }
 
-    /* go back to beginning of file */
-    if (file_seek (wth->fh, 0, SEEK_SET, err) != 0)
-    {
-        return WTAP_OPEN_ERROR;
-    }
-
     /* all's good, this is a IPFIX file */
     wth->file_encap = WTAP_ENCAP_RAW_IPFIX;
     wth->snapshot_length = 0;
-    wth->file_tsprec = WTAP_TSPREC_SEC;
+    wth->tsprecision = WTAP_FILE_TSPREC_SEC;
     wth->subtype_read = ipfix_read;
     wth->subtype_seek_read = ipfix_seek_read;
+    wth->subtype_close = ipfix_close;
     wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_IPFIX;
 
-    return WTAP_OPEN_MINE;
+    /* go back to beginning of file */
+    if (file_seek (wth->fh, 0, SEEK_SET, err) != 0)
+    {
+        return -1;
+    }
+    return 1;
 }
 
 
@@ -326,15 +320,10 @@ ipfix_seek_read(wtap *wth, gint64 seek_off, struct wtap_pkthdr *phdr,
     return TRUE;
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+
+/* classic wtap: close capture file */
+static void
+ipfix_close(wtap *wth _U_)
+{
+    ipfix_debug0("ipfix_close: closing file");
+}

@@ -47,10 +47,11 @@
 
 #include <math.h>
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/etypes.h>
-#include <epan/expert.h>
-#include <epan/exceptions.h>
+
 
 /**********************************************************/
 /* Port definition's for PTP                              */
@@ -1532,7 +1533,6 @@ static int hf_ptp_v2_mm_displayName_length = -1;
 static int hf_ptp_v2_mm_maxKey = -1;
 static int hf_ptp_v2_mm_currentOffset = -1;
 static int hf_ptp_v2_mm_jumpSeconds = -1;
-static int hf_ptp_v2_mm_nextjumpSeconds = -1;
 static int hf_ptp_v2_mm_logAlternateMulticastSyncInterval = -1;
 static int hf_ptp_v2_mm_numberOfAlternateMasters = -1;
 static int hf_ptp_v2_mm_transmitAlternateMulticastSync = -1;
@@ -1557,9 +1557,6 @@ static gint ett_ptp_as_sig_tlv_flags = -1;
 /* static gint ett_ptp_v2_timesource = -1;
 static gint ett_ptp_v2_priority = -1; */
 static gint ett_ptp_v2_transportspecific = -1;
-
-static expert_field ei_ptp_v2_msg_len_too_large = EI_INIT;
-static expert_field ei_ptp_v2_msg_len_too_small = EI_INIT;
 
 /* END Definitions and fields for PTPv2 dissection. */
 
@@ -1643,7 +1640,7 @@ dissect_ptp_v1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 /* Set up structures needed to add the protocol subtree and manage it */
     proto_item *ti, *flags_ti, *time_ti, *time2_ti;
-    proto_tree *ptp_tree = NULL, *ptp_flags_tree, *ptp_time_tree, *ptp_time2_tree;
+    proto_tree *ptp_tree, *ptp_flags_tree, *ptp_time_tree, *ptp_time2_tree;
 
 /* Make entries in Protocol column and Info column on summary display */
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "PTPv1");
@@ -2328,6 +2325,7 @@ dissect_ptp_v2_timeInterval(tvbuff_t *tvb, guint16 *cur_offset, proto_tree *tree
     double      time_double;
     gint64      time_ns;
     guint16     time_subns;
+    proto_item *ptptimeInterval_ti;
     proto_tree *ptptimeInterval_subtree;
 
     time_ns = tvb_get_ntoh64(tvb, *cur_offset);
@@ -2335,8 +2333,10 @@ dissect_ptp_v2_timeInterval(tvbuff_t *tvb, guint16 *cur_offset, proto_tree *tree
     time_ns = time_ns >> 16;
     time_subns = tvb_get_ntohs(tvb, *cur_offset+6);
 
-    ptptimeInterval_subtree = proto_tree_add_subtree_format(tree, tvb, *cur_offset, 8,
-        ett_ptp_v2_timeInterval, NULL, "%s: %f nanoseconds", name, time_double);
+    ptptimeInterval_ti = proto_tree_add_text(tree, tvb, *cur_offset, 8,
+        "%s: %f nanoseconds", name, time_double);
+
+    ptptimeInterval_subtree = proto_item_add_subtree(ptptimeInterval_ti, ett_ptp_v2_timeInterval);
 
     proto_tree_add_uint64_format_value(ptptimeInterval_subtree,
         hf_ptp_v2_timeInterval_ns, tvb, *cur_offset, 6, time_ns, "Ns: %" G_GINT64_MODIFIER "d nanoseconds", time_ns);
@@ -2360,8 +2360,8 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
     guint16 temp;
 
     /* Set up structures needed to add the protocol subtree and manage it */
-    proto_item  *ti = NULL, *msg_len_item = NULL, *transportspecific_ti, *flags_ti, *managementData_ti, *clockType_ti, *protocolAddress_ti;
-    proto_tree  *ptp_tree = NULL, *ptp_transportspecific_tree, *ptp_flags_tree, *ptp_managementData_tree,
+    proto_item  *ti, *transportspecific_ti, *flags_ti, *managementData_ti, *clockType_ti, *protocolAddress_ti;
+    proto_tree  *ptp_tree, *ptp_transportspecific_tree, *ptp_flags_tree, *ptp_managementData_tree,
                 *ptp_clockType_tree, *ptp_protocolAddress_tree;
 
     /* Make entries in Protocol column and Info column on summary display */
@@ -2372,8 +2372,6 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
 
     /* Get control field (what kind of message is this? (Sync, DelayReq, ...) */
     ptp_v2_messageid = 0x0F & tvb_get_guint8 (tvb, PTP_V2_TRANSPORT_SPECIFIC_MESSAGE_ID_OFFSET);
-
-    msg_len = tvb_get_ntohs(tvb, PTP_V2_MESSAGE_LENGTH_OFFSET);
 
     /* Extend  Info column with managementId */
     /* Create and set the string for "Info" column */
@@ -2445,31 +2443,9 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
         proto_tree_add_item(ptp_tree,
             hf_ptp_v2_versionptp, tvb, PTP_V2_VERSIONPTP_OFFSET, 1, ENC_BIG_ENDIAN);
 
-        msg_len_item = proto_tree_add_item(ptp_tree,
+        msg_len = tvb_get_ntohs(tvb, PTP_V2_MESSAGE_LENGTH_OFFSET);
+        proto_tree_add_item(ptp_tree,
             hf_ptp_v2_messagelength, tvb, PTP_V2_MESSAGE_LENGTH_OFFSET, 2, ENC_BIG_ENDIAN);
-   }
-
-   /*
-    * Sanity-check the message length.
-    */
-   if (msg_len > tvb_reported_length(tvb)) {
-       /* Bogus message length - runs past the end of the packet */
-       expert_add_info(pinfo, msg_len_item, &ei_ptp_v2_msg_len_too_large);
-       msg_len = tvb_reported_length(tvb);
-   } else if (msg_len < PTP_V2_MESSAGE_LENGTH_OFFSET + 2) {
-       /* Bogus message length - not long enough to include the message length field */
-       expert_add_info(pinfo, msg_len_item, &ei_ptp_v2_msg_len_too_small);
-       THROW(ReportedBoundsError);
-   } else {
-       /*
-        * Set the length of this tvbuff to the message length, chopping
-        * off extra data.
-        */
-       set_actual_length(tvb, msg_len);
-       proto_item_set_len(ti, msg_len);
-   }
-
-   if (tree) {
 
         proto_tree_add_item(ptp_tree,
             hf_ptp_v2_domainnumber, tvb, PTP_V2_DOMAIN_NUMBER_OFFSET, 1, ENC_BIG_ENDIAN);
@@ -2541,6 +2517,7 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
                 guint16     tlv_type;
                 guint16     tlv_length;
                 guint16     tlv_total_length;
+                proto_item *tlv_ti;
                 proto_tree *ptp_tlv_tree;
 
                 /* In 802.1AS there is no origin timestamp in an Announce Message */
@@ -2590,15 +2567,16 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
                         tlv_type = tvb_get_ntohs (tvb, PTP_V2_AN_TLV_OFFSET+tlv_total_length+PTP_V2_AN_TLV_TYPE_OFFSET);
                         tlv_length = tvb_get_ntohs (tvb, PTP_V2_AN_TLV_OFFSET+tlv_total_length+PTP_V2_AN_TLV_LENGTHFIELD_OFFSET);
 
-                        ptp_tlv_tree = proto_tree_add_subtree_format(
-                            ptp_tree,
-                            tvb,
-                            PTP_V2_AN_TLV_OFFSET + tlv_total_length,
-                            tlv_length + PTP_V2_AN_TLV_DATA_OFFSET,
-                            ett_ptp_v2_tlv, NULL, "%s TLV",
-                            val_to_str_ext(tlv_type,
-                                           &ptp_v2_TLV_type_vals_ext,
-                                           "Unknown (%u)"));
+                    tlv_ti = proto_tree_add_text(
+                        ptp_tree,
+                        tvb,
+                        PTP_V2_AN_TLV_OFFSET + tlv_total_length,
+                        tlv_length + PTP_V2_AN_TLV_DATA_OFFSET,
+                        "%s TLV",
+                        val_to_str_ext(tlv_type,
+                                       &ptp_v2_TLV_type_vals_ext,
+                                       "Unknown (%u)"));
+                        ptp_tlv_tree = proto_item_add_subtree(tlv_ti, ett_ptp_v2_tlv);
 
                         proto_tree_add_item(ptp_tlv_tree,
                                             hf_ptp_v2_an_tlv_tlvtype,
@@ -2790,6 +2768,7 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
 
             case PTP_V2_FOLLOWUP_MESSAGE:{
                 guint16     tlv_length;
+                proto_item *tlv_ti;
                 proto_tree *ptp_tlv_tree;
 
                 proto_tree_add_item(ptp_tree, hf_ptp_v2_fu_preciseorigintimestamp_seconds, tvb,
@@ -2804,12 +2783,15 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
                     /* There are TLV's to be processed */
                     tlv_length = tvb_get_ntohs (tvb, PTP_AS_FU_TLV_INFORMATION_OFFSET + PTP_AS_FU_TLV_LENGTHFIELD_OFFSET);
 
-                    ptp_tlv_tree = proto_tree_add_subtree(
+                    tlv_ti = proto_tree_add_text(
                         ptp_tree,
                         tvb,
                         PTP_AS_FU_TLV_INFORMATION_OFFSET,
                         tlv_length + PTP_AS_FU_TLV_ORGANIZATIONID_OFFSET,
-                        ett_ptp_v2_tlv, NULL, "Follow Up information TLV");
+                        "%s TLV",
+                        "Follow Up information");
+
+                    ptp_tlv_tree = proto_item_add_subtree(tlv_ti, ett_ptp_v2_tlv);
 
                     proto_tree_add_item(ptp_tlv_tree,
                                         hf_ptp_as_fu_tlv_tlvtype,
@@ -2955,12 +2937,15 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
                     /* There are TLV's to be processed */
                     tlv_length = tvb_get_ntohs (tvb, PTP_AS_SIG_TLV_MESSAGEINTERVALREQUEST_OFFSET + PTP_AS_SIG_TLV_LENGTHFIELD_OFFSET);
 
-                    ptp_tlv_tree = proto_tree_add_subtree(
+                    tlv_ti = proto_tree_add_text(
                         ptp_tree,
                         tvb,
                         PTP_AS_SIG_TLV_MESSAGEINTERVALREQUEST_OFFSET,
                         tlv_length + PTP_AS_SIG_TLV_ORGANIZATIONID_OFFSET,
-                        ett_ptp_v2_tlv, NULL, "Message Interval Request TLV");
+                        "%s TLV",
+                        "Message Interval Request");
+
+                    ptp_tlv_tree = proto_item_add_subtree(tlv_ti, ett_ptp_v2_tlv);
 
                     proto_tree_add_item(ptp_tlv_tree,
                                         hf_ptp_as_sig_tlv_tlvtype,
@@ -3340,6 +3325,7 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
                             case PTP_V2_MM_ID_FAULT_LOG:
                             {
                                 guint16 ii, num = 0;
+                                proto_item  *ptpError_ti;
                                 proto_tree  *ptpError_subtree;
 
                                 num = tvb_get_ntohs (tvb, Offset);
@@ -3350,8 +3336,10 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
 
                                 for (ii = 0; ii < num; ii++)
                                 {
-                                    ptpError_subtree = proto_tree_add_subtree(ptp_managementData_tree, tvb, Offset, tvb_get_ntohs (tvb, Offset),
-                                            ett_ptp_v2_faultRecord, NULL, "Fault record");
+                                    ptpError_ti = proto_tree_add_text(ptp_managementData_tree, tvb, Offset, tvb_get_ntohs (tvb, Offset), "Fault record");
+
+                                    /*  (subtree) */
+                                    ptpError_subtree = proto_item_add_subtree(ptpError_ti, ett_ptp_v2_faultRecord);
 
                                     proto_tree_add_item(ptpError_subtree, hf_ptp_v2_mm_faultRecordLength, tvb,
                                         Offset, 2, ENC_BIG_ENDIAN);
@@ -3840,8 +3828,8 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
                                 timeStamp = timeStamp << 16;
                                 timeStamp = timeStamp | tvb_get_ntohs(tvb, Offset+4);
 
-                                proto_tree_add_uint64(ptp_managementData_tree, hf_ptp_v2_mm_nextjumpSeconds, tvb,
-                                    Offset, 6, timeStamp);
+                                proto_tree_add_text(ptp_managementData_tree, tvb, Offset, 6,
+                                    "Time of next jump (seconds): %" G_GINT64_MODIFIER "u", timeStamp);
                                 Offset +=6;
 
                                 proto_tree_add_item(ptp_managementData_tree, hf_ptp_v2_mm_reserved, tvb,
@@ -5911,11 +5899,6 @@ proto_register_ptp(void)
             FT_INT32, BASE_DEC, NULL, 0x00,
             NULL, HFILL }
         },
-        { &hf_ptp_v2_mm_nextjumpSeconds,
-          { "Time of next jump (seconds)", "ptp.v2.mm.nextjumpSeconds",
-            FT_UINT64, BASE_DEC, NULL, 0x00,
-            NULL, HFILL }
-        },
         { &hf_ptp_v2_mm_numberOfAlternateMasters,
           { "Number of alternate masters", "ptp.v2.mm.numberOfAlternateMasters",
             FT_UINT8, BASE_DEC, NULL, 0x00,
@@ -5958,13 +5941,6 @@ proto_register_ptp(void)
         &ett_ptp_as_sig_tlv_flags,
     };
 
-    static ei_register_info ei[] = {
-        { &ei_ptp_v2_msg_len_too_large, { "ptp.v2.msg_len_too_large", PI_MALFORMED, PI_ERROR, "Message length goes past the end of the packet", EXPFILL }},
-        { &ei_ptp_v2_msg_len_too_small, { "ptp.v2.msg_len_too_small", PI_MALFORMED, PI_ERROR, "Message length too short to include the message length field", EXPFILL }},
-    };
-
-    expert_module_t* expert_ptp;
-
 /* Register the protocol name and description */
     proto_ptp = proto_register_protocol("Precision Time Protocol (IEEE1588)",
                                         "PTP", "ptp");
@@ -5972,9 +5948,6 @@ proto_register_ptp(void)
 /* Required function calls to register the header fields and subtrees used */
     proto_register_field_array(proto_ptp, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-
-    expert_ptp = expert_register_protocol(proto_ptp);
-    expert_register_field_array(expert_ptp, ei, array_length(ei));
 }
 
 void

@@ -21,7 +21,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -502,7 +502,6 @@ main(int argc, char **argv)
 	struct wtap_pkthdr	pkthdr;
 	union wtap_pseudo_header *ps_header = &pkthdr.pseudo_header;
 	int 			i, j, len_this_pkt, len_random, err;
-	gchar                   *err_info;
 	guint8			buffer[65536];
 
 	int			opt;
@@ -628,11 +627,7 @@ main(int argc, char **argv)
 			}
 		}
 
-		/* XXX - report errors! */
-		if (!wtap_dump(dump, &pkthdr, &buffer[0], &err, &err_info)) {
-			if (err_info != NULL)
-				g_free(err_info);
-		}
+		wtap_dump(dump, &pkthdr, &buffer[0], &err);
 	}
 
 	wtap_dump_close(dump, &err);

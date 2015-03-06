@@ -1224,8 +1224,8 @@ realm-rusd        688/tcp # ApplianceWare managment protocol [Stacy_Kenworthy] [
 realm-rusd        688/udp # ApplianceWare managment protocol [Stacy_Kenworthy] [Stacy_Kenworthy]
 nmap              689/tcp # NMAP [Peter_Dennis_Bartok] [Peter_Dennis_Bartok]
 nmap              689/udp # NMAP [Peter_Dennis_Bartok] [Peter_Dennis_Bartok]
-vatp              690/tcp # Velazquez Application Transfer Protocol [Velneo] [Velneo]
-vatp              690/udp # Velazquez Application Transfer Protocol [Velneo] [Velneo]
+vatp              690/tcp # Velneo Application Transfer Protocol [Velneo] [David_Gutierrez] 2015-02-03
+vatp              690/udp # Velneo Application Transfer Protocol [Velneo] [David_Gutierrez] 2015-02-03
 msexch-routing    691/tcp # MS Exchange Routing [David_Lemson] [David_Lemson]
 msexch-routing    691/udp # MS Exchange Routing [David_Lemson] [David_Lemson]
 hyperwave-isp     692/tcp # Hyperwave-ISP [Gerald_Mesaric] [Gerald_Mesaric]
@@ -3167,8 +3167,8 @@ ibm-mqseries2    1881/tcp # IBM WebSphere MQ Everyplace [Jane_Porter] [Jane_Port
 ibm-mqseries2    1881/udp # IBM WebSphere MQ Everyplace [Jane_Porter] [Jane_Porter]
 ecsqdmn          1882/tcp # CA eTrust Common Services [Paul_Wissmiller] [Paul_Wissmiller]
 ecsqdmn          1882/udp # CA eTrust Common Services [Paul_Wissmiller] [Paul_Wissmiller]
-ibm-mqisdp       1883/tcp # IBM MQSeries SCADA [Andy_Stanford_Clark] [Andy_Stanford_Clark]
-ibm-mqisdp       1883/udp # IBM MQSeries SCADA [Andy_Stanford_Clark] [Andy_Stanford_Clark]
+mqtt             1883/tcp # Message Queuing Telemetry Transport Protocol [OASIS] [Robin_Cover] 2015-02-10
+mqtt             1883/udp # Message Queuing Telemetry Transport Protocol [OASIS] [Robin_Cover] 2015-02-10
 idmaps           1884/tcp # Internet Distance Map Svc [Sugih_Jamim] [Sugih_Jamim]
 idmaps           1884/udp # Internet Distance Map Svc [Sugih_Jamim] [Sugih_Jamim]
 vrtstrapserver   1885/tcp # Veritas Trap Server [Russell_Thrasher] [Russell_Thrasher]
@@ -3933,8 +3933,8 @@ mfserver         2266/tcp # M-Files Server [Samppa_Lahtinen] [Samppa_Lahtinen] 2
 mfserver         2266/udp # M-files Server [Samppa_Lahtinen] [Samppa_Lahtinen] 2004-06
 ontobroker       2267/tcp # OntoBroker [Dr_Michael_Erdmann] [Dr_Michael_Erdmann] 2004-12
 ontobroker       2267/udp # OntoBroker [Dr_Michael_Erdmann] [Dr_Michael_Erdmann] 2004-12
-amt              2268/tcp # AMT [IESG] [IETF_Chair] 2004-12 2014-12-17 [RFC-ietf-mboned-auto-multicast-18]
-amt              2268/udp # AMT [IESG] [IETF_Chair] 2004-12 2014-12-17 [RFC-ietf-mboned-auto-multicast-18]
+amt              2268/tcp # AMT [IESG] [IETF_Chair] 2004-12 2014-12-17 [RFC7450]
+amt              2268/udp # AMT [IESG] [IETF_Chair] 2004-12 2014-12-17 [RFC7450]
 mikey            2269/tcp # MIKEY [Karl_Norrman] [Karl_Norrman] 2004-12
 mikey            2269/udp # MIKEY [Karl_Norrman] [Karl_Norrman] 2004-12
 starschool       2270/tcp # starSchool [Adam_Ernst] [Adam_Ernst] 2004-12
@@ -9110,10 +9110,10 @@ xtlserv          6116/tcp # XicTools License Manager Service [Stephen_R_Whiteley
 daylitetouch     6117/tcp # Daylite Touch Sync [Brent_Gulanowski] [Brent_Gulanowski] 2009-08-26
 tipc             6118/udp # Transparent Inter Process Communication [Ericsson] [Erik_Hugne] 2012-09-05
 spdy             6121/tcp # SPDY for a faster web [Matthew_Lloyd] [Matthew_Lloyd] 2010-04-26
-bex-webadmin     6122/tcp # Backup Express Web Server [Chi_Shih_Chang] [Chi_Shih_Chang] 2008-03-19
-bex-webadmin     6122/udp # Backup Express Web Server [Chi_Shih_Chang] [Chi_Shih_Chang] 2008-03-19
-backup-express   6123/tcp # Backup Express [Chi_Shih_Chang] [Chi_Shih_Chang] 2008-03-19
-backup-express   6123/udp # Backup Express [Chi_Shih_Chang] [Chi_Shih_Chang] 2008-03-19
+bex-webadmin     6122/tcp # Backup Express Web Server [Catalogic_Software_Inc] [Chi_Shih_Chang] 2008-03-19 2015-02-04
+bex-webadmin     6122/udp # Backup Express Web Server [Catalogic_Software_Inc] [Chi_Shih_Chang] 2008-03-19 2015-02-04
+backup-express   6123/tcp # Backup Express [Catalogic_Software_Inc] [Chi_Shih_Chang] 2008-03-19 2015-02-04
+backup-express   6123/udp # Backup Express [Catalogic_Software_Inc] [Chi_Shih_Chang] 2008-03-19 2015-02-04
 pnbs             6124/tcp # Phlexible Network Backup Service [William_R_Lear_2] [William_R_Lear_2] 2008-10-23
 pnbs             6124/udp # Phlexible Network Backup Service [William_R_Lear_2] [William_R_Lear_2] 2008-10-23
 damewaremobgtwy  6130/tcp # The DameWare Mobile Gateway Service [SolarWinds] [David_Gayler] 2013-05-29
@@ -9364,6 +9364,8 @@ afesc-mc         6628/udp # AFE Stock Channel M/C [K_K_Ho] [K_K_Ho] 2004-04
 mxodbc-connect   6632/tcp # eGenix mxODBC Connect [Marc_Andre_Lemburg] [Marc_Andre_Lemburg] 2009-11-13 Unauthorized Use Known on port 6632
 cisco-vpath-tun  6633/udp # Cisco vPath Services Overlay [Cisco2] [Surendra_Kumar] 2012-06-11
 mpls-pm          6634/udp # MPLS Performance Measurement out-of-band response [Cisco_Systems_2] [Sagar_Soni] 2014-02-20
+mpls-udp         6635/udp # Encapsulate MPLS packets in UDP tunnels. [IESG] [IETF_Chair] 2015-02-10 [RFC-ietf-mpls-in-udp-11]
+mpls-udp-dtls    6636/udp # Encapsulate MPLS packets in UDP tunnels with DTLS. [IESG] [IETF_Chair] 2015-02-10 [RFC-ietf-mpls-in-udp-11]
 ovsdb            6640/tcp # Open vSwitch Database protocol [Bruce_Davie_2] [Bruce_Davie_2] 2013-07-31 [RFC7047]
 openflow         6653/tcp # OpenFlow [Open_Networking_Foundation] [Puneet_Agarwal] 2013-07-18
 openflow         6653/udp # OpenFlow [Open_Networking_Foundation] [Puneet_Agarwal] 2013-07-18
@@ -10142,6 +10144,9 @@ twds             8937/tcp # Transaction Warehouse Data Service [Lance_M_Steenson
 ub-dns-control   8953/tcp # unbound dns nameserver control [NLnet_Labs_Support] [NLnet_Labs_Support] 2011-05-10 2011-07-11
 cumulus-admin    8954/tcp # Cumulus Admin Port [Thomas_Schleu] [Thomas_Schleu]
 cumulus-admin    8954/udp # Cumulus Admin Port [Thomas_Schleu] [Thomas_Schleu]
+nod-provider     8980/tcp # Network of Devices Provider [David_Muller] [David_Muller] 2015-02-22
+nod-provider     8980/udp # Network of Devices Provider [David_Muller] [David_Muller] 2015-02-22
+nod-client       8981/udp # Network of Devices Client [David_Muller] [David_Muller] 2015-02-22
 sunwebadmins     8989/tcp # Sun Web Server SSL Admin Service [Jyri_J_Virkki] [Jyri_J_Virkki] 2005-12
 sunwebadmins     8989/udp # Sun Web Server SSL Admin Service [Jyri_J_Virkki] [Jyri_J_Virkki] 2005-12
 http-wmap        8990/tcp # webmail HTTP service [Fred_Batty] [Fred_Batty] 2007-12-03
@@ -10779,8 +10784,8 @@ xpilot          15345/udp # XPilot Contact Port [Bert_Gijsbers] [Bert_Gijsbers]
 3link           15363/udp # 3Link Negotiation [Brant_Thomsen] [Brant_Thomsen] 2003-01
 cisco-snat      15555/tcp # Cisco Stateful NAT [Kaushik_Biswas] [Kaushik_Biswas] 2006-03
 cisco-snat      15555/udp # Cisco Stateful NAT [Kaushik_Biswas] [Kaushik_Biswas] 2006-03
-bex-xr          15660/tcp # Backup Express Restore Server [Chi_Shih_Chang] [Chi_Shih_Chang] 2008-03-19
-bex-xr          15660/udp # Backup Express Restore Server [Chi_Shih_Chang] [Chi_Shih_Chang] 2008-03-19
+bex-xr          15660/tcp # Backup Express Restore Server [Catalogic_Software_Inc] [Chi_Shih_Chang] 2008-03-19 2015-02-04
+bex-xr          15660/udp # Backup Express Restore Server [Catalogic_Software_Inc] [Chi_Shih_Chang] 2008-03-19 2015-02-04
 ptp             15740/tcp # Picture Transfer Protocol [Petronel_Bigioi] [Petronel_Bigioi] 2004-11 Defined TXT keys: guid=<Device guid>
 ptp             15740/udp # Picture Transfer Protocol [Petronel_Bigioi] [Petronel_Bigioi] 2004-11 Defined TXT keys: guid=<Device guid>
 2ping           15998/udp # 2ping Bi-Directional Ping Service [Ryan_Finnie] [Ryan_Finnie] 2010-10-06

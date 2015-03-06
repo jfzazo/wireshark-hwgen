@@ -75,14 +75,16 @@
 
 #include <string.h>
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/wmem/wmem.h>
 #include <epan/addr_resolv.h>
-#ifndef HAVE_INET_ATON
 #include <wsutil/inet_aton.h>
-#endif
 #include <epan/expert.h>
 #include <epan/prefs.h>
+#include <ctype.h>
 #include "packet-dcerpc.h"
 #include "packet-dcom.h"
 
@@ -251,7 +253,6 @@ static const value_string dcom_boolean_flag_vals[] = {
 };
 #endif
 
-#ifdef DEBUG
 void dcom_interface_dump(void) {
 	dcom_machine_t *machine;
 	dcom_object_t *object;
@@ -263,7 +264,7 @@ void dcom_interface_dump(void) {
 
 	for(machines = dcom_machines; machines != NULL; machines = g_list_next(machines)) {
 		machine = (dcom_machine_t *)machines->data;
-		g_warning("Machine(#%4u): IP:%s", machine->first_packet, address_to_str(wmem_packet_scope(), &machine->ip));
+		g_warning("Machine(#%4u): IP:%s", machine->first_packet, ip_to_str(machine->ip));
 
 		for(objects = machine->objects; objects != NULL; objects = g_list_next(objects)) {
 			object = (dcom_object_t *)objects->data;
@@ -278,9 +279,9 @@ void dcom_interface_dump(void) {
 		}
 	}
 }
-#endif
 
-dcom_interface_t *dcom_interface_find(packet_info *pinfo _U_, const address *addr _U_, e_uuid_t *ipid)
+
+dcom_interface_t *dcom_interface_find(packet_info *pinfo _U_, const guint8 *ip _U_, e_uuid_t *ipid)
 {
 	dcom_interface_t *interf;
 	GList *interfaces;
@@ -303,7 +304,7 @@ dcom_interface_t *dcom_interface_find(packet_info *pinfo _U_, const address *add
 }
 
 
-dcom_interface_t *dcom_interface_new(packet_info *pinfo, const address *addr, e_uuid_t *iid, guint64 oxid, guint64 oid, e_uuid_t *ipid)
+dcom_interface_t *dcom_interface_new(packet_info *pinfo, const guint8 *ip, e_uuid_t *iid, guint64 oxid, guint64 oid, e_uuid_t *ipid)
 {
 	GList *dcom_iter;
 	dcom_machine_t *machine;
@@ -335,7 +336,7 @@ dcom_interface_t *dcom_interface_new(packet_info *pinfo, const address *addr, e_
 	dcom_iter = dcom_machines;
 	while(dcom_iter != NULL) {
 		machine = (dcom_machine_t *)dcom_iter->data;
-		if(CMP_ADDRESS(&machine->ip, addr) == 0) {
+		if(memcmp(machine->ip, ip, 4) == 0) {
 			break;
 		}
 		dcom_iter = g_list_next(dcom_iter);
@@ -344,7 +345,7 @@ dcom_interface_t *dcom_interface_new(packet_info *pinfo, const address *addr, e_
 	/* create new machine if not found */
 	if(dcom_iter == NULL) {
 		machine = g_new(dcom_machine_t,1);
-		COPY_ADDRESS(&machine->ip, addr);
+		memcpy(machine->ip, ip, 4);
 		machine->objects = NULL;
 		machine->first_packet = pinfo->fd->num;
 		dcom_machines = g_list_append(dcom_machines, machine);
@@ -1816,13 +1817,9 @@ dissect_dcom_DUALSTRINGARRAY(tvbuff_t *tvb, gint offset, packet_info *pinfo,
 					first_ip = curr_ip;
 				} else {
 					if(first_ip != curr_ip) {
-						address first_ip_addr, curr_ip_addr;
-
-						SET_ADDRESS(&first_ip_addr, AT_IPv4, 4, &first_ip);
-						SET_ADDRESS(&curr_ip_addr, AT_IPv4, 4, &curr_ip);
 						expert_add_info_format(pinfo, pi, &ei_dcom_dualstringarray_mult_ip,
 								       "DUALSTRINGARRAY: multiple IP's %s %s",
-								       address_to_str(wmem_packet_scope(), &first_ip_addr), address_to_str(wmem_packet_scope(), &curr_ip_addr));
+								       ip_to_str( (guint8 *) &first_ip), ip_to_str( (guint8 *) &curr_ip));
 					}
 				}
 			}
@@ -2076,11 +2073,8 @@ dissect_dcom_OBJREF(tvbuff_t *tvb, gint offset, packet_info *pinfo,
 	if(u32Flags == 0x1 || u32Flags == 0x2) {
 		/* add interface instance to database (we currently only handle IPv4) */
 		if(pinfo->net_src.type == AT_IPv4) {
-			address addr;
-
-			SET_ADDRESS(&addr, AT_IPv4, 4, ip);
 			dcom_if = dcom_interface_new(pinfo,
-						     &addr,
+						     (guint8 *) ip,
 						     &iid, oxid, oid, &ipid);
 		}
 	}
@@ -2177,7 +2171,6 @@ static void dcom_reinit( void) {
 					objects->data = NULL; /* for good measure */
 				}
 				g_list_free(machine->objects);
-				g_free((void*)machine->ip.data);
 				machine->objects = NULL; /* for good measure */
 			}
 
@@ -2188,7 +2181,7 @@ static void dcom_reinit( void) {
 		dcom_machines = NULL;
 	}
 
-	/*  The data in dcom_interfaces is wmem_file_scoped so there's no need to free
+	/*  The data in dcom_interfaces is se_alloc'd so there's no need to free
 	 *  the data pointers.
 	 */
 	if (dcom_interfaces != NULL) {
@@ -2468,7 +2461,7 @@ proto_register_dcom (void)
 	proto_register_field_array(proto_dcom, hf_dcom_sa_array, array_length(hf_dcom_sa_array));
 	proto_register_subtree_array (ett_dcom, array_length (ett_dcom));
 
-	expert_dcom = expert_register_protocol(proto_dcom);
+    expert_dcom = expert_register_protocol(proto_dcom);
 	expert_register_field_array(expert_dcom, ei, array_length(ei));
 
 	/* preferences */
@@ -2497,16 +2490,3 @@ proto_reg_handoff_dcom (void)
 
 	/* Currently, we have nothing to register for DCOM */
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

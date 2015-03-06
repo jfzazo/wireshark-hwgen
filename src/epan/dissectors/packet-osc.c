@@ -29,9 +29,12 @@
 
 #include "config.h"
 
+#include <string.h>
+#include <ctype.h>
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/conversation.h>
 #include <epan/exceptions.h>
 #include "packet-tcp.h"
 
@@ -619,7 +622,7 @@ dissect_osc_pdu_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
 /* OSC TCP */
 
 static guint
-get_osc_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_osc_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     return tvb_get_ntohl(tvb, offset) + 4;
 }
@@ -900,8 +903,7 @@ proto_reg_handoff_osc(void)
     if(! initialized)
     {
         osc_tcp_handle = new_create_dissector_handle(dissect_osc_tcp, proto_osc);
-        /* register for "decode as" for TCP connections */
-        dissector_add_for_decode_as("tcp.port", osc_tcp_handle);
+        dissector_add_handle("tcp.port", osc_tcp_handle); /* for "decode-as" */
 
         /* XXX: Add port pref and  "decode as" for UDP ? */
         /*      (The UDP heuristic is a bit expensive    */

@@ -59,6 +59,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/etypes.h>
 #include <epan/oui.h>
@@ -360,8 +362,8 @@ static const value_string wlccp_status_vs[] = {
 };
 
 static const value_string cisco_pid_vals[] = {
-	{ 0x0000, "WLCCP" },
-	{ 0, NULL         }
+        { 0x0000, "WLCCP" },
+        { 0, NULL         }
 };
 
 static const value_string wlccp_mode_vs[] = {
@@ -4127,16 +4129,3 @@ proto_register_wlccp_oui(void)
 	llc_add_oui(OUI_CISCOWL, "llc.wlccp_pid", "LLC Cisco WLCCP OUI PID", hf);
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

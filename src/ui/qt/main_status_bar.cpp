@@ -46,7 +46,6 @@ enum StatusContext {
     STATUS_CTX_MAIN,
     STATUS_CTX_FILE,
     STATUS_CTX_FIELD,
-    STATUS_CTX_BYTE,
     STATUS_CTX_FILTER,
     STATUS_CTX_TEMPORARY
 };
@@ -118,19 +117,13 @@ MainStatusBar::MainStatusBar(QWidget *parent) :
     expert_status_.setTextFormat(Qt::RichText);
     expert_status_.hide();
 
-    // We just want a clickable image. Using a QPushButton or QToolButton would require
-    // a lot of adjustment.
-    comment_label_.setText("<a href><img src=\":/comment/capture_comment_update.png\"></img></a>");
-    comment_label_.setToolTip(tr("Open the Capture File Properties dialog"));
-    comment_label_.setEnabled(false);
-    connect(&comment_label_, SIGNAL(linkActivated(QString)), this, SIGNAL(editCaptureComment()));
+    // XXX Add the comment icon
 
     info_progress_hb->setContentsMargins(0, 0, 0, 0);
 
     info_status_.setTemporaryContext(STATUS_CTX_TEMPORARY);
 
     info_progress_hb->addWidget(&expert_status_);
-    info_progress_hb->addWidget(&comment_label_);
     info_progress_hb->addWidget(&info_status_);
     info_progress_hb->addWidget(&progress_bar_);
     info_progress_hb->addStretch(10);
@@ -172,6 +165,8 @@ MainStatusBar::MainStatusBar(QWidget *parent) :
     connect(wsApp, SIGNAL(appInitialized()), this, SLOT(pushProfileName()));
     connect(&info_status_, SIGNAL(toggleTemporaryFlash(bool)),
             this, SLOT(toggleBackground(bool)));
+    connect(wsApp, SIGNAL(captureCaptureUpdateContinue(capture_session*)),
+            this, SLOT(updateCaptureStatistics(capture_session*)));
     connect(wsApp, SIGNAL(configurationProfileChanged(const gchar *)),
             this, SLOT(pushProfileName()));
     connect(&profile_status_, SIGNAL(mousePressedAt(QPoint,Qt::MouseButton)),
@@ -225,7 +220,6 @@ void MainStatusBar::expertUpdate() {
 void MainStatusBar::setCaptureFile(capture_file *cf)
 {
     cap_file_ = cf;
-    comment_label_.setEnabled(cap_file_ != NULL);
 }
 
 void MainStatusBar::pushTemporaryStatus(QString &message) {
@@ -255,20 +249,6 @@ void MainStatusBar::pushFieldStatus(QString &message) {
 
 void MainStatusBar::popFieldStatus() {
     info_status_.popText(STATUS_CTX_FIELD);
-}
-
-void MainStatusBar::pushByteStatus(QString &message)
-{
-    if (message.isNull()) {
-        popByteStatus();
-    } else {
-        info_status_.pushText(message, STATUS_CTX_BYTE);
-    }
-}
-
-void MainStatusBar::popByteStatus()
-{
-    info_status_.popText(STATUS_CTX_BYTE);
 }
 
 void MainStatusBar::pushFilterStatus(QString &message) {

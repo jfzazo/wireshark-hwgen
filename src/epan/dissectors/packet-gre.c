@@ -23,10 +23,12 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/etypes.h>
 #include <epan/in_cksum.h>
 #include <epan/expert.h>
+#include <epan/greproto.h>
 #include <epan/ipproto.h>
 #include <epan/llcsaps.h>
 #include "packet-gre.h"
@@ -211,8 +213,8 @@ static const true_false_string gre_wccp_alternative_bucket_used_val = {
 };
 
 static const true_false_string gre_wccp_redirect_header_valid_val = {
-    "Header is present, but ignore contents",
-    "Header contents are valid",
+  "Header is present, but ignore contents",
+  "Header contents are valid",
 };
 
 
@@ -233,8 +235,9 @@ dissect_gre_3gpp2_attribs(tvbuff_t *tvb, int offset, proto_tree *tree)
         guint8 attrib_id = tvb_get_guint8(tvb, offset);
         guint8 attrib_length = tvb_get_guint8(tvb, offset + 1);
 
-        attr_tree = proto_tree_add_subtree(atree, tvb, offset, attrib_length + 1 + 1, ett_3gpp2_attr, &attr_item,
+        attr_item = proto_tree_add_text(atree, tvb, offset, attrib_length + 1 + 1, "%s",
                                         val_to_str((attrib_id&0x7f), gre_3ggp2_attrib_id_vals, "%u (Unknown)"));
+        attr_tree = proto_item_add_subtree(attr_item, ett_3gpp2_attr);
 
         proto_tree_add_item(attr_tree, hf_gre_3ggp2_attrib_id, tvb, offset, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(attr_tree, hf_gre_3ggp2_attrib_length, tvb, offset+1, 1, ENC_BIG_ENDIAN);
@@ -411,7 +414,8 @@ dissect_gre(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             /* The Checksum Present bit is set, and the packet isn't part of a
                fragmented datagram and isn't truncated, so we can checksum it. */
             if ((flags_and_ver & GRE_CHECKSUM) && !pinfo->fragmented && length >= reported_length) {
-                SET_CKSUM_VEC_TVB(cksum_vec[0], tvb, 0, reported_length);
+                cksum_vec[0].ptr = tvb_get_ptr(tvb, 0, reported_length);
+                cksum_vec[0].len = reported_length;
                 computed_cksum = in_cksum(cksum_vec, 1);
                 if (computed_cksum == 0) {
                     proto_item_append_text(it_checksum," [correct]");
@@ -748,16 +752,3 @@ proto_reg_handoff_gre(void)
     dissector_add_uint("ip.proto", IP_PROTO_GRE, gre_handle);
     data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

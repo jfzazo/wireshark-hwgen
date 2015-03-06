@@ -25,13 +25,15 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
-#include <epan/expert.h>
 #include <epan/oids.h>
+#include <epan/wmem/wmem.h>
 #include <epan/asn1.h>
 #include <epan/strutil.h>
 
+#include <string.h>
 #include "packet-ber.h"
 #include "packet-tcap.h"
 #include "packet-ansi_tcap.h"
@@ -68,8 +70,6 @@ static gint ett_ansi_tcap_op_code_nat = -1;
 static gint ett_otid = -1;
 static gint ett_dtid = -1;
 static gint ett_ansi_tcap_stat = -1;
-
-static expert_field ei_ansi_tcap_dissector_not_implemented = EI_INIT;
 
 static struct tcapsrt_info_t * gp_tcapsrt_info;
 static gboolean tcap_subdissector_used=FALSE;
@@ -200,7 +200,7 @@ save_invoke_data(packet_info *pinfo, proto_tree *tree _U_, tvbuff_t *tvb _U_){
 
   if ((!pinfo->fd->flags.visited)&&(ansi_tcap_private.TransactionID_str)){
 
-          /* Only do this once XXX I hope it's the right thing to do */
+          /* Only do this once XXX I hope its the right thing to do */
           /* The hash string needs to contain src and dest to distiguish differnt flows */
           switch(ansi_tcap_response_matching_type){
                         case 0:
@@ -321,20 +321,22 @@ find_tcap_subdissector(tvbuff_t *tvb, asn1_ctx_t *actx, proto_tree *tree){
                 guint8 family = (ansi_tcap_private.d.OperationCode_national & 0x7f00)>>8;
                 guint8 specifier = (guint8)(ansi_tcap_private.d.OperationCode_national & 0xff);
                 if(!dissector_try_uint(ansi_tcap_national_opcode_table, ansi_tcap_private.d.OperationCode_national, tvb, actx->pinfo, tcap_top_tree)){
-                        proto_tree_add_expert_format(tree, actx->pinfo, &ei_ansi_tcap_dissector_not_implemented, tvb, 0, -1,
+                        item = proto_tree_add_text(tree, tvb, 0, -1,
                                         "Dissector for ANSI TCAP NATIONAL code:0x%x(Family %u, Specifier %u) \n"
                                         "not implemented. Contact Wireshark developers if you want this supported(Spec required)",
                                         ansi_tcap_private.d.OperationCode_national, family, specifier);
+                        PROTO_ITEM_SET_GENERATED(item);
                         return FALSE;
                 }
                 return TRUE;
         }else if(ansi_tcap_private.d.OperationCode == 1){
                 /* private */
                 if((ansi_tcap_private.d.OperationCode_private & 0x0900) != 0x0900){
-                        proto_tree_add_expert_format(tree, actx->pinfo, &ei_ansi_tcap_dissector_not_implemented, tvb, 0, -1,
+                        item = proto_tree_add_text(tree, tvb, 0, -1,
                                 "Dissector for ANSI TCAP PRIVATE code:%u not implemented.\n"
                                 "Contact Wireshark developers if you want this supported(Spec required)",
                                 ansi_tcap_private.d.OperationCode_private);
+                        PROTO_ITEM_SET_GENERATED(item);
                         return FALSE;
                 }
         }
@@ -395,8 +397,9 @@ dissect_ansi_tcap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 #if 0 /* Skip this part for now it will be rewritten */
     if (g_ansi_tcap_HandleSRT && !tcap_subdissector_used ) {
                 if (gtcap_DisplaySRT && tree) {
-                        stat_tree = proto_tree_add_subtree(tree, tvb, 0, 0, ett_ansi_tcap_stat, &stat_item, "Stat");
+                        stat_item = proto_tree_add_text(tree, tvb, 0, 0, "Stat");
                         PROTO_ITEM_SET_GENERATED(stat_item);
+                        stat_tree = proto_item_add_subtree(stat_item, ett_ansi_tcap_stat);
                 }
                 p_tcap_context=tcapsrt_call_matching(tvb, pinfo, stat_tree, gp_tcapsrt_info);
                 ansi_tcap_private.context=p_tcap_context;
@@ -501,18 +504,13 @@ proto_register_ansi_tcap(void)
         #include "packet-ansi_tcap-ettarr.c"
     };
 
-    static ei_register_info ei[] = {
-        { &ei_ansi_tcap_dissector_not_implemented, { "ansi_tcap.dissector_not_implemented", PI_UNDECODED, PI_WARN, "Dissector not implemented", EXPFILL }},
-    };
-
-    expert_module_t* expert_ansi_tcap;
-
     static const enum_val_t ansi_tcap_response_matching_type_values[] = {
         {"Only Transaction ID will be used in Invoke/response matching",                        "Transaction ID only", 0},
         {"Transaction ID and Source will be used in Invoke/response matching",                  "Transaction ID and Source", 1},
         {"Transaction ID Source and Destination will be used in Invoke/response matching",      "Transaction ID Source and Destination", 2},
         {NULL, NULL, -1}
     };
+
 
 /* Register the protocol name and description */
     proto_ansi_tcap = proto_register_protocol(PNAME, PSNAME, PFNAME);
@@ -523,8 +521,6 @@ proto_register_ansi_tcap(void)
 /* Required function calls to register the header fields and subtrees used */
     proto_register_field_array(proto_ansi_tcap, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-    expert_ansi_tcap = expert_register_protocol(proto_ansi_tcap);
-    expert_register_field_array(expert_ansi_tcap, ei, array_length(ei));
 
     ansi_tcap_module = prefs_register_protocol(proto_ansi_tcap, proto_reg_handoff_ansi_tcap);
 

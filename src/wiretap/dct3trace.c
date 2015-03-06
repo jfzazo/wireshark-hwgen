@@ -26,9 +26,11 @@
 
 #include "config.h"
 #include "wtap-int.h"
+#include <wsutil/buffer.h>
 #include "dct3trace.h"
 #include "file_wrappers.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -152,7 +154,7 @@ xml_get_int(int *val, const char *str, const char *pattern)
 }
 
 
-wtap_open_return_val dct3trace_open(wtap *wth, int *err, gchar **err_info)
+int dct3trace_open(wtap *wth, int *err, gchar **err_info)
 {
 	char line1[64], line2[64];
 
@@ -162,15 +164,15 @@ wtap_open_return_val dct3trace_open(wtap *wth, int *err, gchar **err_info)
 	{
 		*err = file_error(wth->fh, err_info);
 		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+			return -1;
+		return 0;
 	}
 
 	/* Don't compare line endings */
 	if( strncmp(dct3trace_magic_line1, line1, strlen(dct3trace_magic_line1)) != 0 ||
 		strncmp(dct3trace_magic_line2, line2, strlen(dct3trace_magic_line2)) != 0)
 	{
-		return WTAP_OPEN_NOT_MINE;
+		return 0;
 	}
 
 	wth->file_encap = WTAP_ENCAP_GSM_UM;
@@ -178,9 +180,9 @@ wtap_open_return_val dct3trace_open(wtap *wth, int *err, gchar **err_info)
 	wth->snapshot_length = 0; /* not known */
 	wth->subtype_read = dct3trace_read;
 	wth->subtype_seek_read = dct3trace_seek_read;
-	wth->file_tsprec = WTAP_TSPREC_SEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_SEC;
 
-	return WTAP_OPEN_MINE;
+	return 1;
 }
 
 
@@ -217,8 +219,8 @@ static gboolean dct3trace_get_packet(FILE_T fh, struct wtap_pkthdr *phdr,
 				*err = 0;
 
 				/* Make sure we have enough room for the packet */
-				ws_buffer_assure_space(buf, phdr->caplen);
-				memcpy( ws_buffer_start_ptr(buf), databuf, phdr->caplen );
+				buffer_assure_space(buf, phdr->caplen);
+				memcpy( buffer_start_ptr(buf), databuf, phdr->caplen );
 
 				return TRUE;
 			}
@@ -365,16 +367,3 @@ static gboolean dct3trace_seek_read(wtap *wth, gint64 seek_off,
 
 	return dct3trace_get_packet(wth->random_fh, phdr, buf, err, err_info);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

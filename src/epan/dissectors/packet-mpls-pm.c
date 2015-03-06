@@ -28,8 +28,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include "packet-ip.h"
+#include <packet-ip.h>
 
 void proto_register_mpls_pm(void);
 void proto_reg_handoff_mpls_pm(void);
@@ -108,6 +110,12 @@ static int hf_mpls_pm_timestamp4_r_seq = -1;
 static int hf_mpls_pm_timestamp4_r_ntp = -1;
 static int hf_mpls_pm_timestamp4_r_ptp = -1;
 static int hf_mpls_pm_timestamp4_unk = -1;
+
+static dissector_handle_t mpls_pm_dlm_handle;
+static dissector_handle_t mpls_pm_ilm_handle;
+static dissector_handle_t mpls_pm_dm_handle;
+static dissector_handle_t mpls_pm_dlm_dm_handle;
+static dissector_handle_t mpls_pm_ilm_dm_handle;
 
 /*
  * FF: please keep this list in sync with
@@ -507,12 +515,12 @@ dissect_mpls_pm_loss(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     pm_tree = proto_item_add_subtree(ti, ett_mpls_pm);
 
     /* add version to the subtree */
-    proto_tree_add_item(pm_tree, hf_mpls_pm_version, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(pm_tree, hf_mpls_pm_version, tvb, offset, 1, ENC_NA);
 
     /* ctrl flags subtree */
 
     ti = proto_tree_add_item(pm_tree, hf_mpls_pm_flags, tvb,
-                             offset, 1, ENC_BIG_ENDIAN);
+                             offset, 1, ENC_NA);
     pm_tree_flags = proto_item_add_subtree(ti, ett_mpls_pm_flags);
     proto_tree_add_item(pm_tree_flags, hf_mpls_pm_flags_r, tvb,
                         offset, 1, ENC_NA);
@@ -524,10 +532,10 @@ dissect_mpls_pm_loss(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     if (query) {
         proto_tree_add_item(pm_tree, hf_mpls_pm_query_ctrl_code,
-                            tvb, offset, 1, ENC_BIG_ENDIAN);
+                            tvb, offset, 1, ENC_NA);
     } else {
         proto_tree_add_item(pm_tree, hf_mpls_pm_response_ctrl_code,
-                            tvb, offset, 1, ENC_BIG_ENDIAN);
+                            tvb, offset, 1, ENC_NA);
     }
     offset += 1;
 
@@ -537,7 +545,7 @@ dissect_mpls_pm_loss(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     /* data flags subtree */
     ti = proto_tree_add_item(pm_tree, hf_mpls_pm_dflags, tvb,
-                             offset, 1, ENC_BIG_ENDIAN);
+                             offset, 1, ENC_NA);
     pm_tree_dflags = proto_item_add_subtree(ti, ett_mpls_pm_dflags);
     proto_tree_add_item(pm_tree_dflags, hf_mpls_pm_dflags_x, tvb,
                         offset, 1, ENC_NA);
@@ -558,7 +566,7 @@ dissect_mpls_pm_loss(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     proto_tree_add_uint(pm_tree, hf_mpls_pm_session_id, tvb, offset, 4, sid);
 
     if (class_specific) {
-        proto_tree_add_item(pm_tree, hf_mpls_pm_ds, tvb, offset + 3, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(pm_tree, hf_mpls_pm_ds, tvb, offset + 3, 1, ENC_NA);
     }
     offset += 4;
 
@@ -641,10 +649,10 @@ dissect_mpls_pm_delay(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     pm_tree = proto_item_add_subtree(ti, ett_mpls_pm);
 
     /* add version to the subtree */
-    proto_tree_add_item(pm_tree, hf_mpls_pm_version, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(pm_tree, hf_mpls_pm_version, tvb, offset, 1, ENC_NA);
 
     /* ctrl flags subtree */
-    ti = proto_tree_add_item(pm_tree, hf_mpls_pm_flags, tvb, offset, 1, ENC_BIG_ENDIAN);
+    ti = proto_tree_add_item(pm_tree, hf_mpls_pm_flags, tvb, offset, 1, ENC_NA);
     pm_tree_flags = proto_item_add_subtree(ti, ett_mpls_pm_flags);
     proto_tree_add_item(pm_tree_flags, hf_mpls_pm_flags_r, tvb,
                         offset, 1, ENC_NA);
@@ -656,10 +664,10 @@ dissect_mpls_pm_delay(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     if (query) {
         proto_tree_add_item(pm_tree, hf_mpls_pm_query_ctrl_code,
-                            tvb, offset, 1, ENC_BIG_ENDIAN);
+                            tvb, offset, 1, ENC_NA);
     } else {
         proto_tree_add_item(pm_tree, hf_mpls_pm_response_ctrl_code,
-                            tvb, offset, 1, ENC_BIG_ENDIAN);
+                            tvb, offset, 1, ENC_NA);
     }
     offset += 1;
 
@@ -687,7 +695,7 @@ dissect_mpls_pm_delay(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     proto_tree_add_uint(pm_tree, hf_mpls_pm_session_id, tvb, offset, 4, sid);
 
     if (class_specific) {
-        proto_tree_add_item(pm_tree, hf_mpls_pm_ds, tvb, offset + 3, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(pm_tree, hf_mpls_pm_ds, tvb, offset + 3, 1, ENC_NA);
     }
     offset += 4;
 
@@ -737,10 +745,10 @@ dissect_mpls_pm_combined(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     pm_tree = proto_item_add_subtree(ti, ett_mpls_pm);
 
     /* add version to the subtree */
-    proto_tree_add_item(pm_tree, hf_mpls_pm_version, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(pm_tree, hf_mpls_pm_version, tvb, offset, 1, ENC_NA);
 
     /* ctrl flags subtree */
-    ti = proto_tree_add_item(pm_tree, hf_mpls_pm_flags, tvb, offset, 1, ENC_BIG_ENDIAN);
+    ti = proto_tree_add_item(pm_tree, hf_mpls_pm_flags, tvb, offset, 1, ENC_NA);
     pm_tree_flags = proto_item_add_subtree(ti, ett_mpls_pm_flags);
     proto_tree_add_item(pm_tree_flags, hf_mpls_pm_flags_r, tvb,
                         offset, 1, ENC_NA);
@@ -752,10 +760,10 @@ dissect_mpls_pm_combined(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     if (query) {
         proto_tree_add_item(pm_tree, hf_mpls_pm_query_ctrl_code,
-                            tvb, offset, 1, ENC_BIG_ENDIAN);
+                            tvb, offset, 1, ENC_NA);
     } else {
         proto_tree_add_item(pm_tree, hf_mpls_pm_response_ctrl_code,
-                            tvb, offset, 1, ENC_BIG_ENDIAN);
+                            tvb, offset, 1, ENC_NA);
     }
     offset += 1;
 
@@ -765,7 +773,7 @@ dissect_mpls_pm_combined(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     /* data flags subtree */
     ti = proto_tree_add_item(pm_tree, hf_mpls_pm_dflags, tvb,
-                             offset, 1, ENC_BIG_ENDIAN);
+                             offset, 1, ENC_NA);
     pm_tree_dflags = proto_item_add_subtree(ti, ett_mpls_pm_dflags);
     proto_tree_add_item(pm_tree_dflags, hf_mpls_pm_dflags_x, tvb,
                         offset, 1, ENC_NA);
@@ -799,7 +807,7 @@ dissect_mpls_pm_combined(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     proto_tree_add_uint(pm_tree, hf_mpls_pm_session_id, tvb, offset, 4, sid);
 
     if (class_specific) {
-        proto_tree_add_item(pm_tree, hf_mpls_pm_ds, tvb, offset + 3, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(pm_tree, hf_mpls_pm_ds, tvb, offset + 3, 1, ENC_NA);
     }
     offset += 4;
 
@@ -1375,25 +1383,31 @@ proto_register_mpls_pm(void)
 
     proto_register_field_array(proto_mpls_pm_dlm, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
+
+    register_dissector("mpls_pm_dlm", dissect_mpls_pm_dlm,
+                       proto_mpls_pm_dlm);
+
+    register_dissector("mpls_pm_ilm", dissect_mpls_pm_ilm,
+                       proto_mpls_pm_ilm);
+
+    register_dissector("mpls_pm_dm", dissect_mpls_pm_delay,
+                       proto_mpls_pm_dm);
+
+    register_dissector("mpls_pm_dlm_dm", dissect_mpls_pm_dlm_dm,
+                       proto_mpls_pm_dlm_dm);
+
+    register_dissector("mpls_pm_ilm_dm", dissect_mpls_pm_ilm_dm,
+                       proto_mpls_pm_ilm_dm);
 }
 
 void
 proto_reg_handoff_mpls_pm(void)
 {
-    dissector_handle_t mpls_pm_dlm_handle, mpls_pm_ilm_handle, mpls_pm_dm_handle,
-                       mpls_pm_dlm_dm_handle, mpls_pm_ilm_dm_handle;
-
-    mpls_pm_dlm_handle    = create_dissector_handle( dissect_mpls_pm_dlm, proto_mpls_pm_dlm );
-    dissector_add_uint("pwach.channel_type", 0x000A, mpls_pm_dlm_handle); /* FF: MPLS PM, RFC 6374, DLM */
-    mpls_pm_ilm_handle    = create_dissector_handle( dissect_mpls_pm_ilm, proto_mpls_pm_ilm );
-    dissector_add_uint("pwach.channel_type", 0x000B, mpls_pm_ilm_handle); /* FF: MPLS PM, RFC 6374, ILM */
-    mpls_pm_dm_handle    = create_dissector_handle( dissect_mpls_pm_delay, proto_mpls_pm_dm );
-    dissector_add_uint("pwach.channel_type", 0x000C, mpls_pm_dm_handle); /* FF: MPLS PM, RFC 6374, DM */
-    mpls_pm_dlm_dm_handle    = create_dissector_handle( dissect_mpls_pm_dlm_dm, proto_mpls_pm_dlm_dm );
-    dissector_add_uint("pwach.channel_type", 0x000D, mpls_pm_dlm_dm_handle); /* FF: MPLS PM, RFC 6374, DLM+DM */
-    mpls_pm_ilm_dm_handle    = create_dissector_handle( dissect_mpls_pm_ilm_dm, proto_mpls_pm_ilm_dm );
-    dissector_add_uint("pwach.channel_type", 0x000E, mpls_pm_ilm_dm_handle); /* FF: MPLS PM, RFC 6374, ILM+DM */
-
+    mpls_pm_dlm_handle    = find_dissector("mpls_pm_dlm");
+    mpls_pm_ilm_handle    = find_dissector("mpls_pm_ilm");
+    mpls_pm_dm_handle     = find_dissector("mpls_pm_dm");
+    mpls_pm_dlm_dm_handle = find_dissector("mpls_pm_dlm_dm");
+    mpls_pm_ilm_dm_handle = find_dissector("mpls_pm_ilm_dm");
 }
 
 /*

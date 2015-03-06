@@ -19,8 +19,6 @@
 # in several formats.
 # See the Readme.txt file for instructions.
 #
-
-#
 VPATH = @srcdir@
 am__is_gnu_make = test -n '$(MAKEFILE_LIST)' && test -n '$(MAKELEVEL)'
 am__make_running_with_option = \
@@ -140,8 +138,8 @@ CCDEPMODE = @CCDEPMODE@
 CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
-CFLAGS_SSE42 = @CFLAGS_SSE42@
 CONFIG_ARGS = @CONFIG_ARGS@
+CONFIG_WITH_ARGS = @CONFIG_WITH_ARGS@
 COREFOUNDATION_FRAMEWORKS = @COREFOUNDATION_FRAMEWORKS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -167,7 +165,6 @@ ELINKS = @ELINKS@
 ENABLE_STATIC = @ENABLE_STATIC@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FLOORL_LO = @FLOORL_LO@
 FOP = @FOP@
 GEOIP_LIBS = @GEOIP_LIBS@
 GETOPT_LO = @GETOPT_LO@
@@ -240,7 +237,7 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
-LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDES = @LUA_INCLUDES@
 LUA_LIBS = @LUA_LIBS@
 LYNX = @LYNX@
 MAKEINFO = @MAKEINFO@
@@ -276,14 +273,14 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_LIBS = @PLUGIN_LIBS@
 POD2HTML = @POD2HTML@
 POD2MAN = @POD2MAN@
-POPCOUNT_LO = @POPCOUNT_LO@
 PORTAUDIO_INCLUDES = @PORTAUDIO_INCLUDES@
 PORTAUDIO_LIBS = @PORTAUDIO_LIBS@
 PYTHON = @PYTHON@
+PY_CFLAGS = @PY_CFLAGS@
+PY_LIBS = @PY_LIBS@
 QT_MIN_VERSION = @QT_MIN_VERSION@
 Qt_LIBS = @Qt_LIBS@
 RANLIB = @RANLIB@
-RCC = @RCC@
 RPMBUILD_WITH_ARGS = @RPMBUILD_WITH_ARGS@
 SBC_CFLAGS = @SBC_CFLAGS@
 SBC_LIBS = @SBC_LIBS@
@@ -294,6 +291,8 @@ SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+STRNCASECMP_LO = @STRNCASECMP_LO@
+STRPTIME_C = @STRPTIME_C@
 STRPTIME_LO = @STRPTIME_LO@
 SYSTEMCONFIGURATION_FRAMEWORKS = @SYSTEMCONFIGURATION_FRAMEWORKS@
 UIC = @UIC@
@@ -313,6 +312,7 @@ ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 ac_cv_wireshark_have_rpm = @ac_cv_wireshark_have_rpm@
+ac_ws_python_config = @ac_ws_python_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -342,8 +342,6 @@ echld_test_bin = @echld_test_bin@
 editcap_bin = @editcap_bin@
 editcap_man = @editcap_man@
 exec_prefix = @exec_prefix@
-extcapdir = @extcapdir@
-have_sw_vers = @have_sw_vers@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -364,10 +362,10 @@ mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 plugindir = @plugindir@
-plugins_dir = @plugins_dir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pythondir = @pythondir@
 randpkt_bin = @randpkt_bin@
 randpkt_man = @randpkt_man@
 rawshark_bin = @rawshark_bin@
@@ -417,28 +415,29 @@ A2X_TEXT_OPTS = "--lynx"
 # (See Bug # 1446 for note re 'force-html' below)
 # Sorry about the indenting, but that's what automake requires...
 @HAVE_ELINKS_TRUE@HTML2TXT = $(ELINKS) -dump -dump-width 72
-WSUG_FILES = \
-	wsug_src/WSUG_app_files.asciidoc		\
-	wsug_src/WSUG_app_howitworks.asciidoc		\
-	wsug_src/WSUG_app_messages.asciidoc		\
-	wsug_src/WSUG_app_protocols.asciidoc		\
-	wsug_src/WSUG_app_tools.asciidoc		\
-	wsug_src/WSUG_chapter_advanced.asciidoc		\
-	wsug_src/WSUG_chapter_build_install.asciidoc	\
-	wsug_src/WSUG_chapter_capture.asciidoc		\
-	wsug_src/WSUG_chapter_customize.asciidoc	\
-	wsug_src/WSUG_chapter_introduction.asciidoc	\
-	wsug_src/WSUG_chapter_io.asciidoc		\
-	wsug_src/WSUG_chapter_statistics.asciidoc	\
-	wsug_src/WSUG_chapter_telephony.asciidoc	\
-	wsug_src/WSUG_chapter_troubleshoot.asciidoc	\
-	wsug_src/WSUG_chapter_use.asciidoc		\
-	wsug_src/WSUG_chapter_work.asciidoc		\
-	wsug_src/WSUG_preface.asciidoc			\
-	ws.css
 
-WSUG_GENERATED_SOURCE = \
-	user-guide.xml
+#
+WSUG_FILES = \
+	wsug_src/WSUG_app_files.xml		\
+	wsug_src/WSUG_app_howitworks.xml	\
+	wsug_src/WSUG_app_messages.xml		\
+	wsug_src/WSUG_app_protocols.xml		\
+	wsug_src/WSUG_app_tools.xml		\
+	wsug_src/WSUG_chapter_advanced.xml	\
+	wsug_src/WSUG_chapter_build_install.xml	\
+	wsug_src/WSUG_chapter_capture.xml	\
+	wsug_src/WSUG_chapter_customize.xml	\
+	wsug_src/WSUG_chapter_introduction.xml	\
+	wsug_src/WSUG_chapter_io.xml		\
+	wsug_src/WSUG_chapter_statistics.xml	\
+	wsug_src/WSUG_chapter_telephony.xml	\
+	wsug_src/WSUG_chapter_troubleshoot.xml	\
+	wsug_src/WSUG_chapter_use.xml		\
+	wsug_src/WSUG_chapter_work.xml		\
+	wsug_src/WSUG_meta_info.xml		\
+	wsug_src/WSUG_preface.xml		\
+	wsluarm.xml				\
+	ws.css
 
 WSUG_GRAPHICS = \
 	wsug_graphics/captureOptions.png		\
@@ -507,9 +506,11 @@ WSUG_GRAPHICS = \
 	wsug_graphics/ws-main-toolbar.png		\
 	wsug_graphics/ws-main.png			\
 	wsug_graphics/ws-menu.png			\
+	wsug_graphics/ws-merge-gtk20.png		\
 	wsug_graphics/ws-merge-gtk24.png		\
 	wsug_graphics/ws-merge-win32.png		\
 	wsug_graphics/ws-nameresolution-preferences.png	\
+	wsug_graphics/ws-open-gtk20.png			\
 	wsug_graphics/ws-open-gtk24.png			\
 	wsug_graphics/ws-open-win32.png			\
 	wsug_graphics/ws-packet-format.png		\
@@ -519,6 +520,7 @@ WSUG_GRAPHICS = \
 	wsug_graphics/ws-packet-sep-win.png		\
 	wsug_graphics/ws-print.png			\
 	wsug_graphics/ws-printing-preferences.png	\
+	wsug_graphics/ws-save-as-gtk20.png		\
 	wsug_graphics/ws-save-as-gtk24.png		\
 	wsug_graphics/ws-save-as-win32.png		\
 	wsug_graphics/ws-statistics-menu.png		\
@@ -543,6 +545,9 @@ WSUG_GRAPHICS = \
 	wsug_graphics/ws-tools-menu.png	\
 	wsug_graphics/ws-time-reference.png		\
 	wsug_graphics/ws-view-menu.png			\
+	wsug_graphics/note.png				\
+	wsug_graphics/tip.png				\
+	wsug_graphics/warning.png				\
 	wsug_graphics/toolbar/autoscroll_24.png			\
 	wsug_graphics/toolbar/capture_filter_24.png		\
 	wsug_graphics/toolbar/capture_interfaces_24.png 	\
@@ -589,7 +594,6 @@ WSDG_FILES = \
 	wsdg_src/WSDG_chapter_userinterface.asciidoc	\
 	wsdg_src/WSDG_chapter_works.asciidoc		\
 	wsdg_src/WSDG_preface.asciidoc			\
-	wsluarm.asciidoc				\
 	ws.css
 
 WSDG_GENERATED_SOURCE = \
@@ -603,44 +607,37 @@ WSDG_GRAPHICS = \
 	wsdg_graphics/ws-function-blocks.dia	\
 	wsdg_graphics/ws-function-blocks.png	\
 	wsdg_graphics/ws-logo.png		\
+	wsdg_graphics/note.png			\
+	wsdg_graphics/tip.png			\
+	wsdg_graphics/warning.png		\
 	wsdg_graphics/toolbar/dummy.dummy
-
-COMMON_GRAPHICS = \
-	common_graphics/note.svg	\
-	common_graphics/tip.svg		\
-	common_graphics/warning.svg
 
 
 # user-guide.xml must be first in the list (to match $<)
-WSUG_DIST = \
-	user-guide.asciidoc	\
-	GPL_appendix.asciidoc	\
-	custom_layer_chm.xsl	\
+WSUG_SOURCE = \
+	user-guide.xml		\
+	git_version.xml		\
+	GPL_appendix.xml	\
 	custom_layer_pdf.xsl	\
 	Makefile.common		\
 	$(WSUG_FILES)		\
-	$(WSUG_GRAPHICS)	\
-	$(COMMON_GRAPHICS)
+	$(WSUG_GRAPHICS)
 
-WSUG_SOURCE = $(WSUG_GENERATED_SOURCE) $(WSUG_DIST)
-
-# developer-guide.asciidoc must be first in the list (to match $<)
 WSDG_DIST = \
 	developer-guide.asciidoc	\
 	GPL_appendix.asciidoc	\
-	custom_layer_chm.xsl	\
 	custom_layer_pdf.xsl	\
 	Makefile.common		\
 	$(WSDG_FILES)		\
-	$(WSDG_GRAPHICS)	\
-	$(COMMON_GRAPHICS)
+	$(WSDG_GRAPHICS)
 
+
+# developer-guide.xml must be first in the list (to match $<)
 WSDG_SOURCE = $(WSDG_GENERATED_SOURCE) $(WSDG_DIST)
 RELEASE_NOTES_SOURCE = \
 	release-notes.asciidoc	\
 	Makefile.common		\
-	asciidoc.conf		\
-	asciidoctor-asciidoc.conf
+	asciidoc.conf
 
 CLEANFILES = \
 	*.chm			\
@@ -650,7 +647,6 @@ CLEANFILES = \
 	*.pdf			\
 	*.validated		\
 	$(WSDG_GENERATED_SOURCE) \
-	$(WSUG_GENERATED_SOURCE) \
 	wsdg_chm		\
 	wsdg_html.zip		\
 	wsdg_html_chunked.zip	\
@@ -673,42 +669,19 @@ CLEANDIRS = \
 	wsluarm_src
 
 WSLUA_MODULES = \
-	$(top_srcdir)/epan/wslua/wslua_dumper.c \
-	$(top_srcdir)/epan/wslua/wslua_field.c \
-	$(top_srcdir)/epan/wslua/wslua_gui.c \
-	$(top_srcdir)/epan/wslua/wslua_listener.c \
-	$(top_srcdir)/epan/wslua/wslua_pinfo.c \
-	$(top_srcdir)/epan/wslua/wslua_proto.c \
-	$(top_srcdir)/epan/wslua/wslua_int64.c \
-	$(top_srcdir)/epan/wslua/wslua_struct.c \
-	$(top_srcdir)/epan/wslua/wslua_tree.c \
-	$(top_srcdir)/epan/wslua/wslua_tvb.c \
-	$(top_srcdir)/epan/wslua/wslua_file.c \
-	$(top_srcdir)/epan/wslua/wslua_dir.c \
-	$(top_srcdir)/epan/wslua/wslua_util.c
-
-COMMON_XSLTPROC_ARGS = \
-	--stringparam use.id.as.filename 1 \
-	--stringparam admon.graphics 1 \
-	--stringparam admon.graphics.extension .svg \
-	--stringparam section.autolabel 1 \
-	--stringparam section.label.includes.component.label 1 \
-	--stringparam html.stylesheet ws.css
-
-WSUG_XSLTPROC_ARGS = \
-	--stringparam admon.graphics.path wsug_graphics/
-
-WSDG_XSLTPROC_ARGS = \
-	--stringparam admon.graphics.path wsdg_graphics/
-
-SINGLE_XSLTPROC_ARGS = \
-	--nonet http://docbook.sourceforge.net/release/xsl/current/html/docbook.xsl
-
-CHUNKED_XSLTPROC_ARGS = \
-	--nonet http://docbook.sourceforge.net/release/xsl/current/html/chunk.xsl
-
-HTMLHELP_XSLTPROC_ARGS = \
-	--nonet custom_layer_chm.xsl
+	../epan/wslua/wslua_dumper.c \
+	../epan/wslua/wslua_field.c \
+	../epan/wslua/wslua_gui.c \
+	../epan/wslua/wslua_listener.c \
+	../epan/wslua/wslua_pinfo.c \
+	../epan/wslua/wslua_proto.c \
+	../epan/wslua/wslua_int64.c \
+	../epan/wslua/wslua_struct.c \
+	../epan/wslua/wslua_tree.c \
+	../epan/wslua/wslua_tvb.c \
+	../epan/wslua/wslua_file.c \
+	../epan/wslua/wslua_dir.c \
+	../epan/wslua/wslua_util.c
 
 # if we don't have XSLTPROC, there's nothing to do...
 @HAVE_XSLTPROC_FALSE@ALL_TARGETS = git_version_check
@@ -725,7 +698,7 @@ HTMLHELP_XSLTPROC_ARGS = \
 @HAVE_FOP_FALSE@RELEASE_NOTES_TARGETS = release-notes.html release-notes.txt
 @HAVE_FOP_TRUE@RELEASE_NOTES_TARGETS = release-notes.html release-notes.txt release-notes-a4.pdf release-notes-us.pdf
 EXTRA_DIST = \
-	$(WSUG_DIST)		\
+	$(WSUG_SOURCE)		\
 	$(WSDG_DIST)		\
 	$(RELEASE_NOTES_SOURCE)	\
 	check_git_version.sh	\
@@ -932,7 +905,6 @@ uninstall-am:
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags-am uninstall uninstall-am
 
-#	--nonet http://docbook.sourceforge.net/release/xsl/current/htmlhelp/htmlhelp.xsl
 
 ############### YOU SHOULDN'T HAVE TO EDIT ANYTHING BELOW THIS LINE! ################
 
@@ -943,6 +915,19 @@ uninstall-am:
 @HAVE_FOP_FALSE@	@echo
 @HAVE_FOP_FALSE@	@echo "Error: FOP is needed to create PDFs!"
 @HAVE_FOP_FALSE@	@false
+
+# Convert an AsciiDoc document to a DocBook chapter
+# Used for chapter-by-chapter conversion from DocBook to AsciiDoc.
+# Can be removed after the User's Guide is converted.
+# .asciidoc -> whole book (.dbk) -> chapter (.xml)
+wsug_src/%.asciidoc : wsug_src/%.xml
+	$(A2X) --verbose \
+		--asciidoc-opts="--conf-file=asciidoc.conf" \
+		--no-xmllint \
+		--format=docbook --doctype=book \
+		$<
+	mv $*.xml $*.dbk
+	xmllint --xpath '//chapter | //preface' $*.dbk > $@
 
 all: $(ALL_TARGETS)
 
@@ -959,18 +944,10 @@ git_version.xml: git_version_check
 
 wsug: $(WSUG_TARGETS)
 
-user-guide.xml: user-guide.asciidoc $(WSUG_FILES)
-	$(A2X) --verbose \
-		--attribute=docinfo \
-		--asciidoc-opts="--conf-file=$(srcdir)/asciidoc.conf --conf-file=$(srcdir)/asciidoctor-asciidoc.conf" \
-		--no-xmllint \
-		--format=docbook \
-		$<
-
 # validate the content
-wsug.validated: $(WSUG_SOURCE)
+wsug.validated: $(WSUG_SOURCE) wsluarm
 @HAVE_XMLLINT_TRUE@	@ echo --- WSUG - VALIDATING XML ---
-@HAVE_XMLLINT_TRUE@	$(XMLLINT) --path .:$(srcdir) --valid --noout $<
+@HAVE_XMLLINT_TRUE@	$(XMLLINT) --valid --noout $<
 @HAVE_XMLLINT_TRUE@	touch $@
 @HAVE_XMLLINT_FALSE@	@ echo --- WSUG - SKIP VALIDATION ---
 
@@ -981,11 +958,13 @@ wsug_html/index.html: $(WSUG_SOURCE) wsluarm
 	@ echo --- WSUG - HTML SINGLE PAGE ---
 	mkdir -p wsug_html/wsug_graphics/toolbar
 	cp $(srcdir)/wsug_graphics/*.* wsug_html/wsug_graphics
-	cp $(srcdir)/common_graphics/*.* wsug_html/wsug_graphics
 	cp $(srcdir)/wsug_graphics/toolbar/* wsug_html/wsug_graphics/toolbar
 	cp $(srcdir)/ws.css wsug_html
-	$(XSLTPROC) --stringparam base.dir wsug_html/ $(COMMON_XSLTPROC_ARGS) \
-		$(WSUG_XSLTPROC_ARGS) $(SINGLE_XSLTPROC_ARGS) $< > $@
+	$(XSLTPROC) --stringparam base.dir wsug_html/ --stringparam  use.id.as.filename 1 \
+		    --stringparam admon.graphics 1 --stringparam admon.graphics.path wsug_graphics/ \
+		    --stringparam section.autolabel 1 --stringparam  section.label.includes.component.label 1 \
+		    --stringparam html.stylesheet ws.css \
+		    --nonet http://docbook.sourceforge.net/release/xsl/current/html/docbook.xsl $< > $@
 	-chmod -R og+rX wsug_html
 
 # create html chunked page files
@@ -995,26 +974,26 @@ wsug_html_chunked/index.html: $(WSUG_SOURCE) wsluarm
 	@ echo --- WSUG - HTML CHUNKED ---
 	mkdir -p wsug_html_chunked/wsug_graphics/toolbar
 	cp $(srcdir)/wsug_graphics/*.* wsug_html_chunked/wsug_graphics
-	cp $(srcdir)/common_graphics/*.* wsug_html_chunked/wsug_graphics
 	cp $(srcdir)/wsug_graphics/toolbar/* wsug_html_chunked/wsug_graphics/toolbar
 	cp $(srcdir)/ws.css wsug_html_chunked
-	$(XSLTPROC) --stringparam base.dir wsug_html_chunked/ $(COMMON_XSLTPROC_ARGS) \
-		    $(WSUG_XSLTPROC_ARGS) $(CHUNKED_XSLTPROC_ARGS) $<
+	$(XSLTPROC) --stringparam base.dir wsug_html_chunked/ --stringparam  use.id.as.filename 1 \
+		    --stringparam admon.graphics 1 --stringparam admon.graphics.path wsug_graphics/ \
+		    --stringparam section.autolabel 1 --stringparam  section.label.includes.component.label 1 \
+		    --stringparam html.stylesheet ws.css \
+		    --nonet http://docbook.sourceforge.net/release/xsl/current/html/chunk.xsl $<
 	-chmod -R og+rX wsug_html_chunked
 
 # create pdf file (through XSL-FO), portrait pages on US letter paper
 # you will get lot's of errors, but that's ok
 user-guide-us.fo: $(WSUG_SOURCE) custom_layer_pdf.xsl wsluarm
 	@ echo --- WSUG - PDF US PAPER ---
-	$(XSLTPROC) --stringparam paper.type letter \
-		--nonet custom_layer_pdf.xsl $< > $@
+	$(XSLTPROC) --stringparam paper.type letter --nonet custom_layer_pdf.xsl $< > $@
 
 # create pdf file (through XSL-FO), portrait pages on A4 paper
 # you will get lot's of errors, but that's ok
 user-guide-a4.fo: $(WSUG_SOURCE) custom_layer_pdf.xsl wsluarm
 	@ echo --- WSUG - PDF A4 PAPER ---
-	$(XSLTPROC) --stringparam paper.type A4 \
-		--nonet custom_layer_pdf.xsl $< > $@
+	$(XSLTPROC) --stringparam paper.type A4 --nonet custom_layer_pdf.xsl $< > $@
 
 wsluarm: make-wsluarm.pl $(WSLUA_MODULES)
 	mkdir -p wsluarm_src
@@ -1026,7 +1005,7 @@ wsdg: $(WSDG_TARGETS)
 developer-guide.xml: developer-guide.asciidoc $(WSDG_FILES)
 	$(A2X) --verbose \
 		--attribute=docinfo \
-		--asciidoc-opts="--conf-file=$(srcdir)/asciidoc.conf --conf-file=$(srcdir)/asciidoctor-asciidoc.conf" \
+		--asciidoc-opts="--conf-file=asciidoc.conf" \
 		--no-xmllint \
 		--format=docbook \
 		$<
@@ -1034,23 +1013,24 @@ developer-guide.xml: developer-guide.asciidoc $(WSDG_FILES)
 # validate the content
 wsdg.validated: $(WSDG_SOURCE)
 @HAVE_XMLLINT_TRUE@	@ echo --- WSDG - VALIDATING XML ---
-@HAVE_XMLLINT_TRUE@	$(XMLLINT) --path .:wsluarm_src:$(srcdir) --valid --noout $<
+@HAVE_XMLLINT_TRUE@	$(XMLLINT) --valid --noout $<
 @HAVE_XMLLINT_TRUE@	touch $@
 @HAVE_XMLLINT_FALSE@	@ echo --- WSDG - SKIP VALIDATION ---
 
 # create html single page file
-wsdg_html: wsdg_html/index.html wsluarm
+wsdg_html: wsdg_html/index.html
 
 wsdg_html/index.html: $(WSDG_SOURCE)
 	@ echo --- WSDG - HTML SINGLE PAGE ---
 	mkdir -p wsdg_html/wsdg_graphics/toolbar
 	cp $(srcdir)/wsdg_graphics/*.* wsdg_html/wsdg_graphics
-	cp $(srcdir)/common_graphics/*.* wsdg_html/wsdg_graphics
-	cp $(srcdir)/wsdg_graphics/toolbar/* wsdg_html/wsdg_graphics/toolbar/
+	cp wsdg_graphics/toolbar/* wsdg_html/wsdg_graphics/toolbar/
 	cp $(srcdir)/ws.css wsdg_html
-	$(XSLTPROC) --stringparam base.dir wsdg_html/ $(COMMON_XSLTPROC_ARGS) \
-		--path .:wsluarm_src \
-		$(WSDG_XSLTPROC_ARGS) $(SINGLE_XSLTPROC_ARGS) $< > $@
+	$(XSLTPROC) --stringparam base.dir wsdg_html/ --stringparam  use.id.as.filename 1 \
+		    --stringparam admon.graphics 1 --stringparam admon.graphics.path wsdg_graphics/ \
+		    --stringparam section.autolabel 1 --stringparam  section.label.includes.component.label 1 \
+		    --stringparam html.stylesheet ws.css \
+		    --nonet http://docbook.sourceforge.net/release/xsl/current/html/docbook.xsl $< > $@
 	-chmod -R og+rX wsdg_html
 
 # create html chunked page files
@@ -1060,48 +1040,44 @@ wsdg_html_chunked/index.html: $(WSDG_SOURCE)
 	@ echo --- WSDG - HTML CHUNKED ---
 	mkdir -p wsdg_html_chunked/wsdg_graphics/toolbar
 	cp $(srcdir)/wsdg_graphics/*.* wsdg_html_chunked/wsdg_graphics
-	cp $(srcdir)/common_graphics/*.* wsdg_html_chunked/wsdg_graphics
-	cp $(srcdir)/wsdg_graphics/toolbar/* wsdg_html_chunked/wsdg_graphics/toolbar/
+	cp wsdg_graphics/toolbar/* wsdg_html_chunked/wsdg_graphics/toolbar/
 	cp $(srcdir)/ws.css wsdg_html_chunked
-	$(XSLTPROC) --stringparam base.dir wsdg_html_chunked/ $(COMMON_XSLTPROC_ARGS) \
-		--path .:wsluarm_src \
-		$(WSDG_XSLTPROC_ARGS) $(CHUNKED_XSLTPROC_ARGS) $<
+	$(XSLTPROC) --stringparam base.dir wsdg_html_chunked/ --stringparam  use.id.as.filename 1 \
+		    --stringparam admon.graphics 1 --stringparam admon.graphics.path wsdg_graphics/  \
+		    --stringparam section.autolabel 1 --stringparam  section.label.includes.component.label 1 \
+		    --stringparam html.stylesheet ws.css \
+		    --nonet http://docbook.sourceforge.net/release/xsl/current/html/chunk.xsl $<
 	-chmod -R og+rX wsdg_html_chunked
 
 # create pdf file (through XSL-FO), portrait pages on US letter paper
 # you will get lot's of errors, but that's ok
 developer-guide-us.fo: $(WSDG_SOURCE) custom_layer_pdf.xsl
 	@ echo --- WSDG - PDF US PAPER ---
-	$(XSLTPROC) --stringparam paper.type letter \
-		    --path .:wsluarm_src:$(srcdir) \
-		    --nonet custom_layer_pdf.xsl $< > $@
+	$(XSLTPROC) --stringparam paper.type letter --nonet custom_layer_pdf.xsl $< > $@
 
 # create pdf file (through XSL-FO), portrait pages on A4 paper
 # you will get lot's of errors, but that's ok
 developer-guide-a4.fo: $(WSDG_SOURCE) custom_layer_pdf.xsl
 	@ echo --- WSDG - PDF A4 PAPER ---
-	$(XSLTPROC) --stringparam paper.type A4 \
-		    --path .:wsluarm_src:$(srcdir) \
-		    --nonet custom_layer_pdf.xsl $< > $@
+	$(XSLTPROC) --stringparam paper.type A4 --nonet custom_layer_pdf.xsl $< > $@
 
 release_notes: $(RELEASE_NOTES_TARGETS)
 
 # create html single page file
 release-notes.html: $(RELEASE_NOTES_SOURCE)
 	@ echo --- RELEASE NOTES - HTML ---
-	$(A2X) --format=xhtml $(A2X_HTML_OPTS) $(srcdir)/release-notes.asciidoc
+	$(A2X) --format=xhtml $(A2X_HTML_OPTS) release-notes.asciidoc
 
 # create txt single page file (through HTML)
 release-notes.txt: $(RELEASE_NOTES_SOURCE)
 	@ echo --- RELEASE NOTES - TXT ---
-	TZ=UTC $(A2X) --format=text $(A2X_TEXT_OPTS) \
+	$(A2X) --format=text $(A2X_TEXT_OPTS) \
 		--xsltproc-opts "--stringparam generate.toc \"article nop\"" \
-		$(srcdir)/release-notes.asciidoc
-	mv $(srcdir)/release-notes.text $@
+		release-notes.asciidoc
+	mv release-notes.text $@
 
 news: release-notes.txt
 	cp release-notes.txt ../NEWS
-	-cp release-notes.txt $(top_srcdir)/NEWS
 
 # Apparently we can only run one instance of a2x at a time.
 .NOTPARALLEL: release-notes-us.pdf release-notes-a4.pdf
@@ -1110,18 +1086,18 @@ release-notes-us.pdf: $(RELEASE_NOTES_SOURCE) custom_layer_pdf.xsl
 	@ echo --- RELEASE NOTES - PDF US LETTER PAPER ---
 	$(A2X) --format=pdf $(A2X_HTML_OPTS) --fop \
 		--xsltproc-opts "--stringparam paper.type letter --nonet" \
-		--xsl-file=$(srcdir)/custom_layer_pdf.xsl \
-		$(srcdir)/release-notes.asciidoc
-	mv $(srcdir)/release-notes.pdf $@
+		--xsl-file=custom_layer_pdf.xsl \
+		release-notes.asciidoc
+	mv release-notes.pdf $@
 
 # create pdf file, portrait pages on A4 paper
 release-notes-a4.pdf: $(RELEASE_NOTES_SOURCE) custom_layer_pdf.xsl
 	@ echo --- RELEASE NOTES - PDF A4 PAPER ---
 	$(A2X) --format=pdf $(A2X_HTML_OPTS) --fop \
 		--xsltproc-opts "--stringparam paper.type A4 --nonet" \
-		--xsl-file=$(srcdir)/custom_layer_pdf.xsl \
-		$(srcdir)/release-notes.asciidoc
-	mv $(srcdir)/release-notes.pdf $@
+		--xsl-file=custom_layer_pdf.xsl \
+		release-notes.asciidoc
+	mv release-notes.pdf $@
 
 clean-local:
 	-rm -rf $(CLEANDIRS)

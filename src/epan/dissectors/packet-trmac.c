@@ -23,6 +23,8 @@
 
 #include "config.h"
 
+#include <string.h>
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/to_str.h>
 #include <epan/expert.h>
@@ -50,6 +52,7 @@ static int hf_trmac_errors_freq = -1;
 static int hf_trmac_errors_token = -1;
 static int hf_trmac_naun = -1;
 static int hf_trmac_beacon_type = -1;
+/* Generated from convert_proto_tree_add_text.pl */
 static int hf_trmac_assign_physical_drop_number = -1;
 static int hf_trmac_error_code = -1;
 static int hf_trmac_group_address32 = -1;
@@ -65,15 +68,6 @@ static int hf_trmac_physical_drop_number = -1;
 static int hf_trmac_authorized_function_classes = -1;
 static int hf_trmac_local_ring_number = -1;
 static int hf_trmac_functional_addresses = -1;
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_trmac_unknown_subvector = -1;
-static int hf_trmac_response_code48 = -1;
-static int hf_trmac_product_instance_id = -1;
-static int hf_trmac_ring_station_version_number = -1;
-static int hf_trmac_wrap_data = -1;
-static int hf_trmac_ring_station_status = -1;
-static int hf_trmac_frame_forward = -1;
-static int hf_trmac_response_code32 = -1;
 
 static gint ett_tr_mac = -1;
 static gint ett_tr_sv = -1;
@@ -84,33 +78,32 @@ static expert_field ei_trmac_sv_len = EI_INIT;
 
 /* Major Vector */
 static const value_string major_vector_vs[] = {
-	{ 0x00, "Response" },
-	{ 0x02, "Beacon" },
-	{ 0x03, "Claim Token" },
-	{ 0x04, "Ring Purge" },
-	{ 0x05, "Active Monitor Present" },
-	{ 0x06, "Standby Monitor Present" },
-	{ 0x07, "Duplicate Address Test" },
-	{ 0x09, "Transmit Forward" },
-	{ 0x0B, "Remove Ring Station" },
-	{ 0x0C, "Change Parameters" },
-	{ 0x0D, "Initialize Ring Station" },
-	{ 0x0E, "Request Ring Station Address" },
-	{ 0x0F, "Request Ring Station Address" },
-	{ 0x10, "Request Ring Station Attachments" },
-	{ 0x20, "Request Initialization" },
-	{ 0x22, "Report Ring Station Address" },
-	{ 0x23, "Report Ring Station State" },
-	{ 0x24, "Report Ring Station Attachments" },
-	{ 0x25, "Report New Active Monitor" },
-	{ 0x26, "Report NAUN Change" },
-	{ 0x27, "Report Poll Error" },
-	{ 0x28, "Report Monitor Errors" },
-	{ 0x29, "Report Error" },
-	{ 0x2A, "Report Transmit Forward" },
-	{ 0x00, NULL }
+		{ 0x00, "Response" },
+		{ 0x02, "Beacon" },
+		{ 0x03, "Claim Token" },
+		{ 0x04, "Ring Purge" },
+		{ 0x05, "Active Monitor Present" },
+		{ 0x06, "Standby Monitor Present" },
+		{ 0x07, "Duplicate Address Test" },
+		{ 0x09, "Transmit Forward" },
+		{ 0x0B, "Remove Ring Station" },
+		{ 0x0C, "Change Parameters" },
+		{ 0x0D, "Initialize Ring Station" },
+		{ 0x0E, "Request Ring Station Address" },
+		{ 0x0F, "Request Ring Station Address" },
+		{ 0x10, "Request Ring Station Attachments" },
+		{ 0x20, "Request Initialization" },
+		{ 0x22, "Report Ring Station Address" },
+		{ 0x23, "Report Ring Station State" },
+		{ 0x24, "Report Ring Station Attachments" },
+		{ 0x25, "Report New Active Monitor" },
+		{ 0x26, "Report NAUN Change" },
+		{ 0x27, "Report Poll Error" },
+		{ 0x28, "Report Monitor Errors" },
+		{ 0x29, "Report Error" },
+		{ 0x2A, "Report Transmit Forward" },
+		{ 0x00, NULL }
 };
-static value_string_ext major_vector_vs_ext = VALUE_STRING_EXT_INIT(major_vector_vs);
 
 /* Src. and Dest. Classes */
 static const value_string classes_vs[] = {
@@ -123,34 +116,33 @@ static const value_string classes_vs[] = {
 };
 
 static const value_string subvector_vs[] = {
-	{ 0x01, "Beacon Type" },
-	{ 0x02, "Upstream Neighbor's Address" },
-	{ 0x03, "Local Ring Number" },
-	{ 0x04, "Assign Physical Drop Number" },
-	{ 0x05, "Error Report Timer Value" },
-	{ 0x06, "Authorized Function Classes" },
-	{ 0x07, "Authorized Access Priority" },
-	{ 0x09, "Correlator" },
-	{ 0x0A, "SA of Last AMP or SMP Frame" },
-	{ 0x0B, "Physical Drop Number" },
-	{ 0x20, "Response Code" },
-	{ 0x21, "Individual Address Count" },
-	{ 0x22, "Product Instance ID" },
-	{ 0x23, "Ring Station Version Number" },
-	{ 0x26, "Wrap Data" },
-	{ 0x27, "Frame Forward" },
-	{ 0x28, "Station Identifier" },
-	{ 0x29, "Ring Station Status" },
-	{ 0x2A, "Transmit Forward Status Code" },
-	{ 0x2B, "Group Addresses" },
-	{ 0x2C, "Functional Addresses" },
-	{ 0x2D, "Isolating Error Counts" },
-	{ 0x2E, "Non-Isolating Error Counts" },
-	{ 0x2F, "Function Request ID" },
-	{ 0x30, "Error Code" },
-	{ 0x00, NULL }
+		{ 0x01, "Beacon Type" },
+		{ 0x02, "Upstream Neighbor's Address" },
+		{ 0x03, "Local Ring Number" },
+		{ 0x04, "Assign Physical Drop Number" },
+		{ 0x05, "Error Report Timer Value" },
+		{ 0x06, "Authorized Function Classes" },
+		{ 0x07, "Authorized Access Priority" },
+		{ 0x09, "Correlator" },
+		{ 0x0A, "SA of Last AMP or SMP Frame" },
+		{ 0x0B, "Physical Drop Number" },
+		{ 0x20, "Response Code" },
+		{ 0x21, "Individual Address Count" },
+		{ 0x22, "Product Instance ID" },
+		{ 0x23, "Ring Station Version Number" },
+		{ 0x26, "Wrap Data" },
+		{ 0x27, "Frame Forward" },
+		{ 0x28, "Station Identifier" },
+		{ 0x29, "Ring Station Status" },
+		{ 0x2A, "Transmit Forward Status Code" },
+		{ 0x2B, "Group Addresses" },
+		{ 0x2C, "Functional Addresses" },
+		{ 0x2D, "Isolating Error Counts" },
+		{ 0x2E, "Non-Isolating Error Counts" },
+		{ 0x2F, "Function Request ID" },
+		{ 0x30, "Error Code" },
+		{ 0x00, NULL }
 };
-static value_string_ext subvector_vs_ext = VALUE_STRING_EXT_INIT(subvector_vs);
 
 static const value_string beacon_vs[] = {
 	{ 0x00, "Recovery mode set" },
@@ -173,10 +165,11 @@ sv_text(tvbuff_t *tvb, int svoff, packet_info *pinfo, proto_tree *tree)
 
 	guchar		errors[6];	/* isolating or non-isolating */
 
-	sv_tree = proto_tree_add_subtree(tree, tvb, svoff+0, 1, ett_tr_sv, &sv_item, "Subvector");
+	sv_item = proto_tree_add_text(tree, tvb, svoff+0, 1, "Subvector");
+	sv_tree = proto_item_add_subtree(sv_item, ett_tr_sv);
 
 	sv_length = tvb_get_guint8(tvb, svoff+0);
-	len_item = proto_tree_add_item(sv_tree, hf_trmac_sv_len, tvb, svoff+0, 1, ENC_BIG_ENDIAN);
+	len_item = proto_tree_add_item(sv_tree, hf_trmac_sv_len, tvb, svoff+0, 1, ENC_NA);
 
 	/* Check the SV length; it must be at least 2, to include
 	   the subvector length and indicator. */
@@ -187,8 +180,8 @@ sv_text(tvbuff_t *tvb, int svoff, packet_info *pinfo, proto_tree *tree)
 	}
 
 	sv_id = tvb_get_guint8(tvb, svoff+1);
-	proto_tree_add_item(sv_tree, hf_trmac_sv_id, tvb, svoff+1, 1, ENC_BIG_ENDIAN);
-	proto_item_append_text(sv_item, " (%s)", val_to_str_ext(sv_id, &subvector_vs_ext, "Unknown subvector ID 0x%02X"));
+	proto_tree_add_item(sv_tree, hf_trmac_sv_id, tvb, svoff+1, 1, ENC_NA);
+	proto_item_append_text(sv_item, " (%s)", val_to_str(sv_id, subvector_vs, "Unknown subvector ID 0x%02X"));
 
 	switch(sv_id) {
 		case 0x01: /* Beacon Type */
@@ -198,7 +191,8 @@ sv_text(tvbuff_t *tvb, int svoff, packet_info *pinfo, proto_tree *tree)
 				break;
 			}
 			beacon_type = tvb_get_ntohs(tvb, svoff+2);
-			proto_tree_add_item(sv_tree, hf_trmac_beacon_type, tvb, svoff+2, sv_length-2, ENC_BIG_ENDIAN);
+			proto_tree_add_uint_format_value(sv_tree, hf_trmac_beacon_type, tvb, svoff+2, sv_length-2,
+					beacon_type, "%s", val_to_str(beacon_type, beacon_vs, "Illegal value: %d"));
 			proto_item_append_text(sv_item,
 					": %s", val_to_str(beacon_type, beacon_vs, "Illegal value: %d"));
 			break;
@@ -248,7 +242,7 @@ sv_text(tvbuff_t *tvb, int svoff, packet_info *pinfo, proto_tree *tree)
 			proto_tree_add_uint_format_value(sv_tree, hf_trmac_error_report_timer_value, tvb, svoff+2, sv_length-2,
 											error_report_timer_value, "%u ms", error_report_timer_value );
 			proto_item_append_text(sv_item,
-				": %u ms", error_report_timer_value );
+				": %d ms", error_report_timer_value );
 			break;
 
 		case 0x06: /* Authorized Function Classes */
@@ -314,17 +308,19 @@ sv_text(tvbuff_t *tvb, int svoff, packet_info *pinfo, proto_tree *tree)
 				break;
 			}
 			if (sv_length == 4) {
-				proto_tree_add_uint_format_value(sv_tree, hf_trmac_response_code32, tvb, svoff+2, sv_length-2,
-					tvb_get_ntohl(tvb, svoff+2), "0x%04X 0x%02X 0x%02x",
-					tvb_get_ntohs(tvb, svoff+2), tvb_get_guint8(tvb, svoff+4), tvb_get_guint8(tvb, svoff+5));
+				proto_tree_add_text(sv_tree, tvb, svoff+2, sv_length-2,
+					"Response Code: 0x%04X 0x%02X 0x%02x",
+					tvb_get_ntohs(tvb, svoff+2),
+					tvb_get_guint8(tvb, svoff+4),
+					tvb_get_guint8(tvb, svoff+5));
 				proto_item_append_text(sv_item,
 					": 0x%04X 0x%02X 0x%02x",
 					tvb_get_ntohs(tvb, svoff+2),
 					tvb_get_guint8(tvb, svoff+4),
 					tvb_get_guint8(tvb, svoff+5));
 			} else {
-				proto_tree_add_uint64_format_value(sv_tree, hf_trmac_response_code48, tvb, svoff+2, sv_length-2,
-					tvb_get_ntoh48(tvb, svoff+2), "0x%04X 0x%02X 0x%06X",
+				proto_tree_add_text(sv_tree, tvb, svoff+2, sv_length-2,
+					"Response Code: 0x%04X 0x%02X 0x%06X",
 					tvb_get_ntohs(tvb, svoff+2),
 					tvb_get_guint8(tvb, svoff+4),
 					tvb_get_ntoh24(tvb, svoff+5));
@@ -348,19 +344,23 @@ sv_text(tvbuff_t *tvb, int svoff, packet_info *pinfo, proto_tree *tree)
 			break;
 
 		case 0x22: /* Product Instance ID */
-			proto_tree_add_item(sv_tree, hf_trmac_product_instance_id, tvb, svoff+2, sv_length-2, ENC_NA);
+			proto_tree_add_text(sv_tree, tvb, svoff+2, sv_length-2,
+				"Product Instance ID: ...");
 			break;
 
 		case 0x23: /* Ring Station Version Number */
-			proto_tree_add_item(sv_tree, hf_trmac_ring_station_version_number, tvb, svoff+2, sv_length-2, ENC_NA);
+			proto_tree_add_text(sv_tree, tvb, svoff+2, sv_length-2,
+				"Ring Station Version Number: ...");
 			break;
 
 		case 0x26: /* Wrap data */
-			proto_tree_add_item(sv_tree, hf_trmac_wrap_data, tvb, svoff+2, sv_length-2, ENC_NA);
+			proto_tree_add_text(sv_tree, tvb, svoff+2, sv_length-2,
+				"Wrap Data: ... (%u bytes)", sv_length - 2);
 			break;
 
 		case 0x27: /* Frame Forward */
-			proto_tree_add_item(sv_tree, hf_trmac_frame_forward, tvb, svoff+2, sv_length-2, ENC_NA);
+			proto_tree_add_text(sv_tree, tvb, svoff+2, sv_length-2,
+				"Frame Forward: ... (%d bytes)", sv_length - 2);
 			break;
 
 		case 0x28: /* Station Identifier */
@@ -376,7 +376,8 @@ sv_text(tvbuff_t *tvb, int svoff, packet_info *pinfo, proto_tree *tree)
 			break;
 
 		case 0x29: /* Ring Station Status */
-			proto_tree_add_item(sv_tree, hf_trmac_ring_station_status, tvb, svoff+2, sv_length-2, ENC_NA);
+			proto_tree_add_text(sv_tree, tvb, svoff+2, sv_length-2,
+				"Ring Station Status: ...");
 			break;
 
 		case 0x2A: /* Transmit Status Code */
@@ -468,7 +469,8 @@ sv_text(tvbuff_t *tvb, int svoff, packet_info *pinfo, proto_tree *tree)
 			break;
 
 		default: /* Unknown */
-			proto_tree_add_item(sv_tree, hf_trmac_unknown_subvector, tvb, svoff+2, sv_length-2, ENC_NA);
+			proto_tree_add_text(sv_tree, tvb, svoff+2, sv_length-2,
+				"Unknown Subvector");
 			break;
 	}
 	return sv_length;
@@ -489,7 +491,7 @@ dissect_trmac(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	/* Interpret the major vector */
 	col_add_str(pinfo->cinfo, COL_INFO,
-		    val_to_str_ext(mv_val, &major_vector_vs_ext, "Unknown Major Vector: %u"));
+		    val_to_str(mv_val, major_vector_vs, "Unknown Major Vector: %u"));
 
 	if (tree) {
 		mv_length = tvb_get_ntohs(tvb, 0);
@@ -520,29 +522,29 @@ dissect_trmac(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 void
 proto_register_trmac(void)
 {
-	static hf_register_info hf[] = {
-		{ &hf_trmac_mv,
-		{ "Major Vector",			"trmac.mvec", FT_UINT8, BASE_HEX|BASE_EXT_STRING, &major_vector_vs_ext, 0x0,
+        static hf_register_info hf[] = {
+                { &hf_trmac_mv,
+                { "Major Vector",			"trmac.mvec", FT_UINT8, BASE_HEX, major_vector_vs, 0x0,
 			NULL, HFILL }},
 
-		{ &hf_trmac_length,
-		{ "Total Length",			"trmac.length", FT_UINT8, BASE_DEC, NULL, 0x0,
+                { &hf_trmac_length,
+                { "Total Length",			"trmac.length", FT_UINT8, BASE_DEC, NULL, 0x0,
 			NULL, HFILL }},
 
-		{ &hf_trmac_srcclass,
-		{ "Source Class",			"trmac.srcclass", FT_UINT8, BASE_HEX, VALS(classes_vs), 0x0,
+                { &hf_trmac_srcclass,
+                { "Source Class",			"trmac.srcclass", FT_UINT8, BASE_HEX, classes_vs, 0x0,
 			NULL, HFILL }},
 
-		{ &hf_trmac_dstclass,
-		{ "Destination Class",			"trmac.dstclass", FT_UINT8, BASE_HEX, VALS(classes_vs), 0x0,
+                { &hf_trmac_dstclass,
+                { "Destination Class",			"trmac.dstclass", FT_UINT8, BASE_HEX, classes_vs, 0x0,
 			NULL, HFILL }},
 
-		{ &hf_trmac_sv_len,
-		{ "Subvector Length",			"trmac.svec.len", FT_UINT8, BASE_DEC, NULL, 0x0,
+                { &hf_trmac_sv_len,
+                { "Subvector Length",			"trmac.svec.len", FT_UINT8, BASE_DEC, NULL, 0x0,
 			NULL, HFILL }},
 
-		{ &hf_trmac_sv_id,
-		{ "Subvector Identifier",		"trmac.svec.id", FT_UINT8, BASE_HEX|BASE_EXT_STRING, &subvector_vs_ext, 0x0,
+                { &hf_trmac_sv_id,
+                { "Subvector Identifier",		"trmac.svec.id", FT_UINT8, BASE_HEX, VALS(subvector_vs), 0x0,
 			NULL, HFILL }},
 
 		{ &hf_trmac_errors_iso,
@@ -601,77 +603,24 @@ proto_register_trmac(void)
 		{ "Beacon Type",			"trmac.beacon_type", FT_UINT16, BASE_DEC, VALS(beacon_vs), 0x0,
 			NULL, HFILL }},
 
-		{ &hf_trmac_local_ring_number,
-		{ "Local Ring Number",			"trmac.local_ring_number", FT_UINT16, BASE_HEX_DEC, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_assign_physical_drop_number,
-		{ "Assign Physical Drop Number",	"trmac.assign_physical_drop_number", FT_UINT32, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_error_report_timer_value,
-		{ "Error Report Timer Value",		"trmac.error_report_timer_value", FT_UINT16, BASE_DEC, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_authorized_function_classes,
-		{ "Authorized Function Classes",	"trmac.authorized_function_classes", FT_UINT16, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_authorized_access_priority,
-		{ "Authorized Access Priority",		"trmac.authorized_access_priority", FT_UINT16, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_correlator,
-		{ "Correlator",				"trmac.correlator", FT_UINT16, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_sa_of_last_amp_or_smp_frame,
-		{ "SA of Last AMP or SMP Frame",	"trmac.sa_of_last_amp_or_smp_frame", FT_ETHER, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_physical_drop_number,
-		{ "Physical Drop Number",		"trmac.physical_drop_number", FT_UINT32, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_individual_address_count,
-		{ "Individual Address Count",		"trmac.individual_address_count", FT_UINT16, BASE_DEC, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_station_identifier,
-		{ "Station Identifier",			"trmac.station_identifier", FT_ETHER, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_transmit_status_code,
-		{ "Transmit Status Code",		"trmac.transmit_status_code", FT_UINT16, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_group_address32,
-		{ "Group Address",			"trmac.group_address", FT_UINT32, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_group_address_ether,
-		{ "Group Address",			"trmac.group_address", FT_ETHER, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_functional_addresses,
-		{ "Functional Addresses",		"trmac.functional_addresses", FT_UINT32, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_trmac_error_code,
-		{ "Error Code",				"trmac.error_code", FT_UINT16, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
-
 		/* Generated from convert_proto_tree_add_text.pl */
-		{ &hf_trmac_response_code32, { "Response Code", "trmac.response_code", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-		{ &hf_trmac_response_code48, { "Response Code", "trmac.response_code", FT_UINT64, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-		{ &hf_trmac_product_instance_id, { "Product Instance ID", "trmac.product_instance_id", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_trmac_ring_station_version_number, { "Ring Station Version Number", "trmac.ring_station_version_number", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_trmac_wrap_data, { "Wrap Data", "trmac.wrap_data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_trmac_frame_forward, { "Frame Forward", "trmac.frame_forward", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_trmac_ring_station_status, { "Ring Station Status", "trmac.ring_station_status", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_trmac_unknown_subvector, { "Unknown Subvector", "trmac.unknown_subvector", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_local_ring_number, { "Local Ring Number", "trmac.local_ring_number", FT_UINT16, BASE_HEX_DEC, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_assign_physical_drop_number, { "Assign Physical Drop Number", "trmac.assign_physical_drop_number", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_error_report_timer_value, { "Error Report Timer Value", "trmac.error_report_timer_value", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_authorized_function_classes, { "Authorized Function Classes", "trmac.authorized_function_classes", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_authorized_access_priority, { "Authorized Access Priority", "trmac.authorized_access_priority", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_correlator, { "Correlator", "trmac.correlator", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_sa_of_last_amp_or_smp_frame, { "SA of Last AMP or SMP Frame", "trmac.sa_of_last_amp_or_smp_frame", FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_physical_drop_number, { "Physical Drop Number", "trmac.physical_drop_number", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_individual_address_count, { "Individual Address Count", "trmac.individual_address_count", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_station_identifier, { "Station Identifier", "trmac.station_identifier", FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_transmit_status_code, { "Transmit Status Code", "trmac.transmit_status_code", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_group_address32, { "Group Address", "trmac.group_address", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_group_address_ether, { "Group Address", "trmac.group_address", FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_functional_addresses, { "Functional Addresses", "trmac.functional_addresses", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+		{ &hf_trmac_error_code, { "Error Code", "trmac.error_code", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
 
-	};
+		};
 	static gint *ett[] = {
 		&ett_tr_mac,
 		&ett_tr_sv,
@@ -693,16 +642,3 @@ proto_register_trmac(void)
 
 	register_dissector("trmac", dissect_trmac, proto_trmac);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

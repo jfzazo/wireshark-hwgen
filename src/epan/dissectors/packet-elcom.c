@@ -50,11 +50,9 @@
 #define SUFFIX_LEN  2
 #define TOTAL_LEN (LOWADR_LEN + SUFFIX_LEN + 2)
 
-#if 0 /* ??? */
 #define ELCOM_UNKNOWN_ENDIAN 0
 #define ELCOM_LITTLE_ENDIAN  1
 #define ELCOM_BIG_ENDIAN     2
-#endif
 
 void proto_register_elcom(void);
 void proto_reg_handoff_elcom(void);
@@ -218,9 +216,8 @@ dissect_lower_address(proto_item *ti_arg, gint ett_arg,
         offset += 8;                /* skip the zero bytes */
 
         /* SUFFIX */
-        suffix = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+1, len2, ENC_ASCII);
-        /* hf_suff FIELDTYPE must be FT_UINT_STRING */
-        ti = proto_tree_add_item(tree, hf_suff, tvb, offset, 1, ENC_ASCII|ENC_BIG_ENDIAN);
+        suffix = tvb_get_string(wmem_packet_scope(), tvb, offset+1, len2);
+        ti = proto_tree_add_item(tree, hf_suff, tvb, offset, 1, ENC_ASCII|ENC_LITTLE_ENDIAN);
         offset += len2+1;
 
         if (!(suffix[0] == 'A' || suffix[0] == 'B')) {
@@ -282,7 +279,7 @@ dissect_userdata(proto_item *ti_arg, gint ett_arg, tvbuff_t *tvb, gint arg_offse
         offset++;
 
         /* show the rest */
-        /*        tree2 = proto_tree_add_subtree(tree, tvb, offset, -1, "User Data"); */
+        /*        tree2 = proto_tree_add_text(tree, tvb, offset, -1, "User Data"); */
 
         if (tvb_length_remaining(tvb, offset) <= 0)
                 return offset;
@@ -323,7 +320,7 @@ dissect_datarequest(proto_item *ti_arg, gint ett_arg, tvbuff_t *tvb, gint arg_of
 {
         gint        offset = arg_offset;
         guint8      gtype, oidlen;
-        proto_tree *tree;
+        proto_tree *tree, *tree2;
         proto_item *ti;
 
         tree = proto_item_add_subtree(ti_arg, ett_arg);
@@ -387,7 +384,7 @@ dissect_datarequest(proto_item *ti_arg, gint ett_arg, tvbuff_t *tvb, gint arg_of
                         break;
                 if (tvb_length_remaining(tvb, offset+oidlen+1) <= 0)
                         return offset;
-                proto_tree_add_item(tree, hf_elcom_datarequest_oid, tvb, offset, 1, ENC_ASCII|ENC_BIG_ENDIAN);
+                proto_tree_add_item(tree, hf_elcom_datarequest_oid, tvb, offset, 1, ENC_ASCII|ENC_NA);
                 offset += oidlen+1;
         }
         offset += 1;             /* the loop exited at the 0 length byte */
@@ -395,7 +392,13 @@ dissect_datarequest(proto_item *ti_arg, gint ett_arg, tvbuff_t *tvb, gint arg_of
                 return offset;
 
         /* show the rest */
-        proto_tree_add_item(tree, hf_elcom_strangeleftover, tvb, offset, -1, ENC_NA);
+        tree2 = proto_tree_add_text(tree, tvb, offset, -1, "leftover =");
+        while (tvb_length_remaining(tvb, offset) > 0) {
+                proto_item_append_text(tree2, elcom_show_hex ? " %02x" : " %03o",
+                                       tvb_get_guint8(tvb, offset));
+                offset++;
+        }
+
         return offset;
 }
 
@@ -445,7 +448,7 @@ dissect_elcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                         if (tvb_get_guint8(tvb, 3+1+TOTAL_LEN+LOWADR_LEN) != SUFFIX_LEN) return;
 
                         /* finally believe that there is valid suffix */
-                        suffix = tvb_get_string_enc(wmem_packet_scope(), tvb, 3+2+LOWADR_LEN, 2, ENC_ASCII);
+                        suffix = tvb_get_string(wmem_packet_scope(), tvb, 3+2+LOWADR_LEN, 2);
                         col_append_fstr(pinfo->cinfo, COL_INFO, " %s Connect", suffix);
                         break;
 
@@ -555,10 +558,16 @@ dissect_elcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                 break;
         }
 
-        if (tvb_length_remaining(tvb, offset) > 0)
-        {
-            /* We should not get here, but if we do, show what is left over: */
-            proto_tree_add_item(elcom_tree, hf_elcom_strangeleftover, tvb, offset, -1, ENC_NA);
+
+        if (tvb_length_remaining(tvb, offset) <= 0)
+                return;
+
+        /* We should not get here, but if we do, show what is left over: */
+        ti = proto_tree_add_item(elcom_tree, hf_elcom_strangeleftover, tvb, offset, -1, ENC_NA);
+        while (tvb_length_remaining(tvb, offset) > 0) {
+                proto_item_append_text(ti, elcom_show_hex ? " %02x" : " %03o",
+                                       tvb_get_guint8(tvb, offset));
+                offset++;
         }
 }
 
@@ -728,7 +737,7 @@ proto_register_elcom(void)
                 },
                 { &hf_elcom_strangeleftover,
                   { "Strange Leftover",        "elcom.leftover",
-                    FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }
+                    FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }
                 }
         };
 

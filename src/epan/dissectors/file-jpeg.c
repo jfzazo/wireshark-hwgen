@@ -36,6 +36,10 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 
@@ -340,10 +344,6 @@ static gint hf_sos_se = -1;
 static gint hf_sos_ah = -1;
 static gint hf_sos_al = -1;
 
-/* Comment */
-static gint hf_comment_header = -1;
-static gint hf_comment = -1;
-
 /* Initialize the subtree pointers */
 static gint ett_jfif = -1;
 static gint ett_marker_segment = -1;
@@ -466,32 +466,6 @@ process_sos_header(proto_tree *tree, tvbuff_t *tvb, guint32 len _U_,
     /* offset ++ */;
 }
 
-/*
- * Process a Comment header (with length).
- */
-static void
-process_comment_header(proto_tree *tree, tvbuff_t *tvb, guint32 len _U_,
-        guint16 marker, const char *marker_name)
-{
-    proto_item *ti = NULL;
-    proto_tree *subtree = NULL;
-
-    if (! tree)
-        return;
-
-    ti = proto_tree_add_item(tree, hf_comment_header,
-            tvb, 0, -1, ENC_NA);
-    subtree = proto_item_add_subtree(ti, ett_marker_segment);
-
-    proto_item_append_text(ti, ": %s (0x%04X)", marker_name, marker);
-    proto_tree_add_item(subtree, hf_marker, tvb, 0, 2, ENC_BIG_ENDIAN);
-
-    proto_tree_add_item(subtree, hf_len, tvb, 2, 2, ENC_BIG_ENDIAN);
-
-    proto_tree_add_item(subtree, hf_comment, tvb, 4, len-2, ENC_ASCII|ENC_NA);
-}
-
-
 /* Process an APP0 block.
  *
  * XXX - This code only works on US-ASCII systems!!!
@@ -519,7 +493,7 @@ process_app0_segment(proto_tree *tree, tvbuff_t *tvb, guint32 len,
 
     proto_tree_add_item(subtree, hf_len, tvb, 2, 2, ENC_BIG_ENDIAN);
 
-    str = tvb_get_stringz_enc(wmem_packet_scope(), tvb, 4, &str_size, ENC_ASCII);
+    str = tvb_get_stringz(wmem_packet_scope(), tvb, 4, &str_size);
     ti = proto_tree_add_item(subtree, hf_identifier, tvb, 4, str_size, ENC_ASCII|ENC_NA);
     if (strcmp(str, "JFIF") == 0) {
         /* Version */
@@ -614,7 +588,7 @@ process_app1_segment(proto_tree *tree, tvbuff_t *tvb, guint32 len,
     proto_tree_add_item(subtree, hf_len, tvb, offset, 2, ENC_BIG_ENDIAN);
     offset += 2;
 
-    str = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &str_size, ENC_ASCII);
+    str = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &str_size);
     ti = proto_tree_add_item(subtree, hf_identifier, tvb, offset, str_size, ENC_ASCII|ENC_NA);
     offset += str_size;
     if (strcmp(str, "Exif") == 0) {
@@ -771,7 +745,7 @@ process_app2_segment(proto_tree *tree, tvbuff_t *tvb, guint32 len,
 
     proto_tree_add_item(subtree, hf_len, tvb, 2, 2, ENC_BIG_ENDIAN);
 
-    str = tvb_get_stringz_enc(wmem_packet_scope(), tvb, 4, &str_size, ENC_ASCII);
+    str = tvb_get_stringz(wmem_packet_scope(), tvb, 4, &str_size);
     ti = proto_tree_add_item(subtree, hf_identifier, tvb, 4, str_size, ENC_ASCII|ENC_NA);
     if (strcmp(str, "FPXR") == 0) {
         proto_tree_add_text(tree, tvb, 0, -1, "Exif FlashPix APP2 application marker");
@@ -845,7 +819,7 @@ dissect_jfif(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
             if (marker_has_length(marker)) { /* Marker segment */
                 /* Length of marker segment = 2 + len */
                 const guint16 len = tvb_get_ntohs(tvb, start_marker + 2);
-                tvbuff_t *tmp_tvb = tvb_new_subset_length(tvb, start_marker, 2 + len);
+                tvbuff_t *tmp_tvb = tvb_new_subset(tvb, start_marker, 2 + len, 2 + len);
                 switch (marker) {
                     case MARKER_APP0:
                         process_app0_segment(subtree, tmp_tvb, len, marker, str);
@@ -874,9 +848,6 @@ dissect_jfif(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
                         break;
                     case MARKER_SOS:
                         process_sos_header(subtree, tmp_tvb, len, marker, str);
-                        break;
-                    case MARKER_COM:
-                        process_comment_header(subtree, tmp_tvb, len, marker, str);
                         break;
                     default:
                         process_marker_segment(subtree, tmp_tvb, len, marker, str);
@@ -1195,24 +1166,6 @@ proto_register_jfif(void)
               HFILL
           }
         },
-
-        /* Header: Comment (MARKER_COM) */
-        { &hf_comment_header,
-          {   "Comment header",
-              IMG_JFIF ".header.comment",
-              FT_NONE, BASE_NONE, NULL, 0x00,
-              NULL,
-              HFILL
-          }
-        },
-        { &hf_comment,
-          {   "Comment",
-              IMG_JFIF ".comment",
-              FT_STRING, STR_ASCII, NULL, 0x0,
-              NULL,
-              HFILL
-          }
-        },
     };
 
     /* Setup protocol subtree array */
@@ -1253,16 +1206,3 @@ proto_reg_handoff_jfif(void)
     heur_dissector_add("http", dissect_jfif_heur, proto_jfif);
     heur_dissector_add("wtap_file", dissect_jfif_heur, proto_jfif);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

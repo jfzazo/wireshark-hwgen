@@ -29,13 +29,16 @@
 
 #include <stdlib.h>
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/conversation.h>
 #include <epan/prefs.h>
 #include <epan/strutil.h>
+#include <epan/wmem/wmem.h>
 #include <epan/reassemble.h>
 #include <wsutil/base64.h>
-#include "packet-ssl.h"
+#include <epan/dissectors/packet-ssl.h>
 
 /* RFC 2821 */
 #define TCP_PORT_SMTP      25
@@ -60,7 +63,6 @@ static int hf_smtp_rsp_code = -1;
 static int hf_smtp_rsp_parameter = -1;
 static int hf_smtp_username = -1;
 static int hf_smtp_password = -1;
-static int hf_smtp_eom = -1;
 
 static int hf_smtp_data_fragments = -1;
 static int hf_smtp_data_fragment = -1;
@@ -314,7 +316,7 @@ decode_plain_auth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   gint                       length_pass;
   guint8                    *decrypt   = NULL;
 
-  decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, a_offset, a_linelen, ENC_ASCII);
+  decrypt = tvb_get_string(wmem_packet_scope(), tvb, a_offset, a_linelen);
   if (smtp_decryption_enabled) {
     returncode = (gint)ws_base64_decode_inplace(decrypt);
     if (returncode) {
@@ -576,7 +578,7 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
           if ((session_state->auth_state != SMTP_AUTH_STATE_NONE) &&
               (pinfo->fd->num >= session_state->first_auth_frame) &&
               ((session_state->last_auth_frame == 0) || (pinfo->fd->num <= session_state->last_auth_frame))) {
-            decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, linelen, ENC_ASCII);
+            decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset, linelen);
             if ((smtp_decryption_enabled) &&
                 ((decrypt_len = ws_base64_decode_inplace(decrypt)) > 0)) {
               line = decrypt;
@@ -644,7 +646,7 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             } else if ((g_ascii_strncasecmp(line, "AUTH LOGIN", 10) == 0) && (linelen <= 11)) {
               /*
                * AUTH LOGIN command.
-               * Username is in a separate frame
+               * Username is in a seperate frame
                */
               spd_frame_data->pdu_type        = SMTP_PDU_CMD;
               session_state->smtp_state       = SMTP_STATE_READING_CMDS;
@@ -663,7 +665,7 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             } else if ((g_ascii_strncasecmp(line, "AUTH PLAIN", 10) == 0) && (linelen <= 11)) {
               /*
                * AUTH PLAIN command.
-               * Username and Password is in one separate frame
+               * Username and Password is in one seperate frame
                */
               spd_frame_data->pdu_type        = SMTP_PDU_CMD;
               session_state->smtp_state       = SMTP_STATE_READING_CMDS;
@@ -791,7 +793,7 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
        */
       col_set_str(pinfo->cinfo, COL_INFO, "C: .");
 
-      proto_tree_add_none_format(smtp_tree, hf_smtp_eom, tvb, offset, linelen, "C: .");
+      proto_tree_add_text(smtp_tree, tvb, offset, linelen, "C: .");
 
       if (smtp_data_desegment) {
         /* add final data segment */
@@ -836,12 +838,12 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         if (session_state->username_frame == pinfo->fd->num) {
           if (decrypt == NULL) {
             /* This line wasn't already decrypted through the state machine */
-            decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, linelen, ENC_ASCII);
+            decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset, linelen);
             decrypt_len = linelen;
             if (smtp_decryption_enabled) {
               if ((decrypt_len = ws_base64_decode_inplace(decrypt)) == 0) {
                 /* Go back to the original string */
-                decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, linelen, ENC_ASCII);
+                decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset, linelen);
                 decrypt_len = linelen;
               }
             }
@@ -852,12 +854,12 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         } else if (session_state->password_frame == pinfo->fd->num) {
           if (decrypt == NULL) {
             /* This line wasn't already decrypted through the state machine */
-            decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, linelen, ENC_ASCII);
+            decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset, linelen);
             decrypt_len = linelen;
             if (smtp_decryption_enabled) {
               if ((decrypt_len = ws_base64_decode_inplace(decrypt)) == 0) {
                 /* Go back to the original string */
-                decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, linelen, ENC_ASCII);
+                decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset, linelen);
                 decrypt_len = linelen;
               }
             }
@@ -866,19 +868,19 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                                 loffset, linelen, decrypt);
           col_append_fstr(pinfo->cinfo, COL_INFO, "Pass: %s", format_text(decrypt, decrypt_len));
         } else if (session_state->ntlm_rsp_frame == pinfo->fd->num) {
-          decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, linelen, ENC_ASCII);
+          decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset, linelen);
           decrypt_len = linelen;
           if (smtp_decryption_enabled) {
             if ((decrypt_len = ws_base64_decode_inplace(decrypt)) == 0) {
               /* Go back to the original string */
-              decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, linelen, ENC_ASCII);
+              decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset, linelen);
               decrypt_len = linelen;
               col_append_str(pinfo->cinfo, COL_INFO, format_text(decrypt, linelen));
               proto_tree_add_item(smtp_tree, hf_smtp_command_line, tvb,
                                   loffset, linelen, ENC_ASCII|ENC_NA);
             }
             else {
-              base64_string = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, linelen, ENC_ASCII);
+              base64_string = tvb_get_string(wmem_packet_scope(), tvb, loffset, linelen);
               dissect_ntlm_auth(tvb, pinfo, smtp_tree, base64_string);
             }
           }
@@ -913,19 +915,19 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             if (linelen >= 11) {
               if (decrypt == NULL) {
                 /* This line wasn't already decrypted through the state machine */
-                 decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset + 11, linelen - 11, ENC_ASCII);
+                 decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset + 11, linelen - 11);
                  decrypt_len = linelen - 11;
                  if (smtp_decryption_enabled) {
                    if ((decrypt_len = ws_base64_decode_inplace(decrypt)) == 0) {
                      /* Go back to the original string */
-                     decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset + 11, linelen - 11, ENC_ASCII);
+                     decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset + 11, linelen - 11);
                      decrypt_len = linelen - 11;
                    }
                  }
               }
               proto_tree_add_string(cmdresp_tree, hf_smtp_username, tvb, loffset + 11, linelen - 11, decrypt);
               col_append_str(pinfo->cinfo, COL_INFO,
-                             format_text(tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, 11, ENC_ASCII), 11));
+                             format_text(tvb_get_string(wmem_packet_scope(), tvb, loffset, 11), 11));
               col_append_fstr(pinfo->cinfo, COL_INFO, "User: %s", format_text(decrypt, decrypt_len));
             }
           }
@@ -933,27 +935,27 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             proto_tree_add_item(cmdresp_tree, hf_smtp_req_parameter, tvb,
                               loffset + 5, linelen - 5, ENC_ASCII|ENC_NA);
             if (linelen >= 10) {
-              decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset + 10, linelen - 10, ENC_ASCII);
+              decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset + 10, linelen - 10);
               decrypt_len = linelen - 10;
               if (smtp_decryption_enabled) {
                 if ((decrypt_len = ws_base64_decode_inplace(decrypt)) == 0) {
                   /* Go back to the original string */
-                  decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset + 10, linelen - 10, ENC_ASCII);
+                  decrypt = tvb_get_string(wmem_packet_scope(), tvb, loffset + 10, linelen - 10);
                   decrypt_len = linelen - 10;
                   col_append_str(pinfo->cinfo, COL_INFO,
-                                 format_text(tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, 10, ENC_ASCII), 10));
+                                 format_text(tvb_get_string(wmem_packet_scope(), tvb, loffset, 10), 10));
                   col_append_str(pinfo->cinfo, COL_INFO, format_text(decrypt, linelen - 10));
                 }
                 else {
-                  base64_string = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset + 10, linelen - 10, ENC_ASCII);
+                  base64_string = tvb_get_string(wmem_packet_scope(), tvb, loffset + 10, linelen - 10);
                   col_append_str(pinfo->cinfo, COL_INFO,
-                                 format_text(tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, 10, ENC_ASCII), linelen - 10));
-                  dissect_ntlm_auth(tvb, pinfo, cmdresp_tree, format_text(base64_string, linelen - 10));
+                                 format_text(tvb_get_string(wmem_packet_scope(), tvb, loffset, 10), 10));
+                  dissect_ntlm_auth(tvb, pinfo, cmdresp_tree, base64_string);
                 }
               }
               else {
                 col_append_str(pinfo->cinfo, COL_INFO,
-                               format_text(tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, 10, ENC_ASCII), 10));
+                               format_text(tvb_get_string(wmem_packet_scope(), tvb, loffset, 10), 10));
                 col_append_str(pinfo->cinfo, COL_INFO, format_text(decrypt, linelen - 10));
               }
             }
@@ -962,18 +964,18 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             proto_tree_add_item(cmdresp_tree, hf_smtp_req_parameter, tvb,
                               loffset + 5, linelen - 5, ENC_ASCII|ENC_NA);
             col_append_str(pinfo->cinfo, COL_INFO,
-                           format_text(tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, 11, ENC_ASCII), 11));
+                           format_text(tvb_get_string(wmem_packet_scope(), tvb, loffset, 11), 11));
             decode_plain_auth(tvb, pinfo, cmdresp_tree, loffset + 11, linelen - 11);
           }
           else if (linelen > 5) {
             proto_tree_add_item(cmdresp_tree, hf_smtp_req_parameter, tvb,
                               loffset + 5, linelen - 5, ENC_ASCII|ENC_NA);
             col_append_str(pinfo->cinfo, COL_INFO,
-                           format_text(tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, linelen, ENC_ASCII), linelen));
+                           format_text(tvb_get_string(wmem_packet_scope(), tvb, loffset, linelen), linelen));
           }
           else {
             col_append_str(pinfo->cinfo, COL_INFO,
-                           format_text(tvb_get_string_enc(wmem_packet_scope(), tvb, loffset, linelen, ENC_ASCII), linelen));
+                           format_text(tvb_get_string(wmem_packet_scope(), tvb, loffset, linelen), linelen));
           }
 
           if (smtp_data_desegment && !spd_frame_data->more_frags) {
@@ -1116,12 +1118,14 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                                 code);
 
             decrypt = NULL;
+            decrypt_len = 0;
             if (linelen >= 4) {
                 if ((smtp_decryption_enabled) && (code == 334)) {
-                    decrypt = tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 4, linelen - 4, ENC_ASCII);
+                    decrypt = tvb_get_string(wmem_packet_scope(), tvb, offset + 4, linelen - 4);
+                    decrypt_len = linelen - 4;
                     if ((decrypt_len = ws_base64_decode_inplace(decrypt)) > 0) {
                       if (g_ascii_strncasecmp(decrypt, "NTLMSSP", 7) == 0) {
-                        base64_string = tvb_get_string_enc(wmem_packet_scope(), tvb, loffset + 4, linelen - 4, ENC_ASCII);
+                        base64_string = tvb_get_string(wmem_packet_scope(), tvb, loffset + 4, linelen - 4);
                         col_append_fstr(pinfo->cinfo, COL_INFO, "%d ", code);
                         proto_tree_add_string(cmdresp_tree, hf_smtp_rsp_parameter, tvb,
                                           offset + 4, linelen - 4, (const char*)base64_string);
@@ -1143,11 +1147,11 @@ dissect_smtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                                       offset + 4, linelen - 4, ENC_ASCII|ENC_NA);
 
                     col_append_fstr(pinfo->cinfo, COL_INFO, "%d %s", code,
-                                    format_text(tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 4, linelen - 4, ENC_ASCII), linelen - 4));
+                                    format_text(tvb_get_string(wmem_packet_scope(), tvb, offset + 4, linelen - 4), linelen - 4));
                 }
             } else {
                col_append_str(pinfo->cinfo, COL_INFO,
-                              format_text(tvb_get_string_enc(wmem_packet_scope(), tvb, offset, linelen, ENC_ASCII), linelen));
+                              format_text(tvb_get_string(wmem_packet_scope(), tvb, offset, linelen), linelen));
             }
           }
       }
@@ -1217,10 +1221,6 @@ proto_register_smtp(void)
     { &hf_smtp_password,
       { "Password", "smtp.auth.password",
         FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-
-    { &hf_smtp_eom,
-      { "EOM", "smtp.eom",
-        FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL } },
 
     /* Fragment entries */
     { &hf_smtp_data_fragments,

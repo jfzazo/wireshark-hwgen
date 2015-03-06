@@ -27,11 +27,15 @@
 
 #include "config.h"
 
+#include <gtk/gtk.h>
 
 #include <epan/prefs.h>
+#include <epan/dfilter/dfilter.h>
 
 #include "../cfile.h"
+#include "../color_filters.h"
 
+#include "ui/recent.h"
 
 #ifdef HAVE_LIBPCAP
 #include "ui/gtk/capture_dlg.h"

@@ -36,11 +36,15 @@
 
 #include "config.h"
 
+#include <string.h>
 #include <math.h>
 
 #include <epan/packet.h>
+#include <epan/address.h>
+#include <epan/addr_resolv.h>
 #include <epan/to_str.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
 #include <epan/crc16-tvb.h>
 #include <epan/asn1.h>
@@ -49,7 +53,6 @@
 
 #include "packet-p1.h"
 #include "packet-p22.h"
-#include "packet-s5066sis.h"
 
 void proto_register_dmp(void);
 void proto_reg_handoff_dmp(void);
@@ -1401,8 +1404,8 @@ static void register_dmp_id (packet_info *pinfo, guint8 reason)
   {
     /* Try to match corresponding message */
     dmp_key->id = (guint) dmp.subj_id;
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &dmp_key->src, &(pinfo->dst));
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &dmp_key->dst, &(pinfo->src));
+    SE_COPY_ADDRESS(&dmp_key->src, &(pinfo->dst));
+    SE_COPY_ADDRESS(&dmp_key->dst, &(pinfo->src));
 
     dmp_data = (dmp_id_val *) g_hash_table_lookup (dmp_id_hash_table, dmp_key);
 
@@ -1419,12 +1422,12 @@ static void register_dmp_id (packet_info *pinfo, guint8 reason)
 
   if (dmp.msg_type == ACK) {
     dmp_key->id = (guint) dmp.subj_id;
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &dmp_key->src, &(pinfo->dst));
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &dmp_key->dst, &(pinfo->src));
+    SE_COPY_ADDRESS(&dmp_key->src, &(pinfo->dst));
+    SE_COPY_ADDRESS(&dmp_key->dst, &(pinfo->src));
   } else {
     dmp_key->id = (guint) dmp.msg_id;
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &dmp_key->src, &(pinfo->src));
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &dmp_key->dst, &(pinfo->dst));
+    SE_COPY_ADDRESS(&dmp_key->src, &(pinfo->src));
+    SE_COPY_ADDRESS(&dmp_key->dst, &(pinfo->dst));
   }
 
   dmp_data = (dmp_id_val *) g_hash_table_lookup (dmp_id_hash_table, dmp_key);
@@ -1507,8 +1510,9 @@ static void dmp_add_seq_ack_analysis (tvbuff_t *tvb, packet_info *pinfo,
     return;
   }
 
-  analysis_tree = proto_tree_add_subtree(dmp_tree, tvb, 0, 0, ett_analysis, &en, "SEQ/ACK analysis");
+  en = proto_tree_add_text (dmp_tree, tvb, 0, 0, "SEQ/ACK analysis");
   PROTO_ITEM_SET_GENERATED (en);
+  analysis_tree = proto_item_add_subtree (en, ett_analysis);
 
   if ((dmp.msg_type == STANAG) || (dmp.msg_type == IPM) ||
       (dmp.msg_type == REPORT) || (dmp.msg_type == NOTIF)) {
@@ -1646,7 +1650,7 @@ static void dmp_add_seq_ack_analysis (tvbuff_t *tvb, packet_info *pinfo,
 
 static gchar *dissect_7bit_string (tvbuff_t *tvb, gint offset, gint length)
 {
-  guchar *encoded = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_ASCII);
+  guchar *encoded = tvb_get_string (wmem_packet_scope(), tvb, offset, length);
   guchar *decoded = (guchar *)wmem_alloc0 (wmem_packet_scope(), (size_t)(length * 1.2) + 1);
   guchar  rest = 0, bits = 1;
   gint    len = 0, i;
@@ -2088,7 +2092,7 @@ static gint dissect_dmp_ext_addr (tvbuff_t *tvb, packet_info *pinfo,
   }
 
   if (type == ASN1_BER) {
-    tvbuff_t *next_tvb = tvb_new_subset_length(tvb, offset, length);
+    tvbuff_t *next_tvb = tvb_new_subset(tvb, offset, length, length);
 
     dissect_p1_ORName (FALSE, next_tvb, 0, &asn1_ctx, ext_tree,
                          hf_addr_ext_asn1_ber);
@@ -2685,7 +2689,7 @@ static gint dissect_mts_identifier (tvbuff_t *tvb, packet_info *pinfo _U_, proto
   } else if (dmp_nat_decode == NAT_DECODE_THALES) {
     mts_id = dissect_thales_mts_id (tvb, offset, dmp.mts_id_length);
   } else {
-    mts_id = tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, dmp.mts_id_length);
+    mts_id = tvb_bytes_to_ep_str (tvb, offset, dmp.mts_id_length);
   }
   proto_item_append_text (dmp.mts_id_item, " (%zu bytes decompressed)", strlen (mts_id));
   mts_id = format_text (mts_id, strlen (mts_id));
@@ -2736,7 +2740,7 @@ static gint dissect_ipm_identifier (tvbuff_t *tvb, packet_info *pinfo _U_, proto
   } else if (dmp_nat_decode == NAT_DECODE_THALES) {
     ipm_id = dissect_thales_ipm_id (tvb, offset, ipm_id_length, modifier);
   } else {
-    ipm_id = tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, ipm_id_length);
+    ipm_id = tvb_bytes_to_ep_str (tvb, offset, ipm_id_length);
   }
   proto_item_append_text (tf, " (%zu bytes decompressed)", strlen (ipm_id));
   ipm_id = format_text (ipm_id, strlen (ipm_id));
@@ -2953,7 +2957,7 @@ static gint dissect_dmp_envelope (tvbuff_t *tvb, packet_info *pinfo,
                                    "Submission time: %s",
                                    (subm_time & 0x7FFF) >= 0x7FF8 ?
                                    "Reserved" :
-                                   abs_time_secs_to_str (wmem_packet_scope(), dmp.subm_time, ABSOLUTE_TIME_LOCAL, TRUE));
+                                   abs_time_secs_to_ep_str (dmp.subm_time, ABSOLUTE_TIME_LOCAL, TRUE));
   field_tree = proto_item_add_subtree (tf, ett_envelope_subm_time);
   proto_tree_add_item (field_tree, hf_envelope_time_diff_present, tvb, offset, 2, ENC_BIG_ENDIAN);
   proto_tree_add_item (field_tree, hf_envelope_subm_time_value, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -2971,7 +2975,7 @@ static gint dissect_dmp_envelope (tvbuff_t *tvb, packet_info *pinfo,
     if (secs == DMP_TIME_RESERVED) {
       proto_item_append_text (tf, "Reserved (0x%2.2x)", time_diff);
     } else {
-      proto_item_append_text (tf, "%s", time_secs_to_str(wmem_packet_scope(), secs));
+      proto_item_append_text (tf, "%s", time_secs_to_ep_str (secs));
     }
     offset += 1;
   }
@@ -3079,12 +3083,12 @@ static void dissect_dmp_structured_id (tvbuff_t *tvb, proto_tree *body_tree,
     break;
 
   case STRUCT_ID_STRING:
-    dmp.struct_id = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, (gint) dmp_struct_length, ENC_ASCII);
+    dmp.struct_id = tvb_get_string (wmem_packet_scope(), tvb, offset, (gint) dmp_struct_length);
     proto_tree_add_item (body_tree, hf_message_bodyid_string, tvb, offset, dmp_struct_length, ENC_ASCII|ENC_NA);
     break;
 
   case STRUCT_ID_ZSTRING:
-    dmp.struct_id = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &length, ENC_ASCII);
+    dmp.struct_id = tvb_get_stringz (wmem_packet_scope(), tvb, offset, &length);
     proto_tree_add_item (body_tree, hf_message_bodyid_zstring, tvb, offset, length, ENC_ASCII|ENC_NA);
     break;
 
@@ -3111,7 +3115,7 @@ static gint dissect_dmp_message (tvbuff_t *tvb, packet_info *pinfo,
   if (dmp.body_format == FREE_TEXT_SUBJECT) {
     len = tvb_strsize (tvb, offset);
     if (dmp_subject_as_id) {
-      dmp.struct_id = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII);
+      dmp.struct_id = tvb_get_string (wmem_packet_scope(), tvb, offset, len);
     }
     proto_tree_add_item (message_tree, hf_message_subject, tvb, offset, len, ENC_ASCII|ENC_NA);
     offset += len;
@@ -3291,9 +3295,9 @@ static gint dissect_dmp_report (tvbuff_t *tvb, packet_info *pinfo,
       proto_item_append_text (tf, "Reserved (0x%2.2x)", report);
       proto_item_append_text (ei, " (Reserved)");
     } else {
-      proto_item_append_text (tf, "%s (%s)", time_secs_to_str(wmem_packet_scope(), secs),
-                              abs_time_secs_to_str (wmem_packet_scope(), dmp.subm_time - secs, ABSOLUTE_TIME_LOCAL, TRUE));
-      proto_item_append_text (ei, " (%s from submission time)", time_secs_to_str(wmem_packet_scope(), secs));
+      proto_item_append_text (tf, "%s (%s)", time_secs_to_ep_str (secs),
+                              abs_time_secs_to_ep_str (dmp.subm_time - secs, ABSOLUTE_TIME_LOCAL, TRUE));
+      proto_item_append_text (ei, " (%s from submission time)", time_secs_to_ep_str (secs));
     }
   } else {
     dmp.ndr = TRUE;
@@ -3405,9 +3409,9 @@ static gint dissect_dmp_notification (tvbuff_t *tvb, packet_info *pinfo _U_,
       proto_item_append_text (tf, "Reserved (0x%2.2x)", rec_time);
       proto_item_append_text (ei, " (Reserved)");
     } else {
-      proto_item_append_text (tf, "%s (%s)", time_secs_to_str(wmem_packet_scope(), secs),
-                              abs_time_secs_to_str (wmem_packet_scope(), dmp.subm_time - secs, ABSOLUTE_TIME_LOCAL, TRUE));
-      proto_item_append_text (ei, " (%s from submission time)", time_secs_to_str(wmem_packet_scope(), secs));
+      proto_item_append_text (tf, "%s (%s)", time_secs_to_ep_str (secs),
+                              abs_time_secs_to_ep_str (dmp.subm_time - secs, ABSOLUTE_TIME_LOCAL, TRUE));
+      proto_item_append_text (ei, " (%s from submission time)", time_secs_to_ep_str (secs));
     }
     offset += 1;
 
@@ -3815,9 +3819,9 @@ static gint dissect_dmp_content (tvbuff_t *tvb, packet_info *pinfo,
       proto_item_append_text (tf, "Reserved (0x%2.2x)", exp_time);
       proto_item_append_text (ei, " (Reserved)");
     } else {
-      proto_item_append_text (tf, "%s (%s)", time_secs_to_str(wmem_packet_scope(), secs),
-                              abs_time_secs_to_str (wmem_packet_scope(), dmp.subm_time + secs, ABSOLUTE_TIME_LOCAL, TRUE));
-      proto_item_append_text (ei, " (%s from submission time)", time_secs_to_str(wmem_packet_scope(), secs));
+      proto_item_append_text (tf, "%s (%s)", time_secs_to_ep_str (secs),
+                              abs_time_secs_to_ep_str (dmp.subm_time + secs, ABSOLUTE_TIME_LOCAL, TRUE));
+      proto_item_append_text (ei, " (%s from submission time)", time_secs_to_ep_str (secs));
     }
     offset += 1;
   }
@@ -3837,13 +3841,13 @@ static gint dissect_dmp_content (tvbuff_t *tvb, packet_info *pinfo,
       proto_item_append_text (tf, "0 minutes in the %s (%s)",
                               (dtg & 0x80) ? dtg_sign.true_string :
                               dtg_sign.false_string,
-                              abs_time_secs_to_str (wmem_packet_scope(), dmp.subm_time, ABSOLUTE_TIME_LOCAL, TRUE));
+                              abs_time_secs_to_ep_str (dmp.subm_time, ABSOLUTE_TIME_LOCAL, TRUE));
     } else {
-      proto_item_append_text (tf, "%s in the %s (%s)", time_secs_to_str(wmem_packet_scope(), secs),
+      proto_item_append_text (tf, "%s in the %s (%s)", time_secs_to_ep_str(secs),
                               (dtg & 0x80) ? dtg_sign.true_string :
                               dtg_sign.false_string, (dtg & 0x80) ?
-                              abs_time_secs_to_str (wmem_packet_scope(), dmp.subm_time + secs, ABSOLUTE_TIME_LOCAL, TRUE) :
-                              abs_time_secs_to_str (wmem_packet_scope(), dmp.subm_time - secs, ABSOLUTE_TIME_LOCAL, TRUE));
+                              abs_time_secs_to_ep_str (dmp.subm_time + secs, ABSOLUTE_TIME_LOCAL, TRUE) :
+                              abs_time_secs_to_ep_str (dmp.subm_time - secs, ABSOLUTE_TIME_LOCAL, TRUE));
     }
     offset += 1;
   }
@@ -3944,8 +3948,8 @@ static gint dissect_dmp_extensions (tvbuff_t *tvb, packet_info *pinfo _U_,
   return offset;
 }
 
-static int dissect_dmp (tvbuff_t *tvb, packet_info *pinfo,
-                         proto_tree *tree, void *data _U_)
+static void dissect_dmp (tvbuff_t *tvb, packet_info *pinfo,
+                         proto_tree *tree)
 {
   proto_tree *dmp_tree = NULL, *checksum_tree = NULL;
   proto_item *ti = NULL, *en = NULL;
@@ -3967,7 +3971,7 @@ static int dissect_dmp (tvbuff_t *tvb, packet_info *pinfo,
   if (dmp.version > DMP_VERSION_2) {
     /* Unsupported DMP Version, no point to continue */
     col_add_fstr (pinfo->cinfo, COL_INFO, "Unsupported Version: %d", dmp.version);
-    return 0;
+    return;
   }
 
   if (dmp.extensions) {
@@ -4008,7 +4012,6 @@ static int dissect_dmp (tvbuff_t *tvb, packet_info *pinfo,
                                    offset, 2, TRUE);
       PROTO_ITEM_SET_GENERATED (en);
     }
-    offset += 2;
   }
 
   if (use_seq_ack_analysis) {
@@ -4080,8 +4083,6 @@ static int dissect_dmp (tvbuff_t *tvb, packet_info *pinfo,
   proto_item_append_text (ti, ", Version: %d%s, %s", dmp.version,
                           (dmp.prot_id == PROT_NAT ? " (national)" : ""),
                           msg_type_to_str());
-
-  return offset;
 }
 
 static void dmp_init_routine (void)
@@ -4981,7 +4982,7 @@ void proto_register_dmp (void)
 
   proto_dmp = proto_register_protocol (PNAME, PSNAME, PFNAME);
 
-  dmp_handle = new_register_dissector(PFNAME, dissect_dmp, proto_dmp);
+  dmp_handle = register_dissector(PFNAME, dissect_dmp, proto_dmp);
 
   proto_register_field_array (proto_dmp, hf, array_length (hf));
   proto_register_subtree_array (ett, array_length (ett));
@@ -5065,7 +5066,6 @@ void proto_reg_handoff_dmp (void)
 
   if (!dmp_prefs_initialized) {
     dmp_prefs_initialized = TRUE;
-    dissector_add_uint ("s5066sis.ctl.appid", S5066_CLIENT_S4406_ANNEX_E_TMI_4_DMP, dmp_handle);
   } else {
     dissector_delete_uint_range ("udp.port", dmp_port_range, dmp_handle);
     g_free (dmp_port_range);

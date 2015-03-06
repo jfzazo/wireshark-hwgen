@@ -162,9 +162,9 @@ wtap_file_encap(wtap *wth)
 }
 
 int
-wtap_file_tsprec(wtap *wth)
+wtap_file_tsprecision(wtap *wth)
 {
-	return wth->file_tsprec;
+	return wth->tsprecision;
 }
 
 wtapng_section_t *
@@ -645,8 +645,8 @@ static struct encap_type_info encap_table_base[] = {
 	/* WTAP_ENCAP_BACNET_MS_TP_WITH_PHDR */
 	{ "BACnet MS/TP with Directional Info", "bacnet-ms-tp-with-direction" },
 
-	/* WTAP_ENCAP_IXVERIWAVE */
-	{ "IxVeriWave header and stats block", "ixveriwave" },
+ 	/* WTAP_ENCAP_IXVERIWAVE */
+ 	{ "IxVeriWave header and stats block", "ixveriwave" },
 
 	/* WTAP_ENCAP_IEEE_802_11_AIROPEEK */
 	{ "IEEE 802.11 plus AiroPeek radio header", "ieee-802-11-airopeek" },
@@ -813,80 +813,32 @@ wtap_short_string_to_encap(const char *short_name)
 }
 
 static const char *wtap_errlist[] = {
-	/* WTAP_ERR_NOT_REGULAR_FILE */
 	"The file isn't a plain file or pipe",
-
-	/* WTAP_ERR_RANDOM_OPEN_PIPE */
 	"The file is being opened for random access but is a pipe",
-
-	/* WTAP_ERR_FILE_UNKNOWN_FORMAT */
 	"The file isn't a capture file in a known format",
-
-	/* WTAP_ERR_UNSUPPORTED */
 	"File contains record data we don't support",
-
-	/* WTAP_ERR_CANT_WRITE_TO_PIPE */
 	"That file format cannot be written to a pipe",
-
-	/* WTAP_ERR_CANT_OPEN */
 	NULL,
-
-	/* WTAP_ERR_UNWRITABLE_FILE_TYPE */
 	"Files can't be saved in that format",
-
-	/* WTAP_ERR_UNWRITABLE_ENCAP */
 	"Files from that network type can't be saved in that format",
-
-	/* WTAP_ERR_ENCAP_PER_PACKET_UNSUPPORTED */
 	"That file format doesn't support per-packet encapsulations",
-
-	/* WTAP_ERR_CANT_WRITE */
-	"A write failed for some unknown reason",
-
-	/* WTAP_ERR_CANT_CLOSE */
 	NULL,
-
-	/* WTAP_ERR_SHORT_READ */
+	NULL,
 	"Less data was read than was expected",
-
-	/* WTAP_ERR_BAD_FILE */
 	"The file appears to be damaged or corrupt",
-
-	/* WTAP_ERR_SHORT_WRITE */
 	"Less data was written than was requested",
-
-	/* WTAP_ERR_UNC_OVERFLOW */
+	"Uncompression error: data oddly truncated",
 	"Uncompression error: data would overflow buffer",
-
-	/* WTAP_ERR_RANDOM_OPEN_STDIN */
+	"Uncompression error: bad LZ77 offset",
 	"The standard input cannot be opened for random access",
-
-	/* WTAP_ERR_COMPRESSION_NOT_SUPPORTED */
 	"That file format doesn't support compression",
-
-	/* WTAP_ERR_CANT_SEEK */
 	NULL,
-
-	/* WTAP_ERR_CANT_SEEK_COMPRESSED */
 	NULL,
-
-	/* WTAP_ERR_DECOMPRESS */
 	"Uncompression error",
-
-	/* WTAP_ERR_INTERNAL */
 	"Internal error",
-
-	/* WTAP_ERR_PACKET_TOO_LARGE */
 	"The packet being written is too large for that format",
-
-	/* WTAP_ERR_CHECK_WSLUA */
 	NULL,
-
-	/* WTAP_ERR_UNWRITABLE_REC_TYPE */
-	"That record type cannot be written in that format",
-
-	/* WTAP_ERR_UNWRITABLE_REC_DATA */
-	"That record can't be written in that format"
+	"That record type cannot be written in that format"
 };
 #define	WTAP_ERRLIST_SIZE	(sizeof wtap_errlist / sizeof wtap_errlist[0])
 
@@ -929,7 +881,7 @@ wtap_sequential_close(wtap *wth)
 	}
 
 	if (wth->frame_buffer) {
-		ws_buffer_free(wth->frame_buffer);
+		buffer_free(wth->frame_buffer);
 		g_free(wth->frame_buffer);
 		wth->frame_buffer = NULL;
 	}
@@ -978,12 +930,6 @@ wtap_close(wtap *wth)
 		g_ptr_array_foreach(wth->fast_seek, g_fast_seek_item_free, NULL);
 		g_ptr_array_free(wth->fast_seek, TRUE);
 	}
-
-	g_free(wth->shb_hdr.opt_comment);
-	g_free(wth->shb_hdr.shb_hardware);
-	g_free(wth->shb_hdr.shb_os);
-	g_free(wth->shb_hdr.shb_user_appl);
-
 	for(i = 0; i < wth->interface_data->len; i++) {
 		wtapng_if_descr = &g_array_index(wth->interface_data, wtapng_if_descr_t, i);
 		if(wtapng_if_descr->opt_comment != NULL){
@@ -1044,14 +990,9 @@ wtap_read(wtap *wth, int *err, gchar **err_info, gint64 *data_offset)
 	 * capture file type doesn't have to set it), and if it
 	 * *is* WTAP_ENCAP_PER_PACKET, the caller needs to set it
 	 * anyway.
-	 *
-	 * Do the same for the packet time stamp resolution.
 	 */
 	wth->phdr.pkt_encap = wth->file_encap;
-	wth->phdr.pkt_tsprec = wth->file_tsprec;
 
-	*err = 0;
-	*err_info = NULL;
 	if (!wth->subtype_read(wth, err, err_info, data_offset)) {
 		/*
 		 * If we didn't get an error indication, we read
@@ -1086,65 +1027,6 @@ wtap_read(wtap *wth, int *err, gchar **err_info, gint64 *data_offset)
 }
 
 /*
- * Read a given number of bytes from a file.
- *
- * If we succeed, return TRUE.
- *
- * If we get an EOF, return FALSE with *err set to 0, reporting this
- * as an EOF.
- *
- * If we get fewer bytes than the specified number, return FALSE with
- * *err set to WTAP_ERR_SHORT_READ, reporting this as a short read
- * error.
- *
- * If we get a read error, return FALSE with *err and *err_info set
- * appropriately.
- */
-gboolean
-wtap_read_bytes_or_eof(FILE_T fh, void *buf, unsigned int count, int *err,
-    gchar **err_info)
-{
-	int	bytes_read;
-
-	bytes_read = file_read(buf, count, fh);
-	if (bytes_read < 0 || (guint)bytes_read != count) {
-		*err = file_error(fh, err_info);
-		if (*err == 0 && bytes_read > 0)
-			*err = WTAP_ERR_SHORT_READ;
-		return FALSE;
-	}
-	return TRUE;
-}
-
-/*
- * Read a given number of bytes from a file.
- *
- * If we succeed, return TRUE.
- *
- * If we get fewer bytes than the specified number, including getting
- * an EOF, return FALSE with *err set to WTAP_ERR_SHORT_READ, reporting
- * this as a short read error.
- *
- * If we get a read error, return FALSE with *err and *err_info set
- * appropriately.
- */
-gboolean
-wtap_read_bytes(FILE_T fh, void *buf, unsigned int count, int *err,
-    gchar **err_info)
-{
-	int	bytes_read;
-
-	bytes_read = file_read(buf, count, fh);
-	if (bytes_read < 0 || (guint)bytes_read != count) {
-		*err = file_error(fh, err_info);
-		if (*err == 0)
-			*err = WTAP_ERR_SHORT_READ;
-		return FALSE;
-	}
-	return TRUE;
-}
-
-/*
  * Read packet data into a Buffer, growing the buffer as necessary.
  *
  * This returns an error on a short read, even if the short read hit
@@ -1157,9 +1039,19 @@ gboolean
 wtap_read_packet_bytes(FILE_T fh, Buffer *buf, guint length, int *err,
     gchar **err_info)
 {
-	ws_buffer_assure_space(buf, length);
-	return wtap_read_bytes(fh, ws_buffer_start_ptr(buf), length, err,
-	    err_info);
+	int	bytes_read;
+
+	buffer_assure_space(buf, length);
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(buffer_start_ptr(buf), length, fh);
+
+	if (bytes_read < 0 || (guint)bytes_read != length) {
+		*err = file_error(fh, err_info);
+		if (*err == 0)
+			*err = WTAP_ERR_SHORT_READ;
+		return FALSE;
+	}
+	return TRUE;
 }
 
 /*
@@ -1181,20 +1073,7 @@ wtap_phdr(wtap *wth)
 guint8 *
 wtap_buf_ptr(wtap *wth)
 {
-	return ws_buffer_start_ptr(wth->frame_buffer);
-}
-
-void
-wtap_phdr_init(struct wtap_pkthdr *phdr)
-{
-	memset(phdr, 0, sizeof(struct wtap_pkthdr));
-	ws_buffer_init(&phdr->ft_specific_data, 0);
-}
-
-void
-wtap_phdr_cleanup(struct wtap_pkthdr *phdr)
-{
-	ws_buffer_free(&phdr->ft_specific_data);
+	return buffer_start_ptr(wth->frame_buffer);
 }
 
 gboolean
@@ -1221,16 +1100,3 @@ wtap_seek_read(wtap *wth, gint64 seek_off,
 
 	return TRUE;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -19,12 +19,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-#
-# The cygwin version of bash has an option to ignore the extra CR at
-# the end of a script line that would cause an error otherwise. Use this
-# option if supported.
-# Note: The following line must be the first non-comment line
-(set -o igncr) 2>/dev/null && set -o igncr; # comment is needed as well
+(set -o igncr) 2>/dev/null && set -o igncr;  # hack to force this file to be processed by cygwin bash with -o igncr
+					     # needed when this file is exec'd from win32-setup.sh & win64-setup.sh
 
 err_exit () {
 	echo ""
@@ -37,13 +33,35 @@ err_exit () {
 	exit 1
 }
 
+if [ -z "$DOWNLOAD_TAG" ]; then
+	err_exit "DOWNLOAD_TAG not defined (internal error)"
+fi
+
+if [ -z "$WIRESHARK_TARGET_PLATFORM" ]; then
+	err_exit "WIRESHARK_TARGET_PLATFORM not defined (internal error)"
+fi
+
+# This MUST be in the form
+#   http://anonsvn.wireshark.org/wireshark-win32-libs/tags/<date>/packages
+# or
+#   http://anonsvn.wireshark.org/wireshark-win64-libs/tags/<date>/packages
+# in order to provide backward compatibility with older trees (e.g. a
+# previous release or an older SVN checkout).
+# Save previous tag.
+
+# Set DOWNLOAD_PREFIX to /packages to test uploads before creating the tag.
+#DOWNLOAD_PREFIX="http://anonsvn.wireshark.org/wireshark-$WIRESHARK_TARGET_PLATFORM-libs/trunk/packages/"
+DOWNLOAD_PREFIX="http://anonsvn.wireshark.org/wireshark-$WIRESHARK_TARGET_PLATFORM-libs/tags/$DOWNLOAD_TAG/packages/"
+
+TAG_FILE="current_tag.txt"
+
 usage () {
 	echo "Usage:"
 	echo "	$0 --appverify <appname> [<appname>] ..."
 	echo "  $0 --libverify <destination> <subdirectory> <package>"
-	echo "	$0 --download  <destination> <subdirectory> <package> <tag> <platform>"
-	echo "	$0 --settag    <destination> <tag>"
-	echo "	$0 --checktag  <destination> <tag>"
+	echo "	$0 --download  <destination> <subdirectory> <package>"
+	echo "	$0 --settag  <destination>"
+	echo "	$0 --checktag  <destination>"
 	echo ""
 	exit 1
 }
@@ -92,14 +110,12 @@ find_proxy() {
 	fi
 }
 
-# Main
-TAG_FILE="current_tag.txt"
-if [ -z "$*" ] ; then
-	usage
-fi
+
+
 case "$1" in
 --appverify)
 	shift
+
 	if [ -z "$*" ] ; then
 		usage
 	fi
@@ -159,27 +175,12 @@ case "$1" in
 	fi
 	;;
 --download)
-	if [ -z "$2" -o -z "$3" -o -z "$4" -o -z "$5" -o -z "$6" ] ; then
+	if [ -z "$2" -o -z "$3" -o -z "$4" ] ; then
 		usage
 	fi
 	DEST_PATH=$(cygpath "$2")
 	DEST_SUBDIR=$3
 	PACKAGE_PATH=$4
-	DOWNLOAD_TAG=$5
-	WIRESHARK_TARGET_PLATFORM=$6
-
-	if [ -z "$WIRESHARK_TARGET_PLATFORM" ]; then
-		err_exit "WIRESHARK_TARGET_PLATFORM not defined"
-	fi
-	# DOWNLOAD_PREFIX MUST be in the form
-	#   http://anonsvn.wireshark.org/wireshark-win32-libs/tags/<date>/packages
-	# or
-	#   http://anonsvn.wireshark.org/wireshark-win64-libs/tags/<date>/packages
-	# or
-	#   /packages to test uploads before creating the tag.
-	#DOWNLOAD_PREFIX="http://anonsvn.wireshark.org/wireshark-$WIRESHARK_TARGET_PLATFORM-libs/trunk/packages"
-	DOWNLOAD_PREFIX="http://anonsvn.wireshark.org/wireshark-$WIRESHARK_TARGET_PLATFORM-libs/tags/$DOWNLOAD_TAG/packages"
-
 	PACKAGE=$(basename "$PACKAGE_PATH")
 	echo ""
 	echo "****** $PACKAGE ******"
@@ -212,20 +213,18 @@ case "$1" in
 	fi
 	;;
 --settag)
-	if [ -z "$2"  -o -z "$3" ] ; then
+	if [ -z "$2" ] ; then
 		usage
 	fi
 	DEST_PATH=$(cygpath "$2")
-	DOWNLOAD_TAG=$3
 	echo "$DOWNLOAD_TAG" > "$DEST_PATH/$TAG_FILE"
 	;;
 --checktag)
-	if [ -z "$2" -o -z "$3" ] ; then
+	if [ -z "$2" ] ; then
 		usage
 	fi
 	DEST_PATH=$(cygpath "$2")
 	WIN_PATH=$(cygpath --windows "$2")
-	DOWNLOAD_TAG=$3
 	LAST_TAG=$(cat "$DEST_PATH/$TAG_FILE" 2> /dev/null)
 	if [ "$DOWNLOAD_TAG" != "$LAST_TAG" ] ; then
 		if [ -z "$LAST_TAG" ] ; then

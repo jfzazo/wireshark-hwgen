@@ -27,8 +27,6 @@
 
 #include "packet-ipmi.h"
 
-void proto_register_ipmi_transport(void);
-
 static gint ett_ipmi_trn_lan00_byte1 = -1;
 static gint ett_ipmi_trn_lan01_byte1 = -1;
 static gint ett_ipmi_trn_lan02_byte1 = -1;
@@ -133,7 +131,6 @@ static gint ett_ipmi_trn_1a_byte1 = -1;
 static gint ett_ipmi_trn_1a_byte2 = -1;
 static gint ett_ipmi_trn_1b_byte1 = -1;
 static gint ett_ipmi_trn_1b_byte2 = -1;
-static gint ett_ipmi_trn_parameter = -1;
 
 static gint hf_ipmi_trn_lan00_sip = -1;
 
@@ -199,8 +196,7 @@ static gint hf_ipmi_trn_lan22_num_cs_entries = -1;
 
 static gint hf_ipmi_trn_lan23_cs_entry = -1;
 
-static gint hf_ipmi_trn_lan24_priv1 = -1;
-static gint hf_ipmi_trn_lan24_priv2 = -1;
+static gint hf_ipmi_trn_lan24_priv = -1;
 
 static gint hf_ipmi_trn_lan25_dst_selector = -1;
 static gint hf_ipmi_trn_lan25_addr_format = -1;
@@ -479,11 +475,6 @@ static gint hf_ipmi_trn_1a_chan = -1;
 
 static gint hf_ipmi_trn_1b_user = -1;
 static gint hf_ipmi_trn_1b_chan = -1;
-
-static expert_field ei_ipmi_trn_02_request_param_rev = EI_INIT;
-static expert_field ei_ipmi_trn_02_request_param_data = EI_INIT;
-static expert_field ei_ipmi_trn_11_request_param_rev = EI_INIT;
-static expert_field ei_ipmi_trn_11_request_param_data = EI_INIT;
 
 static const value_string lan00_sip_vals[] = {
 	{ 0x00, "Set complete" },
@@ -924,6 +915,7 @@ lan_24(tvbuff_t *tvb, proto_tree *tree)
 		&ett_ipmi_trn_lan24_byte4, &ett_ipmi_trn_lan24_byte5, &ett_ipmi_trn_lan24_byte6, &ett_ipmi_trn_lan24_byte7,
 		&ett_ipmi_trn_lan24_byte8 };
 	proto_tree *s_tree;
+	proto_item *ti;
 	guint i;
 	guint8 v, v1, v2;
 
@@ -931,14 +923,17 @@ lan_24(tvbuff_t *tvb, proto_tree *tree)
 		v = tvb_get_guint8(tvb, i + 1);
 		v1 = v & 0x0f;
 		v2 = v >> 4;
-		s_tree = proto_tree_add_subtree_format(tree, tvb, i + 1, 1,
-				*ett[i], NULL, "Cipher Suite #%d: %s (0x%02x), Cipher Suite #%d: %s (0x%02x)",
+		ti = proto_tree_add_text(tree, tvb, i + 1, 1,
+				"Cipher Suite #%d: %s (0x%02x), Cipher Suite #%d: %s (0x%02x)",
 				i * 2 + 1, val_to_str_const(v1, lan24_priv_vals, "Reserved"), v1,
 				i * 2 + 2, val_to_str_const(v2, lan24_priv_vals, "Reserved"), v2);
-		proto_tree_add_uint_format_value(s_tree, hf_ipmi_trn_lan24_priv1, tvb, i + 1, 1,
-				v2 << 4, " #%d: %s (0x%02x)", i * 2 + 2, val_to_str_const(v2, lan24_priv_vals, "Reserved"), v2);
-		proto_tree_add_uint_format_value(s_tree, hf_ipmi_trn_lan24_priv2, tvb, i + 1, 1,
-				v1, " #%d: %s (0x%02x)", i * 2 + 1, val_to_str_const(v1, lan24_priv_vals, "Reserved"), v1);
+		s_tree = proto_item_add_subtree(ti, *ett[i]);
+		proto_tree_add_uint_format(s_tree, hf_ipmi_trn_lan24_priv, tvb, i + 1, 1,
+				v2 << 4, "%sMaximum Privilege Level for Cipher Suite #%d: %s (0x%02x)",
+				ipmi_dcd8(v, 0xf0), i * 2 + 2, val_to_str_const(v2, lan24_priv_vals, "Reserved"), v2);
+		proto_tree_add_uint_format(s_tree, hf_ipmi_trn_lan24_priv, tvb, i + 1, 1,
+				v1, "%sMaximum Privilege Level for Cipher Suite #%d: %s (0x%02x)",
+				ipmi_dcd8(v, 0x0f), i * 2 + 1, val_to_str_const(v1, lan24_priv_vals, "Reserved"), v1);
 	}
 }
 
@@ -1033,7 +1028,6 @@ static const value_string cc01[] = {
 	{ 0x80, "Parameter not supported" },
 	{ 0x81, "Attempt to set the 'set in progress' value (in parameter #0) when not in the 'set complete' state" },
 	{ 0x82, "Attempt to write read-only parameter" },
-	{ 0x83, "Attempt to read write-only parameter" },
 	{ 0, NULL }
 };
 
@@ -1068,7 +1062,7 @@ rq02(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 	proto_tree_add_uint_format_value(tree, hf_ipmi_trn_02_param, tvb, 1, 1,
 			pno, "%s (0x%02x)", desc, pno);
 	proto_tree_add_item(tree, hf_ipmi_trn_02_set, tvb, 2, 1, ENC_LITTLE_ENDIAN);
-	proto_tree_add_item(tree, hf_ipmi_trn_02_block, tvb, 2, 1, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item(tree, hf_ipmi_trn_02_block, tvb, 3, 1, ENC_LITTLE_ENDIAN);
 }
 
 static void
@@ -1076,12 +1070,11 @@ rs02(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
 	static const int *byte1[] = { &hf_ipmi_trn_02_rev_present, &hf_ipmi_trn_02_rev_compat, NULL };
 	proto_item *ti;
-	proto_tree *subtree;
 	tvbuff_t *next;
 	const char *desc;
 	guint32 pno, req;
 
-	ti = proto_tree_add_bitmask_text(tree, tvb, 0, 1, NULL, NULL,
+	proto_tree_add_bitmask_text(tree, tvb, 0, 1, NULL, NULL,
 			ett_ipmi_trn_02_rev, byte1, ENC_LITTLE_ENDIAN, 0);
 
 	if (!ipmi_get_data(pinfo, 0, &pno) || !ipmi_get_data(pinfo, 1, &req)) {
@@ -1093,9 +1086,11 @@ rs02(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 	}
 
 	if ((req & 0x80) && tvb_captured_length(tvb) > 1) {
-		expert_add_info(pinfo, ti, &ei_ipmi_trn_02_request_param_rev);
+		ti = proto_tree_add_text(tree, tvb, 0, 0, "Requested parameter revision; parameter data returned");
+		PROTO_ITEM_SET_GENERATED(ti);
 	} else if (!(req & 0x80) && tvb_captured_length(tvb) == 1) {
-		expert_add_info(pinfo, ti, &ei_ipmi_trn_02_request_param_data);
+		ti = proto_tree_add_text(tree, tvb, 0, 0, "Requested parameter data; only parameter version returned");
+		PROTO_ITEM_SET_GENERATED(ti);
 	}
 
 	if (pno < array_length(lan_options)) {
@@ -1106,20 +1101,22 @@ rs02(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 		desc = "Reserved";
 	}
 
-	subtree = proto_tree_add_subtree_format(tree, tvb, 0, 0, ett_ipmi_trn_parameter, NULL, "Parameter: %s", desc);
+	ti = proto_tree_add_text(tree, tvb, 0, 0, "Parameter: %s", desc);
+	PROTO_ITEM_SET_GENERATED(ti);
 
 	if (tvb_captured_length(tvb) > 1) {
 		if (pno < array_length(lan_options)) {
 			next = tvb_new_subset_remaining(tvb, 1);
-			lan_options[pno].intrp(next, subtree);
+			lan_options[pno].intrp(next, tree);
 		} else {
-			proto_tree_add_item(subtree, hf_ipmi_trn_02_param_data, tvb, 1, -1, ENC_NA);
+			proto_tree_add_item(tree, hf_ipmi_trn_02_param_data, tvb, 1, -1, ENC_NA);
 		}
 	}
 }
 
 static const value_string cc02[] = {
 	{ 0x80, "Parameter not supported" },
+	{ 0x83, "Attempt to read write-only parameter" },
 	{ 0, NULL }
 };
 
@@ -1840,12 +1837,11 @@ rs11(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
 	static const int *byte1[] = { &hf_ipmi_trn_11_rev_present, &hf_ipmi_trn_11_rev_compat, NULL };
 	proto_item *ti;
-	proto_tree *subtree;
 	tvbuff_t *next;
 	const char *desc;
 	guint32 pno, req;
 
-	ti = proto_tree_add_bitmask_text(tree, tvb, 0, 1, NULL, NULL,
+	proto_tree_add_bitmask_text(tree, tvb, 0, 1, NULL, NULL,
 			ett_ipmi_trn_11_rev, byte1, ENC_LITTLE_ENDIAN, 0);
 
 	if (!ipmi_get_data(pinfo, 0, &pno) || !ipmi_get_data(pinfo, 1, &req)) {
@@ -1865,19 +1861,22 @@ rs11(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 	}
 
 	if ((req & 0x80) && tvb_captured_length(tvb) > 1) {
-		expert_add_info(pinfo, ti, &ei_ipmi_trn_11_request_param_rev);
+		ti = proto_tree_add_text(tree, tvb, 0, 0, "Requested parameter revision; parameter data returned");
+		PROTO_ITEM_SET_GENERATED(ti);
 	} else if (!(req & 0x80) && tvb_captured_length(tvb) == 1) {
-		expert_add_info(pinfo, ti, &ei_ipmi_trn_11_request_param_data);
+		ti = proto_tree_add_text(tree, tvb, 0, 0, "Requested parameter data; only parameter version returned");
+		PROTO_ITEM_SET_GENERATED(ti);
 	}
 
-	subtree = proto_tree_add_subtree_format(tree, tvb, 0, 0, ett_ipmi_trn_parameter, NULL, "Parameter: %s", desc);
+	ti = proto_tree_add_text(tree, tvb, 0, 0, "Parameter: %s", desc);
+	PROTO_ITEM_SET_GENERATED(ti);
 
 	if (tvb_captured_length(tvb) > 1) {
 		if (pno < array_length(serial_options)) {
 			next = tvb_new_subset_remaining(tvb, 1);
-			serial_options[pno].intrp(next, subtree);
+			serial_options[pno].intrp(next, tree);
 		} else {
-			proto_tree_add_item(subtree, hf_ipmi_trn_11_param_data, tvb, 1, -1, ENC_NA);
+			proto_tree_add_item(tree, hf_ipmi_trn_11_param_data, tvb, 1, -1, ENC_NA);
 		}
 	}
 }
@@ -2137,46 +2136,46 @@ static const value_string cc33[] = {
 };
 
 static ipmi_cmd_t cmd_transport[] = {
-	/* LAN Device Commands */
-	{ 0x01, rq01, NULL, cc01, NULL, "Set LAN Configuration Parameters", 0 },
-	{ 0x02, rq02, rs02, cc02, NULL, "Get LAN Configuration Parameters", CMD_CALLRQ },
-	{ 0x03, rq03, rs03, NULL, NULL, "Suspend BMC ARPs", 0 },
-	{ 0x04, rq04, rs04, NULL, NULL, "Get IP/UDP/RMCP Statistics", 0 },
+  /* LAN Device Commands */
+  { 0x01, rq01, NULL, cc01, NULL, "Set LAN Configuration Parameters", 0 },
+  { 0x02, rq02, rs02, cc02, NULL, "Get LAN Configuration Parameters", CMD_CALLRQ },
+  { 0x03, rq03, rs03, NULL, NULL, "Suspend BMC ARPs", 0 },
+  { 0x04, rq04, rs04, NULL, NULL, "Get IP/UDP/RMCP Statistics", 0 },
 
-	/* Serial/Modem Device Commands */
-	{ 0x10, rq10, NULL, cc10, NULL, "Set Serial/Modem Configuration", 0 },
-	{ 0x11, rq11, rs11, cc11, NULL, "Get Serial/Modem Configuration", CMD_CALLRQ },
-	{ 0x12, rq12, rs12, NULL, NULL, "Set Serial/Modem Mux", 0 },
-	{ 0x13, rq13, rs13, NULL, NULL, "Get TAP Response Codes", 0 },
-	{ 0x14, rq14, NULL, NULL, NULL, "Set PPP UDP Proxy Transmit Data", 0 },
-	{ 0x15, rq15, rs15, NULL, NULL, "Get PPP UDP Proxy Transmit Data", 0 },
-	{ 0x16, rq16, NULL, cc16, NULL, "Send PPP UDP Proxy Packet", 0 },
-	{ 0x17, rq17, rs17, cc17, NULL, "Get PPP UDP Proxy Receive Data", CMD_CALLRQ },
-	{ 0x18, rq18, NULL, NULL, NULL, "Serial/Modem Connection Active", 0 },
-	{ 0x19, rq19, NULL, cc19, NULL, "Callback", 0 },
-	{ 0x1a, rq1a, NULL, NULL, NULL, "Set User Callback Options", 0 },
-	{ 0x1b, rq1b, rs1b, NULL, NULL, "Get User Callback Options", 0 },
-	{ 0x1c, IPMI_TBD,   NULL, NULL, "Set Serial Routing Mux", 0 },
+  /* Serial/Modem Device Commands */
+  { 0x10, rq10, NULL, cc10, NULL, "Set Serial/Modem Configuration", 0 },
+  { 0x11, rq11, rs11, cc11, NULL, "Get Serial/Modem Configuration", CMD_CALLRQ },
+  { 0x12, rq12, rs12, NULL, NULL, "Set Serial/Modem Mux", 0 },
+  { 0x13, rq13, rs13, NULL, NULL, "Get TAP Response Codes", 0 },
+  { 0x14, rq14, NULL, NULL, NULL, "Set PPP UDP Proxy Transmit Data", 0 },
+  { 0x15, rq15, rs15, NULL, NULL, "Get PPP UDP Proxy Transmit Data", 0 },
+  { 0x16, rq16, NULL, cc16, NULL, "Send PPP UDP Proxy Packet", 0 },
+  { 0x17, rq17, rs17, cc17, NULL, "Get PPP UDP Proxy Receive Data", CMD_CALLRQ },
+  { 0x18, rq18, NULL, NULL, NULL, "Serial/Modem Connection Active", 0 },
+  { 0x19, rq19, NULL, cc19, NULL, "Callback", 0 },
+  { 0x1a, rq1a, NULL, NULL, NULL, "Set User Callback Options", 0 },
+  { 0x1b, rq1b, rs1b, NULL, NULL, "Get User Callback Options", 0 },
+  { 0x1c, IPMI_TBD,   NULL, NULL, "Set Serial Routing Mux", 0 },
 
-	/* Serial-Over-LAN Commands */
-	{ 0x20, IPMI_TBD,   NULL, NULL, "SOL Activating", 0 },
-	{ 0x21, IPMI_TBD,   cc21, NULL, "Set SOL Configuration Parameters", 0 },
-	{ 0x22, IPMI_TBD,   cc22, NULL, "Get SOL Configuration Parameters", CMD_CALLRQ },
+  /* Serial-Over-LAN Commands */
+  { 0x20, IPMI_TBD,   NULL, NULL, "SOL Activating", 0 },
+  { 0x21, IPMI_TBD,   cc21, NULL, "Set SOL Configuration Parameters", 0 },
+  { 0x22, IPMI_TBD,   cc22, NULL, "Get SOL Configuration Parameters", CMD_CALLRQ },
 
-	/* Command Forwarding Commands */
-	{ 0x30, IPMI_TBD,   NULL, NULL, "Forwarded Command", 0 },
-	{ 0x31, IPMI_TBD,   NULL, NULL, "Set Forwarded Commands", 0 },
-	{ 0x32, IPMI_TBD,   NULL, NULL, "Get Forwarded Commands", 0 },
-	{ 0x33, IPMI_TBD,   cc33, NULL, "Enable Forwarded Commands", 0 },
+  /* Command Forwarding Commands */
+  { 0x30, IPMI_TBD,   NULL, NULL, "Forwarded Command", 0 },
+  { 0x31, IPMI_TBD,   NULL, NULL, "Set Forwarded Commands", 0 },
+  { 0x32, IPMI_TBD,   NULL, NULL, "Get Forwarded Commands", 0 },
+  { 0x33, IPMI_TBD,   cc33, NULL, "Enable Forwarded Commands", 0 },
 };
 
 void
-proto_register_ipmi_transport(void)
+ipmi_register_transport(gint proto_ipmi)
 {
 	static hf_register_info hf[] = {
 		{ &hf_ipmi_trn_lan00_sip,
 			{ "Set In Progress",
-				"ipmi.lan00.sip", FT_UINT8, BASE_HEX, VALS(lan00_sip_vals), 0x03, NULL, HFILL }},
+				"ipmi.lan00.sip", FT_UINT8, BASE_HEX, lan00_sip_vals, 0x03, NULL, HFILL }},
 
 		{ &hf_ipmi_trn_lanXX_oem,
 			{ "OEM Proprietary",
@@ -2200,7 +2199,7 @@ proto_register_ipmi_transport(void)
 
 		{ &hf_ipmi_trn_lan04_ipsrc,
 			{ "IP Address Source",
-				"ipmi.lan04.ipsrc", FT_UINT8, BASE_HEX, VALS(lan04_ipsrc_vals), 0x0f, NULL, HFILL }},
+				"ipmi.lan04.ipsrc", FT_UINT8, BASE_HEX, lan04_ipsrc_vals, 0x0f, NULL, HFILL }},
 
 		{ &hf_ipmi_trn_lan05_ether,
 			{ "MAC Address",
@@ -2274,7 +2273,7 @@ proto_register_ipmi_transport(void)
 				"ipmi.lan18.ack", FT_BOOLEAN, 8, TFS(&lan18_ack_tfs), 0x80, NULL, HFILL }},
 		{ &hf_ipmi_trn_lan18_dst_type,
 			{ "Destination Type",
-				"ipmi.lan18.dst_type", FT_UINT8, BASE_HEX, VALS(lan18_dst_type_vals), 0x07, NULL, HFILL }},
+				"ipmi.lan18.dst_type", FT_UINT8, BASE_HEX, lan18_dst_type_vals, 0x07, NULL, HFILL }},
 		{ &hf_ipmi_trn_lan18_tout,
 			{ "Timeout/Retry Interval",
 				"ipmi.lan18.tout", FT_UINT8, BASE_CUSTOM, ipmi_fmt_1s_0based, 0, NULL, HFILL }},
@@ -2287,7 +2286,7 @@ proto_register_ipmi_transport(void)
 				"ipmi.lan19.dst_selector", FT_UINT8, BASE_DEC, NULL, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_lan19_addr_format,
 			{ "Address Format",
-				"ipmi.lan19.addr_format", FT_UINT8, BASE_HEX, VALS(lan19_af_vals), 0xf0, NULL, HFILL }},
+				"ipmi.lan19.addr_format", FT_UINT8, BASE_HEX, lan19_af_vals, 0xf0, NULL, HFILL }},
 		{ &hf_ipmi_trn_lan19_address,
 			{ "Address (format unknown)",
 				"ipmi.lan19.address", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
@@ -2320,20 +2319,16 @@ proto_register_ipmi_transport(void)
 			{ "Cipher Suite ID",
 				"ipmi.lan23.cs_entry", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 
-		{ &hf_ipmi_trn_lan24_priv1,
-			{ "Maximum Privilege Level for Cipher Suite",
-				"ipmi.lan24.priv", FT_UINT8, BASE_HEX, NULL, 0xF0, NULL, HFILL }},
-
-		{ &hf_ipmi_trn_lan24_priv2,
-			{ "Maximum Privilege Level for Cipher Suite",
-				"ipmi.lan24.priv", FT_UINT8, BASE_HEX, NULL, 0x0F, NULL, HFILL }},
+		{ &hf_ipmi_trn_lan24_priv,
+			{ "Maximum Privilege Level",
+				"ipmi.lan24.priv", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_trn_lan25_dst_selector,
 			{ "Destination Selector",
 				"ipmi.lan25.dst_selector", FT_UINT8, BASE_DEC, NULL, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_lan25_addr_format,
 			{ "Address Format",
-				"ipmi.lan25.addr_format", FT_UINT8, BASE_HEX, VALS(lan25_af_vals), 0xf0, NULL, HFILL }},
+				"ipmi.lan25.addr_format", FT_UINT8, BASE_HEX, lan25_af_vals, 0xf0, NULL, HFILL }},
 		{ &hf_ipmi_trn_lan25_address,
 			{ "Address (format unknown)",
 				"ipmi.lan25.address", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
@@ -2397,13 +2392,13 @@ proto_register_ipmi_transport(void)
 				"ipmi.serial06.dcd", FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x01, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial07_flowctl,
 			{ "Flow Control",
-				"ipmi.serial07.flowctl", FT_UINT8, BASE_HEX, VALS(serialXX_flowctl_vals), 0xc0, NULL, HFILL }},
+				"ipmi.serial07.flowctl", FT_UINT8, BASE_HEX, serialXX_flowctl_vals, 0xc0, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial07_dtrhangup,
 			{ "DTR Hang-up",
 				"ipmi.serial07.dtrhangup", FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x20, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial07_bitrate,
 			{ "Bit rate",
-				"ipmi.serial07.bitrate", FT_UINT8, BASE_HEX, VALS(serialXX_bitrate_vals), 0x0f, NULL, HFILL }},
+				"ipmi.serial07.bitrate", FT_UINT8, BASE_HEX, serialXX_bitrate_vals, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial08_esc_powerup,
 			{ "Power-up/wakeup via ESC-^",
 				"ipmi.serial08.esc_powerup", FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x40, NULL, HFILL }},
@@ -2475,7 +2470,7 @@ proto_register_ipmi_transport(void)
 				"ipmi.serial17.ack", FT_BOOLEAN, 8, NULL, 0x80, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial17_dest_type,
 			{ "Destination Type",
-				"ipmi.serial17.dest_type", FT_UINT8, BASE_HEX, VALS(serial17_dest_type_vals), 0x0f, NULL, HFILL }},
+				"ipmi.serial17.dest_type", FT_UINT8, BASE_HEX, serial17_dest_type_vals, 0x0f, NULL, HFILL }},
 #if 0
 		{ &hf_ipmi_trn_serial17_ack_timeout,
 			{ "Alert Acknowledge Timeout",
@@ -2513,7 +2508,7 @@ proto_register_ipmi_transport(void)
 				"ipmi.serial19.destsel", FT_UINT8, BASE_DEC, NULL, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial19_flowctl,
 			{ "Flow Control",
-				"ipmi.serial19.flowctl", FT_UINT8, BASE_HEX, VALS(serialXX_flowctl_vals), 0xc0, NULL, HFILL }},
+				"ipmi.serial19.flowctl", FT_UINT8, BASE_HEX, serialXX_flowctl_vals, 0xc0, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial19_dtrhangup,
 			{ "DTR Hang-up",
 				"ipmi.serial19.dtrhangup", FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x20, NULL, HFILL }},
@@ -2525,10 +2520,10 @@ proto_register_ipmi_transport(void)
 				"ipmi.serial19.charsize", FT_BOOLEAN, 8, TFS(&serial19_charsize_tfs), 0x08, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial19_parity,
 			{ "Parity",
-				"ipmi.serial19.parity", FT_UINT8, BASE_HEX, VALS(serial19_parity_vals), 0x07, NULL, HFILL }},
+				"ipmi.serial19.parity", FT_UINT8, BASE_HEX, serial19_parity_vals, 0x07, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial19_bitrate,
 			{ "Bit rate",
-				"ipmi.serial19.bitrate", FT_UINT8, BASE_HEX, VALS(serialXX_bitrate_vals), 0x0f, NULL, HFILL }},
+				"ipmi.serial19.bitrate", FT_UINT8, BASE_HEX, serialXX_bitrate_vals, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial20_num_dial_strings,
 			{ "Number of Dial Strings",
 				"ipmi.serial20.num_dial_strings", FT_UINT8, BASE_DEC, NULL, 0x0f, NULL, HFILL }},
@@ -2579,7 +2574,7 @@ proto_register_ipmi_transport(void)
 				"ipmi.serial28.tapsrv_sel", FT_UINT8, BASE_DEC, NULL, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial28_confirm,
 			{ "TAP Confirmation",
-				"ipmi.serial28.confirm", FT_UINT8, BASE_HEX, VALS(serial28_confirm_vals), 0x03, NULL, HFILL }},
+				"ipmi.serial28.confirm", FT_UINT8, BASE_HEX, serial28_confirm_vals, 0x03, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial28_srvtype,
 			{ "TAP 'SST' Service Type",
 				"ipmi.serial28.srvtype", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
@@ -2618,13 +2613,13 @@ proto_register_ipmi_transport(void)
 				"ipmi.serial28.tap_n3", FT_UINT8, BASE_DEC, NULL, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial29_op,
 			{ "Parameter Operation",
-				"ipmi.serial29.op", FT_UINT8, BASE_HEX, VALS(serial29_op_vals), 0xc0, NULL, HFILL }},
+				"ipmi.serial29.op", FT_UINT8, BASE_HEX, serial29_op_vals, 0xc0, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial29_lineedit,
 			{ "Line Editing",
 				"ipmi.serial29.lineedit", FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x20, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial29_deletectl,
 			{ "Delete control",
-				"ipmi.serial29.deletectl", FT_UINT8, BASE_HEX, VALS(serial29_delete_vals), 0x0c, NULL, HFILL }},
+				"ipmi.serial29.deletectl", FT_UINT8, BASE_HEX, serial29_delete_vals, 0x0c, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial29_echo,
 			{ "Echo",
 				"ipmi.serial29.echo", FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x02, NULL, HFILL }},
@@ -2633,19 +2628,19 @@ proto_register_ipmi_transport(void)
 				"ipmi.serial29.handshake", FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x01, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial29_o_newline,
 			{ "Output newline sequence",
-				"ipmi.serial29.o_newline", FT_UINT8, BASE_HEX, VALS(serial29_o_nl_vals), 0xf0, NULL, HFILL }},
+				"ipmi.serial29.o_newline", FT_UINT8, BASE_HEX, serial29_o_nl_vals, 0xf0, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial29_i_newline,
 			{ "Input newline sequence",
-				"ipmi.serial29.i_newline", FT_UINT8, BASE_HEX, VALS(serial29_i_nl_vals), 0x0f, NULL, HFILL }},
+				"ipmi.serial29.i_newline", FT_UINT8, BASE_HEX, serial29_i_nl_vals, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial30_snooping,
 			{ "System Negotiation Snooping",
 				"ipmi.serial30.snooping", FT_BOOLEAN, 8, NULL, 0x04, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial30_snoopctl,
 			{ "Snoop ACCM Control",
-				"ipmi.serial30.snoopctl", FT_UINT8, BASE_HEX, VALS(serial30_snoopctl_vals), 0x03, NULL, HFILL }},
+				"ipmi.serial30.snoopctl", FT_UINT8, BASE_HEX, serial30_snoopctl_vals, 0x03, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial30_negot_ctl,
 			{ "BMC negotiates link parameters",
-				"ipmi.serial30.negot_ctl", FT_UINT8, BASE_HEX, VALS(serial30_negoctl_vals), 0x30, NULL, HFILL }},
+				"ipmi.serial30.negot_ctl", FT_UINT8, BASE_HEX, serial30_negoctl_vals, 0x30, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial30_use_xmit_accm,
 			{ "Filtering incoming chars",
 				"ipmi.serial30.filter", FT_BOOLEAN, 8, TFS(&serial30_filter_tfs), 0x04, NULL, HFILL }},
@@ -2657,7 +2652,7 @@ proto_register_ipmi_transport(void)
 				"ipmi.serial30.xmit_proto_comp", FT_BOOLEAN, 8, NULL, 0x01, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial30_ipaddr,
 			{ "IP Address negotiation",
-				"ipmi.serial30.ipaddr", FT_UINT8, BASE_HEX, VALS(serial30_ipaddr_val), 0x18, NULL, HFILL }},
+				"ipmi.serial30.ipaddr", FT_UINT8, BASE_HEX, serial30_ipaddr_val, 0x18, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial30_accm,
 			{ "ACCM Negotiation",
 				"ipmi.serial30.accm", FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x04, NULL, HFILL }},
@@ -2675,7 +2670,7 @@ proto_register_ipmi_transport(void)
 				"ipmi.serial32.port", FT_UINT16, BASE_CUSTOM, ipmi_fmt_udpport, 0, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial33_auth_proto,
 			{ "PPP Link Authentication Protocol",
-				"ipmi.serial33.auth_proto", FT_UINT8, BASE_HEX, VALS(serialXX_proto_vals), 0x0f, NULL, HFILL }},
+				"ipmi.serial33.auth_proto", FT_UINT8, BASE_HEX, serialXX_proto_vals, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial34_chap_name,
 			{ "CHAP Name",
 				"ipmi.serial34.chap_name", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
@@ -2726,7 +2721,7 @@ proto_register_ipmi_transport(void)
 				"ipmi.serial43.acct_sel", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial43_auth_proto,
 			{ "Link Auth Type",
-				"ipmi.serial43.auth_proto", FT_UINT8, BASE_HEX, VALS(serialXX_proto_vals), 0x0f, NULL, HFILL }},
+				"ipmi.serial43.auth_proto", FT_UINT8, BASE_HEX, serialXX_proto_vals, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_serial44_acct_sel,
 			{ "PPP Account Selector",
 				"ipmi.serial44.acct_sel", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
@@ -2925,7 +2920,7 @@ proto_register_ipmi_transport(void)
 				"ipmi.tr12.chan", FT_UINT8, BASE_CUSTOM, ipmi_fmt_channel, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_12_mux_setting,
 			{ "Mux Setting",
-				"ipmi.tr12.mux_setting", FT_UINT8, BASE_HEX, VALS(vals_12_mux), 0x0f, NULL, HFILL }},
+				"ipmi.tr12.mux_setting", FT_UINT8, BASE_HEX, vals_12_mux, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_12_sw_to_sys,
 			{ "Requests to switch to system",
 				"ipmi.tr12.sw_to_sys", FT_BOOLEAN, 8, TFS(&tfs_12_blocked), 0x80, NULL, HFILL }},
@@ -3021,7 +3016,7 @@ proto_register_ipmi_transport(void)
 
 		{ &hf_ipmi_trn_18_state,
 			{ "Session state",
-				"ipmi.tr18.state", FT_UINT8, BASE_HEX, VALS(vals_18_state), 0x0f, NULL, HFILL }},
+				"ipmi.tr18.state", FT_UINT8, BASE_HEX, vals_18_state, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_trn_18_ipmi_ver,
 			{ "IPMI Version",
 				"ipmi.tr18.ipmi_ver", FT_UINT8, BASE_CUSTOM, ipmi_fmt_version, 0, NULL, HFILL }},
@@ -3181,35 +3176,10 @@ proto_register_ipmi_transport(void)
 		&ett_ipmi_trn_1a_byte2,
 		&ett_ipmi_trn_1b_byte1,
 		&ett_ipmi_trn_1b_byte2,
-		&ett_ipmi_trn_parameter
 	};
-
-	static ei_register_info ei[] = {
-		{ &ei_ipmi_trn_02_request_param_rev, { "ipmi.tr02.request_param_rev", PI_PROTOCOL, PI_NOTE, "Requested parameter revision; parameter data returned", EXPFILL }},
-		{ &ei_ipmi_trn_02_request_param_data, { "ipmi.tr02.mrequest_param_data", PI_PROTOCOL, PI_NOTE, "Requested parameter data; only parameter version returned", EXPFILL }},
-		{ &ei_ipmi_trn_11_request_param_rev, { "ipmi.tr11.request_param_rev", PI_PROTOCOL, PI_NOTE, "Requested parameter revision; parameter data returned", EXPFILL }},
-		{ &ei_ipmi_trn_11_request_param_data, { "ipmi.tr11.mrequest_param_data", PI_PROTOCOL, PI_NOTE, "Requested parameter data; only parameter version returned", EXPFILL }},
-	};
-
-	expert_module_t* expert_ipmi_trn;
 
 	proto_register_field_array(proto_ipmi, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_ipmi_trn = expert_register_protocol(proto_ipmi);
-	expert_register_field_array(expert_ipmi_trn, ei, array_length(ei));
 	ipmi_register_netfn_cmdtab(IPMI_TRANSPORT_REQ, IPMI_OEM_NONE, NULL, 0, NULL,
 			cmd_transport, array_length(cmd_transport));
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

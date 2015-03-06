@@ -25,9 +25,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
-#include <epan/prefs.h>
+#include <prefs.h>
 #include <epan/asn1.h>
 
 #include "packet-bssgp.h"
@@ -197,7 +198,6 @@ static gint ett_bssgp_pfc_flow_control_parameters_pfc = -1;
 static gint ett_bssgp_ra_id = -1;
 
 static expert_field ei_bssgp_extraneous_data = EI_INIT;
-static expert_field ei_bssgp_missing_mandatory_element = EI_INIT;
 
 /* PDU type coding, v6.5.0, table 11.3.26, p 80 */
 #define BSSGP_PDU_DL_UNITDATA                  0x00
@@ -913,7 +913,7 @@ de_bssgp_llc_pdu(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 of
     curr_offset = offset;
 
     if(len > 0){
-        next_tvb = tvb_new_subset_length(tvb, curr_offset, len);
+        next_tvb = tvb_new_subset(tvb, curr_offset, len, len);
         proto_tree_add_text(tree, tvb, curr_offset, len, "LLC Data");
     }
 
@@ -2146,7 +2146,7 @@ static guint16
 de_bssgp_pfc_flow_ctrl(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offset, guint len _U_, gchar *add_string _U_, int string_len _U_)
 {
     proto_tree *pfc_tree;
-    proto_item *pi;
+    proto_item *pi, *ti2;
 
     guint32 curr_offset;
     guint8 num_pfc, i, pfc_len;
@@ -2172,8 +2172,9 @@ de_bssgp_pfc_flow_ctrl(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, 
     b_pfc_included = (pfc_len == 6);
 
     for (i = 0; i < num_pfc; i++) {
-        pfc_tree = proto_tree_add_subtree_format(tree, tvb, curr_offset, pfc_len,
-                      ett_bssgp_pfc_flow_control_parameters_pfc, NULL, "PFC (%u)", i + 1);
+        ti2 = proto_tree_add_text(tree, tvb, curr_offset, pfc_len,
+                      "PFC (%u)", i + 1);
+        pfc_tree = proto_item_add_subtree(ti2, ett_bssgp_pfc_flow_control_parameters_pfc);
 
         /* PFI: Packet Flow Identifier.
          * Coded as the value part of the Packet Flow Identifier information element in
@@ -2315,7 +2316,7 @@ de_bssgp_mbms_session_dur(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, g
     curr_offset = offset;
 
     /* AVP Code: 904 MBMS-Session-Duration Registered by packet-gtp.c */
-    new_tvb =tvb_new_subset_length(tvb, offset, len);
+    new_tvb =tvb_new_subset(tvb, offset, len, len);
     dissector_try_uint(diameter_3gpp_avp_dissector_table, 904, new_tvb, pinfo, tree);
 
     return(curr_offset-offset);
@@ -2336,7 +2337,7 @@ de_bssgp_mbms_sai_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guin
     curr_offset = offset;
 
     /* AVP Code: 903 MBMS-Service-Area Registered by packet-gtp.c */
-    new_tvb =tvb_new_subset_length(tvb, offset, len);
+    new_tvb =tvb_new_subset(tvb, offset, len, len);
     dissector_try_uint(diameter_3gpp_avp_dissector_table, 903, new_tvb, pinfo, tree);
 
     return(curr_offset-offset);
@@ -2408,6 +2409,7 @@ static value_string_ext bssgp_mbms_num_ra_ids_vals_ext = VALUE_STRING_EXT_INIT(b
 static guint16
 de_bssgp_mbms_ra_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offset, guint len _U_, gchar *add_string _U_, int string_len _U_)
 {
+    proto_item *ti;
     proto_tree *rai_tree;
     guint32 curr_offset;
     guint8 num_ra_ids;
@@ -2421,8 +2423,8 @@ de_bssgp_mbms_ra_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, g
 
     /* octet 4 - 11 Routing Area Identification 1 (etc)*/
     for (i = 0; i < num_ra_ids; i++) {
-        rai_tree = proto_tree_add_subtree_format(tree, tvb, curr_offset, 8,
-                    ett_bssgp_ra_id, NULL, "Routing Area Identification (%u)", i + 1);
+        ti = proto_tree_add_text(tree, tvb, curr_offset, 8, "Routing Area Identification (%u)", i + 1);
+        rai_tree = proto_item_add_subtree(ti, ett_bssgp_ra_id);
 
         /* The element is coded as the Routing Area Identification information element in
          * 3GPP TS 24.008, not including 3GPP TS 24.008 IEI and 3GPP TS 24.008 length indicator.
@@ -2518,7 +2520,7 @@ static guint16
 de_bssgp_pfcs_to_be_set_up_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offset, guint len _U_, gchar *add_string _U_, int string_len _U_)
 {
     proto_tree *pfc_tree, *pft_tree, *abqp_tree, *arp_tree, *t10_tree;
-    proto_item *pi;
+    proto_item *pi, *ti2;
 
     guint32 curr_offset;
     guint8 num_pfc, i, pfc_len;
@@ -2542,8 +2544,9 @@ de_bssgp_pfcs_to_be_set_up_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pi
     pfc_len = (len - 1) / num_pfc;
 
     for (i = 0; i < num_pfc; i++) {
-        pfc_tree = proto_tree_add_subtree_format(tree, tvb, curr_offset, pfc_len,
-                      ett_bssgp_pfcs_to_be_set_up_list, NULL, "PFC (%u)", i + 1);
+        ti2 = proto_tree_add_text(tree, tvb, curr_offset, pfc_len,
+                      "PFC (%u)", i + 1);
+        pfc_tree = proto_item_add_subtree(ti2, ett_bssgp_pfcs_to_be_set_up_list);
 
         de_sm_pflow_id(tvb, pfc_tree, pinfo, curr_offset, 1, NULL, 0);
         curr_offset++;
@@ -2551,8 +2554,8 @@ de_bssgp_pfcs_to_be_set_up_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pi
         /* PFT: Packet Flow Timer. Coded as the GPRS Timer information element,
          * see sub-clause 11.3.44.
          */
-        pft_tree = proto_tree_add_subtree(pfc_tree, tvb, curr_offset, 3,
-                    ett_bssgp_pfcs_to_be_set_up_list_pft, NULL, "Packet Flow Timer(PFT)");
+        proto_tree_add_text(pfc_tree, tvb, curr_offset, 3, "Packet Flow Timer(PFT)");
+        pft_tree = proto_item_add_subtree(ti2, ett_bssgp_pfcs_to_be_set_up_list_pft);
         proto_tree_add_item(pft_tree, hf_bssgp_unit_val, tvb, curr_offset, 3, ENC_BIG_ENDIAN);
         proto_tree_add_item(pft_tree, hf_bssgp_gprs_timer, tvb, curr_offset, 3, ENC_BIG_ENDIAN);
         curr_offset += 3;
@@ -2560,8 +2563,8 @@ de_bssgp_pfcs_to_be_set_up_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pi
         /* ABQP: Aggregate BSS QoS Profile.
          * Coded as the Aggregate BSS QoS Profile information element, see sub-clause 11.3.43.
          */
-        abqp_tree = proto_tree_add_subtree(pfc_tree, tvb, curr_offset, 3,
-            ett_bssgp_pfcs_to_be_set_up_list_abqp, NULL, "Aggregate BSS QoS Profile(ABQP)");
+        proto_tree_add_text(pfc_tree, tvb, curr_offset, 3, "Aggregate BSS QoS Profile(ABQP)");
+        abqp_tree = proto_item_add_subtree(ti2, ett_bssgp_pfcs_to_be_set_up_list_abqp);
         /* Unsure about length 16 */
         curr_offset = curr_offset + de_sm_qos(tvb, abqp_tree, pinfo, curr_offset, 16, NULL, 0);
 
@@ -2570,8 +2573,8 @@ de_bssgp_pfcs_to_be_set_up_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pi
          * This information element is optionally included.
          */
         if(pfc_len>17){
-            arp_tree = proto_tree_add_subtree(pfc_tree, tvb, curr_offset, 3,
-                ett_bssgp_pfcs_to_be_set_up_list_arp, NULL, "Allocation/Retention Priority");
+            proto_tree_add_text(pfc_tree, tvb, curr_offset, 3, "Allocation/Retention Priority");
+            arp_tree = proto_item_add_subtree(ti2, ett_bssgp_pfcs_to_be_set_up_list_arp);
             curr_offset = curr_offset + be_prio(tvb, arp_tree, pinfo, curr_offset, 1, NULL, 0);
         }
         /* T10: T10.
@@ -2580,8 +2583,8 @@ de_bssgp_pfcs_to_be_set_up_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pi
          * is present and if queuing is allowed for the PFC.
          */
         if(pfc_len>18){
-            t10_tree = proto_tree_add_subtree(pfc_tree, tvb, curr_offset, 3,
-                    ett_bssgp_pfcs_to_be_set_up_list_t10, NULL, "T10");
+            proto_tree_add_text(pfc_tree, tvb, curr_offset, 3, "T10");
+            t10_tree = proto_item_add_subtree(ti2, ett_bssgp_pfcs_to_be_set_up_list_t10);
             proto_tree_add_item(t10_tree, hf_bssgp_unit_val, tvb, curr_offset, 3, ENC_BIG_ENDIAN);
             proto_tree_add_item(t10_tree, hf_bssgp_gprs_timer, tvb, curr_offset, 3, ENC_BIG_ENDIAN);
             curr_offset += 3;
@@ -2596,7 +2599,7 @@ static guint16
 de_bssgp_list_of_setup_pfcs(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offset, guint len _U_, gchar *add_string _U_, int string_len _U_)
 {
     proto_tree *pfc_tree;
-    proto_item *pi;
+    proto_item *pi, *ti2;
 
     guint32 curr_offset;
     guint8 num_pfc, i;
@@ -2618,8 +2621,9 @@ de_bssgp_list_of_setup_pfcs(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo 
         return (curr_offset-offset);
 
     for (i = 0; i < num_pfc; i++) {
-        pfc_tree = proto_tree_add_subtree_format(tree, tvb, curr_offset, 1,
-                      ett_bssgp_list_of_setup_pfcs, NULL, "PFC (%u)", i + 1);
+        ti2 = proto_tree_add_text(tree, tvb, curr_offset, 1,
+                      "PFC (%u)", i + 1);
+        pfc_tree = proto_item_add_subtree(ti2, ett_bssgp_list_of_setup_pfcs);
 
         de_sm_pflow_id(tvb, pfc_tree, pinfo, curr_offset, 1, NULL, 0);
         curr_offset++;
@@ -2945,7 +2949,7 @@ static guint16
 de_bssgp_active_pfcs_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offset, guint len _U_, gchar *add_string _U_, int string_len _U_)
 {
     proto_tree *pfc_tree;
-    proto_item *pi;
+    proto_item *pi, *ti2;
 
     guint32 curr_offset;
     guint8 num_pfc, i;
@@ -2967,8 +2971,8 @@ de_bssgp_active_pfcs_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U
         return (curr_offset-offset);
 
     for (i = 0; i < num_pfc; i++) {
-        pfc_tree = proto_tree_add_subtree_format(tree, tvb, curr_offset, 1,
-            ett_bssgp_pfc_flow_control_parameters_pfc, NULL, "PFC (%u)", i + 1);
+        ti2 = proto_tree_add_text(tree, tvb, curr_offset, 1, "PFC (%u)", i + 1);
+        pfc_tree = proto_item_add_subtree(ti2, ett_bssgp_pfc_flow_control_parameters_pfc);
 
         de_sm_pflow_id(tvb, pfc_tree, pinfo, curr_offset, 1, NULL, 0);
         curr_offset++;
@@ -3192,7 +3196,7 @@ de_bssgp_son_transfer_app_id(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo
      * as defined in 3GPP TS 36.413
      */
     if(len > 0){
-        next_tvb = tvb_new_subset_length(tvb, offset, len);
+        next_tvb = tvb_new_subset(tvb, offset, len, len);
         dissect_s1ap_SONtransferApplicationIdentity_PDU(next_tvb, pinfo, tree, NULL);
     }
 
@@ -3256,25 +3260,25 @@ de_bssgp_redir_attempt_flg(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _
  * 11.3.112     Redirection Indication
 */
 static const value_string bssgp_redir_indiction_reroute_reject_cause_vals[] = {
-    {0x00, "Reserved"},
-    {0x01, "Reserved"},
-    {0x02, "Reserved"},
-    {0x03, "Reserved"},
-    {0x04, "Reserved"},
-    {0x05, "Reserved"},
-    {0x06, "Reserved"},
-    {0x07, "Reserved"},
-    {0x08, "Reserved"},
-    {0x09, "Reserved"},
-    {0x0A, "Reserved"},
-    {0x0B, "PLMN not allowed"},
-    {0x0C, "Location area not allowed"},
-    {0x0D, "Roaming not allowed in this location area"},
-    {0x0E, "GPRS services not allowed in this PLMN"},
-    {0x0F, "No suitable cell in location area"},
-    {0x10, "CS/PS domain registration coordination required"},
-    /* {0x11~0xFF, "Reserved"} */
-    { 0,    NULL },
+    	{0x00, "Reserved"},
+    	{0x01, "Reserved"},
+    	{0x02, "Reserved"},
+    	{0x03, "Reserved"},
+    	{0x04, "Reserved"},
+    	{0x05, "Reserved"},
+    	{0x06, "Reserved"},
+    	{0x07, "Reserved"},
+    	{0x08, "Reserved"},
+    	{0x09, "Reserved"},
+    	{0x0A, "Reserved"},
+    	{0x0B, "PLMN not allowed"},
+    	{0x0C, "Location area not allowed"},
+    	{0x0D, "Roaming not allowed in this location area"},
+    	{0x0E, "GPRS services not allowed in this PLMN"},
+    	{0x0F, "No suitable cell in location area"},
+    	{0x10, "CS/PS domain registration coordination required"},
+    	/* {0x11~0xFF, "Reserved"} */
+    	{ 0,    NULL },
 };
 
 static guint16
@@ -3331,7 +3335,7 @@ de_bssgp_unconfim_send_state_var(tvbuff_t *tvb, proto_tree *tree, packet_info *p
 static guint16
 de_bssgp_selected_plmn_id(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offset, guint len _U_, gchar *add_string _U_, int string_len _U_)
 {
-    proto_tree_add_string(tree, hf_bssgp_selected_plmn_id, tvb, offset, 3, dissect_e212_mcc_mnc_wmem_packet_str(tvb, pinfo, tree, offset, E212_NONE, TRUE));
+    proto_tree_add_string(tree, hf_bssgp_selected_plmn_id, tvb, offset, 3, dissect_e212_mcc_mnc_wmem_packet_str(tvb, pinfo, tree, offset, TRUE));
     return 3;
 }
 
@@ -3451,152 +3455,152 @@ typedef enum
 bssgp_elem_idx_t;
 
 static const value_string bssgp_elem_strings[] = {
-    { DE_BSSGP_ALIGNMENT_OCTETS,                     "Alignment Octets" },                                   /* 11.3.1   Alignment octets */
-    { DE_BSSGP_BMAX_DEFAULT_MS,                      "Bmax default MS" },                                    /* 11.3.2   Bmax default MS  */
-    { DE_BSSGP_BSS_AREA_IND,                         "BSS Area Indication" },                                /* 11.3.3   BSS Area Indication  */
-    { DE_BSSGP_BUCKET_LEAK_RATE,                     "Bucket Leak Rate (R)" },                               /* 11.3.4   Bucket Leak Rate (R) */
-    { DE_BSSGP_BVCI,                                 "BVCI (BSSGP Virtual Connection Identifier)" },         /* 11.3.6   BVCI (BSSGP Virtual Connection Identifier)  */
-    { DE_BSSGP_BVC_BUCKET_SIZE,                      "BVC Bucket size" },                                    /* 11.3.5   BVC Bucket Size */
-    { DE_BSSGP_BVC_MEAS,                             "BVC Measurement" },                                    /* 11.3.7   BVC Measurement */
-    { DE_BSSGP_CAUSE,                                "Cause" },                                              /* 11.3.8   Cause */
-    { DE_BSSGP_CELL_ID,                              "Cell Identifier" },                                    /* 11.3.9   Cell Identifier */
-    { DE_BSSGP_CHLN_NEEDED,                          "Channel needed" },                                     /* 11.3.10  Channel needed */
-    { DE_BBSGP_DRX_PARAM,                            "DRX Parameters" },                                     /* 11.3.11  DRX Parameters */
-    { DE_BBSGP_EMLPP_PRIO,                           "eMLPP-Priority" },                                     /* 11.3.12  eMLPP-Priority */
-    { DE_BSSGP_FLUSH_ACTION,                         "Flush Action" },                                       /* 11.3.13  Flush Action */
-    { DE_BSSGP_IMSI,                                 "IMSI" },                                               /* 11.3.14  IMSI */
-    { DE_BSSGP_LLC_PDU,                              "LLC-PDU" },                                            /* 11.3.15  LLC-PDU */
-    { DE_BSSGP_LLC_FRAMES_DISC,                      "LLC Frames Discarded" },                               /* 11.3.16  LLC Frames Discarded  */
-    { DE_BSSGP_LAI,                                  "Location Area" },                                      /* 11.3.17  Location Area  */
-    { DE_BSSGP_MID,                                  "Mobile Id" },                                          /* 11.3.20  Mobile Id */
-    { DE_BSSGP_MS_BUCKET_SIZE,                       "MS Bucket Size" },                                     /* 11.3.21  MS Bucket Size */
-    { DE_BSSGP_MS_RAD_ACC_CAP,                       "MS Radio Access Capability" },                         /* 11.3.22  MS Radio Access Capability GSM_A_PDU_TYPE_GM, DE_MS_RAD_ACC_CAP */
-    { DE_BSSGP_OMC_ID,                               "OMC Id" },                                             /* 11.3.23  OMC Id */
-    { DE_BSSGP_PDU_IN_ERROR,                         "PDU In Error" },                                       /* 11.3.24  PDU In Error */
-    { DE_BSSGP_PDU_LIFETIME,                         "PDU Lifetime" },                                       /* 11.3.25  PDU Lifetime */
-    { DE_BSSP_PRIORITY,                              "Priority" },                                           /* 11.3.27  Priority */
-    { DE_BSSGP_QOS_PROFILE,                          "QoS Profile" },                                        /* 11.3.28  QoS Profile */
-    { DE_BSSGP_RA_CAUSE,                             "Radio Cause" },                                        /* 11.3.29  Radio Cause */
-    { DE_BSSGP_RA_CAP_UPD_CAUSE,                     "RA-Cap-UPD-Cause" },                                   /* 11.3.30  RA-Cap-UPD-Cause */
-    { DE_BSSGP_RAI,                                  "Routeing Area" },                                      /* 11.3.31  Routeing Area */
-    { DE_BSSGP_R_DEFAULT_MS,                         "R_default_MS" },                                       /* 11.3.32  R_default_MS */
-    { DE_BBSGP_SUSPEND_REF_NO,                       "Suspend Reference Number" },                           /* 11.3.33  Suspend Reference Number */
-    { DE_BSSGP_TAG,                                  "Tag" },                                                /* 11.3.34  Tag */
-    { DE_BSSGP_TLLI,                                 "Temporary logical link Identity (TLLI)" },             /* 11.3.35  Temporary logical link Identity (TLLI) GSM_A_PDU_TYPE_RR, DE_RR_TLLI*/
-    { DE_BSSGP_TMSI_PTMSI,                           "Temporary Mobile Subscriber Identity (TMSI)" },        /* 11.3.36  Temporary Mobile Subscriber Identity (TMSI)GSM_A_PDU_TYPE_RR, DE_RR_TMSI_PTMSI */
-    { DE_BSSGP_TRACE_REF,                            "Trace Reference" },                                    /* 11.3.37  Trace Reference */
-    { DE_BSSGP_TRACE_TYPE,                           "Trace Type" },                                         /* 11.3.38  Trace Type */
-    { DE_BSSGP_TRANSACTION_ID,                       "Transaction Id" },                                     /* 11.3.39  Transaction Id */
-    { DE_BSSGP_TRIGGER_ID,                           "Trigger Id" },                                         /* 11.3.40  Trigger Id */
-    { DE_BSSGP_NO_OF_OCT_AFFECTED,                   "Number of octets affected" },                          /* 11.3.41  Number of octets affected */
-    { DE_BSSGP_LSA_ID_LIST,                          "LSA Identifier List" },                                /* 11.3.18  LSA Identifier List */
-    { DE_BSSGP_LSA_INFO,                             "LSA Information" },                                    /* 11.3.19  LSA Information */
-    { DE_BSSGP_ACKET_FLOW_ID,                        "Packet Flow Identifier (PFI)" },                       /* 11.3.42  Packet Flow Identifier (PFI) GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID*/
-    /* 11.3.42a (void) */
-    { DE_BSSGP_GPRS_TIMER,                           "GPRS Timer" },                                         /* 11.3.44  GPRS Timer */
-    { DE_BSSGP_QOS,                                  "Aggregate BSS QoS Profile" },                          /* 11.3.43  Aggregate BSS QoS Profile GSM_A_PDU_TYPE_GM, DE_QOS*/
-    { DE_BSSGP_FEATURE_BITMAP,                       "Feature Bitmap" },                                     /* 11.3.45  Feature Bitmap */
-    { DE_BSSGP_BUCKET_FULL_RATIO,                    "Bucket Full Ratio" },                                  /* 11.3.46  Bucket Full Ratio */
-    { DE_BSSGP_SERV_UTRAN_CCO,                       "Service UTRAN CCO" },                                  /* 11.3.47  Service UTRAN CCO */
-    { DE_BSSGP_NSEI,                                 "NSEI (Network Service Entity Identifier)" },           /* 11.3.48  NSEI (Network Service Entity Identifier) */
-    { DE_BSSGP_RRLP_APDU,                            "RRLP APDU" },                                          /* 11.3.49 RRLP APDU */
-    /* 11.3.50  LCS QoS BSSGP_IEI_LCS_QOS, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_LCSQOS*/
-    /* 11.3.51  LCS Client Type BSSGP_IEI_LCS_CLIENT_TYPE, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_LCS_CLIENT_TYPE*/
-    /* 11.3.52  Requested GPS Assistance Data BSSGP_IEI_REQUESTED_GPS_ASSISTANCE_DATA, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_REQ_GPS_ASSIST_D*/
-    /* 11.3.53  Location Type 0x7c, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_GANSS_LOC_TYPE*/
-    /* 11.3.54  Location Estimate BSSGP_IEI_LOCATION_ESTIMATE, GSM_A_PDU_TYPE_BSSMAP, BE_LOC_EST*/
-    /* 11.3.55  Positioning Data 0x7d, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_POS_DATA*/
-    /* 11.3.56  Deciphering Keys BSSGP_IEI_DECIPHERING_KEYS, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_DECIPH_KEYS */
-    /* 11.3.57  LCS Priority BSSGP_IEI_LCS_PRIORITY, GSM_A_PDU_TYPE_BSSMAP, BE_LCS_PRIO;*/
-    /* 11.3.58  LCS Cause BSSGP_IEI_LCS_CAUSE, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_LCS_CAUSE */
-    /* 11.3.59  LCS Capability 0x49 , GSM_A_PDU_TYPE_GM, DE_PS_LCS_CAP*/
-    { DE_BSSGP_RRLP_FLAGS,                           "RRLP Flags" },                                         /* 11.3.60  RRLP Flags */
-    { DE_BSSGP_RIM_APP_ID,                           "RIM Application Identity" },                           /* 11.3.61  RIM Application Identity */
-    { DE_BSSGP_RIM_SEQ_NO,                           "RIM Sequence Number" },                                /* 11.3.62  RIM Sequence Number */
-    /* 11.3.62a    RIM Container */
-    /* 11.3.62a.0  General */
-    { DE_BSSGP_RAN_INF_REQUEST_RIM_CONT,             "RAN-INFORMATION-REQUEST RIM Container" },              /* 11.3.62a.1   RAN-INFORMATION-REQUEST RIM Container */
-    { DE_BSSGP_RAN_INF_RIM_CONT,                     "RAN-INFORMATION RIM Container" },                      /* 11.3.62a.2   RAN-INFORMATION RIM Container */
-    { DE_BSSGP_RAN_INFORMATION_ACK_RIM_CONT,         "RAN-INFORMATION-ACK RIM Container" },                  /* 11.3.62a.3   RAN-INFORMATION-ACK RIM Container */
-    { DE_BSSGP_RAN_INFORMATION_ERROR_RIM_CONT,       "RAN-INFORMATION-ERROR RIM Container" },                /* 11.3.62a.4   RAN-INFORMATION-ERROR RIM Container */
-    { DE_BSSGP_RAN_INF_APP_ERROR_RIM_CONT,           "RAN-INFORMATION-APPLICATION-ERROR RIM Container" },    /* 11.3.62a.5   RAN-INFORMATION-APPLICATION-ERROR RIM Container */
-    /* 11.3.63 Application Container */
-    { DE_BSSGP_RAN_INFORMATION_REQUEST_APP_CONT,     "RAN-INFORMATION-REQUEST Application Container" },      /* 11.3.63.1    RAN-INFORMATION-REQUEST Application Container */
-    /* 11.3.63.1.0 General */
-    /* 11.3.63.1.1 RAN-INFORMATION-REQUEST Application Container for the NACC Application */
-    /* 11.3.63.1.2 RAN-INFORMATION-REQUEST Application Container for the SI3 Application */
-    /* 11.3.63.1.3 RAN-INFORMATION-REQUEST Application Container for the MBMS data channel Application */
-    /* 11.3.63.1.4 RAN-INFORMATION-REQUEST Application Container for the SON Transfer Application */
-    { DE_BSSGP_RAN_INFORMATION_APP_CONT_UNIT,        "RAN-INFORMATION Application Container Unit" },         /* 11.3.63.2    RAN-INFORMATION Application Container Unit */
-    /* 11.3.63.2.0 General */
-    /* 11.3.63.2.1 RAN-INFORMATION Application Container for the NACC Application */
-    /* 11.3.63.2.2 RAN-INFORMATION Application Container for the SI3 Application */
-    /* 11.3.63.2.3 RAN-INFORMATION Application Container for the MBMS data channel Application */
-    /* 11.3.63.2.4 RAN-INFORMATION Application Container for the SON Transfer Application */
-    { DE_BSSGP_RAN_APP_ERROR_CONT,                   "Application Error Container" },                        /* 11.3.64  Application Error Container */
-    /* 11.3.64.1   Application Error Container layout for the NACC application */
-    /* 11.3.64.2   Application Error Container for the SI3 application */
-    /* 11.3.64.3   Application Error Container for the MBMS data channel application */
-    /* 11.3.64.4   Application Error Container for the SON Transfer Application */
-    { DE_BSSGP_RIM_PDU_INDICATIONS,                  "RIM PDU Indications" },                                /* 11.3.65  RIM PDU Indications */
-    /* 11.3.65.0   General */
-    /* 11.3.65.1   RAN-INFORMATION-REQUEST RIM PDU Indications */
-    /* 11.3.65.2   RAN-INFORMATION RIM PDU Indications */
-    /* 11.3.65.3   RAN-INFORMATION-APPLICATION-ERROR RIM PDU Indications */
-    /* 11.3.66 (void) */
-    { DE_BSSGP_RIM_PROTO_VER_NO,                     "RIM Protocol Version Number" },                        /* 11.3.67  RIM Protocol Version Number */
-    { DE_BSSGP_PFC_FLOW_CTRL,                        "PFC Flow Control parameters" },                        /* 11.3.68  PFC Flow Control parameters */
-    /* 0x53, SGSAP_PDU_TYPE, DE_SGSAP_GLOBAL_CN_ID */                  /* 11.3.69  Global CN-Id */
-    { DE_BSSGP_RIM_ROUTING_INF,                      "RIM Routing Information" },                            /* 11.3.70  RIM Routing Information */
-    { DE_BSSGP_MBMS_SESSION_ID,                      "MBMS Session Identity" },                              /* 11.3.71 MBMS Session Identity */
-    { DE_BSSGP_MBMS_SESSION_DUR,                     "MBMS Session Duration" },                              /* 11.3.72  MBMS Session Duration */
-    { DE_BSSGP_MBMS_SAI_LIST,                        "MBMS Service Area Identity List" },                    /* 11.3.73  MBMS Service Area Identity List */
-    { DE_BSSGP_MBMS_RESPONSE,                        "MBMS Response" },                                      /* 11.3.74  MBMS Response */
-    { DE_BSSGP_MBMS_RA_LIST,                         "MBMS Routing Area List" },                             /* 11.3.75  MBMS Routing Area List */
-    { DE_BSSGP_MBMS_SESSION_INF,                     "MBMS Session Information" },                           /* 11.3.76  MBMS Session Information */
-    { DE_BSSGP_TMGI,                                 "TMGI" },                                               /* 11.3.77  TMGI (Temporary Mobile Group Identity) */
-    { DE_BSSGP_MBMS_STOP_CAUSE,                      "MBMS Stop Cause" },                                    /* 11.3.78  MBMS Stop Cause */
+    { DE_BSSGP_ALIGNMENT_OCTETS, "Alignment Octets" },                                   /* 11.3.1   Alignment octets */
+    { DE_BSSGP_BMAX_DEFAULT_MS, "Bmax default MS" },                                    /* 11.3.2   Bmax default MS  */
+    { DE_BSSGP_BSS_AREA_IND, "BSS Area Indication" },                                /* 11.3.3   BSS Area Indication  */
+    { DE_BSSGP_BUCKET_LEAK_RATE, "Bucket Leak Rate (R)" },                               /* 11.3.4   Bucket Leak Rate (R) */
+    { DE_BSSGP_BVCI, "BVCI (BSSGP Virtual Connection Identifier)" },         /* 11.3.6   BVCI (BSSGP Virtual Connection Identifier)  */
+    { DE_BSSGP_BVC_BUCKET_SIZE, "BVC Bucket size" },                                    /* 11.3.5   BVC Bucket Size */
+    { DE_BSSGP_BVC_MEAS, "BVC Measurement" },                                    /* 11.3.7   BVC Measurement */
+    { DE_BSSGP_CAUSE, "Cause" },                                              /* 11.3.8   Cause */
+    { DE_BSSGP_CELL_ID, "Cell Identifier" },                                    /* 11.3.9   Cell Identifier */
+    { DE_BSSGP_CHLN_NEEDED, "Channel needed" },                                     /* 11.3.10  Channel needed */
+    { DE_BBSGP_DRX_PARAM, "DRX Parameters" },                                     /* 11.3.11  DRX Parameters */
+    { DE_BBSGP_EMLPP_PRIO, "eMLPP-Priority" },                                     /* 11.3.12  eMLPP-Priority */
+    { DE_BSSGP_FLUSH_ACTION, "Flush Action" },                                       /* 11.3.13  Flush Action */
+    { DE_BSSGP_IMSI, "IMSI" },                                               /* 11.3.14  IMSI */
+    { DE_BSSGP_LLC_PDU, "LLC-PDU" },                                            /* 11.3.15  LLC-PDU */
+    { DE_BSSGP_LLC_FRAMES_DISC, "LLC Frames Discarded" },                               /* 11.3.16  LLC Frames Discarded  */
+    { DE_BSSGP_LAI, "Location Area" },                                      /* 11.3.17  Location Area  */
+    { DE_BSSGP_MID, "Mobile Id" },                                          /* 11.3.20  Mobile Id */
+    { DE_BSSGP_MS_BUCKET_SIZE, "MS Bucket Size" },                                     /* 11.3.21  MS Bucket Size */
+    { DE_BSSGP_MS_RAD_ACC_CAP, "MS Radio Access Capability" },                         /* 11.3.22  MS Radio Access Capability GSM_A_PDU_TYPE_GM, DE_MS_RAD_ACC_CAP */
+    { DE_BSSGP_OMC_ID, "OMC Id" },                                             /* 11.3.23  OMC Id */
+    { DE_BSSGP_PDU_IN_ERROR, "PDU In Error" },                                       /* 11.3.24  PDU In Error */
+    { DE_BSSGP_PDU_LIFETIME, "PDU Lifetime" },                                       /* 11.3.25  PDU Lifetime */
+    { DE_BSSP_PRIORITY, "Priority" },                                           /* 11.3.27  Priority */
+    { DE_BSSGP_QOS_PROFILE, "QoS Profile" },                                        /* 11.3.28  QoS Profile */
+    { DE_BSSGP_RA_CAUSE, "Radio Cause" },                                        /* 11.3.29  Radio Cause */
+    { DE_BSSGP_RA_CAP_UPD_CAUSE, "RA-Cap-UPD-Cause" },                                   /* 11.3.30  RA-Cap-UPD-Cause */
+    { DE_BSSGP_RAI, "Routeing Area" },                                      /* 11.3.31  Routeing Area */
+    { DE_BSSGP_R_DEFAULT_MS, "R_default_MS" },                                       /* 11.3.32  R_default_MS */
+    { DE_BBSGP_SUSPEND_REF_NO, "Suspend Reference Number" },                           /* 11.3.33  Suspend Reference Number */
+    { DE_BSSGP_TAG, "Tag" },                                                /* 11.3.34  Tag */
+    { DE_BSSGP_TLLI, "Temporary logical link Identity (TLLI)" },             /* 11.3.35  Temporary logical link Identity (TLLI) GSM_A_PDU_TYPE_RR, DE_RR_TLLI*/
+    { DE_BSSGP_TMSI_PTMSI, "Temporary Mobile Subscriber Identity (TMSI)" },        /* 11.3.36  Temporary Mobile Subscriber Identity (TMSI)GSM_A_PDU_TYPE_RR, DE_RR_TMSI_PTMSI */
+    { DE_BSSGP_TRACE_REF, "Trace Reference" },                                    /* 11.3.37  Trace Reference */
+    { DE_BSSGP_TRACE_TYPE, "Trace Type" },                                         /* 11.3.38  Trace Type */
+    { DE_BSSGP_TRANSACTION_ID, "Transaction Id" },                                     /* 11.3.39  Transaction Id */
+    { DE_BSSGP_TRIGGER_ID, "Trigger Id" },                                         /* 11.3.40  Trigger Id */
+    { DE_BSSGP_NO_OF_OCT_AFFECTED, "Number of octets affected" },                          /* 11.3.41  Number of octets affected */
+    { DE_BSSGP_LSA_ID_LIST, "LSA Identifier List" },                                /* 11.3.18  LSA Identifier List */
+    { DE_BSSGP_LSA_INFO, "LSA Information" },                                    /* 11.3.19  LSA Information */
+    { DE_BSSGP_ACKET_FLOW_ID, "Packet Flow Identifier (PFI)" },                       /* 11.3.42  Packet Flow Identifier (PFI) GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID*/
+                                                                    /* 11.3.42a (void) */
+    { DE_BSSGP_GPRS_TIMER, "GPRS Timer" },                                         /* 11.3.44  GPRS Timer */
+    { DE_BSSGP_QOS, "Aggregate BSS QoS Profile" },                          /* 11.3.43  Aggregate BSS QoS Profile GSM_A_PDU_TYPE_GM, DE_QOS*/
+    { DE_BSSGP_FEATURE_BITMAP, "Feature Bitmap" },                                     /* 11.3.45  Feature Bitmap */
+    { DE_BSSGP_BUCKET_FULL_RATIO, "Bucket Full Ratio" },                                  /* 11.3.46  Bucket Full Ratio */
+    { DE_BSSGP_SERV_UTRAN_CCO, "Service UTRAN CCO" },                                  /* 11.3.47  Service UTRAN CCO */
+    { DE_BSSGP_NSEI, "NSEI (Network Service Entity Identifier)" },           /* 11.3.48  NSEI (Network Service Entity Identifier) */
+    { DE_BSSGP_RRLP_APDU, "RRLP APDU" },                                          /* 11.3.49 RRLP APDU */
+                                                                    /* 11.3.50  LCS QoS BSSGP_IEI_LCS_QOS, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_LCSQOS*/
+                                                                    /* 11.3.51  LCS Client Type BSSGP_IEI_LCS_CLIENT_TYPE, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_LCS_CLIENT_TYPE*/
+                                                                    /* 11.3.52  Requested GPS Assistance Data BSSGP_IEI_REQUESTED_GPS_ASSISTANCE_DATA, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_REQ_GPS_ASSIST_D*/
+                                                                    /* 11.3.53  Location Type 0x7c, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_GANSS_LOC_TYPE*/
+                                                                    /* 11.3.54  Location Estimate BSSGP_IEI_LOCATION_ESTIMATE, GSM_A_PDU_TYPE_BSSMAP, BE_LOC_EST*/
+                                                                    /* 11.3.55  Positioning Data 0x7d, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_POS_DATA*/
+                                                                    /* 11.3.56  Deciphering Keys BSSGP_IEI_DECIPHERING_KEYS, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_DECIPH_KEYS */
+                                                                    /* 11.3.57  LCS Priority BSSGP_IEI_LCS_PRIORITY, GSM_A_PDU_TYPE_BSSMAP, BE_LCS_PRIO;*/
+                                                                    /* 11.3.58  LCS Cause BSSGP_IEI_LCS_CAUSE, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_LCS_CAUSE */
+                                                                    /* 11.3.59  LCS Capability 0x49 , GSM_A_PDU_TYPE_GM, DE_PS_LCS_CAP*/
+    { DE_BSSGP_RRLP_FLAGS, "RRLP Flags" },                                         /* 11.3.60  RRLP Flags */
+    { DE_BSSGP_RIM_APP_ID, "RIM Application Identity" },                           /* 11.3.61  RIM Application Identity */
+    { DE_BSSGP_RIM_SEQ_NO, "RIM Sequence Number" },                                /* 11.3.62  RIM Sequence Number */
+ /* 11.3.62a    RIM Container */
+ /* 11.3.62a.0  General */
+    { DE_BSSGP_RAN_INF_REQUEST_RIM_CONT, "RAN-INFORMATION-REQUEST RIM Container" },              /* 11.3.62a.1   RAN-INFORMATION-REQUEST RIM Container */
+    { DE_BSSGP_RAN_INF_RIM_CONT, "RAN-INFORMATION RIM Container" },                      /* 11.3.62a.2   RAN-INFORMATION RIM Container */
+    { DE_BSSGP_RAN_INFORMATION_ACK_RIM_CONT, "RAN-INFORMATION-ACK RIM Container" },                  /* 11.3.62a.3   RAN-INFORMATION-ACK RIM Container */
+    { DE_BSSGP_RAN_INFORMATION_ERROR_RIM_CONT, "RAN-INFORMATION-ERROR RIM Container" },                /* 11.3.62a.4   RAN-INFORMATION-ERROR RIM Container */
+    { DE_BSSGP_RAN_INF_APP_ERROR_RIM_CONT, "RAN-INFORMATION-APPLICATION-ERROR RIM Container" },    /* 11.3.62a.5   RAN-INFORMATION-APPLICATION-ERROR RIM Container */
+ /* 11.3.63 Application Container */
+    { DE_BSSGP_RAN_INFORMATION_REQUEST_APP_CONT, "RAN-INFORMATION-REQUEST Application Container" },      /* 11.3.63.1    RAN-INFORMATION-REQUEST Application Container */
+ /* 11.3.63.1.0 General */
+ /* 11.3.63.1.1 RAN-INFORMATION-REQUEST Application Container for the NACC Application */
+ /* 11.3.63.1.2 RAN-INFORMATION-REQUEST Application Container for the SI3 Application */
+ /* 11.3.63.1.3 RAN-INFORMATION-REQUEST Application Container for the MBMS data channel Application */
+ /* 11.3.63.1.4 RAN-INFORMATION-REQUEST Application Container for the SON Transfer Application */
+    { DE_BSSGP_RAN_INFORMATION_APP_CONT_UNIT, "RAN-INFORMATION Application Container Unit" },         /* 11.3.63.2    RAN-INFORMATION Application Container Unit */
+ /* 11.3.63.2.0 General */
+ /* 11.3.63.2.1 RAN-INFORMATION Application Container for the NACC Application */
+ /* 11.3.63.2.2 RAN-INFORMATION Application Container for the SI3 Application */
+ /* 11.3.63.2.3 RAN-INFORMATION Application Container for the MBMS data channel Application */
+ /* 11.3.63.2.4 RAN-INFORMATION Application Container for the SON Transfer Application */
+    { DE_BSSGP_RAN_APP_ERROR_CONT, "Application Error Container" },                        /* 11.3.64  Application Error Container */
+ /* 11.3.64.1   Application Error Container layout for the NACC application */
+ /* 11.3.64.2   Application Error Container for the SI3 application */
+ /* 11.3.64.3   Application Error Container for the MBMS data channel application */
+ /* 11.3.64.4   Application Error Container for the SON Transfer Application */
+    { DE_BSSGP_RIM_PDU_INDICATIONS, "RIM PDU Indications" },                                /* 11.3.65  RIM PDU Indications */
+ /* 11.3.65.0   General */
+ /* 11.3.65.1   RAN-INFORMATION-REQUEST RIM PDU Indications */
+ /* 11.3.65.2   RAN-INFORMATION RIM PDU Indications */
+ /* 11.3.65.3   RAN-INFORMATION-APPLICATION-ERROR RIM PDU Indications */
+ /* 11.3.66 (void) */
+    { DE_BSSGP_RIM_PROTO_VER_NO, "RIM Protocol Version Number" },                            /* 11.3.67  RIM Protocol Version Number */
+    { DE_BSSGP_PFC_FLOW_CTRL, "PFC Flow Control parameters" },                        /* 11.3.68  PFC Flow Control parameters */
+ /* 0x53, SGSAP_PDU_TYPE, DE_SGSAP_GLOBAL_CN_ID */                  /* 11.3.69  Global CN-Id */
+    { DE_BSSGP_RIM_ROUTING_INF, "RIM Routing Information" },                            /* 11.3.70  RIM Routing Information */
+    { DE_BSSGP_MBMS_SESSION_ID, "MBMS Session Identity" },                              /* 11.3.71 MBMS Session Identity */
+    { DE_BSSGP_MBMS_SESSION_DUR, "MBMS Session Duration" },                              /* 11.3.72  MBMS Session Duration */
+    { DE_BSSGP_MBMS_SAI_LIST, "MBMS Service Area Identity List" },                    /* 11.3.73  MBMS Service Area Identity List */
+    { DE_BSSGP_MBMS_RESPONSE, "MBMS Response" },                                      /* 11.3.74  MBMS Response */
+    { DE_BSSGP_MBMS_RA_LIST, "MBMS Routing Area List" },                             /* 11.3.75  MBMS Routing Area List */
+    { DE_BSSGP_MBMS_SESSION_INF, "MBMS Session Information" },                           /* 11.3.76  MBMS Session Information */
+    { DE_BSSGP_TMGI, "TMGI" },                                               /* 11.3.77  TMGI (Temporary Mobile Group Identity) */
+    { DE_BSSGP_MBMS_STOP_CAUSE, "MBMS Stop Cause" },                                    /* 11.3.78  MBMS Stop Cause */
     { DE_BSSGP_SOURCE_BSS_TO_TARGET_BSS_TRANSP_CONT, "Source BSS to Target BSS Transparent Container" },     /* 11.3.79  Source BSS to Target BSS Transparent Container */
     { DE_BSSGP_TARGET_BSS_TO_SOURCE_BSS_TRANSP_CONT, "Target BSS to Source BSS Transparent Container" },     /* 11.3.80  Target BSS to Source BSS Transparent Container */
-    /* 11.3.81 NAS container for PS Handover */
-    { DE_BSSGP_PFCS_TO_BE_SET_UP_LIST,               "PFCs to be set-up list" },                             /* 11.3.82  PFCs to be set-up list */
-    { DE_BSSGP_LIST_OF_SETUP_PFCS,                   "List of set-up PFCs" },                                /* 11.3.83  List of set-up PFCs */
-    { DE_BSSGP_EXT_FEATURE_BITMAP,                   "Extended Feature Bitmap" },                            /* 11.3.84  Extended Feature Bitmap */
-    { DE_BSSGP_SRC_TO_TRG_TRANSP_CONT,               "Source to Target Transparent Container" },             /* 11.3.85  Source to Target Transparent Container */
-    { DE_BSSGP_TRG_TO_SRC_TRANSP_CONT,               "Target to Source Transparent Container" },             /* 11.3.86  Target to Source Transparent Container */
-    { BE_BSSGP_RNC_ID,                               "RNC Identifier" },                                     /* 11.3.87  RNC Identifier */
-    { DE_BSSGP_PAGE_MODE,                            "Page Mode" },                                          /* 11.3.88  Page Mode */
-    { DE_BSSGP_CONTAINER_ID,                         "Container ID" },                                       /* 11.3.89  Container ID */
-    { DE_BSSGP_GLOBAL_TFI,                           "Global TFI" },                                         /* 11.3.90  Global TFI */
-    /* 11.3.91 IMEI */
-    { DE_BSSGP_TIME_TO_MBMS_DATA_TRAN,               "Time to MBMS Data Transfer" },                         /* 11.3.92  Time to MBMS Data Transfer */
-    { DE_BSSGP_MBMS_SESSION_REP_NO,                  "MBMS Session Repetition Number" },                     /* 11.3.93  MBMS Session Repetition Number */
-    { DE_BSSGP_INTER_RAT_HO_INFO,                    "Inter RAT Handover Info" },                            /* 11.3.94  Inter RAT Handover Info */
-    { DE_BSSGP_PS_HO_CMD,                            "PS Handover Command" },                                /* 11.3.95  PS Handover Command */
-    { DE_BSSGP_PS_HO_INDICATIONS,                    "PS Handover Indications" },                            /* 11.3.95a PS Handover Indications */
-    { DE_BSSGP_SIPSI_CONTAINER,                      "SI/PSI Container" },                                   /* 11.3.95b SI/PSI Container */
-    { DE_BSSGP_ACTIVE_PFCS_LIST,                     "Active PFCs List" },                                   /* 11.3.95c Active PFCs List */
-    { DE_BSSGP_VELOCITY_DATA,                        "Velocity Data" },                                      /* 11.3.96  Velocity Data */
-    { DE_BBSGP_DTM_HO_CMD,                           "DTM Handover Command" },                               /* 11.3.97  DTM Handover Command */
-    { DE_BSSGP_CS_INDICATION,                        "CS Indication" },                                      /* 11.3.98  CS Indication */
-    /* 11.3.99  Requested GANSS Assistance Data 0x7b, GSM_A_PDU_TYPE_BSSMAP, BE_GANSS_ASS_DTA*/
-    /* 11.3.100 GANSS Location Type 0x7c, GSM_A_PDU_TYPE_BSSMAP, BE_GANSS_LOC_TYP*/
-    /* 11.3.101 GANSS Positioning Data ENC_BIG_ENDIAN);*/
-    { DE_BSSGP_FLOW_CONTROL_GRAN,                    "Flow Control Granularity" },                           /* 11.3.102 Flow Control Granularity */
-    { DE_BSSGP_ENB_ID,                               "eNB Identifier" },                                     /* 11.3.103 eNB Identifier */
-    { DE_BSSGP_E_UTRAN_INTER_RAT_HO_INFO,            "E-UTRAN Inter RAT Handover Info" },                    /* 11.3.104 E-UTRAN Inter RAT Handover Info */
-    { DE_BSSGP_SUB_PROF_ID_F_RAT_FRQ_PRIO,           "Subscriber Profile ID for RAT/Frequency priority" },   /* 11.3.105 Subscriber Profile ID for RAT/Frequency priority */
-    { DE_BSSGP_REQ_FOR_INTER_RAT_HO_INFO,            "Request for Inter-RAT Handover Info" },                /* 11.3.106 Request for Inter-RAT Handover Info */
-    { DE_BSSGP_RELIABLE_INTER_RAT_HO_INF,            "Reliable Inter-RAT Handover Info" },                   /* 11.3.107 Reliable Inter-RAT Handover Info */
-    { DE_BSSGP_SON_TRANSFER_APP_ID,                  "Son transfer application identity" },                  /* 11.3.108 SON Transfer Application Identity */
-    { DE_BSSGP_CSG_ID,                               "CSG Identifier" },                                     /* 11.3.109 CSG Identifier */
-    /* 11.3.110 Tracking Area Code */
-    { DE_BSSGP_REDIR_ATTEMPT_FLG,                    "Redirect Attempt Flag"},                               /* 11.3.111 Redirect Attempt Flag */
-    { DE_BSSGP_REDIR_INDICATION,                     "Redirection Indication"},                              /* 11.3.112 Redirection Indication */
-    { DE_BSSGP_REDIR_COMPLETE,                       "Redirection Completed"},                               /* 11.3.113 Redirection Completed */
-    { DE_BSSGP_UNCONFIRM_SEND_STATE_VAR,             "Unconfirmed Send State Variable"},                     /* 11.3.114 Unconfirmed send state variable */
+ /* 11.3.81 NAS container for PS Handover */
+    { DE_BSSGP_PFCS_TO_BE_SET_UP_LIST, "PFCs to be set-up list" },                             /* 11.3.82  PFCs to be set-up list */
+    { DE_BSSGP_LIST_OF_SETUP_PFCS, "List of set-up PFCs" },                                /* 11.3.83  List of set-up PFCs */
+    { DE_BSSGP_EXT_FEATURE_BITMAP, "Extended Feature Bitmap" },                            /* 11.3.84  Extended Feature Bitmap */
+    { DE_BSSGP_SRC_TO_TRG_TRANSP_CONT, "Source to Target Transparent Container" },             /* 11.3.85  Source to Target Transparent Container */
+    { DE_BSSGP_TRG_TO_SRC_TRANSP_CONT, "Target to Source Transparent Container" },             /* 11.3.86  Target to Source Transparent Container */
+    { BE_BSSGP_RNC_ID, "RNC Identifier" },                                     /* 11.3.87  RNC Identifier */
+    { DE_BSSGP_PAGE_MODE, "Page Mode" },                                          /* 11.3.88  Page Mode */
+    { DE_BSSGP_CONTAINER_ID, "Container ID" },                                       /* 11.3.89  Container ID */
+    { DE_BSSGP_GLOBAL_TFI, "Global TFI" },                                         /* 11.3.90  Global TFI */
+ /* 11.3.91 IMEI */
+    { DE_BSSGP_TIME_TO_MBMS_DATA_TRAN, "Time to MBMS Data Transfer" },                         /* 11.3.92  Time to MBMS Data Transfer */
+    { DE_BSSGP_MBMS_SESSION_REP_NO, "MBMS Session Repetition Number" },                     /* 11.3.93  MBMS Session Repetition Number */
+    { DE_BSSGP_INTER_RAT_HO_INFO, "Inter RAT Handover Info" },                            /* 11.3.94  Inter RAT Handover Info */
+    { DE_BSSGP_PS_HO_CMD, "PS Handover Command" },                                /* 11.3.95  PS Handover Command */
+    { DE_BSSGP_PS_HO_INDICATIONS, "PS Handover Indications" },                            /* 11.3.95a PS Handover Indications */
+    { DE_BSSGP_SIPSI_CONTAINER, "SI/PSI Container" },                                   /* 11.3.95b SI/PSI Container */
+    { DE_BSSGP_ACTIVE_PFCS_LIST, "Active PFCs List" },                                   /* 11.3.95c Active PFCs List */
+    { DE_BSSGP_VELOCITY_DATA, "Velocity Data" },                                      /* 11.3.96  Velocity Data */
+    { DE_BBSGP_DTM_HO_CMD, "DTM Handover Command" },                               /* 11.3.97  DTM Handover Command */
+    { DE_BSSGP_CS_INDICATION, "CS Indication" },                            /* 11.3.98  CS Indication */
+                                                                    /* 11.3.99  Requested GANSS Assistance Data 0x7b, GSM_A_PDU_TYPE_BSSMAP, BE_GANSS_ASS_DTA*/
+                                                                    /* 11.3.100 GANSS Location Type 0x7c, GSM_A_PDU_TYPE_BSSMAP, BE_GANSS_LOC_TYP*/
+                                                                    /* 11.3.101 GANSS Positioning Data ENC_BIG_ENDIAN);*/
+    { DE_BSSGP_FLOW_CONTROL_GRAN, "Flow Control Granularity" },                           /* 11.3.102 Flow Control Granularity */
+    { DE_BSSGP_ENB_ID, "eNB Identifier" },                                     /* 11.3.103 eNB Identifier */
+    { DE_BSSGP_E_UTRAN_INTER_RAT_HO_INFO, "E-UTRAN Inter RAT Handover Info" },                    /* 11.3.104 E-UTRAN Inter RAT Handover Info */
+    { DE_BSSGP_SUB_PROF_ID_F_RAT_FRQ_PRIO, "Subscriber Profile ID for RAT/Frequency priority" },   /* 11.3.105 Subscriber Profile ID for RAT/Frequency priority */
+    { DE_BSSGP_REQ_FOR_INTER_RAT_HO_INFO, "Request for Inter-RAT Handover Info" },                /* 11.3.106 Request for Inter-RAT Handover Info */
+    { DE_BSSGP_RELIABLE_INTER_RAT_HO_INF, "Reliable Inter-RAT Handover Info" },                   /* 11.3.107 Reliable Inter-RAT Handover Info */
+    { DE_BSSGP_SON_TRANSFER_APP_ID, "Son transfer application identity" },                  /* 11.3.108 SON Transfer Application Identity */
+    { DE_BSSGP_CSG_ID, "CSG Identifier" },                                     /* 11.3.109 CSG Identifier */
+                                                                    /* 11.3.110 Tracking Area Code */
+    { DE_BSSGP_REDIR_ATTEMPT_FLG, "Redirect Attempt Flag"},	                            /* 11.3.111 Redirect Attempt Flag */
+    { DE_BSSGP_REDIR_INDICATION, "Redirection Indication"},	                            /* 11.3.112 Redirection Indication */
+    { DE_BSSGP_REDIR_COMPLETE, "Redirection Completed"},                               /* 11.3.113 Redirection Completed */
+    { DE_BSSGP_UNCONFIRM_SEND_STATE_VAR, "Unconfirmed Send State Variable"},                     /* 11.3.114 Unconfirmed send state variable */
 
-    { DE_BSSGP_SELECTED_PLMN_ID,                     "Selected PLMN ID"},                                    /* 11.3.118 Selected PLMN ID */
+    { DE_BSSGP_SELECTED_PLMN_ID, "Selected PLMN ID"},                     /* 11.3.118 Selected PLMN ID */
 
     { 0, NULL }
 };
@@ -3963,7 +3967,7 @@ bssgp_dl_unitdata(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 o
     ELEM_MAND_V(BSSGP_PDU_TYPE, DE_BSSGP_QOS_PROFILE, NULL);
 
     /* PDU Lifetime PDU Lifetime/11.3.25 M TLV 4 */
-    ELEM_MAND_TELV(0x16, BSSGP_PDU_TYPE, DE_BSSGP_PDU_LIFETIME, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x16, BSSGP_PDU_TYPE, DE_BSSGP_PDU_LIFETIME, NULL);
     /* MS Radio Access Capability (note 2) MS Radio Access Capability/11.3.22 O TLV 7-? */
     ELEM_OPT_TELV(BSSGP_IEI_MS_RADIO_ACCESS_CAPABILITY, GSM_A_PDU_TYPE_GM, DE_MS_RAD_ACC_CAP , NULL);
     /* Priority (note 3) Priority/11.3.27 O TLV 3 */
@@ -3994,11 +3998,11 @@ bssgp_dl_unitdata(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 o
     /* Alignment octets Alignment octets/11.3.1 O TLV 2-5 */
     ELEM_OPT_TELV(0x00, BSSGP_PDU_TYPE, DE_BSSGP_ALIGNMENT_OCTETS, NULL);
     /* LLC-PDU (note 4) LLC-PDU/11.3.15 M TLV 2-? */
-    ELEM_MAND_TELV(0x0e, BSSGP_PDU_TYPE, DE_BSSGP_LLC_PDU, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x0e, BSSGP_PDU_TYPE, DE_BSSGP_LLC_PDU, NULL);
     /* Initial LLC-PDU (note 8) LLC-PDU/11.3.15 O TLV 2-? */
     ELEM_OPT_TELV(0x0e, BSSGP_PDU_TYPE, DE_BSSGP_LLC_PDU, " - initial");
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.2.2   UL-UNITDATA
@@ -4030,18 +4034,18 @@ bssgp_ul_unitdata(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 o
     ELEM_OPT_TELV(0x26, GSM_A_PDU_TYPE_BSSMAP, BE_LSA_ID_LIST, NULL);
     /* Redirect Attempt Flag (Note 3) Redirect Attempt Flag/11.3.111 O TLV 3 */
     ELEM_OPT_TELV(BSSGP_IEI_REDIR_ATTEMP_FLG, BSSGP_PDU_TYPE, DE_BSSGP_REDIR_ATTEMPT_FLG, NULL);
-    /* IMSI (note 2) IMSI/11.3.14 O TLV 5-10 */
-    ELEM_OPT_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
+	/* IMSI (note 2) IMSI/11.3.14 O TLV 5-10 */
+	ELEM_OPT_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
     /* Unconfirmed send state variable (note 4) Unconfirmed send state variable/11.3.114 O TLV 4 */
     ELEM_OPT_TELV(BSSGP_IEI_UNCONFIRM_SEND_STATE_VAR, BSSGP_PDU_TYPE, DE_BSSGP_UNCONFIRM_SEND_STATE_VAR, NULL);
-    /* Selected PLMN ID (note 5) Selected PLMN ID/11.3.118 O TLV 5 */
-    ELEM_OPT_TELV(BSSGP_IEI_SELECTED_PLMN_ID, BSSGP_PDU_TYPE, DE_BSSGP_SELECTED_PLMN_ID, NULL);
+	/* Selected PLMN ID (note 5) Selected PLMN ID/11.3.118 O TLV 5 */
+	ELEM_OPT_TELV(BSSGP_IEI_SELECTED_PLMN_ID, BSSGP_PDU_TYPE, DE_BSSGP_SELECTED_PLMN_ID, NULL);
     /* Alignment octets Alignment octets/11.3.1 O TLV 2-5  */
     ELEM_OPT_TELV(0x00, BSSGP_PDU_TYPE, DE_BSSGP_ALIGNMENT_OCTETS, NULL);
     /* LLC-PDU (note) LLC-PDU/11.3.15 M TLV 2-?  */
-    ELEM_MAND_TELV(0x0e, BSSGP_PDU_TYPE, DE_BSSGP_LLC_PDU, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x0e, BSSGP_PDU_TYPE, DE_BSSGP_LLC_PDU, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.2.3   RA-CAPABILITY
@@ -4060,11 +4064,11 @@ bssgp_ra_cap(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* MS Radio Access Capability MS Radio Access Capability/11.3.22 M TLV 7-? */
-    ELEM_MAND_TELV(BSSGP_IEI_MS_RADIO_ACCESS_CAPABILITY, GSM_A_PDU_TYPE_GM, DE_MS_RAD_ACC_CAP, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_MS_RADIO_ACCESS_CAPABILITY, GSM_A_PDU_TYPE_GM, DE_MS_RAD_ACC_CAP , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4089,18 +4093,18 @@ bssgp_dl_mbms_unitdata(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guin
     pinfo->link_dir = P2P_DIR_DL;
 
     /* PDU Lifetime PDU Lifetime/11.3.25 M TLV 4  */
-    ELEM_MAND_TELV(0x16, BSSGP_PDU_TYPE, DE_BSSGP_PDU_LIFETIME, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x16, BSSGP_PDU_TYPE, DE_BSSGP_PDU_LIFETIME, NULL);
     /* TMGI TMGI/ 11.3.77 M TLV 3-8 */
-    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL);
     /* MBMS Session Identity MBMS Session Identity/ 11.3.71 O TLV 3 */
     ELEM_OPT_TELV(0x5d, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_ID, NULL);
     /* Alignment octets Alignment octets/11.3.1 O TLV 2-5 */
     ELEM_OPT_TELV(0x00, BSSGP_PDU_TYPE, DE_BSSGP_ALIGNMENT_OCTETS, NULL);
     /* LLC-PDU LLC-PDU/11.3.15 M TLV 3-? */
-    ELEM_MAND_TELV(0x0e, BSSGP_PDU_TYPE, DE_BSSGP_LLC_PDU, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x0e, BSSGP_PDU_TYPE, DE_BSSGP_LLC_PDU, NULL);
 
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4121,15 +4125,15 @@ bssgp_ul_mbms_unitdata(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guin
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TMGI TMGI/ 11.3.77 M TLV 3-8 */
-    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL);
     /* MBMS Session Identity MBMS Session Identity/ 11.3.71 O TLV 3 */
     ELEM_OPT_TELV(0x5d, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_ID, NULL);
     /* Alignment octets Alignment octets/11.3.1 O TLV 2-5 */
     ELEM_OPT_TELV(0x00, BSSGP_PDU_TYPE, DE_BSSGP_ALIGNMENT_OCTETS, NULL);
     /* LLC-PDU (note 1) LLC-PDU/11.3.15 M TLV 2-? */
-    ELEM_MAND_TELV(0x0e, BSSGP_PDU_TYPE, DE_BSSGP_LLC_PDU, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x0e, BSSGP_PDU_TYPE, DE_BSSGP_LLC_PDU, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4151,7 +4155,7 @@ bssgp_paging_ps(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 off
     pinfo->link_dir = P2P_DIR_DL;
 
     /* IMSI IMSI/11.3.14 M TLV 5 -10 */
-    ELEM_MAND_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
     /* DRX Parameters DRX Parameters/11.3.11 O TLV 4 */
     ELEM_OPT_TELV(0x0a , GSM_A_PDU_TYPE_GM, DE_DRX_PARAM , NULL);
     /* BVCI a) BVCI/11.3.6 C TLV 4 */
@@ -4167,11 +4171,11 @@ bssgp_paging_ps(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 off
     /* ABQP ABQP/11.3.43 O TLV 13-? */
     ELEM_OPT_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS , NULL);
     /* QoS Profile QoS Profile/11.3.28 M TLV 5 */
-    ELEM_MAND_TELV(0x18,BSSGP_PDU_TYPE, DE_BSSGP_QOS_PROFILE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x18,BSSGP_PDU_TYPE, DE_BSSGP_QOS_PROFILE, NULL);
     /* P-TMSI TMSI/11.3.36 O TLV 6 */
     ELEM_OPT_TELV(BSSGP_IEI_TMSI,GSM_A_PDU_TYPE_RR, DE_RR_TMSI_PTMSI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4191,9 +4195,9 @@ bssgp_paging_cs(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 off
      */
     pinfo->link_dir = P2P_DIR_DL;
     /* IMSI IMSI/11.3.14 M TLV 5 -10 */
-    ELEM_MAND_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
     /* DRX Parameters DRX Parameters/11.3.11 M TLV 4 */
-    ELEM_MAND_TELV(0x0a , GSM_A_PDU_TYPE_GM, DE_DRX_PARAM, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x0a , GSM_A_PDU_TYPE_GM, DE_DRX_PARAM , NULL);
     /* BVCI a) BVCI/11.3.6 C TLV 4 */
     ELEM_OPT_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , NULL);
     /* Location Area (note 1) Location Area/11.3.17 C TLV 7 */
@@ -4213,7 +4217,7 @@ bssgp_paging_cs(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 off
     /* Global CN-Id (note 2) Global CN-Id/11.3.69 O TLV 7 */
     ELEM_OPT_TELV(0x53, SGSAP_PDU_TYPE, DE_SGSAP_GLOBAL_CN_ID, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4233,9 +4237,9 @@ bssgp_ra_cap_upd(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 of
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Tag Tag/11.3.34 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG , NULL);
     /* IMSI (note) IMSI/11.3.14 C TLV 5 -10 */
     ELEM_OPT_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
     /* RA-Cap-UPD-CAUSE RA-Cap-UPDCAUSE/11.3.30 M TLV 3 */
@@ -4243,7 +4247,7 @@ bssgp_ra_cap_upd(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 of
     /* MS Radio Access Capability MS Radio Access Capability/11.3.22 C TLV 7-? */
     ELEM_OPT_TELV(BSSGP_IEI_MS_RADIO_ACCESS_CAPABILITY, GSM_A_PDU_TYPE_GM, DE_MS_RAD_ACC_CAP , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4264,9 +4268,9 @@ bssgp_ra_cap_upd_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Tag Tag/11.3.34 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG , NULL);
     /* IMSI (note) IMSI/11.3.14 C TLV 5 -10 */
     ELEM_OPT_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
     /* RA-Cap-UPD-CAUSE RA-Cap-UPDCAUSE/11.3.30 M TLV 3 */
@@ -4274,7 +4278,7 @@ bssgp_ra_cap_upd_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     /* MS Radio Access Capability MS Radio Access Capability/11.3.22 C TLV 7-? */
     ELEM_OPT_TELV(BSSGP_IEI_MS_RADIO_ACCESS_CAPABILITY, GSM_A_PDU_TYPE_GM, DE_MS_RAD_ACC_CAP , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4301,9 +4305,9 @@ bssgp_ra_status(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 off
     /* IMSI (note) IMSI/11.3.14 C TLV 5-10 */
     ELEM_OPT_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
     /* Radio Cause Radio Cause/11.3.29 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_RADIO_CAUSE, BSSGP_PDU_TYPE, DE_BSSGP_RA_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RADIO_CAUSE, BSSGP_PDU_TYPE, DE_BSSGP_RA_CAUSE , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.3.6   SUSPEND
@@ -4323,11 +4327,11 @@ bssgp_suspend(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offse
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Routeing Area Routeing Area/11.3.31 M TLV 8 */
-    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.3.7   SUSPEND-ACK
@@ -4347,14 +4351,14 @@ bssgp_suspend_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 o
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Routeing Area Routeing Area/11.3.31 M TLV 8 */
-    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL);
     /* Suspend Reference Number Suspend Reference Number/11.3.33 M TLV 3 */
-    ELEM_MAND_TELV(0x1d,BSSGP_PDU_TYPE, DE_BBSGP_SUSPEND_REF_NO, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x1d,BSSGP_PDU_TYPE, DE_BBSGP_SUSPEND_REF_NO, NULL);
 
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.3.8   SUSPEND-NACK
@@ -4375,13 +4379,13 @@ bssgp_suspend_nack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Routeing Area Routeing Area/11.3.31 M TLV 8 */
-    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL);
     /* Cause Cause/11.3.8 O TLV 3 */
     ELEM_OPT_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.3.9   RESUME
@@ -4401,13 +4405,13 @@ bssgp_resume(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Routeing Area Routeing Area/11.3.31 M TLV 8 */
-    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL);
     /* Suspend Reference Number Suspend Reference Number/11.3.33 M TLV 3 */
-    ELEM_MAND_TELV(0x1d,BSSGP_PDU_TYPE, DE_BBSGP_SUSPEND_REF_NO, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x1d,BSSGP_PDU_TYPE, DE_BBSGP_SUSPEND_REF_NO, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.3.10  RESUME-ACK
@@ -4428,11 +4432,11 @@ bssgp_resume_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 of
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Routeing Area Routeing Area/11.3.31 M TLV 8 */
-    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.3.11  RESUME-NACK
@@ -4453,13 +4457,13 @@ bssgp_resume_nack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 o
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Routeing Area Routeing Area/11.3.31 M TLV 8 */
-    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x1b,GSM_A_PDU_TYPE_GM, DE_RAI, NULL);
     /* Cause Cause/11.3.8 O TLV 3 */
     ELEM_OPT_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4 PDU functional definitions and contents at NM SAP
@@ -4480,15 +4484,15 @@ bssgp_flush_ll(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offs
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* BVCI (old) BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, " - Old", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , " - Old");
     /* BVCI (new) BVCI/11.3.6 O TLV 4 */
     ELEM_OPT_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , " - New");
     /* NSEI (new) NSEI/11.3.48 O (note) TLV 4 */
     ELEM_OPT_TELV(0x3e, GSM_A_PDU_TYPE_RR, DE_BSSGP_NSEI , " - New");
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.2   FLUSH-LL-ACK
@@ -4509,18 +4513,18 @@ bssgp_flush_ll_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Flush Action Flush Action/11.3.13 M TLV 3 */
-    ELEM_MAND_TELV(0x0c, BSSGP_PDU_TYPE, DE_BSSGP_FLUSH_ACTION, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x0c, BSSGP_PDU_TYPE, DE_BSSGP_FLUSH_ACTION , NULL);
     /* BVCI (new) BVCI/11.3.13 C (note 1) TLV 4 */
     ELEM_OPT_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , " - New");
     /* Number of octets affected Number of octets affected/11.3.41 M TLV 5 */
-    ELEM_MAND_TELV(BSSGP_IEI_NUMBER_OF_OCTETS_AFFECTED, BSSGP_PDU_TYPE, DE_BSSGP_NO_OF_OCT_AFFECTED, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_NUMBER_OF_OCTETS_AFFECTED, BSSGP_PDU_TYPE, DE_BSSGP_NO_OF_OCT_AFFECTED , NULL);
     /* NSEI (new) NSEI/11.3.48 C (note 2) TLV 4 */
     ELEM_OPT_TELV(0x3e, GSM_A_PDU_TYPE_RR, DE_BSSGP_NSEI , " - New");
 
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.3   LLC-DISCARDED
@@ -4539,17 +4543,17 @@ bssgp_llc_discarded(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* LLC Frames Discarded LLC Frames Discarded/11.3.16 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_LLC_FRAMES_DISCARDED, BSSGP_PDU_TYPE, DE_BSSGP_LLC_FRAMES_DISC, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_LLC_FRAMES_DISCARDED, BSSGP_PDU_TYPE, DE_BSSGP_LLC_FRAMES_DISC , NULL);
     /* BVCI BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , NULL);
     /* Number of octets deleted Number of octets affected/11.3.41 M TLV 5 */
-    ELEM_MAND_TELV(BSSGP_IEI_NUMBER_OF_OCTETS_AFFECTED, BSSGP_PDU_TYPE, DE_BSSGP_NO_OF_OCT_AFFECTED, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_NUMBER_OF_OCTETS_AFFECTED, BSSGP_PDU_TYPE, DE_BSSGP_NO_OF_OCT_AFFECTED , NULL);
     /* PFI (note) PFI/11.3.42 O TLV 3 */
     ELEM_OPT_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4572,15 +4576,15 @@ bssgp_flow_control_bvc(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guin
     pinfo->link_dir = P2P_DIR_UL;
 
     /* Tag Tag/11.3.34 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG , NULL);
     /* BVC Bucket Size BVC Bucket Size/11.3.5 M TLV 4 */
-    ELEM_MAND_TELV(0x05, BSSGP_PDU_TYPE, DE_BSSGP_BVC_BUCKET_SIZE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x05, BSSGP_PDU_TYPE, DE_BSSGP_BVC_BUCKET_SIZE , NULL);
     /* Bucket Leak Rate Bucket Leak Rate/11.3.4 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BUCKET_LEAK_RATE, BSSGP_PDU_TYPE, DE_BSSGP_BUCKET_LEAK_RATE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BUCKET_LEAK_RATE, BSSGP_PDU_TYPE, DE_BSSGP_BUCKET_LEAK_RATE , NULL);
     /* Bmax default MS Bmax default MS/11.3.2 M TLV 4 */
-    ELEM_MAND_TELV(0x01, BSSGP_PDU_TYPE, DE_BSSGP_BMAX_DEFAULT_MS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x01, BSSGP_PDU_TYPE, DE_BSSGP_BMAX_DEFAULT_MS , NULL);
     /* R_default_MS R_default_MS/11.3.32 M TLV 4 */
-    ELEM_MAND_TELV(0x1c, BSSGP_PDU_TYPE, DE_BSSGP_R_DEFAULT_MS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x1c, BSSGP_PDU_TYPE, DE_BSSGP_R_DEFAULT_MS , NULL);
     /* Bucket_Full Ratio Bucket_Full Ratio/11.3.46 C TLV 3 */
     ELEM_OPT_TELV(BSSGP_IEI_BUCKET_FULL_RATIO, BSSGP_PDU_TYPE, DE_BSSGP_BUCKET_FULL_RATIO , NULL);
     /* BVC Measurement BVC Measurement/11.3.7 O TLV 4  */
@@ -4588,7 +4592,7 @@ bssgp_flow_control_bvc(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guin
     /* Flow Control Granularity (note) Flow Control Granularity/11.3.102 O TLV 3 */
     ELEM_OPT_TELV(0x7e, BSSGP_PDU_TYPE, DE_BSSGP_FLOW_CONTROL_GRAN , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4612,9 +4616,9 @@ bssgp_flow_control_bvc_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, 
     pinfo->link_dir = P2P_DIR_DL;
 
     /* Tag Tag/11.3.34 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4638,19 +4642,19 @@ bssgp_flow_control_ms(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Tag Tag/11.3.34 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG , NULL);
     /* MS Bucket Size MS Bucket Size/11.3.21 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_MS_BUCKET_SIZE, BSSGP_PDU_TYPE, DE_BSSGP_MS_BUCKET_SIZE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_MS_BUCKET_SIZE, BSSGP_PDU_TYPE, DE_BSSGP_MS_BUCKET_SIZE , NULL);
     /* Bucket Leak rate Bucket Leak rate/11.3.4 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BUCKET_LEAK_RATE, BSSGP_PDU_TYPE, DE_BSSGP_BUCKET_LEAK_RATE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BUCKET_LEAK_RATE, BSSGP_PDU_TYPE, DE_BSSGP_BUCKET_LEAK_RATE , NULL);
     /* Bucket_Full Ratio Bucket_Full Ratio/11.3.46 C TLV 3 */
     ELEM_OPT_TELV(BSSGP_IEI_BUCKET_FULL_RATIO, BSSGP_PDU_TYPE, DE_BSSGP_BUCKET_FULL_RATIO , NULL);
     /* Flow Control Granularity (note) Flow Control Granularity/11.3.102 O TLV 3 */
     ELEM_OPT_TELV(0x7e, BSSGP_PDU_TYPE, DE_BSSGP_FLOW_CONTROL_GRAN , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.7   FLOW-CONTROL-MS-ACK
@@ -4671,11 +4675,11 @@ bssgp_flow_control_ms_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, g
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6  */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Tag Tag/11.3.34 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.8   BVC-BLOCK
@@ -4696,11 +4700,11 @@ bssgp_bvc_block(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 off
     pinfo->link_dir = P2P_DIR_UL;
 
     /* BVCI BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , NULL);
     /* Cause Cause/11.3.8 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4721,9 +4725,9 @@ bssgp_bvc_block_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32
     pinfo->link_dir = P2P_DIR_DL;
 
     /* BVCI BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4744,9 +4748,10 @@ bssgp_bvc_un_block(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 
     pinfo->link_dir = P2P_DIR_UL;
 
     /* BVCI BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.11  BVC-UNBLOCK-ACK
@@ -4767,9 +4772,9 @@ bssgp_bvc_un_block_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guin
     pinfo->link_dir = P2P_DIR_DL;
 
     /* BVCI BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4790,9 +4795,9 @@ bssgp_bvc_reset(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 off
     /* Direction: SGSN to BSS, BSS to SGSN */
 
     /* BVCI BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , NULL);
     /* Cause Cause/11.3.8 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
     /* Cell Identifier (note 1) C TLV 10 */
     ELEM_OPT_TELV(BSSGP_IEI_CELL_IDENTIFIER, BSSGP_PDU_TYPE, DE_BSSGP_CELL_ID , NULL);
     /* Feature bitmap (note 2) Feature bitmap/11.3.45 O TLV 3 */
@@ -4800,7 +4805,7 @@ bssgp_bvc_reset(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 off
     /* Extended Feature Bitmap (note 3) Extended Feature Bitmap/11.3.84 O TLV 3 */
     ELEM_OPT_TELV(0x69, BSSGP_PDU_TYPE, DE_BSSGP_EXT_FEATURE_BITMAP , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4821,7 +4826,7 @@ bssgp_bvc_reset_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32
     /* BSS to SGSN, SGSN to BSS */
 
     /* BVCI BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , NULL);
     /* Cell Identifier (note 1) C TLV 10 */
     ELEM_OPT_TELV(BSSGP_IEI_CELL_IDENTIFIER, BSSGP_PDU_TYPE, DE_BSSGP_CELL_ID , NULL);
     /* Feature bitmap (note 2) Feature bitmap/11.3.45 O TLV 3 */
@@ -4829,7 +4834,7 @@ bssgp_bvc_reset_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32
     /* Extended Feature Bitmap (note 3) Extended Feature Bitmap/11.3.84 O TLV 3 */
     ELEM_OPT_TELV(0x69, BSSGP_PDU_TYPE, DE_BSSGP_EXT_FEATURE_BITMAP , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4849,13 +4854,13 @@ bssgp_status(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset
     /* Direction: SGSN to BSS, BSS to SGSN */
 
     /* Cause Cause/11.3.8 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
     /* BVCI BVCI/11.3.6 C TLV 4 */
     ELEM_OPT_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, NULL);
     /* PDU In Error (note) PDU In Error/11.3.24 O TLV 3-? */
     ELEM_OPT_TELV(0x15, BSSGP_PDU_TYPE, DE_BSSGP_PDU_IN_ERROR, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.15  SGSN-INVOKE-TRACE
@@ -4876,9 +4881,9 @@ bssgp_sgsn_invoke_trace(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gui
     pinfo->link_dir = P2P_DIR_UL;
 
     /* Trace Type Trace Type/11.3.38 M TLV 3 */
-    ELEM_MAND_TELV(0x22, BSSGP_PDU_TYPE, DE_BSSGP_TRACE_TYPE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x22, BSSGP_PDU_TYPE, DE_BSSGP_TRACE_TYPE , NULL);
     /* Trace Reference Trace Reference/11.3.37 M TLV 4 */
-    ELEM_MAND_TELV(0x21, BSSGP_PDU_TYPE, DE_BSSGP_TRACE_REF, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x21, BSSGP_PDU_TYPE, DE_BSSGP_TRACE_REF , NULL);
     /* Trigger Id Trigger Id/11.3.40 O TLV 4-24 */
     ELEM_OPT_TELV(0x24, BSSGP_PDU_TYPE, DE_BSSGP_TRIGGER_ID , NULL);
     /* Mobile Id Mobile Id/11.3.20 O TLV 3-10 */
@@ -4888,7 +4893,7 @@ bssgp_sgsn_invoke_trace(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gui
     /* TransactionId TransactionId/11.3.39 O TLV 4 */
     ELEM_OPT_TELV(0x23, BSSGP_PDU_TYPE, DE_BSSGP_TRANSACTION_ID , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4909,11 +4914,11 @@ bssgp_download_bss_pfc(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guin
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* PFI PFI/11.3.42 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4934,15 +4939,15 @@ bssgp_create_bss_pfc(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* IMSI IMSI/11.3.14 O (note 4) TLV 5 -10 */
     ELEM_OPT_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
     /* PFI PFI/11.3.42 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID , NULL);
     /* PFT GPRS Timer/11.3.44 M TLV 3 */
-    ELEM_MAND_TELV(0x29, BSSGP_PDU_TYPE, DE_BSSGP_GPRS_TIMER, " - PFT", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x29, BSSGP_PDU_TYPE, DE_BSSGP_GPRS_TIMER , " - PFT");
     /* ABQP ABQP/11.3.43 M TLV 13-? */
-    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS , NULL);
     /* Service UTRAN CCO Service UTRAN CCO/11.3.47 O TLV 3 */
     ELEM_OPT_TELV(BSSGP_IEI_SERVICE_UTRAN_CCO, BSSGP_PDU_TYPE, DE_BSSGP_SERV_UTRAN_CCO, NULL);
     /* MS Radio Access Capability MS Radio Access Capability/11.3.22 O (note 1) TLV 7-? */
@@ -4960,7 +4965,7 @@ bssgp_create_bss_pfc(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
      */
     ELEM_OPT_TELV(0x81, BSSGP_PDU_TYPE, DE_BSSGP_SUB_PROF_ID_F_RAT_FRQ_PRIO, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -4983,15 +4988,15 @@ bssgp_create_bss_pfc_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gu
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* PFI PFI/11.3.42 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID , NULL);
     /* ABQP ABQP/11.3.43 M TLV 13-? */
-    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS , NULL);
     /* Cause Cause/11.3.8 O TLV 3 */
     ELEM_OPT_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.19  CREATE-BSS-PFC-NACK
@@ -5013,13 +5018,13 @@ bssgp_create_bss_pfc_nack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, g
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* PFI PFI/11.3.42 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID , NULL);
     /* Cause Cause/11.3.8 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.20  MODIFY-BSS-PFC
@@ -5039,13 +5044,13 @@ bssgp_modify_bss_pfc(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* PFI PFI/11.3.42 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID , NULL);
     /* ABQP ABQP/11.3.43 M TLV 13-? */
-    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5066,16 +5071,16 @@ bssgp_modify_bss_pfc_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gu
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* PFI PFI/11.3.42 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID , NULL);
     /* PFT GPRS Timer/11.3.44 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_GPRS_TIMER, BSSGP_PDU_TYPE, DE_BSSGP_GPRS_TIMER, " - PFT", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_GPRS_TIMER, BSSGP_PDU_TYPE, DE_BSSGP_GPRS_TIMER , " - PFT");
     /* ABQP ABQP/11.3.43 M TLV 13-? */
-    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS , NULL);
 
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.22  DELETE-BSS-PFC
@@ -5095,11 +5100,11 @@ bssgp_delete_bss_pfc(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* PFI PFI/11.3.42 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.23  DELETE-BSS-PFC-ACK
@@ -5119,11 +5124,11 @@ bssgp_delete_bss_pfc_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gu
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* PFI PFI/11.3.42 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.24  FLOW-CONTROL-PFC
@@ -5143,9 +5148,9 @@ bssgp_flow_cntrl_pfc(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Tag Tag/11.3.34 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG , NULL);
     /* MS Bucket Size MS Bucket Size/11.3.21 O TLV 4 */
     ELEM_OPT_TELV(BSSGP_IEI_MS_BUCKET_SIZE, BSSGP_PDU_TYPE, DE_BSSGP_MS_BUCKET_SIZE , NULL);
     /* Bucket Leak rate Bucket Leak rate/11.3.4 O TLV 4 */
@@ -5153,11 +5158,11 @@ bssgp_flow_cntrl_pfc(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     /* Bucket_Full Ratio Bucket_Full Ratio/11.3.46 O TLV 3 */
     ELEM_OPT_TELV(BSSGP_IEI_BUCKET_FULL_RATIO, BSSGP_PDU_TYPE, DE_BSSGP_BUCKET_FULL_RATIO , NULL);
     /* PFC flow control parameters PFC flow control parameters/11.3.68 M TLV */
-    ELEM_MAND_TELV(0x52, BSSGP_PDU_TYPE, DE_BSSGP_PFC_FLOW_CTRL, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x52, BSSGP_PDU_TYPE, DE_BSSGP_PFC_FLOW_CTRL , NULL);
     /* Flow Control Granularity (note) Flow Control Granularity/11.3.102 O TLV 3 */
     ELEM_OPT_TELV(0x7e, BSSGP_PDU_TYPE, DE_BSSGP_FLOW_CONTROL_GRAN , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.25  FLOW-CONTROL-PFC-ACK
@@ -5179,11 +5184,11 @@ bssgp_flow_cntrl_pfc_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gu
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Tag Tag/11.3.34 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TAG, BSSGP_PDU_TYPE, DE_BSSGP_TAG , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.26  DELETE-BSS-PFC-REQ
@@ -5203,13 +5208,13 @@ bssgp_delete_bss_pfc_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gu
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* PFI PFI/11.3.42 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_PFI , GSM_A_PDU_TYPE_GM, DE_PACKET_FLOW_ID , NULL);
     /* Cause Cause/11.3.8 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.27  PS-HANDOVER-REQUIRED
@@ -5229,11 +5234,11 @@ bssgp_ps_ho_required(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Cause Cause/11.3.8 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
     /* Source Cell Identifier Cell Identifier/11.3.9 M TLV 10 */
-    ELEM_MAND_TELV(BSSGP_IEI_CELL_IDENTIFIER, BSSGP_PDU_TYPE, DE_BSSGP_CELL_ID, " - Source", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_CELL_IDENTIFIER, BSSGP_PDU_TYPE, DE_BSSGP_CELL_ID , " - Source");
     /* Target Cell Identifier (note 2) Cell Identifier/11.3.9 C TLV 10 */
     ELEM_OPT_TELV(BSSGP_IEI_CELL_IDENTIFIER, BSSGP_PDU_TYPE, DE_BSSGP_CELL_ID , " - Target");
     /* Source BSS to Target BSS Transparent Container (note 1)
@@ -5259,7 +5264,7 @@ bssgp_ps_ho_required(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     /* TAC (note 6) Tracking Area Code/11.3.110 C TLV 5 */
     ELEM_OPT_TELV(0x86, NAS_PDU_TYPE_EMM, DE_EMM_TRAC_AREA_ID, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.28  PS-HANDOVER-REQUIRED-ACK
@@ -5281,9 +5286,9 @@ bssgp_ps_ho_required_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gu
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* List of set-up PFCs List of set-up PFCs/11.3.83 M TLV 3-?S */
-    ELEM_MAND_TELV(0x68,BSSGP_PDU_TYPE, DE_BSSGP_LIST_OF_SETUP_PFCS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x68,BSSGP_PDU_TYPE, DE_BSSGP_LIST_OF_SETUP_PFCS, NULL);
     /* Target BSS to Source BSS Transparent Container (note)
      * Target BSS to Source BSS Transparent Container/11.3.80 C TLV 3-?
      */
@@ -5293,7 +5298,7 @@ bssgp_ps_ho_required_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gu
      */
     ELEM_OPT_TELV(0x6b,BSSGP_PDU_TYPE, DE_BSSGP_TRG_TO_SRC_TRANSP_CONT, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5314,11 +5319,11 @@ bssgp_ps_ho_required_nack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, g
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Cause Cause/11.3.8 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.30  PS-HANDOVER-REQUEST
@@ -5338,11 +5343,11 @@ bssgp_ps_ho_request(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* IMSI IMSI/11.3.14 M TLV 5-10 */
-    ELEM_MAND_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
     /* Cause Cause/11.3.8 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
     /* Source Cell Identifier (note 1) Cell Identifier/11.3.9 C TLV 10 */
     ELEM_OPT_TELV(BSSGP_IEI_CELL_IDENTIFIER, BSSGP_PDU_TYPE, DE_BSSGP_CELL_ID , " - Source");
     /* Source RNC Identifier (note 1) RNC Identifier/11.3.87 C TLV 10 */
@@ -5362,7 +5367,7 @@ bssgp_ps_ho_request(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32
     /* Reliable Inter RAT Handover Info (note 3) Reliable Inter RAT Handover Info/11.3.107 C TLV 3 */
     ELEM_OPT_TELV(0x83,BSSGP_PDU_TYPE, DE_BSSGP_RELIABLE_INTER_RAT_HO_INF, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5383,13 +5388,13 @@ bssgp_ps_ho_request_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gui
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* List of set-up PFCs List of set-up PFCs/11.3.83 M TLV 3-? */
-    ELEM_MAND_TELV(0x68,BSSGP_PDU_TYPE, DE_BSSGP_LIST_OF_SETUP_PFCS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x68,BSSGP_PDU_TYPE, DE_BSSGP_LIST_OF_SETUP_PFCS, NULL);
     /* Target BSS to Source BSS Transparent Container Target BSS to Source BSS Transparent Container/11.3.80 M TLV 3-? */
-    ELEM_MAND_TELV(0x65,BSSGP_PDU_TYPE, DE_BSSGP_TARGET_BSS_TO_SOURCE_BSS_TRANSP_CONT, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x65,BSSGP_PDU_TYPE, DE_BSSGP_TARGET_BSS_TO_SOURCE_BSS_TRANSP_CONT, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.32  PS-HANDOVER-REQUEST-NACK
@@ -5409,11 +5414,11 @@ bssgp_ps_ho_request_nack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gu
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Cause Cause/11.3.8 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5434,15 +5439,15 @@ bssgp_ps_ho_complete(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* IMSI IMSI/11.3.14 M TLV 5-10 */
-    ELEM_MAND_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
     /* Target Cell Identifier (note 1) Cell Identifier/11.3.9 O TLV 10 */
     ELEM_OPT_TELV(BSSGP_IEI_CELL_IDENTIFIER, BSSGP_PDU_TYPE, DE_BSSGP_CELL_ID , " - Target");
     /* Request for Inter RAT Handover Info (note 2) Request for Inter RAT Handover Info/11.3.106 C TLV 3 */
     ELEM_OPT_TELV(0x82, BSSGP_PDU_TYPE, DE_BSSGP_REQ_FOR_INTER_RAT_HO_INFO , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.4.34  PS-HANDOVER-CANCEL
@@ -5462,7 +5467,7 @@ bssgp_ps_ho_cancel(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Cause Cause/11.3.8 M TLV 3 */
     ELEM_IN_ELEM_MAND_TELV(BSSGP_IEI_CAUSE,BSSGP_PDU_TYPE, DE_BSSGP_CAUSE, NULL);
     /* Source Cell Identifier Cell Identifier/11.3.9 M TLV 10 */
@@ -5474,7 +5479,7 @@ bssgp_ps_ho_cancel(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 
     /* Target eNB Identifier (note 1) (note 2) eNB Identifier/11.3.103 C TLV 3-n */
     ELEM_OPT_TELV(0x7f,BSSGP_PDU_TYPE, DE_BSSGP_ENB_ID, " - Target");
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5500,13 +5505,13 @@ bssgp_ps_ho_complete_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gu
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* Inter RAT Handover Info Inter RAT Handover Info/11.3.94 C (note 1) TLV 3-? */
     ELEM_OPT_TELV(0x73, BSSGP_PDU_TYPE, DE_BSSGP_INTER_RAT_HO_INFO, NULL);
     /* E-UTRAN Inter RAT Handover Info E-UTRAN Inter RAT Handover Info/11.3.104 C (note 1) TLV 3-? */
     ELEM_OPT_TELV(0x80, BSSGP_PDU_TYPE, DE_BSSGP_E_UTRAN_INTER_RAT_HO_INFO, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.5 PDU functional definitions and contents at LCS SAP
@@ -5527,13 +5532,13 @@ bssgp_perform_loc_request(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, g
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* IMSI IMSI/11.3.14 M TLV 5-10 */
-    ELEM_MAND_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_IMSI, BSSGP_PDU_TYPE, DE_BSSGP_IMSI , NULL);
     /* DRX Parameters (note 1) DRX Parameters/11.3.11 O TLV 4 */
     ELEM_OPT_TELV(0x86, NAS_PDU_TYPE_EMM, DE_EMM_TRAC_AREA_ID, NULL);
     /* BVCI (PCU-PTP) BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, " - (PCU-PTP)", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , " - (PCU-PTP)");
     /* NSEI (PCU-PTP) NSEI/11.3.48 M TLV 4-? */
     ELEM_OPT_TELV(0x3e, GSM_A_PDU_TYPE_RR, DE_BSSGP_NSEI , " - (PCU-PTP)");
     /* Location Type Location Type/11.3.53 M TLV 3-? */
@@ -5557,7 +5562,7 @@ bssgp_perform_loc_request(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, g
     /* Requested GANSS Assistance Data (note 6) Requested GANSS Assistance Data/11.3.99 O TLV 3-? */
     ELEM_OPT_TLV(0x7b, GSM_A_PDU_TYPE_BSSMAP, BE_GANSS_ASS_DTA, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5578,9 +5583,9 @@ bssgp_perform_loc_response(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, 
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* BVCI (PCU-PTP) BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, " - (PCU-PTP)", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , " - (PCU-PTP)");
     /* Location Estimate (note 1) Location Estimate/11.3.54 C TLV 3-? */
     ELEM_OPT_TELV(BSSGP_IEI_LOCATION_ESTIMATE, GSM_A_PDU_TYPE_BSSMAP, BE_LOC_EST, NULL);
     /* Positioning Data Positioning Data/11.3.55 O TLV 3-? */
@@ -5594,7 +5599,7 @@ bssgp_perform_loc_response(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, 
     /* GANSS Positioning Data GANSS Positioning Data /11.3.101 O TLV 3-? */
     ELEM_OPT_TELV(0x7d, GSM_A_PDU_TYPE_BSSMAP, BE_GANSS_POS_DTA, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5615,13 +5620,13 @@ bssgp_perform_loc_response_abort(tvbuff_t *tvb, proto_tree *tree, packet_info *p
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* BVCI (PCU-PTP) BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, " - (PCU-PTP)", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , " - (PCU-PTP)");
     /* LCS Cause LCS Cause/11.3.58 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_LCS_CAUSE, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_LCS_CAUSE, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_LCS_CAUSE, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_LCS_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5642,15 +5647,15 @@ bssgp_pos_cmd(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offse
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* BVCI (PCU-PTP) BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, " - (PCU-PTP)", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , " - (PCU-PTP)");
     /* RRLP Flags RRLP Flags/11.3.60 M TLV 3 */
-    ELEM_MAND_TELV(BSSGP_IEI_RRLP_FLAGS, BSSGP_PDU_TYPE, DE_BSSGP_RRLP_FLAGS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RRLP_FLAGS, BSSGP_PDU_TYPE, DE_BSSGP_RRLP_FLAGS , NULL);
     /* RRLP APDU RRLP APDU/11.3.49 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RRLP_APDU, BSSGP_PDU_TYPE, DE_BSSGP_RRLP_APDU, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RRLP_APDU, BSSGP_PDU_TYPE, DE_BSSGP_RRLP_APDU , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5671,9 +5676,9 @@ bssgp_pos_resp(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offs
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TLLI TLLI/11.3.35 M TLV 6 */
-    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_TLLI, GSM_A_PDU_TYPE_RR, DE_RR_TLLI , NULL);
     /* BVCI (PCU-PTP) BVCI/11.3.6 M TLV 4 */
-    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI, " - (PCU-PTP)", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_BVCI, BSSGP_PDU_TYPE, DE_BSSGP_BVCI , " - (PCU-PTP)");
     /* RRLP Flags a) RRLP Flags/11.3.60 C TLV 3 */
     ELEM_OPT_TELV(BSSGP_IEI_RRLP_FLAGS, BSSGP_PDU_TYPE, DE_BSSGP_RRLP_FLAGS , NULL);
     /* RRLP APDU a) RRLP APDU/11.3.49 C TLV 3-? */
@@ -5681,7 +5686,7 @@ bssgp_pos_resp(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offs
     /* LCS Cause b) LCS Cause/11.3.58 O TLV 3-? */
     ELEM_OPT_TELV(BSSGP_IEI_LCS_CAUSE, GSM_PDU_TYPE_BSSMAP_LE, DE_BMAPLE_LCS_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5702,13 +5707,13 @@ bssgp_ran_inf_request(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint
     /* Direction: BSS to SGSN - SGSN to BSS */
 
     /* Destination Cell Identifier RIM Routing Information/11.3.70 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF, " - Destination Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF , " - Destination Cell Identifier");
     /* Source Cell Identifier RIM Routing Information/11.3.70 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF, " - Source Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF , " - Source Cell Identifier");
     /* RIM Container RAN-INFORMATION-REQUEST RIM Container/11.3.62a.1 M TLV 3-? */
     ELEM_OPT_TELV(BSSGP_IEI_RAN_INF_REQUEST_RIM_CONTAINER, BSSGP_PDU_TYPE, DE_BSSGP_RAN_INF_REQUEST_RIM_CONT, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5728,14 +5733,14 @@ bssgp_ran_inf(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offse
     /* Direction: BSS to SGSN SGSN to BSS */
 
     /* Destination Cell Identifier RIM Routing Information/11.3.70 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF, " - Destination Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF , " - Destination Cell Identifier");
     /* Source Cell Identifier RIM Routing Information/11.3.70 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF, " - Source Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF , " - Source Cell Identifier");
     /* RIM Container RAN-INFORMATION RIM Container/11.3.62a.2 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RAN_INF_RIM_CONTAINER, BSSGP_PDU_TYPE, DE_BSSGP_RAN_INF_RIM_CONT, " - Source Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RAN_INF_RIM_CONTAINER, BSSGP_PDU_TYPE, DE_BSSGP_RAN_INF_RIM_CONT , " - Source Cell Identifier");
 
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5758,13 +5763,13 @@ bssgp_ran_inf_request_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, g
     /* Direction: BSS to SGSN SGSN to BSS */
 
     /* Destination Cell Identifier RIM Routing Information/11.3.70 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF, " - Destination Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF , " - Destination Cell Identifier");
     /* Source Cell Identifier RIM Routing Information/11.3.70 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF, " - Source Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF , " - Source Cell Identifier");
     /* RIM Container RAN-INFORMATION-ACK RIM Container/11.3.62a.3 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RAN_INF_ACK_RIM_CONTAINER, BSSGP_PDU_TYPE, DE_BSSGP_RAN_INFORMATION_ACK_RIM_CONT, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RAN_INF_ACK_RIM_CONTAINER, BSSGP_PDU_TYPE, DE_BSSGP_RAN_INFORMATION_ACK_RIM_CONT , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5788,13 +5793,13 @@ bssgp_ran_inf_err(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 o
     /* Direction: BSS to SGSN SGSN to BSS */
 
     /* Destination Cell Identifier RIM Routing Information/11.3.70 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF, " - Destination Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF , " - Destination Cell Identifier");
     /* Source Cell Identifier RIM Routing Information/11.3.70 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF, " - Source Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF , " - Source Cell Identifier");
     /* RIM Container RAN-INFORMATION-ERROR RIM Container/11.3.62a.4 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RAN_INF_ERROR_RIM_CONTAINER, BSSGP_PDU_TYPE, DE_BSSGP_RAN_INFORMATION_ERROR_RIM_CONT, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RAN_INF_ERROR_RIM_CONTAINER, BSSGP_PDU_TYPE, DE_BSSGP_RAN_INFORMATION_ERROR_RIM_CONT , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.6.5   RAN-INFORMATION-APPLICATION-ERROR
@@ -5816,13 +5821,13 @@ bssgp_ran_inf_app_err(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint
     /* Direction: BSS to SGSN SGSN to BSS */
 
     /* Destination Cell Identifier RIM Routing Information/11.3.70 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF, " - Destination Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF , " - Destination Cell Identifier");
     /* Source Cell Identifier RIM Routing Information/11.3.70 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF, " - Source Cell Identifier", ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RIM_ROUTING_INFORMATION, BSSGP_PDU_TYPE, DE_BSSGP_RIM_ROUTING_INF , " - Source Cell Identifier");
     /* RIM Container RAN-INFORMATION-APPLICATION ERROR RIM Container/11.3.62a.5 M TLV 3-? */
-    ELEM_MAND_TELV(BSSGP_IEI_RAN_INF_APP_ERROR_RIM_CONTAINER, BSSGP_PDU_TYPE, DE_BSSGP_RAN_INF_APP_ERROR_RIM_CONT, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(BSSGP_IEI_RAN_INF_APP_ERROR_RIM_CONTAINER, BSSGP_PDU_TYPE, DE_BSSGP_RAN_INF_APP_ERROR_RIM_CONT , NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5845,28 +5850,28 @@ bssgp_mbms_session_start_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TMGI TMGI/11.3.77 M TLV 3-8  */
-    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL);
     /* MBMS Session Identity MBMS Session Identity/11.3.71 O TLV 3 */
     ELEM_OPT_TELV(0x5d, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_ID, NULL);
     /* ABQP ABQP/11.3.43 M TLV 13-? */
-    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS , NULL);
     /* MBMS Service Area Identity List MBMS Service Area Identity List/11.3.73 M TLV 4-? */
-    ELEM_MAND_TELV(0x5f, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SAI_LIST, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5f, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SAI_LIST, NULL);
     /* MBMS Routing Area List MBMS Routing Area List/11.3.75 M TLV 3-? */
-    ELEM_MAND_TELV(0x61, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_RA_LIST, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x61, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_RA_LIST, NULL);
     /* MBMS Session Duration MBMS Session Duration/11.3.72 M TLV 3-? */
-    ELEM_MAND_TELV(0x5e, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_DUR, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5e, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_DUR, NULL);
     /* MBMS Session Information MBMS Session Information/11.3.76 M TLV 3 */
-    ELEM_MAND_TELV(0x62, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_INF, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x62, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_INF, NULL);
     /* Time to MBMS Data Transfer Time to MBMS Data Transfer/11.3.92 M TLV 3 */
-    ELEM_MAND_TELV(0x71, BSSGP_PDU_TYPE, DE_BSSGP_TIME_TO_MBMS_DATA_TRAN, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x71, BSSGP_PDU_TYPE, DE_BSSGP_TIME_TO_MBMS_DATA_TRAN, NULL);
     /* Allocation/Retention Priority Priority/11.3.27 O TLV 3 */
     ELEM_OPT_TELV(0x17, GSM_A_PDU_TYPE_BSSMAP, BE_PRIO, NULL);
     /* MBMS Session Repetition Number MBMS Session Repetition Number/11.3.93 O TLV 3 */
     ELEM_OPT_TELV(0x72, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_REP_NO, NULL);
 
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.7.2   MBMS-SESSION-START-RESPONSE
@@ -5889,13 +5894,13 @@ bssgp_mbms_session_start_resp(tvbuff_t *tvb, proto_tree *tree, packet_info *pinf
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TMGI TMGI/ 11.3.77 M TLV 3-8 */
-    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL);
     /* MBMS Session Identity MBMS Session Identity/ 11.3.71 O TLV 3 */
     ELEM_OPT_TELV(0x5d, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_ID, NULL);
     /* MBMS Response MBMS Response/ 11.3.74 M TLV 3 */
     ELEM_OPT_TELV(0x60, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_RESPONSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 /*
@@ -5917,13 +5922,13 @@ bssgp_mbms_session_stop_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo,
     pinfo->link_dir = P2P_DIR_DL;
 
     /* TMGI TMGI/ 11.3.77 M TLV 3-8 */
-    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL);
     /* MBMS Session Identity MBMS Session Identity/ 11.3.71 O TLV 3 */
     ELEM_OPT_TELV(0x5d, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_ID, NULL);
     /* MBMS Stop Cause MBMS Stop Cause/11.3.78 M TLV 3 */
     ELEM_OPT_TELV(0x63, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_STOP_CAUSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.7.4   MBMS-SESSION-STOP-RESPONSE
@@ -5944,13 +5949,13 @@ bssgp_mbms_session_stop_resp(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TMGI TMGI/ 11.3.77 M TLV 3-8 */
-    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL);
     /* MBMS Session Identity MBMS Session Identity/ 11.3.71 O TLV 3 */
     ELEM_OPT_TELV(0x5d, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_ID, NULL);
     /* MBMS Response MBMS Response/ 11.3.74 M TLV 3 */
     ELEM_OPT_TELV(0x60, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_RESPONSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.7.5   MBMS-SESSION-UPDATE-REQUEST
@@ -5973,27 +5978,27 @@ bssgp_mbms_session_update_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinf
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TMGI TMGI/ 11.3.77 M TLV 3-8 */
-    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL);
     /* MBMS Session Identity MBMS Session Identity/ 11.3.71 O TLV 3 */
     ELEM_OPT_TELV(0x5d, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_ID, NULL);
     /* ABQP ABQP/11.3.43 M TLV 13-? */
-    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x3a , GSM_A_PDU_TYPE_GM, DE_QOS , NULL);
     /* MBMS Service Area Identity List MBMS Service Area Identity List/11.3.73 M TLV 4-? */
-    ELEM_MAND_TELV(0x5f, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SAI_LIST, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5f, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SAI_LIST, NULL);
     /* MBMS Routing Area List MBMS Routing Area List/11.3.75 M TLV 3-? */
-    ELEM_MAND_TELV(0x61, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_RA_LIST, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x61, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_RA_LIST, NULL);
     /* MBMS Session Duration MBMS Session Duration/11.3.72 M TLV 3-? */
-    ELEM_MAND_TELV(0x5e, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_DUR, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5e, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_DUR, NULL);
     /* MBMS Session Information MBMS Session Information/11.3.76 M TLV 3 */
-    ELEM_MAND_TELV(0x62, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_INF, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x62, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_INF, NULL);
     /* Time to MBMS Data Transfer Time to MBMS Data Transfer/11.3.92 M TLV 3 */
-    ELEM_MAND_TELV(0x71, BSSGP_PDU_TYPE, DE_BSSGP_TIME_TO_MBMS_DATA_TRAN, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x71, BSSGP_PDU_TYPE, DE_BSSGP_TIME_TO_MBMS_DATA_TRAN, NULL);
     /* Allocation/Retention Priority Priority/11.3.27 O TLV 3 */
     ELEM_OPT_TELV(0x17, GSM_A_PDU_TYPE_BSSMAP, BE_PRIO, NULL);
     /* MBMS Session Repetition Number MBMS Session Repetition Number/11.3.93 O TLV 3 */
     ELEM_OPT_TELV(0x72, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_REP_NO, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 /*
  * 10.7.6   MBMS-SESSION-UPDATE-RESPONSE
@@ -6016,13 +6021,13 @@ bssgp_mbms_session_uptate_resp(tvbuff_t *tvb, proto_tree *tree, packet_info *pin
     pinfo->link_dir = P2P_DIR_UL;
 
     /* TMGI TMGI/ 11.3.77 M TLV 3-8 */
-    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL, ei_bssgp_missing_mandatory_element);
+    ELEM_MAND_TELV(0x5c, GSM_A_PDU_TYPE_GM, DE_TMGI, NULL);
     /* MBMS Session Identity MBMS Session Identity/ 11.3.71 O TLV 3 */
     ELEM_OPT_TELV(0x5d, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_SESSION_ID, NULL);
     /* MBMS Response MBMS Response/ 11.3.74 M TLV 3 */
     ELEM_OPT_TELV(0x60, BSSGP_PDU_TYPE, DE_BSSGP_MBMS_RESPONSE, NULL);
 
-    EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
+    EXTRANEOUS_DATA_CHECK_EXPERT(curr_len, 0, pinfo, &ei_bssgp_extraneous_data);
 }
 
 static const value_string bssgp_msg_strings[] = {
@@ -6394,7 +6399,7 @@ dissect_bssgp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     /* Save pinfo */
     g_rim_application_identity = 0;
     gparent_tree = tree;
-    len = tvb_reported_length(tvb);
+    len = tvb_length(tvb);
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "BSSGP");
 
@@ -6928,7 +6933,6 @@ proto_register_bssgp(void)
 
     static ei_register_info ei[] = {
         { &ei_bssgp_extraneous_data, { "bssgp.extraneous_data", PI_PROTOCOL, PI_NOTE, "Extraneous Data, dissector bug or later version spec(report to wireshark.org)", EXPFILL }},
-        { &ei_bssgp_missing_mandatory_element, { "bssgp.missing_mandatory_element", PI_PROTOCOL, PI_WARN, "Missing Mandatory element, rest of dissection is suspect", EXPFILL }},
     };
 
     expert_module_t* expert_bssgp;
@@ -6990,16 +6994,3 @@ proto_reg_handoff_bssgp(void)
 
     diameter_3gpp_avp_dissector_table = find_dissector_table("diameter.3gpp");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

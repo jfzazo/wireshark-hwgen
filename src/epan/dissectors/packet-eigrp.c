@@ -26,14 +26,19 @@
  */
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/guid-utils.h>
 #include <epan/addr_resolv.h>
+#include <epan/atalk-utils.h>
 #include <epan/addr_and_mask.h>
 #include <epan/ipproto.h>
+#include <epan/tfs.h>
 #include <epan/expert.h>
+#include <epan/reassemble.h>
 
 #include "packet-ipx.h"
-#include "packet-atalk.h"
+#include "packet-osi.h"
 
 /**
  * EIGRP Header size in bytes
@@ -144,7 +149,7 @@
  * External routes originate from some other protocol - these are them
  */
 #define NULL_PROTID     0       /*!< unknown protocol */
-#define IGRP1_PROTID    1       /*!< IGRP.. who's your daddy! */
+#define IGRP1_PROTID    1       /*!< IGRP.. whos your daddy! */
 #define IGRP2_PROTID    2       /*!< EIGRP - Just flat out the best */
 #define STATIC_PROTID   3       /*!< Staticly configured source */
 #define RIP_PROTID      4       /*!< Routing Information Protocol */
@@ -645,7 +650,7 @@ static const value_string eigrp_saf_srv2string[] = {
  * Dissect the Parameter TLV, which is used to convey metric weights and the
  * hold time.
  *
- * @brief
+ * @usage
  * Note the addition of K6 for the new extended metrics, and does not apply to
  * older TLV packet formats.
  */
@@ -930,6 +935,7 @@ dissect_eigrp_peer_termination (packet_info *pinfo, proto_item *ti)
 static void
 dissect_eigrp_peer_tidlist (proto_tree *tree, tvbuff_t *tvb)
 {
+    proto_item *sub_ti;
     proto_tree *sub_tree;
     int         offset = 0;
     guint16     size;
@@ -943,7 +949,8 @@ dissect_eigrp_peer_tidlist (proto_tree *tree, tvbuff_t *tvb)
                         ENC_BIG_ENDIAN);
     offset += 2;
 
-    sub_tree = proto_tree_add_subtree_format(tree, tvb, offset, (size*2), ett_eigrp_tidlist, NULL, "%d TIDs", size);
+    sub_ti = proto_tree_add_text(tree, tvb, offset, (size*2), "%d TIDs", size);
+    sub_tree = proto_item_add_subtree(sub_ti, ett_eigrp_tidlist);
     for (; size ; size--) {
         proto_tree_add_item(sub_tree, hf_eigrp_tidlist_tid, tvb, offset, 2,
                             ENC_BIG_ENDIAN);
@@ -975,11 +982,13 @@ dissect_eigrp_peer_tidlist (proto_tree *tree, tvbuff_t *tvb)
 static int
 dissect_eigrp_extdata_flags (proto_tree *tree, tvbuff_t *tvb, int offset)
 {
+    proto_item *sub_ti;
     proto_tree *sub_tree;
     tvbuff_t   *sub_tvb;
 
     /* Decode the route flags field */
-    sub_tree = proto_tree_add_subtree(tree, tvb, offset, 1, ett_eigrp_extdata_flags, NULL, "External Flags");
+    sub_ti = proto_tree_add_text(tree, tvb, offset, 1, "External Flags");
+    sub_tree = proto_item_add_subtree(sub_ti, ett_eigrp_extdata_flags);
     sub_tvb = tvb_new_subset_remaining(tvb, offset);
 
     proto_tree_add_item(sub_tree, hf_eigrp_extdata_flag_ext, sub_tvb, 0, 1,
@@ -1019,11 +1028,13 @@ dissect_eigrp_extdata_flags (proto_tree *tree, tvbuff_t *tvb, int offset)
 static int
 dissect_eigrp_metric_flags (proto_tree *tree, tvbuff_t *tvb, int offset, int limit)
 {
+    proto_item *sub_ti;
     proto_tree *sub_tree;
     tvbuff_t   *sub_tvb;
 
     /* Decode the route flags field */
-    sub_tree = proto_tree_add_subtree(tree, tvb, offset, limit, ett_eigrp_metric_flags, NULL, "Flags");
+    sub_ti = proto_tree_add_text(tree, tvb, offset, limit, "Flags");
+    sub_tree = proto_item_add_subtree(sub_ti, ett_eigrp_metric_flags);
     sub_tvb = tvb_new_subset(tvb, offset, limit, -1);
 
     /* just care about 'flags' byte, there are no MP flags for now */
@@ -1072,18 +1083,15 @@ dissect_eigrp_ipv4_addr (proto_item *ti, proto_tree *tree, tvbuff_t *tvb,
             addr_len = 4; /* assure we can exit the loop */
 
         } else {
-            address addr;
-
             proto_tree_add_item(tree, hf_eigrp_ipv4_prefixlen, tvb, offset, 1,
                                 ENC_BIG_ENDIAN);
             offset += 1;
-            SET_ADDRESS(&addr, AT_IPv4, 4, ip_addr);
             ti_dst = proto_tree_add_text(tree, tvb, offset, addr_len,
-                                         "Destination: %s", address_to_str(wmem_packet_scope(), &addr));
+                                         "Destination: %s", ip_to_str(ip_addr));
 
             /* add it to the top level line */
             proto_item_append_text(ti,"  %c   %s/%u", first ? '=':',',
-                                   address_to_str(wmem_packet_scope(), &addr), length);
+                                   ip_to_str(ip_addr), length);
 
             if (unreachable) {
                 expert_add_info(pinfo, ti_dst, &ei_eigrp_unreachable);
@@ -1115,7 +1123,6 @@ dissect_eigrp_ipv6_addr (proto_item *ti, proto_tree *tree, tvbuff_t *tvb,
     guint8             length;
     int                addr_len;
     struct e_in6_addr  addr;
-    address            addr_str;
     proto_item        *ti_prefixlen, *ti_dst;
     int                first = TRUE;
 
@@ -1137,13 +1144,12 @@ dissect_eigrp_ipv6_addr (proto_item *ti, proto_tree *tree, tvbuff_t *tvb,
                 addr_len++;
             }
 
-            SET_ADDRESS(&addr_str, AT_IPv6, 16, addr.bytes);
             ti_dst = proto_tree_add_text(tree, tvb, offset, addr_len,
-                                         "Destination: %s", address_to_str(wmem_packet_scope(), &addr_str));
+                                         "Destination: %s", ip6_to_str(&addr));
 
             /* add it to the top level line */
             proto_item_append_text(ti,"  %c   %s/%u", first ? '=':',',
-                                   address_to_str(wmem_packet_scope(), &addr_str), length);
+                                   ip6_to_str(&addr), length);
 
             if (unreachable) {
                 expert_add_info(pinfo, ti_dst, &ei_eigrp_unreachable);
@@ -1178,7 +1184,8 @@ dissect_eigrp_ipx_addr (proto_item *ti, proto_tree *tree, tvbuff_t *tvb,
                                  ENC_NA);
 
     /* add it to the top level line */
-    proto_item_append_text(ti,"  =   %s", ipxnet_to_str_punct(wmem_packet_scope(), tvb_get_ntohl(tvb, offset), ' '));
+    proto_item_append_text(ti,"  =   %s",
+                           tvb_ipxnet_to_string(tvb, offset));
 
     if (unreachable) {
         expert_add_info(pinfo, ti_dst, &ei_eigrp_unreachable);
@@ -1241,13 +1248,14 @@ dissect_eigrp_service (proto_item *ti, proto_tree *tree, tvbuff_t *tvb,
 {
     int         afi, length, remaining;
     int         sub_offset;
-    proto_item *sub_ti;
+    proto_item *sub_ti, *reach_ti;
     proto_tree *sub_tree, *reach_tree;
     tvbuff_t   *sub_tvb, *reach_tvb;
     guint16     service, sub_service;
 
     remaining = tvb_length_remaining(tvb, offset);
-    sub_tree = proto_tree_add_subtree(tree, tvb, offset, remaining, ett_eigrp_tlv_metric, &sub_ti, "SAF Service ");
+    sub_ti = proto_tree_add_text(tree, tvb, offset, remaining, "SAF Service ");
+    sub_tree = proto_item_add_subtree(sub_ti, ett_eigrp_tlv_metric);
     sub_tvb = tvb_new_subset(tvb, offset, remaining, -1);
     sub_offset = 0;
 
@@ -1281,8 +1289,9 @@ dissect_eigrp_service (proto_item *ti, proto_tree *tree, tvbuff_t *tvb,
         /*
          * Reachability information
          */
-        reach_tree = proto_tree_add_subtree(sub_tree, sub_tvb, sub_offset, 22,
-                                       ett_eigrp_saf_reachability, NULL, "Reachability");
+        reach_ti = proto_tree_add_text(sub_tree, sub_tvb, sub_offset, 22,
+                                       "Reachability");
+        reach_tree = proto_item_add_subtree(reach_ti, ett_eigrp_saf_reachability);
         reach_tvb = tvb_new_subset(sub_tvb, sub_offset, 22, -1);
 
         afi = tvb_get_ntohs(reach_tvb, 0);
@@ -1326,9 +1335,9 @@ dissect_eigrp_service (proto_item *ti, proto_tree *tree, tvbuff_t *tvb,
              * XML. If it "looks like" XML (begins with optional white-space
              * followed by a '<'), try XML. Otherwise, try plain-text.
              */
-            xml_tvb = tvb_new_subset_length(sub_tvb, sub_offset, length);
-            test_string = tvb_get_string_enc(wmem_packet_scope(), xml_tvb, 0, (length < 32 ?
-                                                                length : 32), ENC_ASCII);
+            xml_tvb = tvb_new_subset(sub_tvb, sub_offset, length, length);
+            test_string = tvb_get_string(wmem_packet_scope(), xml_tvb, 0, (length < 32 ?
+                                                                length : 32));
             tok = strtok(test_string, " \t\r\n");
 
             if (tok && tok[0] == '<') {
@@ -1377,10 +1386,12 @@ dissect_eigrp_service (proto_item *ti, proto_tree *tree, tvbuff_t *tvb,
 static int
 dissect_eigrp_legacy_metric (proto_tree *tree, tvbuff_t *tvb, int offset)
 {
+    proto_item *sub_ti;
     proto_tree *sub_tree;
     tvbuff_t   *sub_tvb;
 
-    sub_tree = proto_tree_add_subtree(tree, tvb, offset, 16, ett_eigrp_tlv_metric, NULL, "Legacy Metric");
+    sub_ti = proto_tree_add_text(tree, tvb, offset, 16, "Legacy Metric");
+    sub_tree = proto_item_add_subtree(sub_ti, ett_eigrp_tlv_metric);
     sub_tvb = tvb_new_subset(tvb, offset, 16, -1);
 
     proto_tree_add_item(sub_tree, hf_eigrp_legacy_metric_delay, sub_tvb,
@@ -1437,11 +1448,13 @@ dissect_eigrp_legacy_metric (proto_tree *tree, tvbuff_t *tvb, int offset)
 static int
 dissect_eigrp_ipx_extdata (proto_tree *tree, tvbuff_t *tvb, int offset)
 {
+    proto_item *sub_ti;
     proto_tree *sub_tree;
     tvbuff_t   *sub_tvb;
     int         sub_offset = 0;
 
-    sub_tree = proto_tree_add_subtree(tree, tvb, offset, 20, ett_eigrp_tlv_extdata, NULL, "External Data");
+    sub_ti = proto_tree_add_text(tree, tvb, offset, 20, "External Data");
+    sub_tree = proto_item_add_subtree(sub_ti, ett_eigrp_tlv_extdata);
     sub_tvb = tvb_new_subset(tvb, offset, 20, -1);
 
     /* Decode the external route source info */
@@ -1504,11 +1517,13 @@ dissect_eigrp_ipx_extdata (proto_tree *tree, tvbuff_t *tvb, int offset)
 static int
 dissect_eigrp_extdata (proto_tree *tree, tvbuff_t *tvb, int offset)
 {
+    proto_item *sub_ti;
     proto_tree *sub_tree;
     tvbuff_t   *sub_tvb;
     int         sub_offset = 0;
 
-    sub_tree = proto_tree_add_subtree(tree, tvb, offset, 20, ett_eigrp_tlv_extdata, NULL, "External Data");
+    sub_ti = proto_tree_add_text(tree, tvb, offset, 20, "External Data");
+    sub_tree = proto_item_add_subtree(sub_ti, ett_eigrp_tlv_extdata);
     sub_tvb = tvb_new_subset(tvb, offset, 20, -1);
 
     /* Decode the external route source info */
@@ -2111,6 +2126,7 @@ static int
 dissect_eigrp_wide_metric_attr (proto_tree *tree, tvbuff_t *tvb,
                                 int offset, int limit)
 {
+    proto_item *sub_ti;
     proto_tree *sub_tree;
     tvbuff_t   *sub_tvb;
     int         sub_offset;
@@ -2120,7 +2136,8 @@ dissect_eigrp_wide_metric_attr (proto_tree *tree, tvbuff_t *tvb,
 
     limit *= 2;   /* words to bytes */
 
-    sub_tree = proto_tree_add_subtree(tree, tvb, offset, limit, ett_eigrp_tlv_attr, NULL, "Attributes");
+    sub_ti     = proto_tree_add_text(tree, tvb, offset, limit, "Attributes");
+    sub_tree   = proto_item_add_subtree(sub_ti, ett_eigrp_tlv_attr);
     sub_tvb    = tvb_new_subset(tvb, offset, limit, -1);
     sub_offset = 0;
 
@@ -2217,12 +2234,14 @@ dissect_eigrp_wide_metric_attr (proto_tree *tree, tvbuff_t *tvb,
 static int
 dissect_eigrp_wide_metric (proto_tree *tree, tvbuff_t *tvb, int offset)
 {
+    proto_item *sub_ti;
     proto_tree *sub_tree;
     tvbuff_t   *sub_tvb;
     gint8       attr_size = 0;
     guint64     big_num;
 
-    sub_tree = proto_tree_add_subtree(tree, tvb, offset, 24, ett_eigrp_tlv_metric, NULL, "Wide Metric");
+    sub_ti = proto_tree_add_text(tree, tvb, offset, 24, "Wide Metric");
+    sub_tree = proto_item_add_subtree(sub_ti, ett_eigrp_tlv_metric);
     sub_tvb = tvb_new_subset(tvb, offset, 24, -1);
 
     attr_size = tvb_get_guint8(sub_tvb, 0);
@@ -2394,6 +2413,14 @@ dissect_eigrp_multi_protocol_tlv (proto_item *ti, proto_tree *tree, tvbuff_t *tv
  */
 #include <epan/in_cksum.h>
 
+static guint16 ip_checksum(const guint8 *ptr, int len)
+{
+    vec_t cksum_vec[1];
+
+    cksum_vec[0].ptr = ptr;
+    cksum_vec[0].len = len;
+    return in_cksum(&cksum_vec[0], 1);
+}
 static int
 dissect_eigrp (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
@@ -2446,7 +2473,7 @@ dissect_eigrp (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
 
     size          = tvb_length(tvb);
     checksum      = tvb_get_ntohs(tvb, 2);
-    cacl_checksum = ip_checksum_tvb(tvb, 0, size);
+    cacl_checksum = ip_checksum(tvb_get_ptr(tvb, 0, size), size);
 
     if (cacl_checksum == checksum) {
         proto_tree_add_text(eigrp_tree, tvb, 2, 2,
@@ -2499,9 +2526,10 @@ dissect_eigrp (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
                 return(tvb_length(tvb));
             }
 
-            tlv_tree = proto_tree_add_subtree(eigrp_tree, tvb, offset, size, ett_eigrp_tlv, &ti,
+            ti = proto_tree_add_text(eigrp_tree, tvb, offset, size, "%s",
                                      val_to_str(tlv, eigrp_tlv2string, "Unknown TLV (0x%04x)"));
 
+            tlv_tree = proto_item_add_subtree(ti, ett_eigrp_tlv);
             proto_tree_add_item(tlv_tree, hf_eigrp_tlv_type, tvb,
                                 offset, 2, ENC_BIG_ENDIAN);
             proto_tree_add_item(tlv_tree, hf_eigrp_tlv_len, tvb,
@@ -2556,7 +2584,7 @@ dissect_eigrp (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
  *
  * @usage
  *      you can not have the function name inside a comment or else Wireshark
- *      will fail with "duplicate protocol" error.  Don't you hate it when tools
+ *      will fail with "duplicate protocol" error.  Dont you hate it when tools
  *      try to be to smart :(
  *
  * @par
@@ -3338,16 +3366,3 @@ proto_reg_handoff_eigrp(void)
     dissector_add_uint("ddp.type", DDP_EIGRP, eigrp_handle);
     dissector_add_uint("ipx.socket", IPX_SOCKET_EIGRP, eigrp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

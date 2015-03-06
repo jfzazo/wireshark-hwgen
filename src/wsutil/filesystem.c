@@ -34,6 +34,7 @@
 #endif
 
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -950,6 +951,118 @@ get_datafile_dir(void)
     return datafile_dir;
 }
 
+#ifdef HAVE_PYTHON
+/*
+ * Find the directory where the python dissectors are stored.
+ *
+ * On Windows, we use the "py_dissector" subdirectory of the datafile directory.
+ *
+ * On UN*X, we use the PYTHON_DIR value supplied by the configure
+ * script, unless we think we're being run from the build directory,
+ * in which case we use the "py_dissector" subdirectory of the datafile directory.
+ *
+ * In both cases, we then use the subdirectory of that directory whose
+ * name is the version number.
+ *
+ * XXX - if we think we're being run from the build directory, perhaps we
+ * should have the plugin code not look in the version subdirectory
+ * of the plugin directory, but look in all of the subdirectories
+ * of the plugin directory, so it can just fetch the plugins built
+ * as part of the build process.
+ */
+static const char *wspython_dir = NULL;
+
+static void
+init_wspython_dir(void)
+{
+#ifdef _WIN32
+    /*
+     * On Windows, the data file directory is the installation
+     * directory; the python dissectors are stored under it.
+     *
+     * Assume we're running the installed version of Wireshark;
+     * on Windows, the data file directory is the directory
+     * in which the Wireshark binary resides.
+     */
+    wspython_dir = g_strdup_printf("%s\\python\\%s", get_datafile_dir(),
+                                   VERSION);
+
+    /*
+     * Make sure that pathname refers to a directory.
+     */
+    if (test_for_directory(wspython_dir) != EISDIR) {
+        /*
+         * Either it doesn't refer to a directory or it
+         * refers to something that doesn't exist.
+         *
+         * Assume that means we're running a version of
+         * Wireshark we've built in a build directory,
+         * in which case {datafile dir}\python is the
+         * top-level plugins source directory, and use
+         * that directory and set the "we're running in
+         * a build directory" flag, so the plugin
+         * scanner will check all subdirectories of that
+         * directory for python dissectors.
+         */
+        g_free( (gpointer) wspython_dir);
+        wspython_dir = g_strdup_printf("%s\\python", get_datafile_dir());
+        running_in_build_directory_flag = TRUE;
+    }
+#else
+    if (running_in_build_directory_flag) {
+        /*
+         * We're (probably) being run from the build directory and
+         * weren't started with special privileges, so we'll use
+         * the "python" subdirectory of the datafile directory
+         * (the datafile directory is the build directory).
+         */
+        wspython_dir = g_strdup_printf("%s/epan/wspython/", get_datafile_dir());
+    } else {
+        if (getenv("WIRESHARK_PYTHON_DIR") && !started_with_special_privs()) {
+            /*
+             * The user specified a different directory for plugins
+             * and we aren't running with special privileges.
+             */
+            wspython_dir = g_strdup(getenv("WIRESHARK_PYTHON_DIR"));
+        }
+#ifdef __APPLE__
+        /*
+         * If we're running from an app bundle and weren't started
+         * with special privileges, use the Contents/Resources/lib/wireshark/python
+         * subdirectory of the app bundle.
+         *
+         * (appbundle_dir is not set to a non-null value if we're
+         * started with special privileges, so we need only check
+         * it; we don't need to call started_with_special_privs().)
+         */
+        else if (appbundle_dir != NULL) {
+            wspython_dir = g_strdup_printf("%s/Contents/Resources/lib/wireshark/python",
+                                           appbundle_dir);
+        }
+#endif
+        else {
+            wspython_dir = PYTHON_DIR;
+        }
+    }
+#endif
+}
+#endif /* HAVE_PYTHON */
+
+/*
+ * Get the directory in which the python dissectors are stored.
+ */
+const char *
+get_wspython_dir(void)
+{
+#ifdef HAVE_PYTHON
+    if (!wspython_dir) init_wspython_dir();
+    return wspython_dir;
+#else
+    return NULL;
+#endif
+}
+
+
 #if defined(HAVE_PLUGINS) || defined(HAVE_LUA)
 /*
  * Find the directory where the plugins are stored.
@@ -1056,117 +1169,6 @@ get_plugin_dir(void)
 #if defined(HAVE_PLUGINS) || defined(HAVE_LUA)
     if (!plugin_dir) init_plugin_dir();
     return plugin_dir;
-#else
-    return NULL;
-#endif
-}
-
-#if defined(HAVE_EXTCAP)
-/*
- * Find the directory where the extcap hooks are stored.
- *
- * On Windows, we use the "extcap" subdirectory of the datafile directory.
- *
- * On UN*X, we use the EXTCAP_DIR value supplied by the configure
- * script, unless we think we're being run from the build directory,
- * in which case we use the "extcap" subdirectory of the datafile directory.
- *
- * In both cases, we then use the subdirectory of that directory whose
- * name is the version number.
- *
- * XXX - if we think we're being run from the build directory, perhaps we
- * should have the extcap code not look in the version subdirectory
- * of the extcap directory, but look in all of the subdirectories
- * of the extcap directory, so it can just fetch the extcap hooks built
- * as part of the build process.
- */
-static const char *extcap_dir = NULL;
-
-static void init_extcap_dir(void) {
-#ifdef _WIN32
-    /*
-     * On Windows, the data file directory is the installation
-     * directory; the extcap hooks are stored under it.
-     *
-     * Assume we're running the installed version of Wireshark;
-     * on Windows, the data file directory is the directory
-     * in which the Wireshark binary resides.
-     */
-    extcap_dir = g_strdup_printf("%s\\extcap\\%s", get_datafile_dir(),
-                                 VERSION);
-
-    /*
-     * Make sure that pathname refers to a directory.
-     */
-    if (test_for_directory(extcap_dir) != EISDIR) {
-        /*
-         * Either it doesn't refer to a directory or it
-         * refers to something that doesn't exist.
-         *
-         * Assume that means we're running a version of
-         * Wireshark we've built in a build directory,
-         * in which case {datafile dir}\plugins is the
-         * top-level extcap hooks source directory, and use
-         * that directory and set the "we're running in
-         * a build directory" flag, so the plugin
-         * scanner will check all subdirectories of that
-         * directory for extcap hooks.
-         */
-        g_free( (gpointer) extcap_dir);
-        extcap_dir = g_strdup_printf("%s\\extcap", get_datafile_dir());
-        running_in_build_directory_flag = TRUE;
-    }
-#else
-    if (running_in_build_directory_flag) {
-        /*
-         * We're (probably) being run from the build directory and
-         * weren't started with special privileges, so we'll use
-         * the "extcap hooks" subdirectory of the directory where the program
-         * we're running is (that's the build directory).
-         */
-        extcap_dir = g_strdup_printf("%s/extcap", get_progfile_dir());
-    } else {
-        if (getenv("WIRESHARK_EXTCAP_DIR") && !started_with_special_privs()) {
-            /*
-             * The user specified a different directory for extcap hooks
-             * and we aren't running with special privileges.
-             */
-            extcap_dir = g_strdup(getenv("WIRESHARK_EXTCAP_DIR"));
-        }
-#ifdef __APPLE__
-        /*
-         * If we're running from an app bundle and weren't started
-         * with special privileges, use the Contents/Resources/lib/wireshark/extcap
-         * subdirectory of the app bundle.
-         *
-         * (appbundle_dir is not set to a non-null value if we're
-         * started with special privileges, so we need only check
-         * it; we don't need to call started_with_special_privs().)
-         */
-        else if (appbundle_dir != NULL) {
-            extcap_dir = g_strdup_printf("%s/Contents/Resources/lib/wireshark/extcap",
-                                         appbundle_dir);
-        }
-#endif
-        else {
-            extcap_dir = EXTCAP_DIR;
-        }
-    }
-#endif
-}
-#endif /* HAVE_EXTCAP */
-
-/*
- * Get the directory in which the extcap hooks are stored.
- *
- * XXX - A fix instead of HAVE_EXTCAP must be found
- */
-const char *
-get_extcap_dir(void) {
-#if defined(HAVE_EXTCAP)
-    if (!extcap_dir)
-        init_extcap_dir();
-    return extcap_dir;
 #else
     return NULL;
 #endif
@@ -1815,13 +1817,10 @@ get_persconffile_path(const char *filename, gboolean from_profile)
 char *
 get_datafile_path(const char *filename)
 {
-    if (running_in_build_directory_flag &&
-        (!strcmp(filename, "AUTHORS-SHORT") ||
-         !strcmp(filename, "hosts"))) {
+    if (running_in_build_directory_flag && !strcmp(filename, "AUTHORS-SHORT")) {
         /* We're running in the build directory and the requested file is a
-         * generated (or a test) file.  Return the file name in the build
-         * directory (not in the source/data directory).
-         * (Oh the things we do to keep the source directory pristine...)
+         * generated file.  Return the file name in the build directory (not
+         * in the source/data directory).
          */
         return g_strdup_printf("%s" G_DIR_SEPARATOR_S "%s", get_progfile_dir(), filename);
     } else {

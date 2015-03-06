@@ -38,9 +38,13 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/etypes.h>
+#include <epan/wmem/wmem.h>
+#include <epan/expert.h>
 #include <epan/show_exception.h>
 
 void proto_register_mint(void);
@@ -284,10 +288,10 @@ dissect_eth_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *mint_tree,
 	tvbuff_t *eth_tvb;
 
 #ifdef MINT_DEVELOPMENT
-	col_set_writable(pinfo->cinfo, FALSE);
+        col_set_writable(pinfo->cinfo, FALSE);
 #endif
 
-	eth_tvb = tvb_new_subset_length(tvb, offset, length);
+	eth_tvb = tvb_new_subset(tvb, offset, length, length);
 	/* Continue after Ethernet dissection errors */
 	TRY {
 		call_dissector(eth_handle, eth_tvb, pinfo, mint_tree);
@@ -297,7 +301,7 @@ dissect_eth_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *mint_tree,
 	offset += length;
 
 #ifdef MINT_DEVELOPMENT
-	col_set_writable(pinfo->cinfo, TRUE);
+        col_set_writable(pinfo->cinfo, TRUE);
 #endif
 	return offset;
 }
@@ -353,7 +357,7 @@ dissect_mint_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 	offset += 2;
 	/* FIXME: This is probably not the right way to determine the packet type.
 	 *	  It's more likely something in mint_header_unknown1 but I haven't
-	 *        found out what. */
+         *        found out what. */
 	switch(packet_type) {
 	case MINT_TYPE_DATA_UC:
 		ti = proto_tree_add_item(mint_tree, &hfi_mint_data, tvb,
@@ -387,7 +391,7 @@ dissect_mint_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 			offset += dissect_eth_frame(tvb, pinfo, tree,
 				offset, packet_length - offset);
 		break;
-	case MINT_TYPE_CTRL_0x0c:
+        case MINT_TYPE_CTRL_0x0c:
 		ti = proto_tree_add_item(mint_tree, &hfi_mint_control, tvb,
 			offset, packet_length - 16, ENC_NA);
 		mint_ctrl_tree = proto_item_add_subtree(ti, ett_mint_ctrl);
@@ -475,7 +479,7 @@ dissect_mint_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 			}
 		}
 		break;
-	case MINT_TYPE_CTRL_0x1e:
+        case MINT_TYPE_CTRL_0x1e:
 		ti = proto_tree_add_item(mint_tree, &hfi_mint_control, tvb,
 			offset, packet_length - 16, ENC_NA);
 		mint_ctrl_tree = proto_item_add_subtree(ti, ett_mint_ctrl);
@@ -487,7 +491,7 @@ dissect_mint_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 			offset, bytes_remaining, ENC_NA);
 		offset += bytes_remaining;
 		break;
-	case MINT_TYPE_ETH_0x22:
+        case MINT_TYPE_ETH_0x22:
 		ti = proto_tree_add_item(mint_tree, &hfi_mint_control, tvb,
 			offset, packet_length - 16, ENC_NA);
 		mint_ctrl_tree = proto_item_add_subtree(ti, ett_mint_ctrl);
@@ -749,15 +753,3 @@ proto_reg_handoff_mint(void)
 	eth_handle = find_dissector("eth_withoutfcs");
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

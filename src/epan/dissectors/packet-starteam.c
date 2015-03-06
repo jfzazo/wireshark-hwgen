@@ -29,7 +29,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/conversation.h>
 #include <epan/prefs.h>
 #include "packet-tcp.h"
 
@@ -527,7 +529,8 @@ dissect_starteam(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 
       if(bRequest){
         if(tvb_length_remaining(tvb, offset) >= 20){
-          starteam_tree = proto_tree_add_subtree(starteamroot_tree, tvb, offset, 20, ett_starteam_mdh, NULL, STARTEAM_TEXT_MDH);
+          ti = proto_tree_add_text(starteamroot_tree, tvb, offset, 20, STARTEAM_TEXT_MDH);
+          starteam_tree = proto_item_add_subtree(ti, ett_starteam_mdh);
 
           proto_tree_add_item(starteam_tree, hf_starteam_mdh_session_tag, tvb, offset + 0,  4, ENC_LITTLE_ENDIAN);
           proto_tree_add_item(starteam_tree, hf_starteam_mdh_ctimestamp,  tvb, offset + 4,  4, ENC_LITTLE_ENDIAN);
@@ -539,7 +542,8 @@ dissect_starteam(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
       }
 
       if(tvb_length_remaining(tvb, offset) >= 16){
-        starteam_tree = proto_tree_add_subtree(starteamroot_tree, tvb, offset, 16, ett_starteam_ph, NULL, STARTEAM_TEXT_PH);
+        ti = proto_tree_add_text(starteamroot_tree, tvb, offset, 16, STARTEAM_TEXT_PH);
+        starteam_tree = proto_item_add_subtree(ti, ett_starteam_ph);
 
         proto_tree_add_item(starteam_tree, hf_starteam_ph_signature,   tvb, offset + 0,  4,  ENC_ASCII|ENC_NA);
         proto_tree_add_item(starteam_tree, hf_starteam_ph_packet_size, tvb, offset + 4,  4,  ENC_LITTLE_ENDIAN);
@@ -549,7 +553,8 @@ dissect_starteam(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 
         if(bRequest){
           if(tvb_length_remaining(tvb, offset) >= 38){
-            starteam_tree = proto_tree_add_subtree(starteamroot_tree, tvb, offset, 38, ett_starteam_id, NULL, STARTEAM_TEXT_ID);
+            ti = proto_tree_add_text(starteamroot_tree, tvb, offset, 38, STARTEAM_TEXT_ID);
+            starteam_tree = proto_item_add_subtree(ti, ett_starteam_id);
 
             proto_tree_add_item(starteam_tree, hf_starteam_id_revision_level, tvb, offset + 0,  2, ENC_LITTLE_ENDIAN);
             proto_tree_add_item(starteam_tree, hf_starteam_id_client,         tvb, offset + 2, 16, ENC_ASCII|ENC_NA);
@@ -562,8 +567,9 @@ dissect_starteam(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
           }
         }
         if(tvb_length_remaining(tvb, offset) > 0){
-          starteam_tree = proto_tree_add_subtree(starteamroot_tree, tvb, offset, -1, ett_starteam_data, NULL, STARTEAM_TEXT_DATA);
-          proto_tree_add_item(starteam_tree, hf_starteam_data_data, tvb, offset, -1, ENC_ASCII|ENC_NA);
+          ti = proto_tree_add_text(starteamroot_tree, tvb, offset, -1, STARTEAM_TEXT_DATA);
+          starteam_tree = proto_item_add_subtree(ti, ett_starteam_data);
+          proto_tree_add_item(starteam_tree, hf_starteam_data_data, tvb, offset, tvb_length_remaining(tvb, offset), ENC_ASCII|ENC_NA);
         }
       }
     }
@@ -573,8 +579,7 @@ dissect_starteam(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 }
 
 static guint
-get_starteam_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                     int offset, void *data _U_)
+get_starteam_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   guint32 iPDULength = 0;
   if(tvb_length_remaining(tvb, offset) >= 8 && tvb_get_ntohl(tvb, offset + 0) == STARTEAM_MAGIC){
@@ -710,16 +715,3 @@ proto_reg_handoff_starteam(void)
   heur_dissector_add("tcp", dissect_starteam_heur, proto_starteam);
   starteam_tcp_handle = new_create_dissector_handle(dissect_starteam_tcp, proto_starteam);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

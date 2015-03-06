@@ -25,11 +25,8 @@
 #include "file.h"
 
 #include "epan/stats_tree_priv.h"
-
-#include "ui/last_open_dir.h"
-#include "ui/utf8_entities.h"
-
 #include "wsutil/file_util.h"
+#include "ui/last_open_dir.h"
 
 #include "wireshark_application.h"
 
@@ -47,7 +44,9 @@
 // - Add help
 // - Update to match bug 9452 / r53657
 
-const int item_col_ = 0;
+#include <QDebug>
+
+const int item_col_     = 0;
 
 const int expand_all_threshold_ = 100; // Arbitrary
 
@@ -73,15 +72,15 @@ public:
     }
 };
 
-StatsTreeDialog::StatsTreeDialog(QWidget &parent, CaptureFile &cf, const char *cfg_abbr) :
-    WiresharkDialog(parent, cf),
+StatsTreeDialog::StatsTreeDialog(QWidget *parent, capture_file *cf, const char *cfg_abbr) :
+    QDialog(parent),
     ui(new Ui::StatsTreeDialog),
     st_(NULL),
-    st_cfg_(NULL)
+    st_cfg_(NULL),
+    cap_file_(cf)
 {
     ui->setupUi(this);
     st_cfg_ = stats_tree_get_cfg_by_abbr(cfg_abbr);
-    memset(&cfg_pr_, 0, sizeof(struct _tree_cfg_pres));
 
     if (!st_cfg_) {
         QMessageBox::critical(this, tr("Configuration not found"),
@@ -111,19 +110,35 @@ StatsTreeDialog::~StatsTreeDialog()
     delete ui;
 }
 
+void StatsTreeDialog::setCaptureFile(capture_file *cf)
+{
+    if (!cf) { // We only want to know when the file closes.
+        cap_file_ = NULL;
+        ui->displayFilterLineEdit->setEnabled(false);
+        ui->applyFilterButton->setEnabled(false);
+    }
+}
+
 void StatsTreeDialog::fillTree()
 {
     GString *error_string;
-    if (!st_cfg_ || file_closed_) return;
+    if (!st_cfg_) return;
 
     gchar* display_name_temp = stats_tree_get_displayname(st_cfg_->name);
     QString display_name(display_name_temp);
     g_free(display_name_temp);
 
-    // The GTK+ UI appends "Stats Tree" to the window title. If we do the same
-    // here we should expand the name completely, e.g. to "Statistics Tree".
-    setWindowSubtitle(display_name);
+    setWindowTitle(display_name + tr(" Stats Tree"));
 
+    if (!cap_file_) return;
+
+    if (st_cfg_->in_use) {
+        QMessageBox::warning(this, tr("%1 already open").arg(display_name),
+                             tr("Each type of tree can only be generated one at time."));
+        reject();
+    }
+
+    st_cfg_->in_use = TRUE;
     st_cfg_->pr = &cfg_pr_;
     cfg_pr_.st_dlg = this;
 
@@ -159,12 +174,13 @@ void StatsTreeDialog::fillTree()
         reject();
     }
 
-    cf_retap_packets(cap_file_.capFile());
+    cf_retap_packets(cap_file_);
     drawTreeItems(st_);
 
     ui->statsTreeWidget->setSortingEnabled(true);
     remove_tap_listener(st_);
 
+    st_cfg_->in_use = FALSE;
     st_cfg_->pr = NULL;
 }
 
@@ -234,14 +250,6 @@ void StatsTreeDialog::drawTreeItems(void *st_ptr)
     }
 }
 
-void StatsTreeDialog::updateWidgets()
-{
-    if (file_closed_) {
-        ui->displayFilterLineEdit->setEnabled(false);
-        ui->applyFilterButton->setEnabled(false);
-    }
-}
-
 void StatsTreeDialog::on_applyFilterButton_clicked()
 {
     fillTree();
@@ -265,8 +273,7 @@ void StatsTreeDialog::on_actionSaveAs_triggered()
     bool success= false;
     int last_errno;
 
-    QFileDialog SaveAsDialog(this, wsApp->windowTitleString(tr("Save Statistics As" UTF8_HORIZONTAL_ELLIPSIS)),
-                                                            get_last_open_dir());
+    QFileDialog SaveAsDialog(this, tr("Wireshark: Save stats tree as ..."), get_last_open_dir());
     SaveAsDialog.setNameFilter(tr("Plain text file (*.txt);;"
                                     "Comma separated values (*.csv);;"
                                     "XML document (*.xml);;"
@@ -326,6 +333,7 @@ extern "C" {
 void
 register_tap_listener_stats_tree_stat(void)
 {
+
     stats_tree_presentation(NULL,
                 StatsTreeDialog::setupNode,
                 NULL,

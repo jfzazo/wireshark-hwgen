@@ -42,8 +42,11 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/wmem/wmem.h>
+#include <epan/expert.h>
 #include <epan/show_exception.h>
 
 void proto_register_wassp(void);
@@ -347,47 +350,47 @@ static int hf_config_radio_tx_power_adj = -1;
 
 /* ============= copy/paste/modify from value_string.[hc] ============== */
 typedef struct _ext_value_string {
-	guint32      value;
-	const gchar *strptr;
-	int         *hf_element;
-	int (*specialfunction)(tvbuff_t *, packet_info *, proto_tree *, guint32,
-			       guint32, const struct _ext_value_string *);
-	const struct _ext_value_string *evs;
+  guint32  value;
+  const gchar   *strptr;
+  int* hf_element;
+  int (*specialfunction)(tvbuff_t *, packet_info *, proto_tree *, guint32,
+	guint32, const struct _ext_value_string *);
+  const struct _ext_value_string *evs;
 } ext_value_string;
 
 
-static const gchar *
+static const gchar*
 match_strextval_idx(guint32 val, const ext_value_string *vs, gint *idx) {
-	gint i = 0;
+  gint i = 0;
 
-	if(vs) {
-		while (vs[i].strptr) {
-			if (vs[i].value == val) {
-				if (idx)
-					*idx = i;
-				return(vs[i].strptr);
-			}
-			i++;
-		}
-	}
-
+  if(vs) {
+    while (vs[i].strptr) {
+      if (vs[i].value == val) {
 	if (idx)
-		*idx = -1;
-	return NULL;
+	  *idx = i;
+	return(vs[i].strptr);
+      }
+      i++;
+    }
+  }
+
+  if (idx)
+    *idx = -1;
+  return NULL;
 }
 
 static const gchar*
 extval_to_str_idx(guint32 val, const ext_value_string *vs, gint *idx, const char *fmt) {
-	const gchar *ret;
+  const gchar *ret;
 
-	if (!fmt)
-		fmt="Unknown";
+  if (!fmt)
+    fmt="Unknown";
 
-	ret = match_strextval_idx(val, vs, idx);
-	if (ret != NULL)
-		return ret;
+  ret = match_strextval_idx(val, vs, idx);
+  if (ret != NULL)
+    return ret;
 
-	return wmem_strdup_printf(wmem_packet_scope(), fmt, val);
+  return wmem_strdup_printf(wmem_packet_scope(), fmt, val);
 }
 /* ============= end copy/paste/modify  ============== */
 
@@ -775,7 +778,7 @@ dissect_snmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *wassp_tree,
 	/* Don't add SNMP stuff to the info column */
 	col_set_writable(pinfo->cinfo, FALSE);
 
-	snmp_tvb = tvb_new_subset_length(tvb, offset, length);
+	snmp_tvb = tvb_new_subset(tvb, offset, length, length);
 
 	/* Continue after SNMP dissection errors */
 	TRY {
@@ -800,7 +803,7 @@ dissect_ieee80211(tvbuff_t *tvb, packet_info *pinfo, proto_tree *wassp_tree,
 	/* Don't add IEEE 802.11 stuff to the info column */
 	col_set_writable(pinfo->cinfo, FALSE);
 
-	ieee80211_tvb = tvb_new_subset_length(tvb, offset, length);
+	ieee80211_tvb = tvb_new_subset(tvb, offset, length, length);
 
 	/* Continue after IEEE 802.11 dissection errors */
 	TRY {
@@ -822,6 +825,7 @@ dissect_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *wassp_tree,
 {
 	guint32 tlv_type;
 	guint32 tlv_length;
+	proto_item *tlv_item;
 	proto_item *tlv_tree;
 	proto_item *type_item;
 	int type_index;
@@ -830,12 +834,14 @@ dissect_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *wassp_tree,
 	tlv_type = tvb_get_ntohs(tvb, offset);
 	tlv_length = tvb_get_ntohs(tvb, offset + 2);
 	DISSECTOR_ASSERT(tlv_length >= 4);
-	tlv_tree = proto_tree_add_subtree_format(wassp_tree, tvb,
-		offset, tlv_length, ett_wassp_tlv_header, NULL,
+	tlv_item = proto_tree_add_text(wassp_tree, tvb,
+		offset, tlv_length,
 		"T %d, L %d: %s",
 		tlv_type,
 		tlv_length,
 		extval_to_str_idx(tlv_type, value_array, NULL, "Unknown"));
+	tlv_tree = proto_item_add_subtree(tlv_item,
+		ett_wassp_tlv_header);
 	type_item = proto_tree_add_item(tlv_tree, hf_wassp_tlv_type,
 		tvb, offset, 2, ENC_BIG_ENDIAN);
 	proto_item_append_text(type_item, " = %s",
@@ -2110,15 +2116,3 @@ proto_reg_handoff_wassp(void)
 	ieee80211_handle = find_dissector("wlan_withoutfcs");
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

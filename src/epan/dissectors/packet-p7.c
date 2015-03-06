@@ -31,6 +31,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/oids.h>
@@ -121,7 +122,7 @@ static int proto_p7 = -1;
 #define ub_ua_restrictions             16
 
 /*--- End of included file: packet-p7-val.h ---*/
-#line 58 "../../asn1/p7/packet-p7-template.c"
+#line 59 "../../asn1/p7/packet-p7-template.c"
 
 
 /*--- Included file: packet-p7-hf.c ---*/
@@ -493,7 +494,7 @@ static int hf_p7_T_entry_class_problem_entry_class_not_subscribed = -1;
 static int hf_p7_T_entry_class_problem_inappropriate_entry_class = -1;
 
 /*--- End of included file: packet-p7-hf.c ---*/
-#line 60 "../../asn1/p7/packet-p7-template.c"
+#line 61 "../../asn1/p7/packet-p7-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_p7 = -1;
@@ -635,7 +636,7 @@ static gint ett_p7_RTSE_apdus = -1;
 static gint ett_p7_RTABapdu = -1;
 
 /*--- End of included file: packet-p7-ett.c ---*/
-#line 64 "../../asn1/p7/packet-p7-template.c"
+#line 65 "../../asn1/p7/packet-p7-template.c"
 
 
 /*--- Included file: packet-p7-table.c ---*/
@@ -678,7 +679,7 @@ static const value_string p7_err_code_string_vals[] = {
 
 
 /*--- End of included file: packet-p7-table.c ---*/
-#line 66 "../../asn1/p7/packet-p7-template.c"
+#line 67 "../../asn1/p7/packet-p7-template.c"
 
 
 /*--- Included file: packet-p7-fn.c ---*/
@@ -3735,47 +3736,35 @@ dissect_p7_RTSE_apdus(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _
 
 /*--- PDUs ---*/
 
-static int dissect_AutoActionType_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_AutoActionType_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_AutoActionType(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_AutoActionType_PDU);
-  return offset;
+  dissect_p7_AutoActionType(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_AutoActionType_PDU);
 }
-static int dissect_AutoActionError_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_AutoActionError_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_AutoActionError(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_AutoActionError_PDU);
-  return offset;
+  dissect_p7_AutoActionError(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_AutoActionError_PDU);
 }
-static int dissect_EntryType_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_EntryType_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_EntryType(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_EntryType_PDU);
-  return offset;
+  dissect_p7_EntryType(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_EntryType_PDU);
 }
-static int dissect_SequenceNumber_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SequenceNumber_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_SequenceNumber(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_SequenceNumber_PDU);
-  return offset;
+  dissect_p7_SequenceNumber(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_SequenceNumber_PDU);
 }
-static int dissect_RetrievalStatus_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_RetrievalStatus_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_RetrievalStatus(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_RetrievalStatus_PDU);
-  return offset;
+  dissect_p7_RetrievalStatus(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_RetrievalStatus_PDU);
 }
-static int dissect_MessageGroupName_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MessageGroupName_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_MessageGroupName(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_MessageGroupName_PDU);
-  return offset;
+  dissect_p7_MessageGroupName(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_MessageGroupName_PDU);
 }
 static int dissect_MSBindArgument_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
   int offset = 0;
@@ -3791,19 +3780,15 @@ static int dissect_MSBindResult_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, p
   offset = dissect_p7_MSBindResult(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_MSBindResult_PDU);
   return offset;
 }
-static int dissect_MS_EIT_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MS_EIT_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_MS_EIT(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_MS_EIT_PDU);
-  return offset;
+  dissect_p7_MS_EIT(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_MS_EIT_PDU);
 }
-static int dissect_ChangeCredentialsAlgorithms_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ChangeCredentialsAlgorithms_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_ChangeCredentialsAlgorithms(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_ChangeCredentialsAlgorithms_PDU);
-  return offset;
+  dissect_p7_ChangeCredentialsAlgorithms(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_ChangeCredentialsAlgorithms_PDU);
 }
 static int dissect_PAR_ms_bind_error_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
   int offset = 0;
@@ -3812,19 +3797,15 @@ static int dissect_PAR_ms_bind_error_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _
   offset = dissect_p7_PAR_ms_bind_error(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_PAR_ms_bind_error_PDU);
   return offset;
 }
-static int dissect_CreationTime_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CreationTime_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_CreationTime(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_CreationTime_PDU);
-  return offset;
+  dissect_p7_CreationTime(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_CreationTime_PDU);
 }
-static int dissect_OriginatorToken_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_OriginatorToken_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_OriginatorToken(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_OriginatorToken_PDU);
-  return offset;
+  dissect_p7_OriginatorToken(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_OriginatorToken_PDU);
 }
 static int dissect_SummarizeArgument_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
   int offset = 0;
@@ -3896,12 +3877,10 @@ static int dissect_Register_MSResult_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _
   offset = dissect_p7_Register_MSResult(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_Register_MSResult_PDU);
   return offset;
 }
-static int dissect_ProtectedChangeCredentials_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ProtectedChangeCredentials_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_ProtectedChangeCredentials(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_ProtectedChangeCredentials_PDU);
-  return offset;
+  dissect_p7_ProtectedChangeCredentials(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_ProtectedChangeCredentials_PDU);
 }
 static int dissect_AlertArgument_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
   int offset = 0;
@@ -4050,80 +4029,60 @@ static int dissect_EntryClassErrorParameter_PDU(tvbuff_t *tvb _U_, packet_info *
   offset = dissect_p7_EntryClassErrorParameter(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_EntryClassErrorParameter_PDU);
   return offset;
 }
-static int dissect_ReportLocation_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ReportLocation_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_ReportLocation(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_ReportLocation_PDU);
-  return offset;
+  dissect_p7_ReportLocation(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_ReportLocation_PDU);
 }
-static int dissect_PerRecipientReport_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_PerRecipientReport_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_PerRecipientReport(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_PerRecipientReport_PDU);
-  return offset;
+  dissect_p7_PerRecipientReport(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_PerRecipientReport_PDU);
 }
-static int dissect_ReportSummary_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ReportSummary_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_ReportSummary(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_ReportSummary_PDU);
-  return offset;
+  dissect_p7_ReportSummary(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_ReportSummary_PDU);
 }
-static int dissect_DeferredDeliveryCancellationTime_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_DeferredDeliveryCancellationTime_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_DeferredDeliveryCancellationTime(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_DeferredDeliveryCancellationTime_PDU);
-  return offset;
+  dissect_p7_DeferredDeliveryCancellationTime(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_DeferredDeliveryCancellationTime_PDU);
 }
-static int dissect_DeletionTime_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_DeletionTime_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_DeletionTime(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_DeletionTime_PDU);
-  return offset;
+  dissect_p7_DeletionTime(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_DeletionTime_PDU);
 }
-static int dissect_SubmissionError_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SubmissionError_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_SubmissionError(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_SubmissionError_PDU);
-  return offset;
+  dissect_p7_SubmissionError(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_SubmissionError_PDU);
 }
-static int dissect_SignatureVerificationStatus_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SignatureVerificationStatus_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_SignatureVerificationStatus(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_SignatureVerificationStatus_PDU);
-  return offset;
+  dissect_p7_SignatureVerificationStatus(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_SignatureVerificationStatus_PDU);
 }
-static int dissect_StoragePeriod_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_StoragePeriod_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_StoragePeriod(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_StoragePeriod_PDU);
-  return offset;
+  dissect_p7_StoragePeriod(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_StoragePeriod_PDU);
 }
-static int dissect_StorageTime_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_StorageTime_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_StorageTime(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_StorageTime_PDU);
-  return offset;
+  dissect_p7_StorageTime(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_StorageTime_PDU);
 }
-static int dissect_RTSE_apdus_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_RTSE_apdus_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_p7_RTSE_apdus(FALSE, tvb, offset, &asn1_ctx, tree, hf_p7_RTSE_apdus_PDU);
-  return offset;
+  dissect_p7_RTSE_apdus(FALSE, tvb, 0, &asn1_ctx, tree, hf_p7_RTSE_apdus_PDU);
 }
 
 
 /*--- End of included file: packet-p7-fn.c ---*/
-#line 68 "../../asn1/p7/packet-p7-template.c"
+#line 69 "../../asn1/p7/packet-p7-template.c"
 
 
 /*--- Included file: packet-p7-table11.c ---*/
@@ -4155,7 +4114,7 @@ static const ros_opr_t p7_opr_tab[] = {
 
 
 /*--- End of included file: packet-p7-table11.c ---*/
-#line 70 "../../asn1/p7/packet-p7-template.c"
+#line 71 "../../asn1/p7/packet-p7-template.c"
 
 /*--- Included file: packet-p7-table21.c ---*/
 #line 1 "../../asn1/p7/packet-p7-table21.c"
@@ -4194,7 +4153,7 @@ static const ros_err_t p7_err_tab[] = {
 
 
 /*--- End of included file: packet-p7-table21.c ---*/
-#line 71 "../../asn1/p7/packet-p7-template.c"
+#line 72 "../../asn1/p7/packet-p7-template.c"
 
 static const ros_info_t p7_ros_info = {
   "P7",
@@ -5674,7 +5633,7 @@ void proto_register_p7(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-p7-hfarr.c ---*/
-#line 90 "../../asn1/p7/packet-p7-template.c"
+#line 91 "../../asn1/p7/packet-p7-template.c"
   };
 
   /* List of subtrees */
@@ -5818,7 +5777,7 @@ void proto_register_p7(void) {
     &ett_p7_RTABapdu,
 
 /*--- End of included file: packet-p7-ettarr.c ---*/
-#line 96 "../../asn1/p7/packet-p7-template.c"
+#line 97 "../../asn1/p7/packet-p7-template.c"
   };
   module_t *p7_module;
 
@@ -5847,37 +5806,37 @@ void proto_reg_handoff_p7(void) {
 
 /*--- Included file: packet-p7-dis-tab.c ---*/
 #line 1 "../../asn1/p7/packet-p7-dis-tab.c"
-  new_register_ber_oid_dissector("2.6.4.3.42", dissect_ReportLocation_PDU, proto_p7, "id-att-ac-correlated-report-list");
-  new_register_ber_oid_dissector("2.6.4.3.76", dissect_SequenceNumber_PDU, proto_p7, "id-att-ac-report-subject-entry");
-  new_register_ber_oid_dissector("2.6.4.3.43", dissect_ReportSummary_PDU, proto_p7, "id-att-ac-report-summary");
-  new_register_ber_oid_dissector("2.6.4.3.44", dissect_PerRecipientReport_PDU, proto_p7, "id-att-ac-uncorrelated-report-list");
-  new_register_ber_oid_dissector("2.6.4.3.46", dissect_AutoActionError_PDU, proto_p7, "id-att-auto-action-error");
-  new_register_ber_oid_dissector("2.6.4.3.48", dissect_SequenceNumber_PDU, proto_p7, "id-att-auto-action-subject-entry");
-  new_register_ber_oid_dissector("2.6.4.3.49", dissect_AutoActionType_PDU, proto_p7, "id-att-auto-action-type");
-  new_register_ber_oid_dissector("2.6.4.3.0", dissect_SequenceNumber_PDU, proto_p7, "id-att-child-sequence-numbers");
-  new_register_ber_oid_dissector("2.6.4.3.10", dissect_MS_EIT_PDU, proto_p7, "id-att-converted-EITs");
-  new_register_ber_oid_dissector("2.6.4.3.11", dissect_CreationTime_PDU, proto_p7, "id-att-creation-time");
-  new_register_ber_oid_dissector("2.6.4.3.50", dissect_DeferredDeliveryCancellationTime_PDU, proto_p7, "id-att-deferred-delivery-cancellation-time");
-  new_register_ber_oid_dissector("2.6.4.3.52", dissect_DeletionTime_PDU, proto_p7, "id-att-deletion-time");
-  new_register_ber_oid_dissector("2.6.4.3.12", dissect_MS_EIT_PDU, proto_p7, "id-att-delivered-EITs");
-  new_register_ber_oid_dissector("2.6.4.3.16", dissect_EntryType_PDU, proto_p7, "id-att-entry-type");
-  new_register_ber_oid_dissector("2.6.4.3.57", dissect_MessageGroupName_PDU, proto_p7, "id-att-message-group-name");
-  new_register_ber_oid_dissector("2.6.4.3.61", dissect_SubmissionError_PDU, proto_p7, "id-att-ms-submission-error");
-  new_register_ber_oid_dissector("2.6.4.3.25", dissect_MS_EIT_PDU, proto_p7, "id-att-original-EITs");
-  new_register_ber_oid_dissector("2.6.4.3.29", dissect_SequenceNumber_PDU, proto_p7, "id-att-parent-sequence-number");
-  new_register_ber_oid_dissector("2.6.4.3.15", dissect_RetrievalStatus_PDU, proto_p7, "id-att-retrieval-status");
-  new_register_ber_oid_dissector("2.6.4.3.39", dissect_SequenceNumber_PDU, proto_p7, "id-att-sequence-number");
-  new_register_ber_oid_dissector("2.6.4.3.79", dissect_SignatureVerificationStatus_PDU, proto_p7, "id-att-signature-verification-status");
-  new_register_ber_oid_dissector("2.6.4.3.73", dissect_StoragePeriod_PDU, proto_p7, "id-att-storage-period");
-  new_register_ber_oid_dissector("2.6.4.3.74", dissect_StorageTime_PDU, proto_p7, "id-att-storage-time");
-  new_register_ber_oid_dissector("2.6.4.9.5", dissect_ChangeCredentialsAlgorithms_PDU, proto_p7, "id-ext-protected-change-credentials-capability");
-  new_register_ber_oid_dissector("2.6.4.9.3", dissect_OriginatorToken_PDU, proto_p7, "id-ext-originator-token");
-  new_register_ber_oid_dissector("2.6.4.9.4", dissect_ProtectedChangeCredentials_PDU, proto_p7, "id-ext-protected-change-credentials");
-  new_register_ber_oid_dissector("2.6.0.2.10""id-as-ms-rtse", dissect_RTSE_apdus_PDU, proto_p7, "");
+  register_ber_oid_dissector("2.6.4.3.42", dissect_ReportLocation_PDU, proto_p7, "id-att-ac-correlated-report-list");
+  register_ber_oid_dissector("2.6.4.3.76", dissect_SequenceNumber_PDU, proto_p7, "id-att-ac-report-subject-entry");
+  register_ber_oid_dissector("2.6.4.3.43", dissect_ReportSummary_PDU, proto_p7, "id-att-ac-report-summary");
+  register_ber_oid_dissector("2.6.4.3.44", dissect_PerRecipientReport_PDU, proto_p7, "id-att-ac-uncorrelated-report-list");
+  register_ber_oid_dissector("2.6.4.3.46", dissect_AutoActionError_PDU, proto_p7, "id-att-auto-action-error");
+  register_ber_oid_dissector("2.6.4.3.48", dissect_SequenceNumber_PDU, proto_p7, "id-att-auto-action-subject-entry");
+  register_ber_oid_dissector("2.6.4.3.49", dissect_AutoActionType_PDU, proto_p7, "id-att-auto-action-type");
+  register_ber_oid_dissector("2.6.4.3.0", dissect_SequenceNumber_PDU, proto_p7, "id-att-child-sequence-numbers");
+  register_ber_oid_dissector("2.6.4.3.10", dissect_MS_EIT_PDU, proto_p7, "id-att-converted-EITs");
+  register_ber_oid_dissector("2.6.4.3.11", dissect_CreationTime_PDU, proto_p7, "id-att-creation-time");
+  register_ber_oid_dissector("2.6.4.3.50", dissect_DeferredDeliveryCancellationTime_PDU, proto_p7, "id-att-deferred-delivery-cancellation-time");
+  register_ber_oid_dissector("2.6.4.3.52", dissect_DeletionTime_PDU, proto_p7, "id-att-deletion-time");
+  register_ber_oid_dissector("2.6.4.3.12", dissect_MS_EIT_PDU, proto_p7, "id-att-delivered-EITs");
+  register_ber_oid_dissector("2.6.4.3.16", dissect_EntryType_PDU, proto_p7, "id-att-entry-type");
+  register_ber_oid_dissector("2.6.4.3.57", dissect_MessageGroupName_PDU, proto_p7, "id-att-message-group-name");
+  register_ber_oid_dissector("2.6.4.3.61", dissect_SubmissionError_PDU, proto_p7, "id-att-ms-submission-error");
+  register_ber_oid_dissector("2.6.4.3.25", dissect_MS_EIT_PDU, proto_p7, "id-att-original-EITs");
+  register_ber_oid_dissector("2.6.4.3.29", dissect_SequenceNumber_PDU, proto_p7, "id-att-parent-sequence-number");
+  register_ber_oid_dissector("2.6.4.3.15", dissect_RetrievalStatus_PDU, proto_p7, "id-att-retrieval-status");
+  register_ber_oid_dissector("2.6.4.3.39", dissect_SequenceNumber_PDU, proto_p7, "id-att-sequence-number");
+  register_ber_oid_dissector("2.6.4.3.79", dissect_SignatureVerificationStatus_PDU, proto_p7, "id-att-signature-verification-status");
+  register_ber_oid_dissector("2.6.4.3.73", dissect_StoragePeriod_PDU, proto_p7, "id-att-storage-period");
+  register_ber_oid_dissector("2.6.4.3.74", dissect_StorageTime_PDU, proto_p7, "id-att-storage-time");
+  register_ber_oid_dissector("2.6.4.9.5", dissect_ChangeCredentialsAlgorithms_PDU, proto_p7, "id-ext-protected-change-credentials-capability");
+  register_ber_oid_dissector("2.6.4.9.3", dissect_OriginatorToken_PDU, proto_p7, "id-ext-originator-token");
+  register_ber_oid_dissector("2.6.4.9.4", dissect_ProtectedChangeCredentials_PDU, proto_p7, "id-ext-protected-change-credentials");
+  register_ber_oid_dissector("2.6.0.2.10""id-as-ms-rtse", dissect_RTSE_apdus_PDU, proto_p7, "");
 
 
 /*--- End of included file: packet-p7-dis-tab.c ---*/
-#line 122 "../../asn1/p7/packet-p7-template.c"
+#line 123 "../../asn1/p7/packet-p7-template.c"
 
   /* APPLICATION CONTEXT */
 

@@ -90,7 +90,7 @@ hwgen_read_packet(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr,
   /*
    * Read the header.
    */
-  if (!wtap_read_bytes_or_eof(fh, &hdr, sizeof hdr, err, err_info))
+  if (file_read(&hdr, sizeof hdr, fh) != sizeof hdr)
     return FALSE;
 
   if(hdr.magic_word!=0x6969) {
@@ -129,7 +129,7 @@ hwgen_read_packet(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr,
   /*
    * Read the padding.
    */
-  if (!wtap_read_bytes_or_eof(fh, &padding, 4 - (phdr->caplen%4), err, err_info))
+  if (file_read(&padding, 4 - (phdr->caplen%4), fh) != (4 - (phdr->caplen%4)))
     return FALSE; 
 
 
@@ -172,7 +172,7 @@ int hwgen_dump_can_write_encap(int encap)
       return 0;
       break;
     default:
-      return WTAP_ERR_UNWRITABLE_ENCAP;
+      return -1; //WTAP_ERR_UNWRITABLE_ENCAP;
       break;
   }
   
@@ -191,7 +191,7 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
 
   /* We can only write packet records. */
   if (phdr->rec_type != REC_TYPE_PACKET) {
-    *err = WTAP_ERR_UNWRITABLE_REC_TYPE;
+    *err = -1; //WTAP_ERR_UNWRITABLE_REC_TYPE;
     return FALSE;
   }
 
@@ -271,7 +271,7 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
 gboolean hwgen_dump_open(wtap_dumper *wdh, int *err)
 {
   
-  err = 0;
+  err = err;
 
   wdh->subtype_write = hwgen_dump;
   wdh->subtype_close = NULL;
@@ -282,27 +282,29 @@ gboolean hwgen_dump_open(wtap_dumper *wdh, int *err)
 
 
 
-wtap_open_return_val hwgen_open(wtap *wth, int *err, gchar **err_info _U_)
+int hwgen_open(wtap *wth, int *err, gchar **err_info _U_)
 {
   guint8  block[4];
 
-  if (!wtap_read_bytes(wth->fh, block, sizeof(block), err, err_info)) {
-      if (*err == WTAP_ERR_SHORT_READ)
-        return WTAP_OPEN_ERROR;
+  if (file_read(block, sizeof(block),wth->fh)!=sizeof(block)) {
+      *err = file_error(wth->fh, err_info);
+	if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+		return -1;
+	return 0;
   }
 
   if (!(block[2]==0x69 && block[3] == 0x69)) {
-    return WTAP_OPEN_NOT_MINE; 
+    return 2; 
   }
 
 
   /* rewind the fh so we re-read from the beginning */
   if (-1 == file_seek(wth->fh, 0, SEEK_SET, err))
-      return WTAP_OPEN_ERROR;
+      return 1;
 
   wth->file_encap = WTAP_ENCAP_HW_GENERATOR;
   wth->snapshot_length = 0;
-  wth->file_tsprec = WTAP_TSPREC_NSEC;
+ // wth->file_tsprec = WTAP_TSPREC_NSEC;
 
   wth->priv = NULL;
 
@@ -311,7 +313,7 @@ wtap_open_return_val hwgen_open(wtap *wth, int *err, gchar **err_info _U_)
   wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_HWGEN_V1;
 
   *err = 0;
-  return WTAP_OPEN_MINE;
+  return 0;
 }
 
 

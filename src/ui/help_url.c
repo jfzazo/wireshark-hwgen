@@ -54,8 +54,6 @@ data_file_url(const gchar *filename)
     if((strlen(filename) > 1) && (filename[0] == '/')) {
       file_path = g_strdup(filename);
 #endif
-    } else if(running_in_build_directory()) {
-        file_path = g_strdup_printf("%s/doc/%s", get_datafile_dir(), filename);
     } else {
         file_path = g_strdup_printf("%s/%s", get_datafile_dir(), filename);
     }
@@ -119,6 +117,7 @@ topic_online_url(topic_action_e action)
 gchar *
 user_guide_url(const gchar *page) {
     GString *url = g_string_new("");
+    gchar *ug_url = NULL;
 
     /*
      * Try to open local .chm file. This is not the most intuitive way to
@@ -154,7 +153,9 @@ user_guide_url(const gchar *page) {
 #endif /* ifdef DOC_DIR */
 
 
-    return g_string_free(url, FALSE);
+    ug_url = url->str;
+    g_string_free(url, FALSE);
+    return ug_url;
 }
 
 gchar *
@@ -241,9 +242,6 @@ topic_action_url(topic_action_e action)
     case(HELP_CAPTURE_INFO_DIALOG):
         url = user_guide_url("ChCapRunningSection.html");
         break;
-    case(HELP_CAPTURE_MANAGE_INTERFACES_DIALOG):
-        url = user_guide_url("ChCapManageInterfacesSection.html");
-        break;
     case(HELP_ENABLED_PROTOCOLS_DIALOG):
         url = user_guide_url("ChCustProtocolDissectionSection.html");
         break;
@@ -329,12 +327,6 @@ topic_action_url(topic_action_e action)
         break;
     case(HELP_FILTER_SAVE_DIALOG):
         url = user_guide_url("ChWorkFilterSaveSection.html");
-        break;
-    case(HELP_TELEPHONY_VOIP_CALLS_DIALOG):
-        url = user_guide_url("ChTelVoipCalls.html");
-        break;
-    case(HELP_RTP_ANALYSIS_DIALOG):
-        url = user_guide_url("ChTelRTPAnalysis.html");
         break;
 
     case(TOPIC_ACTION_NONE):

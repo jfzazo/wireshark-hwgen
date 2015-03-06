@@ -28,6 +28,9 @@
 #include "config.h"
 
 #include <stdlib.h>
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 
@@ -303,7 +306,7 @@ static gboolean dissect_xcsl_tcp_heur(tvbuff_t *tvb, packet_info *pinfo, proto_t
     guint8 *protocol;
 
     if (tvb_length_remaining (tvb, offset) >= 5) {
-        protocol = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 5, ENC_ASCII);
+        protocol = tvb_get_string(wmem_packet_scope(), tvb, offset, 5);
 
         if (strncmp(protocol,"xcsl",4) == 0 && (protocol[4] == ';' || protocol[4] == '-')) {
 
@@ -351,16 +354,3 @@ void proto_register_xcsl(void) {
 void proto_reg_handoff_xcsl(void) {
     heur_dissector_add("tcp", dissect_xcsl_tcp_heur, hfi_xcsl->id);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -931,6 +931,8 @@ char *DiamDicttext;
 	 ** diam_dict.h
 	 ** Diameter Dictionary Import Routines
 	 **
+	 ** $Id$
+	 **
 	 ** (c) 2007, Luis E. Garcia Ontanon <luis@ontanon.org>
 	 **
 	 ** This library is free software; you can redistribute it and/or
@@ -1014,7 +1016,7 @@ static FILE* ddict_open(const char*, const char*);
 
 
 
-#line 1018 "diam_dict.c"
+#line 1020 "diam_dict.c"
 
 #define INITIAL 0
 #define LOADING 1
@@ -1236,9 +1238,9 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 200 "diam_dict.l"
+#line 202 "diam_dict.l"
 
-#line 1242 "diam_dict.c"
+#line 1244 "diam_dict.c"
 
 	if ( !(yy_init) )
 		{
@@ -1320,47 +1322,47 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 201 "diam_dict.l"
+#line 203 "diam_dict.l"
 ;
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 202 "diam_dict.l"
+#line 204 "diam_dict.l"
 ;
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 204 "diam_dict.l"
+#line 206 "diam_dict.l"
 BEGIN LOADING_COMMENT;
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 205 "diam_dict.l"
+#line 207 "diam_dict.l"
 ;
 	YY_BREAK
 case 5:
 /* rule 5 can match eol */
 YY_RULE_SETUP
-#line 206 "diam_dict.l"
+#line 208 "diam_dict.l"
 BEGIN LOADING;
 	YY_BREAK
 case 6:
 /* rule 6 can match eol */
 YY_RULE_SETUP
-#line 208 "diam_dict.l"
+#line 210 "diam_dict.l"
 BEGIN LOADING_XMLPI;
 	YY_BREAK
 case 7:
 /* rule 7 can match eol */
 YY_RULE_SETUP
-#line 209 "diam_dict.l"
+#line 211 "diam_dict.l"
 ;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 210 "diam_dict.l"
+#line 212 "diam_dict.l"
 {
 	xmlpi = g_new(ddict_xmlpi_t,1);
 	xmlpi->name = g_strdup(DiamDicttext);
@@ -1377,47 +1379,47 @@ YY_RULE_SETUP
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 223 "diam_dict.l"
+#line 225 "diam_dict.l"
 BEGIN XMLPI_GETKEY;
 	YY_BREAK
 case 10:
 /* rule 10 can match eol */
 YY_RULE_SETUP
-#line 224 "diam_dict.l"
+#line 226 "diam_dict.l"
 { xmlpi->key = strdup(DiamDicttext); BEGIN XMLPI_ATTRS; }
 	YY_BREAK
 case 11:
 /* rule 11 can match eol */
 YY_RULE_SETUP
-#line 226 "diam_dict.l"
+#line 228 "diam_dict.l"
 BEGIN XMLPI_GETVAL;
 	YY_BREAK
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 227 "diam_dict.l"
+#line 229 "diam_dict.l"
 { xmlpi->value = strdup(DiamDicttext); BEGIN XMLPI_ATTRS; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 229 "diam_dict.l"
+#line 231 "diam_dict.l"
 
 	YY_BREAK
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 230 "diam_dict.l"
+#line 232 "diam_dict.l"
 BEGIN LOADING;
 	YY_BREAK
 case 15:
 /* rule 15 can match eol */
 YY_RULE_SETUP
-#line 233 "diam_dict.l"
+#line 235 "diam_dict.l"
 BEGIN ENTITY;
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 234 "diam_dict.l"
+#line 236 "diam_dict.l"
 {
 	entity_t* e = g_new(entity_t,1);
 	e->name = strdup(DiamDicttext);
@@ -1429,13 +1431,13 @@ YY_RULE_SETUP
 case 17:
 /* rule 17 can match eol */
 YY_RULE_SETUP
-#line 241 "diam_dict.l"
+#line 243 "diam_dict.l"
 BEGIN GET_FILE;
 	YY_BREAK
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 242 "diam_dict.l"
+#line 244 "diam_dict.l"
 {
 		ents.next->file = strdup(DiamDicttext);
 		BEGIN END_ENTITY;
@@ -1444,59 +1446,59 @@ YY_RULE_SETUP
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 246 "diam_dict.l"
+#line 248 "diam_dict.l"
 BEGIN LOADING;
 	YY_BREAK
 case 20:
 /* rule 20 can match eol */
 YY_RULE_SETUP
-#line 248 "diam_dict.l"
+#line 250 "diam_dict.l"
 APPEND("<",1);
 	YY_BREAK
 case 21:
 /* rule 21 can match eol */
 YY_RULE_SETUP
-#line 250 "diam_dict.l"
+#line 252 "diam_dict.l"
 APPEND(">",1);
 	YY_BREAK
 case 22:
 /* rule 22 can match eol */
 YY_RULE_SETUP
-#line 252 "diam_dict.l"
+#line 254 "diam_dict.l"
 APPEND("/>",2);
 	YY_BREAK
 case 23:
 /* rule 23 can match eol */
 YY_RULE_SETUP
-#line 254 "diam_dict.l"
+#line 256 "diam_dict.l"
 APPEND("</",2);
 	YY_BREAK
 case 24:
 /* rule 24 can match eol */
 YY_RULE_SETUP
-#line 256 "diam_dict.l"
+#line 258 "diam_dict.l"
 APPEND(" ",1);
 	YY_BREAK
 case 25:
 /* rule 25 can match eol */
 YY_RULE_SETUP
-#line 258 "diam_dict.l"
+#line 260 "diam_dict.l"
 APPEND(DiamDicttext, (unsigned) DiamDictleng);
 	YY_BREAK
 case 26:
 /* rule 26 can match eol */
 YY_RULE_SETUP
-#line 260 "diam_dict.l"
+#line 262 "diam_dict.l"
 APPEND("=",1);
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 262 "diam_dict.l"
+#line 264 "diam_dict.l"
 APPEND(DiamDicttext, (unsigned) DiamDictleng);
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 264 "diam_dict.l"
+#line 266 "diam_dict.l"
 {
 	char* p = ++DiamDicttext;
 	entity_t* e;
@@ -1566,7 +1568,7 @@ case YY_STATE_EOF(XMLPI_ATTRS):
 case YY_STATE_EOF(XMLPI_GETKEY):
 case YY_STATE_EOF(XMLPI_GETVAL):
 case YY_STATE_EOF(XMLPI_ENDATTR):
-#line 305 "diam_dict.l"
+#line 307 "diam_dict.l"
 {
 	if (!DiamDictin) yyterminate();
 
@@ -1587,7 +1589,7 @@ case YY_STATE_EOF(XMLPI_ENDATTR):
 case 29:
 /* rule 29 can match eol */
 YY_RULE_SETUP
-#line 323 "diam_dict.l"
+#line 325 "diam_dict.l"
 {
 	*attr_str = strdup(DiamDicttext);
 	D(("%s\n",DiamDicttext));
@@ -1597,7 +1599,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 330 "diam_dict.l"
+#line 332 "diam_dict.l"
 {
 	*attr_uint = (unsigned) strtoul(DiamDicttext,NULL,10);
 	D(("%s\n",DiamDicttext););
@@ -1607,12 +1609,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 337 "diam_dict.l"
+#line 339 "diam_dict.l"
 {	yy_pop_state(); }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 339 "diam_dict.l"
+#line 341 "diam_dict.l"
 {
 	/* XXX: should go?*/
 	D(("{%s}",DiamDicttext));
@@ -1621,7 +1623,7 @@ YY_RULE_SETUP
 case 33:
 /* rule 33 can match eol */
 YY_RULE_SETUP
-#line 344 "diam_dict.l"
+#line 346 "diam_dict.l"
 {
 	D(("=>%s<=\n",DiamDicttext));
 	yy_pop_state();
@@ -1629,7 +1631,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 349 "diam_dict.l"
+#line 351 "diam_dict.l"
 {
 	D(("dictionary_start\n"));
 
@@ -1639,7 +1641,7 @@ YY_RULE_SETUP
 case 35:
 /* rule 35 can match eol */
 YY_RULE_SETUP
-#line 355 "diam_dict.l"
+#line 357 "diam_dict.l"
 {
 	D(("base_start\n"));
 	BEGIN IN_APPL;
@@ -1647,7 +1649,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 360 "diam_dict.l"
+#line 362 "diam_dict.l"
 {
 	D(("application_start\n"));
 
@@ -1664,32 +1666,32 @@ YY_RULE_SETUP
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 374 "diam_dict.l"
+#line 376 "diam_dict.l"
 { ATTR_STR(appl->name); }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 375 "diam_dict.l"
+#line 377 "diam_dict.l"
 { ATTR_UINT(appl->code); }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 377 "diam_dict.l"
+#line 379 "diam_dict.l"
 BEGIN IN_APPL;
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 378 "diam_dict.l"
+#line 380 "diam_dict.l"
 BEGIN IN_DICT;
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 380 "diam_dict.l"
+#line 382 "diam_dict.l"
 ;
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 382 "diam_dict.l"
+#line 384 "diam_dict.l"
 {
 	D(("command_start\n"));
 
@@ -1707,29 +1709,29 @@ YY_RULE_SETUP
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 397 "diam_dict.l"
+#line 399 "diam_dict.l"
 { ATTR_STR(cmd->name); }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 398 "diam_dict.l"
+#line 400 "diam_dict.l"
 { ATTR_STR(cmd->vendor); }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 399 "diam_dict.l"
+#line 401 "diam_dict.l"
 { ATTR_UINT(cmd->code); }
 	YY_BREAK
 case 46:
-#line 401 "diam_dict.l"
+#line 403 "diam_dict.l"
 case 47:
 YY_RULE_SETUP
-#line 401 "diam_dict.l"
+#line 403 "diam_dict.l"
 { BEGIN IN_APPL; }
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 403 "diam_dict.l"
+#line 405 "diam_dict.l"
 {
 	D(("vendor_start\n"));
 
@@ -1746,29 +1748,29 @@ YY_RULE_SETUP
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 417 "diam_dict.l"
+#line 419 "diam_dict.l"
 { ATTR_STR(vnd->desc); }
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 418 "diam_dict.l"
+#line 420 "diam_dict.l"
 { ATTR_STR(vnd->name); }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 419 "diam_dict.l"
+#line 421 "diam_dict.l"
 { ATTR_UINT(vnd->code); }
 	YY_BREAK
 case 52:
-#line 421 "diam_dict.l"
+#line 423 "diam_dict.l"
 case 53:
 YY_RULE_SETUP
-#line 421 "diam_dict.l"
+#line 423 "diam_dict.l"
 { BEGIN IN_APPL; }
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-#line 423 "diam_dict.l"
+#line 425 "diam_dict.l"
 {
 	D(("typedefn_start\n"));
 
@@ -1785,24 +1787,24 @@ YY_RULE_SETUP
 	YY_BREAK
 case 55:
 YY_RULE_SETUP
-#line 437 "diam_dict.l"
+#line 439 "diam_dict.l"
 { ATTR_STR(typedefn->name); }
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 438 "diam_dict.l"
+#line 440 "diam_dict.l"
 { ATTR_STR(typedefn->parent); }
 	YY_BREAK
 case 57:
-#line 440 "diam_dict.l"
+#line 442 "diam_dict.l"
 case 58:
 YY_RULE_SETUP
-#line 440 "diam_dict.l"
+#line 442 "diam_dict.l"
 { BEGIN IN_APPL; }
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
-#line 443 "diam_dict.l"
+#line 445 "diam_dict.l"
 {
 	D(("avp_start\n"));
 
@@ -1824,57 +1826,57 @@ YY_RULE_SETUP
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
-#line 462 "diam_dict.l"
+#line 464 "diam_dict.l"
 { ATTR_STR(avp->name); }
 	YY_BREAK
 case 61:
 YY_RULE_SETUP
-#line 463 "diam_dict.l"
+#line 465 "diam_dict.l"
 { ATTR_STR(avp->description); }
 	YY_BREAK
 case 62:
 YY_RULE_SETUP
-#line 464 "diam_dict.l"
+#line 466 "diam_dict.l"
 { ATTR_STR(avp->vendor); }
 	YY_BREAK
 case 63:
 YY_RULE_SETUP
-#line 465 "diam_dict.l"
+#line 467 "diam_dict.l"
 { ATTR_UINT(avp->code); }
 	YY_BREAK
 case 64:
 YY_RULE_SETUP
-#line 466 "diam_dict.l"
+#line 468 "diam_dict.l"
 { BEGIN IN_AVP;  }
 	YY_BREAK
 case 65:
 YY_RULE_SETUP
-#line 467 "diam_dict.l"
+#line 469 "diam_dict.l"
 { BEGIN IN_APPL; }
 	YY_BREAK
 case 66:
 YY_RULE_SETUP
-#line 470 "diam_dict.l"
+#line 472 "diam_dict.l"
 { avp->type = strdup("Grouped"); };
 	YY_BREAK
 case 67:
 YY_RULE_SETUP
-#line 471 "diam_dict.l"
+#line 473 "diam_dict.l"
 ;
 	YY_BREAK
 case 68:
 YY_RULE_SETUP
-#line 473 "diam_dict.l"
+#line 475 "diam_dict.l"
 { BEGIN TYPE_ATTRS; }
 	YY_BREAK
 case 69:
 YY_RULE_SETUP
-#line 474 "diam_dict.l"
+#line 476 "diam_dict.l"
 { ATTR_STR(avp->type); }
 	YY_BREAK
 case 70:
 YY_RULE_SETUP
-#line 476 "diam_dict.l"
+#line 478 "diam_dict.l"
 {
 	D(("gavp_start\n"));
 
@@ -1891,12 +1893,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 71:
 YY_RULE_SETUP
-#line 491 "diam_dict.l"
+#line 493 "diam_dict.l"
 { ATTR_STR(gavp->name); }
 	YY_BREAK
 case 72:
 YY_RULE_SETUP
-#line 494 "diam_dict.l"
+#line 496 "diam_dict.l"
 {
 	D(("enum_start\n"));
 
@@ -1913,61 +1915,61 @@ YY_RULE_SETUP
 	YY_BREAK
 case 73:
 YY_RULE_SETUP
-#line 509 "diam_dict.l"
+#line 511 "diam_dict.l"
 { ATTR_STR(enumitem->name); }
 	YY_BREAK
 case 74:
 YY_RULE_SETUP
-#line 510 "diam_dict.l"
+#line 512 "diam_dict.l"
 { ATTR_UINT(enumitem->code); }
 	YY_BREAK
 case 75:
 YY_RULE_SETUP
-#line 512 "diam_dict.l"
+#line 514 "diam_dict.l"
 { BEGIN IN_AVP; }
 	YY_BREAK
 case 76:
 YY_RULE_SETUP
-#line 513 "diam_dict.l"
+#line 515 "diam_dict.l"
 { BEGIN IN_AVP; }
 	YY_BREAK
 case 77:
 YY_RULE_SETUP
-#line 515 "diam_dict.l"
-{ D(("avp_end\n")); BEGIN IN_APPL; }
+#line 517 "diam_dict.l"
+{ D(("avp_end")); BEGIN IN_APPL; }
 	YY_BREAK
 case 78:
-#line 518 "diam_dict.l"
+#line 520 "diam_dict.l"
 case 79:
 YY_RULE_SETUP
-#line 518 "diam_dict.l"
+#line 520 "diam_dict.l"
 {
-	D(("application_end\n")); BEGIN IN_DICT;
+	BEGIN IN_DICT;
 }
 	YY_BREAK
 case 80:
 YY_RULE_SETUP
-#line 522 "diam_dict.l"
+#line 524 "diam_dict.l"
 {
 	yyterminate();
 }
 	YY_BREAK
 case 81:
 YY_RULE_SETUP
-#line 526 "diam_dict.l"
+#line 528 "diam_dict.l"
 IGNORE();
 	YY_BREAK
 case 82:
 YY_RULE_SETUP
-#line 528 "diam_dict.l"
+#line 530 "diam_dict.l"
 ;
 	YY_BREAK
 case 83:
 YY_RULE_SETUP
-#line 535 "diam_dict.l"
+#line 537 "diam_dict.l"
 ECHO;
 	YY_BREAK
-#line 1971 "diam_dict.c"
+#line 1973 "diam_dict.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2968,7 +2970,7 @@ void DiamDictfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 535 "diam_dict.l"
+#line 537 "diam_dict.l"
 
 
 

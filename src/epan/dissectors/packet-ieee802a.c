@@ -22,8 +22,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/addr_resolv.h>
+#include <epan/strutil.h>
 #include <epan/etypes.h>
 
 #include "packet-ieee802a.h"
@@ -56,7 +58,7 @@ static GHashTable *oui_info_table = NULL;
  */
 void
 ieee802a_add_oui(guint32 oui, const char *table_name, const char *table_ui_name,
-		 hf_register_info *hf_item)
+    hf_register_info *hf_item)
 {
 	oui_info_t *new_info;
 
@@ -79,7 +81,7 @@ ieee802a_add_oui(guint32 oui, const char *table_name, const char *table_ui_name,
 static void
 dissect_ieee802a(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	proto_tree	*ieee802a_tree;
+	proto_tree	*ieee802a_tree = NULL;
 	proto_item	*ti;
 	tvbuff_t	*next_tvb;
 	const gchar	*manuf;
@@ -93,8 +95,10 @@ dissect_ieee802a(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "IEEE802a");
 	col_clear(pinfo->cinfo, COL_INFO);
 
-	ti = proto_tree_add_item(tree, proto_ieee802a, tvb, 0, 5, ENC_NA);
-	ieee802a_tree = proto_item_add_subtree(ti, ett_ieee802a);
+	if (tree) {
+		ti = proto_tree_add_item(tree, proto_ieee802a, tvb, 0, 5, ENC_NA);
+		ieee802a_tree = proto_item_add_subtree(ti, ett_ieee802a);
+	}
 
 	tvb_memcpy(tvb, oui, 0, 3);
 	oui32 = oui[0] << 16 | oui[1] << 8 | oui[2];
@@ -102,12 +106,12 @@ dissect_ieee802a(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	pid = tvb_get_ntohs(tvb, 3);
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "OUI %s (%s), PID 0x%04X",
-	    bytestring_to_str(wmem_packet_scope(), oui, 3, ':'),
+	    bytes_to_ep_str_punct(oui, 3, ':'),
 	    manuf ? manuf : "Unknown", pid);
 
 	proto_tree_add_uint_format_value(ieee802a_tree, hf_ieee802a_oui,
 	    tvb, 0, 3, oui32, "%s (%s)",
-	    bytestring_to_str(wmem_packet_scope(), oui, 3, ':'), manuf ? manuf : "Unknown");
+	    bytes_to_ep_str_punct(oui, 3, ':'), manuf ? manuf : "Unknown");
 
 	/*
 	 * Do we have information for this OUI?
@@ -145,12 +149,12 @@ proto_register_ieee802a(void)
 {
 	static hf_register_info hf[] = {
 		{ &hf_ieee802a_oui,
-		  { "Organization Code",	"ieee802a.oui", FT_UINT24, BASE_HEX,
-		    NULL, 0x0, NULL, HFILL }},
+		{ "Organization Code",	"ieee802a.oui", FT_UINT24, BASE_HEX,
+			NULL, 0x0, NULL, HFILL }},
 
 		{ &hf_ieee802a_pid,
-		  { "Protocol ID", "ieee802a.pid", FT_UINT16, BASE_HEX,
-		    NULL, 0x0, NULL, HFILL }}
+		{ "Protocol ID", "ieee802a.pid", FT_UINT16, BASE_HEX,
+			NULL, 0x0, NULL, HFILL }}
 	};
 	static gint *ett[] = {
 		&ett_ieee802a,
@@ -187,16 +191,3 @@ proto_reg_handoff_ieee802a(void)
 	if (oui_info_table != NULL)
 		g_hash_table_foreach(oui_info_table, register_hf, NULL);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -20,12 +20,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- * ref OMA-TS-ULP-V2_0_2-20140708-A
+ * ref OMA-TS-ULP-V2_0_1-20121205-A
  * http://www.openmobilealliance.org
  */
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/asn1.h>
@@ -72,7 +73,7 @@ static gint ett_ulp = -1;
 
 
 static guint
-get_ulp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_ulp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   /* PDU length = Message length */
   return tvb_get_ntohs(tvb,offset);
@@ -83,7 +84,7 @@ dissect_ulp_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
   tcp_dissect_pdus(tvb, pinfo, tree, ulp_desegment, ULP_HEADER_SIZE,
                    get_ulp_pdu_len, dissect_ULP_PDU_PDU, data);
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 void proto_reg_handoff_ulp(void);

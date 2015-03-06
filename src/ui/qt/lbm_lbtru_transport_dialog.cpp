@@ -26,7 +26,6 @@
 
 #include "file.h"
 
-#include "qt_ui_utils.h"
 #include "wireshark_application.h"
 
 #include <QClipboard>
@@ -37,6 +36,7 @@
 #include <epan/packet_info.h>
 #include <epan/tap.h>
 #include <epan/to_str.h>
+#include <epan/wmem/wmem.h>
 #include <epan/dissectors/packet-lbm.h>
 #include <wsutil/nstime.h>
 
@@ -1396,7 +1396,7 @@ void LBMLBTRUTransportDialogInfo::processPacket(const packet_info * pinfo, const
             {
                 LBMLBTRUSourceEntry * source = NULL;
                 LBMLBTRUSourceMapIterator it;
-                QString src_address = address_to_qstring(&(pinfo->src));
+                QString src_address = QString(address_to_str(wmem_packet_scope(), &(pinfo->src)));
 
                 it = m_sources.find(src_address);
                 if (m_sources.end() == it)
@@ -1425,7 +1425,7 @@ void LBMLBTRUTransportDialogInfo::processPacket(const packet_info * pinfo, const
             {
                 LBMLBTRUReceiverEntry * receiver = NULL;
                 LBMLBTRUReceiverMapIterator it;
-                QString src_address = address_to_qstring(&(pinfo->src));
+                QString src_address = QString(address_to_str(wmem_packet_scope(), &(pinfo->src)));
 
                 it = m_receivers.find(src_address);
                 if (m_receivers.end() == it)
@@ -1721,7 +1721,7 @@ void LBMLBTRUTransportDialog::fillTree(void)
     }
     m_dialog_info->setDialog(this);
 
-    error_string = register_tap_listener("lbm_lbtru",
+    error_string = register_tap_listener("lbtru",
         (void *)m_dialog_info,
         m_ui->displayFilterLineEdit->text().toUtf8().constData(),
         TL_REQUIRES_COLUMNS,

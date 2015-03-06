@@ -34,21 +34,14 @@ void proto_reg_handoff_daytime(void);
 
 static dissector_handle_t daytime_handle;
 
-static const true_false_string tfs_response_request = { "Response", "Request" };
-
 static header_field_info *hfi_daytime = NULL;
 
 #define DAYTIME_HFI_INIT HFI_INIT(proto_daytime)
 
 static header_field_info hfi_daytime_string DAYTIME_HFI_INIT =
-{ "Daytime", "daytime.string",
-  FT_STRING, BASE_NONE, NULL, 0x0,
-  "String containing time and date", HFILL };
-
-static header_field_info hfi_response_request DAYTIME_HFI_INIT =
-{ "Type", "daytime.response_request",
-  FT_BOOLEAN, 8, TFS(&tfs_response_request), 0x0,
-  NULL, HFILL };
+      { "Daytime", "daytime.string",
+	FT_STRING, BASE_NONE, NULL, 0x0,
+      	"String containing time and date", HFILL };
 
 static gint ett_daytime = -1;
 
@@ -58,8 +51,8 @@ static gint ett_daytime = -1;
 static void
 dissect_daytime(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-  proto_tree    *daytime_tree;
-  proto_item    *ti;
+  proto_tree	*daytime_tree;
+  proto_item	*ti;
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "DAYTIME");
 
@@ -71,7 +64,8 @@ dissect_daytime(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     ti = proto_tree_add_item(tree, hfi_daytime, tvb, 0, -1, ENC_NA);
     daytime_tree = proto_item_add_subtree(ti, ett_daytime);
 
-    proto_tree_add_boolean(daytime_tree, &hfi_response_request, tvb, 0, 0, pinfo->srcport==DAYTIME_PORT);
+    proto_tree_add_text(daytime_tree, tvb, 0, 0,
+			pinfo->srcport==DAYTIME_PORT ? "Type: Response":"Type: Request");
     if (pinfo->srcport == DAYTIME_PORT) {
       proto_tree_add_item(daytime_tree, &hfi_daytime_string, tvb, 0, -1, ENC_ASCII|ENC_NA);
     }
@@ -84,7 +78,6 @@ proto_register_daytime(void)
 #ifndef HAVE_HFI_SECTION_INIT
   static header_field_info *hfi[] = {
     &hfi_daytime_string,
-    &hfi_response_request,
   };
 #endif
 
@@ -109,16 +102,3 @@ proto_reg_handoff_daytime(void)
   dissector_add_uint("udp.port", DAYTIME_PORT, daytime_handle);
   dissector_add_uint("tcp.port", DAYTIME_PORT, daytime_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

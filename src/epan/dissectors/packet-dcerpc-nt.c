@@ -27,8 +27,11 @@
 
 #include "config.h"
 
+#include <string.h>
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
 #include "packet-dcerpc.h"
 #include "packet-dcerpc-nt.h"
@@ -41,13 +44,7 @@ int hf_nt_cs_size = -1;
 static int hf_lsa_String_name_len = -1;
 static int hf_lsa_String_name_size = -1;
 static int hf_nt_data_blob_len = -1;
-static int hf_nt_data_blob_data = -1;
-static int hf_nt_midl_blob_len = -1;
-static int hf_nt_midl_fill_bytes = -1;
-static int hf_nt_midl_version = -1;
-static int hf_nt_midl_hdr_len = -1;
 
-static gint ett_nt_MIDL_BLOB = -1;
 static gint ett_lsa_String = -1;
 static gint ett_nt_data_blob = -1;
 static expert_field ei_dcerpc_nt_badsid = EI_INIT;
@@ -87,8 +84,10 @@ dissect_ndr_datablob(tvbuff_t *tvb, int offset, packet_info *pinfo,
 	guint3264 len;
 	proto_tree *subtree;
 
-	subtree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_nt_data_blob, &item,
+	item = proto_tree_add_text(tree, tvb, offset, 0, "%s",
 			proto_registrar_get_name(hf_index));
+
+	subtree = proto_item_add_subtree(item, ett_nt_data_blob);
 
 	if (use_remaining_space) {
 		len = tvb_length_remaining (tvb, offset);
@@ -96,7 +95,7 @@ dissect_ndr_datablob(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		offset = dissect_ndr_uint3264(tvb, offset, pinfo, subtree, di, drep,
 				    hf_nt_data_blob_len, &len);
 	}
-	proto_tree_add_item(subtree, hf_nt_data_blob_data, tvb, offset, (int)len, ENC_NA);
+	proto_tree_add_text(subtree, tvb, offset, (int)len, "Blob data");
 	offset += (int)len;
 	return offset;
 }
@@ -186,9 +185,11 @@ dissect_ndr_counted_string_helper(tvbuff_t *tvb, int offset,
 
 	if (add_subtree) {
 
-		subtree = proto_tree_add_subtree(
-			tree, tvb, offset, 0, ett_nt_counted_string, &item,
+		item = proto_tree_add_text(
+			tree, tvb, offset, 0, "%s",
 			proto_registrar_get_name(hf_index));
+
+		subtree = proto_item_add_subtree(item, ett_nt_counted_string);
 	}
 
 	/*
@@ -249,8 +250,10 @@ dissect_ndr_counted_byte_array_cb(tvbuff_t *tvb, int offset,
 	if (di->conformant_run)
 		return offset;
 
-	subtree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_nt_counted_byte_array, &item,
+	item = proto_tree_add_text(tree, tvb, offset, 0, "%s",
 		proto_registrar_get_name(hf_index));
+
+	subtree = proto_item_add_subtree(item, ett_nt_counted_byte_array);
 
 	/*
 	   struct {
@@ -297,7 +300,8 @@ static void cb_byte_array_postprocess(packet_info *pinfo, proto_tree *tree _U_,
 	if ((end_offset - start_offset) <= 12)
 		return;
 
-	s = tvb_bytes_to_str(wmem_packet_scope(), tvb, start_offset + 12, (end_offset - start_offset - 12) );
+	s = tvb_bytes_to_ep_str(
+		tvb, start_offset + 12, (end_offset - start_offset - 12) );
 
 	/* Append string to COL_INFO */
 
@@ -354,8 +358,10 @@ dissect_ndr_counted_ascii_string_cb(tvbuff_t *tvb, int offset,
 	if (di->conformant_run)
 		return offset;
 
-	subtree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_nt_counted_ascii_string, &item,
+	item = proto_tree_add_text(tree, tvb, offset, 0, "%s",
 		proto_registrar_get_name(hf_index));
+
+	subtree = proto_item_add_subtree(item, ett_nt_counted_ascii_string);
 
 	/*
 	   struct {
@@ -425,7 +431,8 @@ dissect_ndr_lsa_String(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
 	hf_info=proto_registrar_get_nth(hfindex);
 
 	if (parent_tree) {
-		tree = proto_tree_add_subtree_format(parent_tree, tvb, offset, 0, ett_lsa_String, &item, "%s: ", hf_info->name);
+		item = proto_tree_add_text(parent_tree, tvb, offset, 0, "%s: ", hf_info->name);
+		tree = proto_item_add_subtree(item, ett_lsa_String);
 	}
 
 	offset = PIDL_dissect_uint16(tvb, offset, pinfo, tree, di, drep, hf_lsa_String_name_len, 0);
@@ -464,22 +471,6 @@ dissect_ndr_nt_NTTIME (tvbuff_t *tvb, int offset,
 	ALIGN_TO_4_BYTES;
 
 	offset = dissect_nt_64bit_time(tvb, tree, offset, hf_index);
-	return offset;
-}
-
-int
-dissect_ndr_nt_NTTIME_hyper (tvbuff_t *tvb, int offset,
-			packet_info *pinfo _U_, proto_tree *tree,
-			dcerpc_info *di, guint8 *drep _U_, int hf_index, gboolean onesec_resolution)
-{
-	if(di->conformant_run){
-		/*just a run to handle conformant arrays, nothing to dissect */
-		return offset;
-	}
-
-	ALIGN_TO_8_BYTES;
-
-	offset = dissect_nt_64bit_time_opt(tvb, tree, offset, hf_index, onesec_resolution);
 	return offset;
 }
 
@@ -873,8 +864,8 @@ static void init_pol_hash(void)
 	/* Initialise hash table */
 
 	if (pol_hash) {
-		/*  Everything in the table is allocated with wmem file
-		 *  scope so there's no need to go through and free it all.
+		/*  Everything in the table is se_ allocated so there's no
+		 *  need to go through and free it all.
 		 */
 		g_hash_table_destroy(pol_hash);
 	}
@@ -971,15 +962,19 @@ dissect_nt_hnd(tvbuff_t *tvb, gint offset, packet_info *pinfo,
 
 	switch(type){
 	case HND_TYPE_CTX_HANDLE:
-		subtree = proto_tree_add_subtree(tree, tvb, offset, sizeof(e_ctx_hnd),
-					   ett_nt_policy_hnd, &item, "Policy Handle");
+		item = proto_tree_add_text(tree, tvb, offset, sizeof(e_ctx_hnd),
+					   "Policy Handle");
+
+		subtree = proto_item_add_subtree(item, ett_nt_policy_hnd);
 
 		offset = dissect_ndr_ctx_hnd(tvb, offset, pinfo, subtree, di, drep,
 					     hfindex, &hnd);
 		break;
 	case HND_TYPE_GUID:
-		subtree = proto_tree_add_subtree(tree, tvb, offset, 16,
-					   ett_nt_policy_hnd, &item, "GUID handle");
+		item = proto_tree_add_text(tree, tvb, offset, 16,
+					   "GUID handle");
+
+		subtree = proto_item_add_subtree(item, ett_nt_policy_hnd);
 
 		hnd.attributes=0;
 		offset=dissect_ndr_uuid_t(tvb, offset, pinfo, subtree, di, drep, hfindex, &hnd.uuid);
@@ -1076,7 +1071,7 @@ PIDL_dissect_policy_hnd(tvbuff_t *tvb, gint offset, packet_info *pinfo,
 		      param&PIDL_POLHND_OPEN, param&PIDL_POLHND_CLOSE,
 		      HND_TYPE_CTX_HANDLE);
 
-	/* If this was an open/create and we don't yet have a policy name
+	/* If this was an open/create and we dont yet have a policy name
 	 * then create one.
 	 * XXX We do not yet have the infrastructure to know the name of the
 	 * actual object  so just show it as <...> for the time being.
@@ -1292,8 +1287,8 @@ void cb_str_postprocess(packet_info *pinfo, proto_tree *tree _U_,
 	 * some way we can get that string, rather than duplicating the
 	 * efforts of that routine?
 	 */
-	s = tvb_get_string_enc(wmem_packet_scope(),
-		tvb, start_offset + 12, (end_offset - start_offset - 12), ENC_ASCII);
+	s = tvb_get_string(wmem_packet_scope(),
+		tvb, start_offset + 12, (end_offset - start_offset - 12) );
 
 	/* Append string to COL_INFO */
 
@@ -1370,7 +1365,7 @@ dissect_ndr_nt_SID28(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
 	newoffset = dissect_nt_sid(tvb, offset, tree, name, &sid_str,
 				hf_nt_domain_sid);
-	/* The dissected stuff can't be more than 28 bytes */
+	/* The dissected stuff cant be more than 28 bytes */
 	if ((newoffset - offset) > 28) {
 		item = proto_tree_get_parent(tree? tree->last_child : NULL);
 		expert_add_info(pinfo, item, &ei_dcerpc_nt_badsid);
@@ -1514,8 +1509,9 @@ dissect_ndr_nt_PSID(tvbuff_t *tvb, int offset,
 	int old_offset=offset;
 
 	if(parent_tree){
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-			ett_nt_sid_pointer, &item, "SID pointer:");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1,
+			"SID pointer:");
+		tree = proto_item_add_subtree(item, ett_nt_sid_pointer);
 	}
 
 	offset = dissect_ndr_pointer(tvb, offset, pinfo, tree, di, drep,
@@ -1653,8 +1649,9 @@ dissect_LOGON_HOURS_hours(tvbuff_t *tvb, int offset,
 	int old_offset=offset;
 
 	if(parent_tree){
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-			ett_nt_logon_hours_hours, &item, "LOGON_HOURS:");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1,
+			"LOGON_HOURS:");
+		tree = proto_item_add_subtree(item, ett_nt_logon_hours_hours);
 	}
 
 	offset = dissect_ndr_ucvarray(tvb, offset, pinfo, tree, di, drep,
@@ -1679,8 +1676,9 @@ dissect_ndr_nt_LOGON_HOURS(tvbuff_t *tvb, int offset,
 	ALIGN_TO_4_BYTES;  /* strcture starts with short, but is aligned for longs */
 
 	if(parent_tree){
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-			ett_nt_logon_hours, &item, "LOGON_HOURS:");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1,
+			"LOGON_HOURS:");
+		tree = proto_item_add_subtree(item, ett_nt_logon_hours);
 	}
 
 	offset = dissect_ndr_uint16(tvb, offset, pinfo, tree, di, drep,
@@ -1729,8 +1727,9 @@ dissect_ndr_nt_PSID_ARRAY(tvbuff_t *tvb, int offset,
 	int old_offset=offset;
 
 	if(parent_tree){
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-			ett_nt_sid_array, &item, "SID array:");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1,
+			"SID array:");
+		tree = proto_item_add_subtree(item, ett_nt_sid_array);
 	}
 
 	ALIGN_TO_5_BYTES;
@@ -1762,8 +1761,9 @@ dissect_ndr_nt_SID_AND_ATTRIBUTES(tvbuff_t *tvb, int offset,
 	proto_tree *tree=NULL;
 
 	if(parent_tree){
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-			ett_nt_sid_and_attributes, &item, "SID_AND_ATTRIBUTES:");
+		item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+			"SID_AND_ATTRIBUTES:");
+		tree = proto_item_add_subtree(item, ett_nt_sid_and_attributes);
 	}
 
 	offset = dissect_ndr_nt_PSID(tvb, offset, pinfo, tree, di, drep);
@@ -1786,8 +1786,9 @@ dissect_ndr_nt_SID_AND_ATTRIBUTES_ARRAY(tvbuff_t *tvb, int offset,
 	int old_offset=offset;
 
 	if(parent_tree){
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-			ett_nt_sid_and_attributes_array, &item, "SID_AND_ATTRIBUTES array:");
+		item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+			"SID_AND_ATTRIBUTES array:");
+		tree = proto_item_add_subtree(item, ett_nt_sid_and_attributes_array);
 	}
 
 	/*offset = dissect_ndr_uint32 (tvb, offset, pinfo, tree, di, drep,
@@ -1796,47 +1797,6 @@ dissect_ndr_nt_SID_AND_ATTRIBUTES_ARRAY(tvbuff_t *tvb, int offset,
 			dissect_ndr_nt_SID_AND_ATTRIBUTES);
 
 	proto_item_set_len(item, offset-old_offset);
-	return offset;
-}
-
-/* This might be some sort of header that MIDL generates when creating
- * marshalling/unmarshalling code for blobs that are not to be transported
- * ontop of DCERPC and where the DREP fields specifying things such as
- * endianess and similar are not available.
- */
-int
-nt_dissect_MIDL_NDRHEADERBLOB(proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint8 *drep)
-{
-	proto_tree *tree;
-	guint8 val;
-
-	tree=proto_tree_add_subtree(parent_tree, tvb, offset, 16, ett_nt_MIDL_BLOB, NULL, "MES header");
-
-	/* modified DREP field that is used for stuff that is transporetd ontop
-	 * of non dcerpc
-	 */
-	proto_tree_add_item(tree, hf_nt_midl_version, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-	offset++;
-
-	val = tvb_get_guint8(tvb, offset);
-	proto_tree_add_uint(tree, hf_dcerpc_drep_byteorder, tvb, offset, 1, val>>4);
-
-	offset++;
-
-	if (drep) {
-		*drep = val;
-	}
-
-	proto_tree_add_item(tree, hf_nt_midl_hdr_len, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-	offset+=2;
-
-	proto_tree_add_item(tree, hf_nt_midl_fill_bytes, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-	offset += 4;
-
-	/* length of blob that follows */
-	proto_tree_add_item(tree, hf_nt_midl_blob_len, tvb, offset, 8, ENC_LITTLE_ENDIAN);
-	offset += 8;
-
 	return offset;
 }
 
@@ -1985,27 +1945,6 @@ void dcerpc_smb_init(int proto_dcerpc)
 		{ &hf_nt_data_blob_len,
 		  { "Blob size", "dcerpc.nt.blob.size",
 		    FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-
-		{ &hf_nt_data_blob_data,
-		  { "Blob data", "dcerpc.nt.blob.data",
-		    FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
-
-		{ &hf_nt_midl_blob_len, {
-		  "Blob Length", "nt.midl_blob_len", FT_UINT64, BASE_DEC,
-		  NULL, 0, "Length of NDR encoded data that follows", HFILL }},
-
-		{ &hf_nt_midl_fill_bytes, {
-		  "Fill bytes", "nt.midl.fill_bytes", FT_UINT32, BASE_HEX,
-		  NULL, 0, "Just some fill bytes", HFILL }},
-
-		{ &hf_nt_midl_version, {
-		  "Version", "nt.midl.version", FT_UINT8, BASE_DEC,
-		  NULL, 0, "Version of pickling", HFILL }},
-
-		{ &hf_nt_midl_hdr_len, {
-		  "HDR Length", "nt.midl.hdr_len", FT_UINT16, BASE_DEC,
-		  NULL, 0, "Length of header", HFILL }},
-
 	};
 
 	static gint *ett[] = {
@@ -2022,7 +1961,6 @@ void dcerpc_smb_init(int proto_dcerpc)
 		&ett_nt_sid_and_attributes,
 		&ett_nt_counted_ascii_string,
 		&ett_lsa_String,
-		&ett_nt_MIDL_BLOB,
 	};
 	static ei_register_info ei[] = {
 		{ &ei_dcerpc_nt_badsid, { "dcerpc.nt.badsid", PI_MALFORMED, PI_ERROR, "Association rejected", EXPFILL }},
@@ -2038,16 +1976,3 @@ void dcerpc_smb_init(int proto_dcerpc)
 	expert_register_field_array(expert_dcerpc_nt, ei, array_length(ei));
 	register_init_routine(&init_pol_hash);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

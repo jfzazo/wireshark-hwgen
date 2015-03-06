@@ -24,6 +24,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 void proto_register_mwmtp(void);
@@ -103,7 +105,7 @@ static void dissect_nwmtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 					    tvb, offset + 8, 4, ENC_BIG_ENDIAN);
 		}
 
-		next_tvb = tvb_new_subset_length(tvb, offset + 12, len);
+		next_tvb = tvb_new_subset(tvb, offset + 12, len, len);
 		if (tvb_length(next_tvb) > 0)
 			call_dissector(mtp_handle, next_tvb, pinfo, tree);
 		/* Check for overflows, which probably can't happen, but better
@@ -161,7 +163,8 @@ void proto_register_mwmtp(void)
 
 void proto_reg_handoff_nwmtp(void)
 {
-	dissector_add_for_decode_as("udp.port", nwmtp_handle);
+	/* For decode as */
+	dissector_add_handle("udp.port", nwmtp_handle);
 	mtp_handle = find_dissector("mtp3");
 }
 

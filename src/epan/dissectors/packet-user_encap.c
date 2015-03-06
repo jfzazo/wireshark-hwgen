@@ -23,13 +23,14 @@
 
 #include "config.h"
 
+#include <stdio.h>
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
 #include <epan/uat.h>
-#include <epan/exported_pdu.h>
-#include <epan/tap.h>
+#include <epan/wmem/wmem.h>
 #include <wiretap/wtap.h>
 
 #ifdef _MSC_VER
@@ -81,27 +82,10 @@ static guint num_encaps = 0;
 static uat_t* encaps_uat;
 static dissector_handle_t data_handle;
 
-static gint exported_pdu_tap = -1;
-
 /*
  * Use this for DLT_USER2 if we don't have an encapsulation for it.
  */
 static user_encap_t user2_encap;
-
-static void export_pdu(tvbuff_t *tvb, packet_info* pinfo, char *proto_name)
-{
-    if (have_tap_listener(exported_pdu_tap)) {
-        exp_pdu_data_t *exp_pdu_data;
-        guint8 exp_pdu_data_tag;
-
-        exp_pdu_data_tag = EXP_PDU_TAG_ORIG_FNO_BIT;
-        exp_pdu_data = load_export_pdu_tags(pinfo, proto_name, -1, &exp_pdu_data_tag, 1);
-        exp_pdu_data->tvb_captured_length = tvb_captured_length(tvb);
-        exp_pdu_data->tvb_reported_length = tvb_reported_length(tvb);
-        exp_pdu_data->pdu_tvb = tvb;
-        tap_queue_packet(exported_pdu_tap, pinfo, exp_pdu_data);
-    }
-}
 
 static void dissect_user(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree) {
     user_encap_t* encap = NULL;
@@ -153,8 +137,7 @@ static void dissect_user(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree) {
     proto_item_set_text(item,"DLT: %d",pinfo->match_uint + 147 - WTAP_ENCAP_USER0);
 
     if (encap->header_size) {
-        tvbuff_t* hdr_tvb = tvb_new_subset_length(tvb, 0, encap->header_size);
-        export_pdu(hdr_tvb, pinfo, encap->header_proto_name);
+        tvbuff_t* hdr_tvb = tvb_new_subset(tvb, 0, encap->header_size, encap->header_size);
         call_dissector(encap->header_proto, hdr_tvb, pinfo, tree);
         if (encap->header_proto_name) {
             const char *proto_name = dissector_handle_get_long_name(find_dissector(encap->header_proto_name));
@@ -164,11 +147,10 @@ static void dissect_user(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree) {
         }
     }
 
-    len = tvb_captured_length(tvb) - (encap->header_size + encap->trailer_size);
+    len = tvb_length(tvb) - (encap->header_size + encap->trailer_size);
     reported_len = tvb_reported_length(tvb) - (encap->header_size + encap->trailer_size);
 
     payload_tvb = tvb_new_subset(tvb, encap->header_size, len, reported_len);
-    export_pdu(payload_tvb, pinfo, encap->payload_proto_name);
     call_dissector(encap->payload_proto, payload_tvb, pinfo, tree);
     if (encap->payload_proto_name) {
         const char *proto_name = dissector_handle_get_long_name(find_dissector(encap->payload_proto_name));
@@ -178,8 +160,7 @@ static void dissect_user(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree) {
     }
 
     if (encap->trailer_size) {
-        tvbuff_t* trailer_tvb = tvb_new_subset_length(tvb, encap->header_size + len, encap->trailer_size);
-        export_pdu(trailer_tvb, pinfo, encap->trailer_proto_name);
+        tvbuff_t* trailer_tvb = tvb_new_subset(tvb, encap->header_size + len, encap->trailer_size, encap->trailer_size);
         call_dissector(encap->trailer_proto, trailer_tvb, pinfo, tree);
         if (encap->trailer_proto_name) {
             const char *proto_name = dissector_handle_get_long_name(find_dissector(encap->trailer_proto_name));
@@ -301,19 +282,4 @@ void proto_register_user_encap(void)
     prefs_register_protocol_obsolete(proto_register_protocol("DLT User C","DLT_USER_C","user_dlt_c"));
     prefs_register_protocol_obsolete(proto_register_protocol("DLT User D","DLT_USER_D","user_dlt_d"));
     */
-
-    exported_pdu_tap = register_export_pdu_tap("DLT User");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

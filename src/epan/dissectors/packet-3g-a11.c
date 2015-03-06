@@ -40,8 +40,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 /* Include vendor id translation */
 #include <epan/sminmpec.h>
 #include <epan/to_str.h>
@@ -95,7 +98,6 @@ static int hf_a11_vse_panid = -1;
 static int hf_a11_vse_srvopt = -1;
 static int hf_a11_vse_qosmode = -1;
 static int hf_a11_vse_pdit = -1;
-static int hf_a11_vse_session_parameter = -1;
 static int hf_a11_vse_code = -1;
 static int hf_a11_vse_dormant = -1;
 static int hf_a11_vse_ehrpd_mode = -1;
@@ -218,10 +220,6 @@ static gint ett_a11_aut_flow_profile_ids = -1;
 static gint ett_a11_bcmcs_entry = -1;
 
 static expert_field ei_a11_sub_type_length_not2 = EI_INIT;
-static expert_field ei_a11_sse_too_short = EI_INIT;
-static expert_field ei_a11_bcmcs_too_short = EI_INIT;
-static expert_field ei_a11_entry_data_not_dissected = EI_INIT;
-static expert_field ei_a11_session_data_not_dissected = EI_INIT;
 
 /* Port used for Mobile IP based Tunneling Protocol (A11) */
 #define UDP_PORT_3GA11    699
@@ -262,7 +260,6 @@ static const value_string a11_types[] = {
 
     {0, NULL},
 };
-static value_string_ext a11_types_ext = VALUE_STRING_EXT_INIT(a11_types);
 
 static const value_string a11_ses_ptype_vals[] = {
     {0x8881, "Unstructured Byte Stream"},
@@ -315,7 +312,7 @@ static const value_string a11_reply_codes[]= {
     {142, "Registration Denied - nonexistent A10 or IP flow"},
     {0, NULL},
 };
-static value_string_ext a11_reply_codes_ext = VALUE_STRING_EXT_INIT(a11_reply_codes);
+
 
 static const value_string a11_ack_status[]= {
     {0x00, "Update Accepted"},
@@ -331,7 +328,6 @@ static const value_string a11_ack_status[]= {
     {0xff, "Update Denied - handoff in progress"},
     {0, NULL},
 };
-static value_string_ext a11_ack_status_ext = VALUE_STRING_EXT_INIT(a11_ack_status);
 
 typedef enum {
     MH_AUTH_EXT      = 32,
@@ -361,12 +357,11 @@ static const value_string a11_ext_types[]= {
     {RU_AUTH_EXT,      "Registration Update Authentication Extension"},
     {MN_NAI_EXT,       "Mobile Node NAI Extension"},
     {MF_CHALLENGE_EXT, "MN-FA Challenge Extension"},
-    {OLD_NVSE_EXT,     "Normal Vendor/Organization Specific Extension (OLD)"},
     {NVSE_EXT,         "Normal Vendor/Organization Specific Extension"},
+    {OLD_NVSE_EXT,     "Normal Vendor/Organization Specific Extension (OLD)"},
     {BCMCS_EXT,        "BCMCS Session Extension"},
     {0, NULL},
 };
-static value_string_ext a11_ext_types_ext = VALUE_STRING_EXT_INIT(a11_ext_types);
 
 static const value_string a11_ext_stypes[]= {
     {1, "MN AAA Extension"},
@@ -467,7 +462,6 @@ static const value_string a11_ext_app[]= {
     {0xB001, "System Identifiers (BSID / HRPD Subnet)"},
     {0, NULL},
 };
-static value_string_ext a11_ext_app_ext = VALUE_STRING_EXT_INIT(a11_ext_app);
 
 #if 0
 static const value_string a11_airlink_types[]= {
@@ -478,6 +472,8 @@ static const value_string a11_airlink_types[]= {
     {0, NULL},
 };
 #endif
+
+static const true_false_string tfs_included_not_included = { "Included", "Not Included" };
 
 static const value_string a11_bcmcs_stype_vals[] = {
     {1, "BCMCS Flow and Registration Information"},
@@ -501,6 +497,7 @@ static const value_string a11_rohc_profile_vals[] =
     { 0x0003,    "ROHC ESP" },                   /*RFC 3095*/
     { 0x0004,    "ROHC IP" },                    /*RFC 3843*/
     { 0x0005,    "ROHC LLA" },                   /*RFC 3242*/
+    { 0x0105,    "ROHC LLA with R-mode" },       /*RFC 3408*/
     { 0x0006,    "ROHC TCP" },                   /*RFC 4996*/
     { 0x0007,    "ROHC RTP/UDP-Lite" },          /*RFC 4019*/
     { 0x0008,    "ROHC UDP-Lite" },              /*RFC 4019*/
@@ -508,12 +505,10 @@ static const value_string a11_rohc_profile_vals[] =
     { 0x0102,    "ROHCv2 UDP" },                 /*RFC 5225*/
     { 0x0103,    "ROHCv2 ESP" },                 /*RFC 5225*/
     { 0x0104,    "ROHCv2 IP" },                  /*RFC 5225*/
-    { 0x0105,    "ROHC LLA with R-mode" },       /*RFC 3408*/
     { 0x0107,    "ROHCv2 RTP/UDP-Lite" },        /*RFC 5225*/
     { 0x0108,    "ROHCv2 UDP-Lite" },            /*RFC 5225*/
     { 0, NULL },
 };
-static value_string_ext a11_rohc_profile_vals_ext = VALUE_STRING_EXT_INIT(a11_rohc_profile_vals);
 
 #define NUM_ATTR (sizeof(attrs)/sizeof(struct radius_attribute))
 
@@ -544,19 +539,8 @@ static const value_string a11_ses_msid_type_vals[] =
     { 0, NULL },
 };
 
-static const int * a11_flags[] = {
-    &hf_a11_s,
-    &hf_a11_b,
-    &hf_a11_d,
-    &hf_a11_m,
-    &hf_a11_g,
-    &hf_a11_v,
-    &hf_a11_t,
-    NULL
-};
-
 static void
-decode_sse(proto_tree *ext_tree, packet_info *pinfo, tvbuff_t *tvb, int offset, guint ext_len, proto_item *ext_len_item)
+decode_sse(proto_tree *ext_tree, tvbuff_t *tvb, int offset, guint ext_len)
 {
     guint8      msid_len;
     guint8      msid_start_offset;
@@ -568,7 +552,7 @@ decode_sse(proto_tree *ext_tree, packet_info *pinfo, tvbuff_t *tvb, int offset, 
 
     /* Decode Protocol Type */
     if (ext_len < 2) {
-        expert_add_info_format(pinfo, ext_len_item, &ei_a11_sse_too_short,
+        proto_tree_add_text(ext_tree, tvb, offset, 0,
                     "Cannot decode Protocol Type - SSE too short");
         return;
     }
@@ -578,7 +562,7 @@ decode_sse(proto_tree *ext_tree, packet_info *pinfo, tvbuff_t *tvb, int offset, 
 
     /* Decode Session Key */
     if (ext_len < 4) {
-        expert_add_info_format(pinfo, ext_len_item, &ei_a11_sse_too_short,
+        proto_tree_add_text(ext_tree, tvb, offset, 0,
                     "Cannot decode Session Key - SSE too short");
         return;
     }
@@ -589,7 +573,7 @@ decode_sse(proto_tree *ext_tree, packet_info *pinfo, tvbuff_t *tvb, int offset, 
 
     /* Decode Session Id Version */
     if (ext_len < 2) {
-        expert_add_info_format(pinfo, ext_len_item, &ei_a11_sse_too_short,
+        proto_tree_add_text(ext_tree, tvb, offset, 0,
                     "Cannot decode Session Id Version - SSE too short");
         return;
     }
@@ -600,7 +584,7 @@ decode_sse(proto_tree *ext_tree, packet_info *pinfo, tvbuff_t *tvb, int offset, 
 
     /* Decode SRID */
     if (ext_len < 2) {
-        expert_add_info_format(pinfo, ext_len_item, &ei_a11_sse_too_short,
+        proto_tree_add_text(ext_tree, tvb, offset, 0,
                     "Cannot decode SRID - SSE too short");
         return;
     }
@@ -610,7 +594,7 @@ decode_sse(proto_tree *ext_tree, packet_info *pinfo, tvbuff_t *tvb, int offset, 
 
     /* MSID Type */
     if (ext_len < 2) {
-        expert_add_info_format(pinfo, ext_len_item, &ei_a11_sse_too_short,
+        proto_tree_add_text(ext_tree, tvb, offset, 0,
                     "Cannot decode MSID Type - SSE too short");
         return;
     }
@@ -621,7 +605,7 @@ decode_sse(proto_tree *ext_tree, packet_info *pinfo, tvbuff_t *tvb, int offset, 
 
     /* MSID Len */
     if (ext_len < 1) {
-        expert_add_info_format(pinfo, ext_len_item, &ei_a11_sse_too_short,
+        proto_tree_add_text(ext_tree, tvb, offset, 0,
                     "Cannot decode MSID Length - SSE too short");
         return;
     }
@@ -632,7 +616,7 @@ decode_sse(proto_tree *ext_tree, packet_info *pinfo, tvbuff_t *tvb, int offset, 
 
     /* Decode MSID */
     if (ext_len < msid_len) {
-        expert_add_info_format(pinfo, ext_len_item, &ei_a11_sse_too_short,
+        proto_tree_add_text(ext_tree, tvb, offset, 0,
                     "Cannot decode MSID - SSE too short");
         return;
     }
@@ -667,18 +651,22 @@ decode_sse(proto_tree *ext_tree, packet_info *pinfo, tvbuff_t *tvb, int offset, 
         p_msid = msid_digits + 1;
     }
 
-    proto_tree_add_string(ext_tree, hf_a11_ses_msid, tvb, msid_start_offset, msid_len, p_msid);
+
+    proto_tree_add_string
+        (ext_tree, hf_a11_ses_msid, tvb, msid_start_offset, msid_len, p_msid);
+
+    return;
 }
 
 static void
-decode_bcmcs(proto_tree* ext_tree, packet_info *pinfo, tvbuff_t* tvb, int offset, guint ext_len, proto_item *ext_len_item)
+decode_bcmcs(proto_tree* ext_tree, tvbuff_t* tvb, int offset, guint ext_len)
 {
 
     guint8 bc_stype, entry_len;
 
     /* Decode Protocol Type */
     if (ext_len < 2) {
-        expert_add_info_format(pinfo, ext_len_item, &ei_a11_bcmcs_too_short,
+        proto_tree_add_text(ext_tree, tvb, offset, 0,
                             "Cannot decode Protocol Type - BCMCS too short");
         return;
     }
@@ -692,6 +680,7 @@ decode_bcmcs(proto_tree* ext_tree, packet_info *pinfo, tvbuff_t* tvb, int offset
     case 1:
     {
         int i = 0;
+        proto_item   *ti;
         proto_tree   *entry_tree;
         while (ext_len > 0) {
             i++;
@@ -702,17 +691,17 @@ decode_bcmcs(proto_tree* ext_tree, packet_info *pinfo, tvbuff_t* tvb, int offset
             } else {
                 ext_len = ext_len - entry_len;
             }
-            entry_tree = proto_tree_add_subtree_format(ext_tree, tvb, offset, entry_len,
-                ett_a11_bcmcs_entry, NULL, "BCMCS Information Entry %u", i);
+            ti = proto_tree_add_text(ext_tree, tvb, offset, entry_len, "BCMCS Information Entry %u", i);
+            entry_tree = proto_item_add_subtree(ti, ett_a11_bcmcs_entry);
             proto_tree_add_item(entry_tree, hf_a11_bcmcs_entry_len, tvb, offset, 1, ENC_BIG_ENDIAN);
 
-            proto_tree_add_expert(ext_tree, pinfo, &ei_a11_entry_data_not_dissected, tvb, offset, entry_len -1);
+            proto_tree_add_text(ext_tree, tvb, offset, entry_len -1, "Entry Data, Not dissected yet");
             offset = offset+entry_len;
         }
     }
     break;
     default:
-        proto_tree_add_expert_format(ext_tree, pinfo, &ei_a11_session_data_not_dissected, tvb, offset, -1, "Session Data Type %u Not dissected yet", bc_stype);
+        proto_tree_add_text(ext_tree, tvb, offset, -1, "Session Data Type %u Not dissected yet",bc_stype);
         return;
         break;
     }
@@ -724,6 +713,7 @@ decode_bcmcs(proto_tree* ext_tree, packet_info *pinfo, tvbuff_t* tvb, int offset
 static void
 dissect_a11_radius( tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, int app_len)
 {
+    proto_item *ti;
     proto_tree *radius_tree;
 
     /* None of this really matters if we don't have a tree */
@@ -735,7 +725,9 @@ dissect_a11_radius( tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *t
         return;
     }
 
-    radius_tree = proto_tree_add_subtree(tree, tvb, offset - 2, app_len, ett_a11_radiuses, NULL, "Airlink Record");
+    ti = proto_tree_add_text(tree, tvb, offset - 2, app_len, "Airlink Record");
+
+    radius_tree = proto_item_add_subtree(ti, ett_a11_radiuses);
 
     dissect_attribute_value_pairs(radius_tree, pinfo, tvb, offset, app_len-2);
 
@@ -754,7 +746,7 @@ dissect_3gpp2_service_option_profile(proto_tree  *tree, tvbuff_t  *tvb, packet_i
     proto_tree_add_item(tree, hf_a11_serv_opt_prof_max_serv, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
-    while (tvb_reported_length_remaining(tvb,offset) > 0) {
+    while (tvb_length_remaining(tvb,offset) > 0) {
         sub_type_length = tvb_get_guint8(tvb,offset+1);
 
         sub_type = tvb_get_guint8(tvb,offset);
@@ -798,13 +790,14 @@ dissect_3gpp2_radius_aut_flow_profile_ids(proto_tree  *tree, tvbuff_t  *tvb, pac
     guint8      sub_type, sub_type_length;
     guint32     value;
 
-    while (tvb_reported_length_remaining(tvb,offset) > 0) {
+    while (tvb_length_remaining(tvb,offset) > 0) {
         sub_type = tvb_get_guint8(tvb,offset);
         sub_type_length = tvb_get_guint8(tvb,offset+1);
         /* value is 2 octets */
         value = tvb_get_ntohs(tvb,offset+2);
-        sub_tree = proto_tree_add_subtree_format(tree, tvb, offset, sub_type_length, ett_a11_aut_flow_profile_ids, &item,
-                                   "%s = %u", val_to_str_const(sub_type, a11_aut_flow_prof_subtype_vals, "Unknown"), value);
+        item = proto_tree_add_text(tree, tvb, offset, sub_type_length, "%s = %u",
+                                   val_to_str_const(sub_type, a11_aut_flow_prof_subtype_vals, "Unknown"), value);
+        sub_tree = proto_item_add_subtree(item, ett_a11_aut_flow_profile_ids);
 
         proto_tree_add_item(sub_tree, hf_a11_aut_flow_prof_sub_type, tvb, offset, 1, ENC_BIG_ENDIAN);
         offset += 1;
@@ -832,19 +825,20 @@ dissect_ase(tvbuff_t *tvb, int offset, guint ase_len, proto_tree *ext_tree)
         proto_tree *exts_tree;
         guint8      srid           = tvb_get_guint8(tvb, offset+1);
         guint16     service_option = tvb_get_ntohs(tvb,  offset+2);
-        guint8      entry_length;
+        proto_item *ti;
+        guint8      entry_lenght;
         int         entry_start_offset;
 
         /* Entry Length */
         entry_start_offset = offset;
-        entry_length = tvb_get_guint8(tvb, offset);
+        entry_lenght = tvb_get_guint8(tvb, offset);
 
         if (registration_request_msg && ((service_option == 64) || (service_option == 67)))
-            exts_tree = proto_tree_add_subtree_format(ext_tree, tvb, offset, entry_length+1,
-                        ett_a11_ase, NULL, "GRE Key Entry (SRID: %d)", srid);
+            ti = proto_tree_add_text(ext_tree, tvb, offset, entry_lenght+1, "GRE Key Entry (SRID: %d)", srid);
         else
-            exts_tree = proto_tree_add_subtree_format(ext_tree, tvb, offset, entry_length,
-                        ett_a11_ase, NULL, "GRE Key Entry (SRID: %d)", srid);
+            ti = proto_tree_add_text(ext_tree, tvb, offset, entry_lenght, "GRE Key Entry (SRID: %d)", srid);
+
+        exts_tree = proto_item_add_subtree(ti, ett_a11_ase);
 
         proto_tree_add_item(exts_tree, hf_a11_ase_len_type, tvb, offset, 1, ENC_BIG_ENDIAN);
         offset += 1;
@@ -869,15 +863,17 @@ dissect_ase(tvbuff_t *tvb, int offset, guint ase_len, proto_tree *ext_tree)
         proto_tree_add_item(exts_tree, hf_a11_ase_pcf_addr_key, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset += 4;
 
-        if ((entry_length>14)&&(registration_request_msg)) {
+        if ((entry_lenght>14)&&(registration_request_msg)) {
             if (service_option == 0x0043) {
+                proto_item *tl;
                 proto_tree *extv_tree;
                 guint8      profile_count = tvb_get_guint8(tvb, offset+6);
                 guint8      profile_index = 0;
                 guint8      reverse_profile_count;
 
-                proto_tree *extt_tree = proto_tree_add_subtree(exts_tree, tvb, offset,6+(profile_count*2)+1,
-                                        ett_a11_forward_rohc, NULL, "Forward ROHC Info");
+                proto_item *tj = proto_tree_add_text(exts_tree, tvb, offset,6+(profile_count*2)+1, "Forward ROHC Info");
+
+                proto_tree *extt_tree = proto_item_add_subtree(tj, ett_a11_forward_rohc);
 
                 proto_tree_add_item(extt_tree, hf_a11_ase_forward_rohc_info_len, tvb, offset, 1, ENC_BIG_ENDIAN);
                 offset += 1;
@@ -895,8 +891,8 @@ dissect_ase(tvbuff_t *tvb, int offset, guint ase_len, proto_tree *ext_tree)
 
 
                 for (profile_index=0; profile_index<profile_count; profile_index++) {
-                    proto_tree *extu_tree = proto_tree_add_subtree_format(extt_tree, tvb, offset, (2*profile_count),
-                                        ett_a11_forward_profile, NULL, "Forward Profile : %d", profile_index);
+                    proto_item *tk = proto_tree_add_text (extt_tree, tvb, offset, (2*profile_count), "Forward Profile : %d", profile_index);
+                    proto_tree *extu_tree = proto_item_add_subtree(tk, ett_a11_forward_profile);
                     proto_tree_add_item(extu_tree, hf_a11_ase_forward_profile, tvb, offset, 2, ENC_BIG_ENDIAN);
                     offset += 2;
                 }/*for*/
@@ -904,8 +900,9 @@ dissect_ase(tvbuff_t *tvb, int offset, guint ase_len, proto_tree *ext_tree)
 
                 reverse_profile_count=tvb_get_guint8(tvb, offset+6);
 
-                extv_tree = proto_tree_add_subtree(exts_tree, tvb, offset,6+(reverse_profile_count*2)+1,
-                            ett_a11_reverse_rohc, NULL, "Reverse ROHC Info");
+                tl = proto_tree_add_text(exts_tree, tvb, offset,6+(reverse_profile_count*2)+1, "Reverse ROHC Info");
+
+                extv_tree = proto_item_add_subtree(tl, ett_a11_reverse_rohc);
 
                 proto_tree_add_item(extv_tree, hf_a11_ase_reverse_rohc_info_len, tvb, offset, 1, ENC_BIG_ENDIAN);
                 offset += 1;
@@ -925,8 +922,9 @@ dissect_ase(tvbuff_t *tvb, int offset, guint ase_len, proto_tree *ext_tree)
 
 
                 for (profile_index=0; profile_index<reverse_profile_count; profile_index++) {
-                    proto_tree *extw_tree = proto_tree_add_subtree_format(extv_tree, tvb, offset, (2*profile_count),
-                        ett_a11_reverse_profile, NULL, "Reverse Profile : %d", profile_index);
+                    proto_item *tm = proto_tree_add_text(extv_tree, tvb, offset, (2*profile_count), "Reverse Profile : %d", profile_index);
+
+                    proto_tree *extw_tree = proto_item_add_subtree(tm, ett_a11_reverse_profile);
 
                     proto_tree_add_item(extw_tree, hf_a11_ase_reverse_profile, tvb, offset, 2, ENC_BIG_ENDIAN);
                     offset += 2;
@@ -934,9 +932,9 @@ dissect_ase(tvbuff_t *tvb, int offset, guint ase_len, proto_tree *ext_tree)
             }/* Service option */
 
         }/* if */
-        clen += entry_length + 1;
+        clen += entry_lenght + 1;
         /* Set offset = start of next entry in case of padding */
-        offset = entry_start_offset + entry_length+1;
+        offset = entry_start_offset + entry_lenght+1;
 
     } /* while */
 
@@ -1017,8 +1015,10 @@ dissect_fwd_qosinfo(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
         guint8 entry_len = tvb_get_guint8(tvb, offset+clen);
         guint8 flow_id   = tvb_get_guint8(tvb, offset+clen+1);
 
-        proto_tree *flow_tree = proto_tree_add_subtree_format(ext_tree, tvb, offset+clen,
-            entry_len+1, ett_a11_fqi_flowentry, NULL, "Forward Flow Entry (Flow Id: %d)", flow_id);
+        proto_item *ti = proto_tree_add_text
+            (ext_tree, tvb, offset+clen, entry_len+1, "Forward Flow Entry (Flow Id: %d)", flow_id);
+
+        proto_tree *flow_tree = proto_item_add_subtree(ti, ett_a11_fqi_flowentry);
 
         /* Entry Length */
         proto_tree_add_item(flow_tree, hf_a11_fqi_entrylen, tvb, offset+clen, 1, ENC_BIG_ENDIAN);
@@ -1040,10 +1040,13 @@ dissect_fwd_qosinfo(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
 
         /* Requested QoS Blob */
         if (requested_qos_len) {
+            proto_item *ti2;
             proto_tree *exts_tree2;
 
-            proto_tree *exts_tree1 = proto_tree_add_subtree(flow_tree, tvb, offset+clen,requested_qos_len,
-                                ett_a11_fqi_requestedqos, NULL, "Forward Requested QoS ");
+            proto_item *ti1 = proto_tree_add_text(flow_tree, tvb, offset+clen,requested_qos_len, "Forward Requested QoS ");
+            proto_tree *exts_tree1 = proto_item_add_subtree(ti1, ett_a11_fqi_requestedqos);
+
+            proto_tree_add_text(exts_tree1, tvb, offset+clen, requested_qos_len, "Forward Requested QoS Sub Blob");
 
             /* Flow Priority */
             proto_tree_add_item(exts_tree1, hf_a11_fqi_flow_priority, tvb,offset+clen , 1, ENC_BIG_ENDIAN);
@@ -1056,8 +1059,8 @@ dissect_fwd_qosinfo(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
             clen++;
 
             /* QoS attribute set */
-            exts_tree2 = proto_tree_add_subtree(exts_tree1, tvb, offset+clen, 4, ett_a11_fqi_qos_attribute_set,
-                                                NULL, "QoS Attribute Set");
+            ti2 = proto_tree_add_text(exts_tree1, tvb, offset+clen, 4, "QoS Attribute Set");
+            exts_tree2 = proto_item_add_subtree(ti2, ett_a11_fqi_qos_attribute_set);
 
             /* QoS attribute setid */
             proto_tree_add_item(exts_tree2, hf_a11_fqi_qos_attribute_setid, tvb, offset+clen, 2, ENC_BIG_ENDIAN);
@@ -1079,10 +1082,14 @@ dissect_fwd_qosinfo(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
 
         /* Granted QoS Blob */
         if (granted_qos_len) {
+            proto_item *ti3;
             proto_tree *exts_tree3;
 
-            exts_tree3 = proto_tree_add_subtree(flow_tree, tvb, offset+clen, granted_qos_len,
-                        ett_a11_fqi_grantedqos, NULL, "Forward Granted QoS ");
+            ti3 = proto_tree_add_text(flow_tree, tvb, offset+clen, granted_qos_len, "Forward Granted QoS ");
+
+            exts_tree3 = proto_item_add_subtree(ti3, ett_a11_fqi_grantedqos);
+
+            proto_tree_add_text(exts_tree3, tvb, offset+clen, granted_qos_len, "Forward Granted QoS Sub Blob");
 
             /* QoS attribute setid */
             proto_tree_add_item(exts_tree3, hf_a11_fqi_qos_granted_attribute_setid, tvb, offset+clen, 1, ENC_BIG_ENDIAN);
@@ -1116,9 +1123,10 @@ dissect_rev_qosinfo(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
         guint8 entry_len = tvb_get_guint8(tvb, offset+clen);
         guint8 flow_id   = tvb_get_guint8(tvb, offset+clen+1);
 
-        proto_tree *flow_tree = proto_tree_add_subtree_format
-            (ext_tree, tvb, offset+clen, entry_len+1, ett_a11_rqi_flowentry, NULL,
-            "Reverse Flow Entry (Flow Id: %d)", flow_id);
+        proto_item *ti = proto_tree_add_text
+            (ext_tree, tvb, offset+clen, entry_len+1, "Reverse Flow Entry (Flow Id: %d)", flow_id);
+
+        proto_tree *flow_tree = proto_item_add_subtree(ti, ett_a11_rqi_flowentry);
 
         /* Entry Length */
         proto_tree_add_item(flow_tree, hf_a11_rqi_entrylen, tvb, offset+clen, 1, ENC_BIG_ENDIAN);
@@ -1139,10 +1147,14 @@ dissect_rev_qosinfo(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
 
         /* Requested QoS Blob */
         if (requested_qos_len) {
+            proto_item *ti1, *ti2;
             proto_tree *exts_tree1, *exts_tree2;
 
-            exts_tree1 = proto_tree_add_subtree(flow_tree, tvb, offset+clen,requested_qos_len,
-                        ett_a11_rqi_requestedqos, NULL, "Reverse Requested QoS ");
+            ti1 = proto_tree_add_text(flow_tree, tvb, offset+clen,requested_qos_len , "Reverse Requested QoS ");
+
+            exts_tree1 = proto_item_add_subtree(ti1, ett_a11_rqi_requestedqos);
+
+            proto_tree_add_text(exts_tree1, tvb, offset+clen, requested_qos_len, "Reverse Requested QoS Sub Blob");
 
             /* Flow Priority */
             proto_tree_add_item(exts_tree1, hf_a11_rqi_flow_priority, tvb,offset+clen , 1, ENC_BIG_ENDIAN);
@@ -1155,8 +1167,8 @@ dissect_rev_qosinfo(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
             clen++;
 
             /* QoS attribute set */
-            exts_tree2 = proto_tree_add_subtree(exts_tree1, tvb, offset+clen, 4,
-                                                ett_a11_rqi_qos_attribute_set, NULL, "QoS Attribute Set");
+            ti2 = proto_tree_add_text(exts_tree1, tvb, offset+clen, 4, "QoS Attribute Set");
+            exts_tree2 = proto_item_add_subtree(ti2, ett_a11_rqi_qos_attribute_set);
 
             /* QoS attribute setid */
             proto_tree_add_item(exts_tree2, hf_a11_rqi_qos_attribute_setid, tvb, offset+clen, 2, ENC_BIG_ENDIAN);
@@ -1177,10 +1189,13 @@ dissect_rev_qosinfo(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
 
         /* Granted QoS Blob */
         if (granted_qos_len) {
+            proto_item *ti3;
             proto_tree *exts_tree3;
 
-            exts_tree3 = proto_tree_add_subtree(flow_tree, tvb, offset+clen,granted_qos_len,
-                                        ett_a11_rqi_grantedqos, NULL, "Reverse Granted QoS ");
+            ti3 = proto_tree_add_text(flow_tree, tvb, offset+clen,granted_qos_len , "Reverse Granted QoS ");
+            exts_tree3 = proto_item_add_subtree(ti3, ett_a11_rqi_grantedqos);
+
+            proto_tree_add_text(exts_tree3, tvb, offset+clen, granted_qos_len, "Reverse Granted QoS Sub Blob");
 
             /* QoS attribute setid */
             proto_tree_add_item(exts_tree3, hf_a11_rqi_qos_granted_attribute_setid, tvb, offset+clen, 1, ENC_BIG_ENDIAN);
@@ -1198,10 +1213,12 @@ dissect_subscriber_qos_profile(tvbuff_t *tvb, packet_info *pinfo, int offset, in
 
     int qos_profile_len = ext_len;
 
-    exts_tree =
-        proto_tree_add_subtree_format(ext_tree, tvb, offset, 0, ett_a11_subscriber_profile, NULL,
+    proto_item *ti =
+        proto_tree_add_text (ext_tree, tvb, offset, 0,
                              "Subscriber Qos Profile (%d bytes)",
                              qos_profile_len);
+
+    exts_tree = proto_item_add_subtree(ti, ett_a11_subscriber_profile);
 
     /* Subscriber QoS profile */
     if (qos_profile_len) {
@@ -1232,11 +1249,11 @@ dissect_fwd_qosupdate_info(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
 
         guint8 flow_id = tvb_get_guint8(tvb, offset+clen);
 
-        exts_tree = proto_tree_add_subtree_format
-            (ext_tree, tvb, offset+clen, 1, ett_a11_fqui_flowentry, NULL,
-            "Forward Flow Entry (Flow Id: %d)", flow_id);
+        proto_item *ti = proto_tree_add_text
+            (ext_tree, tvb, offset+clen, 1, "Forward Flow Entry (Flow Id: %d)", flow_id);
 
         clen++;
+        exts_tree = proto_item_add_subtree(ti, ett_a11_fqui_flowentry);
 
         /* Forward QoS Sub Blob Length */
         granted_qos_len = tvb_get_guint8(tvb, offset+clen);
@@ -1274,10 +1291,10 @@ dissect_rev_qosupdate_info(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
 
         guint8      flow_id = tvb_get_guint8(tvb, offset+clen);
 
-        exts_tree = proto_tree_add_subtree_format
-            (ext_tree, tvb, offset+clen, 1, ett_a11_rqui_flowentry, NULL,
-                    "Reverse Flow Entry (Flow Id: %d)", flow_id);
+        proto_item *ti = proto_tree_add_text
+            (ext_tree, tvb, offset+clen, 1, "Reverse Flow Entry (Flow Id: %d)", flow_id);
         clen++;
+        exts_tree = proto_item_add_subtree(ti, ett_a11_rqui_flowentry);
 
         /* Reverse QoS Sub Blob Length */
         granted_qos_len = tvb_get_guint8(tvb, offset+clen);
@@ -1299,9 +1316,9 @@ dissect_rev_qosupdate_info(tvbuff_t *tvb, int offset, proto_tree *ext_tree)
 static void
 dissect_a11_extensions( tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree)
 {
+    proto_item *ti;
     proto_tree *exts_tree;
     proto_tree *ext_tree;
-    proto_item *ext_len_item = NULL;
     guint       ext_len;
     guint8      ext_type;
     guint8      ext_subtype = 0;
@@ -1310,7 +1327,8 @@ dissect_a11_extensions( tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tre
     gint16      apptype = -1;
 
     /* Add our tree, if we have extensions */
-    exts_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_a11_exts, NULL, "Extensions");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Extensions");
+    exts_tree = proto_item_add_subtree(ti, ett_a11_exts);
 
     /* And, handle each extension */
     while (tvb_reported_length_remaining(tvb, offset) > 0) {
@@ -1334,32 +1352,33 @@ dissect_a11_extensions( tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tre
             hdrLen  = 2;
         }
 
-        ext_tree = proto_tree_add_subtree_format(exts_tree, tvb, offset, ext_len + hdrLen,
-                                 ett_a11_ext, NULL, "Extension: %s",
-                                 val_to_str_ext(ext_type, &a11_ext_types_ext,
+        ti = proto_tree_add_text(exts_tree, tvb, offset, ext_len + hdrLen,
+                                 "Extension: %s",
+                                 val_to_str(ext_type, a11_ext_types,
                                             "Unknown Extension %u"));
+        ext_tree = proto_item_add_subtree(ti, ett_a11_ext);
 
         proto_tree_add_uint(ext_tree, hf_a11_ext_type, tvb, offset, 1, ext_type);
         offset += 1;
 
         if (ext_type == SS_EXT) {
-            ext_len_item = proto_tree_add_uint(ext_tree, hf_a11_ext_len, tvb, offset, 1, ext_len);
+            proto_tree_add_uint(ext_tree, hf_a11_ext_len, tvb, offset, 1, ext_len);
             offset += 1;
         }
         else if ((ext_type == CVSE_EXT) || (ext_type == OLD_CVSE_EXT)) {
             offset += 1;
-            ext_len_item = proto_tree_add_uint(ext_tree, hf_a11_ext_len, tvb, offset, 2, ext_len);
+            proto_tree_add_uint(ext_tree, hf_a11_ext_len, tvb, offset, 2, ext_len);
             offset += 2;
         }
         else if (ext_type != GEN_AUTH_EXT) {
             /* Another nasty hack since GEN_AUTH_EXT broke everything */
-            ext_len_item = proto_tree_add_uint(ext_tree, hf_a11_ext_len, tvb, offset, 1, ext_len);
+            proto_tree_add_uint(ext_tree, hf_a11_ext_len, tvb, offset, 1, ext_len);
             offset += 1;
         }
 
         switch (ext_type) {
         case SS_EXT:
-            decode_sse(ext_tree, pinfo, tvb, offset, ext_len, ext_len_item);
+            decode_sse(ext_tree, tvb, offset, ext_len);
             offset += ext_len;
             ext_len = 0;
             break;
@@ -1491,7 +1510,7 @@ dissect_a11_extensions( tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tre
                 proto_tree_add_item(ext_tree, hf_a11_vse_pdit, tvb, offset, 1, ENC_BIG_ENDIAN);
                 break;
             case 0x0802:
-                proto_tree_add_item(ext_tree, hf_a11_vse_session_parameter, tvb, offset, -1, ENC_NA);
+                proto_tree_add_text(ext_tree, tvb, offset, -1, "Session Parameter - Always On");
                 break;
             case 0x0803:
                 proto_tree_add_item(ext_tree, hf_a11_vse_qosmode, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -1523,7 +1542,7 @@ dissect_a11_extensions( tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tre
 
             break;
         case BCMCS_EXT:
-            decode_bcmcs(ext_tree, pinfo, tvb, offset, ext_len, ext_len_item);
+            decode_bcmcs(ext_tree, tvb, offset, ext_len);
             offset += ext_len;
             ext_len = 0;
             break;
@@ -1546,14 +1565,17 @@ dissect_a11( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     /* Set up structures we will need to add the protocol subtree and manage it */
     proto_item *ti;
     proto_tree *a11_tree = NULL;
+    proto_item *tf;
+    proto_tree *flags_tree;
     guint8      type;
+    guint8      flags;
     guint       offset   = 0;
 
     if (!tvb_bytes_exist(tvb, offset, 1))
         return 0;       /* not enough data to check message type */
 
     type = tvb_get_guint8(tvb, offset);
-    if (try_val_to_str_ext(type, &a11_types_ext) == NULL)
+    if (try_val_to_str(type, a11_types) == NULL)
         return 0;       /* not a known message type */
 
     /* Make entries in Protocol column and Info column on summary display */
@@ -1584,8 +1606,17 @@ dissect_a11( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
             offset += 1;
 
             /* flags */
-            proto_tree_add_bitmask(a11_tree, tvb, offset, hf_a11_flags,
-			                ett_a11_flags, a11_flags, ENC_NA);
+            flags = tvb_get_guint8(tvb, offset);
+            tf = proto_tree_add_uint(a11_tree, hf_a11_flags, tvb,
+                                     offset, 1, flags);
+            flags_tree = proto_item_add_subtree(tf, ett_a11_flags);
+            proto_tree_add_boolean(flags_tree, hf_a11_s, tvb, offset, 1, flags);
+            proto_tree_add_boolean(flags_tree, hf_a11_b, tvb, offset, 1, flags);
+            proto_tree_add_boolean(flags_tree, hf_a11_d, tvb, offset, 1, flags);
+            proto_tree_add_boolean(flags_tree, hf_a11_m, tvb, offset, 1, flags);
+            proto_tree_add_boolean(flags_tree, hf_a11_g, tvb, offset, 1, flags);
+            proto_tree_add_boolean(flags_tree, hf_a11_v, tvb, offset, 1, flags);
+            proto_tree_add_boolean(flags_tree, hf_a11_t, tvb, offset, 1, flags);
             offset += 1;
 
             /* lifetime */
@@ -1904,8 +1935,17 @@ dissect_a11( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
                offset += 1;
 
                /* flags */
-               proto_tree_add_bitmask(a11_tree, tvb, offset, hf_a11_flags,
-			                ett_a11_flags, a11_flags, ENC_NA);
+               flags = tvb_get_guint8(tvb, offset);
+               tf = proto_tree_add_uint(a11_tree, hf_a11_flags, tvb,
+                                        offset, 1, flags);
+               flags_tree = proto_item_add_subtree(tf, ett_a11_flags);
+               proto_tree_add_boolean(flags_tree, hf_a11_s, tvb, offset, 1, flags);
+               proto_tree_add_boolean(flags_tree, hf_a11_b, tvb, offset, 1, flags);
+               proto_tree_add_boolean(flags_tree, hf_a11_d, tvb, offset, 1, flags);
+               proto_tree_add_boolean(flags_tree, hf_a11_m, tvb, offset, 1, flags);
+               proto_tree_add_boolean(flags_tree, hf_a11_g, tvb, offset, 1, flags);
+               proto_tree_add_boolean(flags_tree, hf_a11_v, tvb, offset, 1, flags);
+               proto_tree_add_boolean(flags_tree, hf_a11_t, tvb, offset, 1, flags);
                offset += 1;
 
                /* lifetime */
@@ -2056,7 +2096,7 @@ proto_register_a11(void)
     static hf_register_info hf[] = {
         { &hf_a11_type,
           { "Message Type",           "a11.type",
-            FT_UINT8, BASE_DEC | BASE_EXT_STRING, &a11_types_ext, 0,
+            FT_UINT8, BASE_DEC, VALS(a11_types), 0,
             "A11 Message Type", HFILL }
         },
         { &hf_a11_flags,
@@ -2101,12 +2141,12 @@ proto_register_a11(void)
         },
         { &hf_a11_code,
           { "Reply Code",           "a11.code",
-            FT_UINT8, BASE_DEC | BASE_EXT_STRING, &a11_reply_codes_ext, 0,
+            FT_UINT8, BASE_DEC, VALS(a11_reply_codes), 0,
             "A11 Registration Reply code", HFILL }
         },
         { &hf_a11_status,
           { "Reply Status",           "a11.ackstat",
-            FT_UINT8, BASE_DEC | BASE_EXT_STRING, &a11_ack_status_ext, 0,
+            FT_UINT8, BASE_DEC, VALS(a11_ack_status), 0,
             "A11 Registration Ack Status", HFILL }
         },
         { &hf_a11_life,
@@ -2137,7 +2177,7 @@ proto_register_a11(void)
         },
         { &hf_a11_ext_type,
           { "Extension Type",           "a11.ext.type",
-            FT_UINT8, BASE_DEC | BASE_EXT_STRING, &a11_ext_types_ext, 0,
+            FT_UINT8, BASE_DEC, VALS(a11_ext_types), 0,
             "Mobile IP Extension Type", HFILL }
         },
         { &hf_a11_ext_stype,
@@ -2212,7 +2252,7 @@ proto_register_a11(void)
         },
         { &hf_a11_vse_apptype,
           { "Application Type",                      "a11.ext.apptype",
-            FT_UINT8, BASE_HEX | BASE_EXT_STRING, &a11_ext_app_ext, 0,
+            FT_UINT8, BASE_HEX, VALS(a11_ext_app), 0,
             NULL, HFILL }
         },
         { &hf_a11_vse_ppaddr,
@@ -2247,18 +2287,13 @@ proto_register_a11(void)
         },
         { &hf_a11_vse_code,
           { "Reply Code",           "a11.ext.code",
-            FT_UINT8, BASE_DEC | BASE_EXT_STRING, &a11_reply_codes_ext, 0,
+            FT_UINT8, BASE_DEC, VALS(a11_reply_codes), 0,
             NULL, HFILL }
         },
         /* XXX: Is this the correct filter name ?? */
         { &hf_a11_vse_pdit,
           { "PDSN Code",                      "a11.ext.code",
             FT_UINT8, BASE_HEX, VALS(a11_ext_nvose_pdsn_code), 0,
-            NULL, HFILL }
-        },
-        { &hf_a11_vse_session_parameter,
-          { "Session Parameter - Always On",                      "a11.ext.session_parameter",
-            FT_NONE, BASE_NONE, NULL, 0,
             NULL, HFILL }
         },
         { &hf_a11_vse_srvopt,
@@ -2585,7 +2620,7 @@ proto_register_a11(void)
 
         { &hf_a11_ase_forward_profile,
           { "Forward Profile",   "a11.ext.ase.forwardprofile",
-            FT_UINT16, BASE_DEC | BASE_EXT_STRING, &a11_rohc_profile_vals_ext, 0,
+            FT_UINT16, BASE_DEC, VALS(a11_rohc_profile_vals), 0,
             NULL, HFILL }
         },
 
@@ -2622,7 +2657,7 @@ proto_register_a11(void)
 
         { &hf_a11_ase_reverse_profile,
           { "Reverse Profile",   "a11.ext.ase.reverseprofile",
-            FT_UINT16, BASE_DEC | BASE_EXT_STRING, &a11_rohc_profile_vals_ext, 0,
+            FT_UINT16, BASE_DEC, VALS(a11_rohc_profile_vals), 0,
             NULL, HFILL }
         },
         { &hf_a11_aut_flow_prof_sub_type,
@@ -2711,10 +2746,6 @@ proto_register_a11(void)
 
     static ei_register_info ei[] = {
         { &ei_a11_sub_type_length_not2, { "a11.sub_type_length.bad", PI_PROTOCOL, PI_WARN, "Sub-Type Length should be at least 2", EXPFILL }},
-        { &ei_a11_sse_too_short, { "a11.sse_too_short", PI_MALFORMED, PI_ERROR, "SSE too short", EXPFILL }},
-        { &ei_a11_bcmcs_too_short, { "a11.bcmcs_too_short", PI_MALFORMED, PI_ERROR, "BCMCS too short", EXPFILL }},
-        { &ei_a11_entry_data_not_dissected, { "a11.entry_data_not_dissected", PI_UNDECODED, PI_WARN, "Entry Data, Not dissected yet", EXPFILL }},
-        { &ei_a11_session_data_not_dissected, { "a11.session_data_not_dissected", PI_UNDECODED, PI_WARN, "Session Data Type Not dissected yet", EXPFILL }},
     };
 
     expert_module_t* expert_a11;
@@ -2746,16 +2777,3 @@ proto_reg_handoff_a11(void)
     /* 3GPP2-Authorized-Flow-Profile-IDs(131) */
     radius_register_avp_dissector(VENDOR_THE3GPP2, 131, dissect_3gpp2_radius_aut_flow_profile_ids);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -25,10 +25,14 @@
 
 #include "config.h"
 
+#include <string.h>
 
 #include <epan/packet.h>
-#include "packet-tcp.h"
-#include "packet-epmd.h"
+#include <epan/strutil.h>
+#include <epan/wmem/wmem.h>
+
+#include <epan/dissectors/packet-tcp.h>
+#include <epan/dissectors/packet-epmd.h>
 
 #define ERL_PASS_THROUGH      'p'
 
@@ -120,7 +124,6 @@ static const value_string erldp_ctlmsg_vals[] = {
 int proto_erldp = -1;
 static int hf_erldp_length_2 = -1;
 static int hf_erldp_length_4 = -1;
-static int hf_etf_version_magic = -1;
 static int hf_erldp_tag = -1;
 static int hf_erldp_type = -1;
 static int hf_erldp_version = -1;
@@ -182,7 +185,7 @@ static gint dissect_etf_dist_header(packet_info *pinfo _U_, tvbuff_t *tvb, gint 
   const gchar *str;
 
   num = tvb_get_guint8(tvb, offset);
-  proto_tree_add_item(tree, hf_erldp_num_atom_cache_refs, tvb, offset, 1, ENC_BIG_ENDIAN );
+  proto_tree_add_item(tree, hf_erldp_num_atom_cache_refs, tvb, offset, 1, ENC_NA );
   offset++;
 
   if (num == 0)
@@ -207,12 +210,14 @@ static gint dissect_etf_dist_header(packet_info *pinfo _U_, tvbuff_t *tvb, gint 
   offset += flen;
 
   acrs_offset = offset;
-  acrs_tree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_etf_acrs, &ti_acrs, "AtomCacheRefs");
+  ti_acrs = proto_tree_add_text(tree, tvb, offset, 0, "AtomCacheRefs");
+  acrs_tree = proto_item_add_subtree(ti_acrs, ett_etf_acrs);
   for (i=0; i<num; i++) {
     flg = tvb_get_guint8(tvb, flg_offset + i / 2);
     new_entry = flg & (0x08 << 4*(i%2));
     acr_offset = offset;
-    acr_tree = proto_tree_add_subtree_format(acrs_tree, tvb, offset, 0, ett_etf_acr, &ti_acr, "AtomCacheRef[%2d]:", i);
+    ti_acr = proto_tree_add_text(acrs_tree, tvb, offset, 0, "AtomCacheRef[%2d]:", i);
+    acr_tree = proto_item_add_subtree(ti_acr, ett_etf_acr);
     isi = tvb_get_guint8(tvb, offset);
     proto_tree_add_uint(acr_tree, hf_erldp_internal_segment_index, tvb, offset, 1, isi);
     proto_item_append_text(ti_acr, " %3d", isi);
@@ -229,7 +234,7 @@ static gint dissect_etf_dist_header(packet_info *pinfo _U_, tvbuff_t *tvb, gint 
       proto_tree_add_uint(acr_tree, hf_erldp_atom_length, tvb, offset, 1, atom_txt_len);
       offset++;
     }
-    str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, atom_txt_len, ENC_ASCII);
+    str = tvb_get_string(wmem_packet_scope(), tvb, offset, atom_txt_len);
     proto_tree_add_item(acr_tree, hf_erldp_atom_text, tvb, offset, atom_txt_len, ENC_NA|ENC_ASCII);
     proto_item_append_text(ti_acr, " - '%s'", str);
     offset += atom_txt_len;
@@ -353,9 +358,10 @@ static gint dissect_etf_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     return 0;
   }
 
-  etf_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_etf, &ti, (label) ? label : "External Term Format");
+  ti = proto_tree_add_text(tree, tvb, offset, -1, "%s", (label) ? label : "External Term Format");
+  etf_tree = proto_item_add_subtree(ti, ett_etf);
 
-  proto_tree_add_item(etf_tree, hf_etf_version_magic, tvb, offset, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_text(etf_tree, tvb, offset, 1, "VERSION_MAGIC: %d", mag);
   offset++;
 
   tag = tvb_get_guint8(tvb, offset);
@@ -379,7 +385,8 @@ static gint dissect_etf_type(const gchar *label, packet_info *pinfo, tvbuff_t *t
   proto_tree *etf_tree;
   gchar *value_str = NULL;
 
-  etf_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_etf, &ti, (label) ? label : "External Term Format");
+  ti = proto_tree_add_text(tree, tvb, offset, -1, "%s", (label) ? label : "External Term Format");
+  etf_tree = proto_item_add_subtree(ti, ett_etf);
 
   tag = tvb_get_guint8(tvb, offset);
   proto_tree_add_item(etf_tree, hf_etf_tag, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -436,7 +443,7 @@ static void dissect_erldp_handshake(tvbuff_t *tvb, packet_info *pinfo, proto_tre
         offset += 4;
       }
       str_len = tvb_length_remaining(tvb, offset);
-      str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, str_len, ENC_ASCII);
+      str = tvb_get_string(wmem_packet_scope(), tvb, offset, str_len);
       proto_tree_add_item(tree, hf_erldp_name, tvb, offset, str_len, ENC_ASCII|ENC_NA);
       col_add_fstr(pinfo->cinfo, COL_INFO, "%s %s", (is_challenge) ? "SEND_CHALLENGE" : "SEND_NAME", str);
       break;
@@ -457,7 +464,7 @@ static void dissect_erldp_handshake(tvbuff_t *tvb, packet_info *pinfo, proto_tre
 
     case 's' :
       str_len = tvb_length_remaining(tvb, offset);
-      str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, str_len, ENC_ASCII);
+      str = tvb_get_string(wmem_packet_scope(), tvb, offset, str_len);
       proto_tree_add_item(tree, hf_erldp_status, tvb, offset, str_len, ENC_ASCII|ENC_NA);
       col_add_fstr(pinfo->cinfo, COL_INFO, "SEND_STATUS %s", str);
       break;
@@ -523,9 +530,7 @@ static int dissect_erldp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 }
 
 /*--- get_erldp_pdu_len -------------------------------------------------*/
-static guint get_erldp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                               int offset, void *data _U_)
-{
+static guint get_erldp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset) {
   if (is_handshake(tvb, offset))
     return(2 + tvb_get_ntohs(tvb, offset));
 
@@ -553,9 +558,6 @@ void proto_register_erldp(void) {
     { &hf_erldp_length_2, { "Length", "erldp.len",
                         FT_UINT16, BASE_DEC, NULL, 0x0,
                         "Message Length", HFILL}},
-    { &hf_etf_version_magic, { "VERSION_MAGIC", "erldp.version_magic",
-                        FT_UINT8, BASE_DEC, NULL, 0x0,
-                        NULL, HFILL}},
     { &hf_erldp_tag,  { "Tag", "erldp.tag",
                         FT_STRING, BASE_NONE, NULL, 0x0,
                         NULL, HFILL}},
@@ -686,18 +688,5 @@ void proto_register_erldp(void) {
 /*--- proto_reg_handoff_erldp -------------------------------------------*/
 void proto_reg_handoff_erldp(void) {
 
-  dissector_add_for_decode_as("tcp.port", erldp_handle);
+  dissector_add_handle("tcp.port", erldp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

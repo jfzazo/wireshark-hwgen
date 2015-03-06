@@ -38,7 +38,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -249,8 +249,8 @@ pcapng_count_string_option(const char *option_value)
                 /* There's a value to write; get its length */
                 return (guint32)(sizeof(struct option) +
                                  (guint16)ADD_PADDING(strlen(option_value)));
-        }
-        return 0; /* nothing to write */
+	}
+	return 0; /* nothing to write */
 }
 
 static gboolean
@@ -734,11 +734,11 @@ pcapng_write_interface_statistics_block(FILE* pfile,
  * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
  *
  * Local variables:
- * c-basic-offset: 8
+ * c-basic-offset: 4
  * tab-width: 8
  * indent-tabs-mode: nil
  * End:
  *
- * vi: set shiftwidth=8 tabstop=8 expandtab:
- * :indentSize=8:tabSize=8:noTabs=true:
+ * vi: set shiftwidth=4 tabstop=8 expandtab:
+ * :indentSize=4:tabSize=8:noTabs=true:
  */

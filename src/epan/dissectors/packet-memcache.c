@@ -33,6 +33,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/strutil.h>
 #include <epan/prefs.h>
@@ -240,8 +242,7 @@ is_memcache_request_or_reply(const gchar *data, int linelen, guint8 *opcode,
                              ReqRespDissector *reqresp_dissector);
 
 static guint
-get_memcache_pdu_len (packet_info *pinfo _U_, tvbuff_t *tvb,
-                      int offset, void *data _U_)
+get_memcache_pdu_len (packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   guint32 body_len;
 
@@ -647,7 +648,7 @@ get_payload_length (tvbuff_t *tvb, const int token_number, int offset,
     return FALSE;
   }
 
-  bytes_val = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, tokenlen, ENC_ASCII);
+  bytes_val = tvb_get_string (wmem_packet_scope(), tvb, offset, tokenlen);
   if (bytes_val) {
     if (sscanf (bytes_val, "%u", bytes) == 1) {
       *content_length_found = TRUE;
@@ -1003,7 +1004,7 @@ incr_dissector (tvbuff_t *tvb, proto_tree *tree, int offset)
   int            tokenlen;
 
   /* expecting to read 'bytes' number of bytes from the buffer. */
-  if (tvb_reported_length_remaining (tvb, offset) != 0) {
+  if (tvb_offset_exists (tvb, offset)) {
     /* Find the end of the line. */
     linelen = tvb_find_line_end (tvb, offset,
                                  tvb_ensure_length_remaining (tvb, offset), &next_offset,
@@ -1054,7 +1055,7 @@ stat_dissector (tvbuff_t *tvb, proto_tree *tree, int offset)
   guint32       slabclass;
   guchar        response_chars[21];
 
-  while (tvb_reported_length_remaining (tvb, offset) != 0) {
+  while (tvb_offset_exists (tvb, offset)) {
     /* Find the end of the line. */
     linelen = tvb_find_line_end (tvb, offset,
                                  tvb_ensure_length_remaining (tvb, offset), &next_offset,
@@ -1167,7 +1168,7 @@ get_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
   gchar          response_chars[21]; /* cover uint64 (20 + 1) bytes*/
 
   /* expecting to read 'bytes' number of bytes from the buffer. */
-  while (tvb_reported_length_remaining (tvb, offset) != 0) {
+  while (tvb_offset_exists (tvb, offset)) {
     /* Find the end of the line. */
     linelen = tvb_find_line_end (tvb, offset,
                                  tvb_ensure_length_remaining (tvb, offset), &next_offset,

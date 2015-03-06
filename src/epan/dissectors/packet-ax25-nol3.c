@@ -46,8 +46,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
 #include <epan/ax25_pids.h>
 
 #define STRLEN	80
@@ -292,16 +295,3 @@ proto_reg_handoff_ax25_nol3(void)
 	default_handle  = find_dissector( "data" );
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

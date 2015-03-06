@@ -25,6 +25,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/expert.h>
@@ -87,10 +89,6 @@ static int hf_dlsw_target_link_sap = -1;
 static int hf_dlsw_dlc_header_da = -1;
 static int hf_dlsw_netbios_name = -1;
 static int hf_dlsw_dlc_header_dsap = -1;
-static int hf_dlsw_reserved = -1;
-static int hf_dlsw_data = -1;
-static int hf_dlsw_vector_data = -1;
-static int hf_dlsw_unknown_data = -1;
 
 static gint ett_dlsw = -1;
 static gint ett_dlsw_header = -1;
@@ -100,7 +98,6 @@ static gint ett_dlsw_data = -1;
 static gint ett_dlsw_vector = -1;
 
 static expert_field ei_dlsw_dlc_header_length = EI_INIT;
-static expert_field ei_dlsw_not_used_for_capex = EI_INIT;
 
 #define  CANUREACH               0x03
 #define  ICANREACH               0x04
@@ -295,32 +292,32 @@ dissect_dlsw_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
 
     hlen=tvb_get_guint8(tvb,1);
 
-    dlsw_header_tree = proto_tree_add_subtree_format(dlsw_tree, tvb, 0, hlen, ett_dlsw_header, NULL,
-                               "DLSw header, %s",
+    ti2 = proto_tree_add_text (dlsw_tree, tvb, 0, hlen,"DLSw header, %s",
                                val_to_str_const(version , dlsw_version_vals, "Unknown Version"));
+    dlsw_header_tree = proto_item_add_subtree(ti2, ett_dlsw_header);
 
-    proto_tree_add_item(dlsw_header_tree, hf_dlsw_version, tvb, 0, 1, ENC_BIG_ENDIAN);
-    proto_tree_add_item(dlsw_header_tree, hf_dlsw_header_length, tvb, 1, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(dlsw_header_tree, hf_dlsw_version, tvb, 0, 1, ENC_NA);
+    proto_tree_add_item(dlsw_header_tree, hf_dlsw_header_length, tvb, 1, 1, ENC_NA);
     mlen=tvb_get_ntohs(tvb,2);
     proto_tree_add_item(dlsw_header_tree, hf_dlsw_message_length, tvb, 2, 2, ENC_BIG_ENDIAN);
     proto_tree_add_item(dlsw_header_tree, hf_dlsw_remote_dlc, tvb, 4, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(dlsw_header_tree, hf_dlsw_remote_dlc_pid, tvb, 8, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(dlsw_header_tree, hf_dlsw_reserved, tvb, 12, 2, ENC_NA) ;
+    proto_tree_add_text (dlsw_header_tree,tvb,12,2,"Reserved") ;
   } ;
 
   mtype=tvb_get_guint8(tvb,14);
   col_append_fstr(pinfo->cinfo, COL_INFO, ", %s",val_to_str_const(mtype , dlsw_type_vals, "Unknown message Type"));
   if (tree)
   {
-    proto_tree_add_item(dlsw_header_tree, hf_dlsw_message_type, tvb, 14, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(dlsw_header_tree, hf_dlsw_message_type, tvb, 14, 1, ENC_NA);
     if (mtype==CAP_EXCHANGE)
     {
-      proto_tree_add_expert(dlsw_header_tree, pinfo, &ei_dlsw_not_used_for_capex, tvb, 15, 1);
+      proto_tree_add_text (dlsw_header_tree,tvb, 15,1,"Not used for CapEx") ;
     }
     else
     {
       flags = tvb_get_guint8(tvb,15);
-      ti2 = proto_tree_add_item(dlsw_header_tree, hf_dlsw_flow_ctrl_byte, tvb, 15, 1, ENC_BIG_ENDIAN);
+      ti2 = proto_tree_add_item(dlsw_header_tree, hf_dlsw_flow_ctrl_byte, tvb, 15, 1, ENC_NA);
       dlsw_flags_tree = proto_item_add_subtree(ti2, ett_dlsw_fc);
       proto_tree_add_item(dlsw_flags_tree, hf_dlsw_flow_control_indication, tvb, 15, 1, ENC_BIG_ENDIAN);
       if (flags & 0x80)
@@ -333,31 +330,31 @@ dissect_dlsw_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
     {
       if (mtype==CAP_EXCHANGE)
       {
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_protocol_id, tvb, 16, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_header_number, tvb, 17, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_expert(dlsw_header_tree, pinfo, &ei_dlsw_not_used_for_capex, tvb, 18, 5);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_old_message_type, tvb, 23, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_expert(dlsw_header_tree, pinfo, &ei_dlsw_not_used_for_capex, tvb, 24, 14);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_capex_type, tvb, 38, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_expert(dlsw_header_tree, pinfo, &ei_dlsw_not_used_for_capex, tvb, 39, 33);
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_protocol_id, tvb, 16, 1, ENC_NA);
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_header_number, tvb, 17, 1, ENC_NA);
+        proto_tree_add_text (dlsw_header_tree,tvb, 18,5,"Not used for CapEx") ;
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_old_message_type, tvb, 23, 1, ENC_NA);
+        proto_tree_add_text (dlsw_header_tree,tvb, 24,14,"Not used for CapEx") ;
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_capex_type, tvb, 38, 1, ENC_NA);
+        proto_tree_add_text (dlsw_header_tree,tvb, 39,33,"Not used for CapEx") ;
       }
       else
       {
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_protocol_id, tvb, 16, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_header_number, tvb, 17, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_reserved, tvb, 18, 2, ENC_NA) ;
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_largest_frame_size, tvb, 20, 1, ENC_BIG_ENDIAN);
-        ti2 = proto_tree_add_item(dlsw_header_tree, hf_dlsw_ssp_flags, tvb, 21, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_protocol_id, tvb, 16, 1, ENC_NA);
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_header_number, tvb, 17, 1, ENC_NA);
+        proto_tree_add_text (dlsw_header_tree,tvb, 18,2,"Reserved") ;
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_largest_frame_size, tvb, 20, 1, ENC_NA);
+        ti2 = proto_tree_add_item(dlsw_header_tree, hf_dlsw_ssp_flags, tvb, 21, 1, ENC_NA);
         dlsw_flags_tree = proto_item_add_subtree(ti2, ett_dlsw_sspflags);
         proto_tree_add_item (dlsw_flags_tree, hf_dlsw_flags_explorer_msg, tvb, 21, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_circuit_priority, tvb, 22, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_old_message_type, tvb, 23, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_circuit_priority, tvb, 22, 1, ENC_NA);
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_old_message_type, tvb, 23, 1, ENC_NA);
         proto_tree_add_item(dlsw_header_tree, hf_dlsw_target_mac_address, tvb, 24, 6, ENC_NA);
         proto_tree_add_item(dlsw_header_tree, hf_dlsw_origin_mac_address, tvb, 30, 6, ENC_NA);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_origin_link_sap, tvb, 36, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_target_link_sap, tvb, 37, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_frame_direction, tvb, 38, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_reserved, tvb, 39, 3, ENC_NA) ;
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_origin_link_sap, tvb, 36, 1, ENC_NA);
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_target_link_sap, tvb, 37, 1, ENC_NA);
+        proto_tree_add_item(dlsw_header_tree, hf_dlsw_frame_direction, tvb, 38, 1, ENC_NA);
+        proto_tree_add_text (dlsw_header_tree,tvb, 39,3,"Reserved") ;
         dlchlen=tvb_get_ntohs(tvb,42);
         ti = proto_tree_add_item(dlsw_header_tree, hf_dlsw_dlc_header_length, tvb, 42, 2, ENC_BIG_ENDIAN);
         if ( dlchlen > mlen )
@@ -372,13 +369,14 @@ dissect_dlsw_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
         proto_tree_add_item(dlsw_header_tree, hf_dlsw_target_dlc_port_id, tvb, 56, 4, ENC_BIG_ENDIAN);
         proto_tree_add_item(dlsw_header_tree, hf_dlsw_target_dlc, tvb, 60, 4, ENC_BIG_ENDIAN);
         proto_tree_add_item(dlsw_header_tree, hf_dlsw_target_transport_id, tvb, 64, 4, ENC_BIG_ENDIAN);
-        proto_tree_add_item(dlsw_header_tree, hf_dlsw_reserved, tvb, 68, 4, ENC_NA) ;
+        proto_tree_add_text (dlsw_header_tree,tvb, 68,4,"Reserved") ;
       }
     }
 
 /* end of header dissector */
 
-    dlsw_data_tree = proto_tree_add_subtree(dlsw_tree, tvb, hlen, mlen, ett_dlsw_data, &ti2, "DLSw data");
+    ti2 = proto_tree_add_text (dlsw_tree, tvb, hlen, mlen,"DLSw data");
+    dlsw_data_tree = proto_item_add_subtree(ti2, ett_dlsw_data);
 
     switch (mtype)
     {
@@ -388,22 +386,22 @@ dissect_dlsw_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
       case IFCM:
       case INFOFRAME:
       case KEEPALIVE:
-        proto_tree_add_item(dlsw_data_tree, hf_dlsw_data, tvb, hlen, mlen, ENC_NA);
+        proto_tree_add_text (dlsw_data_tree,tvb,hlen,mlen,"Data") ;
         break;
 
       default:
         if (dlchlen!=0)
         {
-          proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_ac_byte, tvb, hlen, 1, ENC_BIG_ENDIAN);
-          proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_fc_byte, tvb, hlen+1, 1, ENC_BIG_ENDIAN);
+          proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_ac_byte, tvb, hlen, 1, ENC_NA);
+          proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_fc_byte, tvb, hlen+1, 1, ENC_NA);
           proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_da, tvb, hlen+2, 6, ENC_NA|ENC_ASCII);
           proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_sa, tvb, hlen+8, 6, ENC_NA|ENC_ASCII);
           proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_rif, tvb, hlen+14, 18, ENC_NA|ENC_ASCII);
-          proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_dsap, tvb, hlen+32, 1, ENC_BIG_ENDIAN);
-          proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_ssap, tvb, hlen+33, 1, ENC_BIG_ENDIAN);
-          proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_ctrl, tvb, hlen+34, 1, ENC_BIG_ENDIAN);
+          proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_dsap, tvb, hlen+32, 1, ENC_NA);
+          proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_ssap, tvb, hlen+33, 1, ENC_NA);
+          proto_tree_add_item(dlsw_data_tree, hf_dlsw_dlc_header_ctrl, tvb, hlen+34, 1, ENC_NA);
         }
-        proto_tree_add_item(dlsw_data_tree, hf_dlsw_data, tvb, hlen+dlchlen, mlen-dlchlen, ENC_NA);
+        proto_tree_add_text (dlsw_data_tree,tvb,hlen+dlchlen,mlen-dlchlen,"Data") ;
     }
 
   }
@@ -415,7 +413,7 @@ static void
 dissect_dlsw_capex(tvbuff_t *tvb, proto_tree *tree, proto_tree *ti2)
 {
   int mlen,vlen,vtype,offset=4,gdsid,sap,i=0;
-  proto_tree *dlsw_vector_tree;
+  proto_tree *ti,*dlsw_vector_tree;
   mlen=tvb_get_ntohs(tvb,0);
   gdsid=tvb_get_ntohs(tvb,2);
   proto_tree_add_item(tree, hf_dlsw_capabilities_length, tvb, 0, 2, ENC_BIG_ENDIAN);
@@ -433,10 +431,11 @@ dissect_dlsw_capex(tvbuff_t *tvb, proto_tree *tree, proto_tree *ti2)
         vlen=tvb_get_guint8(tvb,offset);
         if (vlen < 3) THROW(ReportedBoundsError);
         vtype=tvb_get_guint8(tvb,offset+1);
-        dlsw_vector_tree=proto_tree_add_subtree (tree,tvb,offset,vlen,ett_dlsw_vector,NULL,
+        ti=proto_tree_add_text (tree,tvb,offset,vlen,"%s",
                                 val_to_str_const(vtype,dlsw_vector_vals,"Unknown vector type"));
-        proto_tree_add_item(dlsw_vector_tree, hf_dlsw_vector_length, tvb, offset, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(dlsw_vector_tree, hf_dlsw_vector_type, tvb, offset+1, 1, ENC_BIG_ENDIAN);
+        dlsw_vector_tree = proto_item_add_subtree(ti, ett_dlsw_vector);
+        proto_tree_add_item(dlsw_vector_tree, hf_dlsw_vector_length, tvb, offset, 1, ENC_NA);
+        proto_tree_add_item(dlsw_vector_tree, hf_dlsw_vector_type, tvb, offset+1, 1, ENC_NA);
         switch (vtype){
           case 0x81:
             proto_tree_add_item(dlsw_vector_tree, hf_dlsw_oui, tvb, offset+2, vlen-2, ENC_BIG_ENDIAN);
@@ -467,7 +466,7 @@ dissect_dlsw_capex(tvbuff_t *tvb, proto_tree *tree, proto_tree *ti2)
             }
             break;
           case 0x87:
-            proto_tree_add_item(dlsw_vector_tree, hf_dlsw_tcp_connections, tvb, offset+2, vlen-2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(dlsw_vector_tree, hf_dlsw_tcp_connections, tvb, offset+2, vlen-2, ENC_NA);
             break;
           case 0x88:
             proto_tree_add_text (dlsw_vector_tree,tvb,offset+2,vlen-2,
@@ -484,16 +483,16 @@ dissect_dlsw_capex(tvbuff_t *tvb, proto_tree *tree, proto_tree *ti2)
             proto_tree_add_item(dlsw_vector_tree, hf_dlsw_vendor_oui, tvb, offset+2, vlen-2, ENC_BIG_ENDIAN);
             break;
           case 0x8c:
-            proto_tree_add_item(dlsw_vector_tree, hf_dlsw_multicast_version_number, tvb, offset+2, vlen-2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(dlsw_vector_tree, hf_dlsw_multicast_version_number, tvb, offset+2, vlen-2, ENC_NA);
             break;
           default:
-            proto_tree_add_item(dlsw_vector_tree, hf_dlsw_vector_data, tvb, offset+2, vlen-2, ENC_NA);
+            proto_tree_add_text (dlsw_vector_tree,tvb,offset+2,vlen-2,"Vector Data = ???");
         }
         offset+=vlen;
       };
       break;
     default:
-      proto_tree_add_item(tree, hf_dlsw_unknown_data, tvb, 4, mlen - 4, ENC_NA);
+      proto_tree_add_text (tree,tvb,4,mlen - 4,"Unknown data");
   }
 
 }
@@ -511,7 +510,7 @@ dissect_dlsw_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
 }
 
 static guint
-get_dlsw_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_dlsw_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   guint hlen, mlen;
 
@@ -548,70 +547,66 @@ void
 proto_register_dlsw(void)
 {
   static hf_register_info hf[] = {
-    {&hf_dlsw_flow_control_indication,
-     {"Flow Control Indication", "dlsw.flow_control_indication", FT_BOOLEAN, 8, TFS(&tfs_yes_no), 0x80,
-      NULL, HFILL}},
-    {&hf_dlsw_flow_control_ack,
-     {"Flow Control Acknowledgment", "dlsw.flow_control_ack", FT_BOOLEAN, 8, TFS(&tfs_yes_no), 0x40,
-      NULL, HFILL}},
-    {&hf_dlsw_flow_control_operator,
+	{&hf_dlsw_flow_control_indication,
+	 {"Flow Control Indication", "dlsw.flow_control_indication", FT_BOOLEAN, 8, TFS(&tfs_yes_no), 0x80,
+	  NULL, HFILL}},
+	{&hf_dlsw_flow_control_ack,
+	 {"Flow Control Acknowledgment", "dlsw.flow_control_ack", FT_BOOLEAN, 8, TFS(&tfs_yes_no), 0x40,
+	  NULL, HFILL}},
+	{&hf_dlsw_flow_control_operator,
      {"Flow Control Operator", "dlsw.flow_control_operator", FT_UINT8, BASE_DEC, VALS(dlsw_fc_cmd_vals), 0x07,
-      NULL, HFILL}},
-    {&hf_dlsw_flags_explorer_msg,
+	  NULL, HFILL}},
+	{&hf_dlsw_flags_explorer_msg,
      {"Explorer message", "dlsw.flags.explorer_msg", FT_BOOLEAN, 8, TFS(&tfs_yes_no), 0x80,
-      NULL, HFILL}},
-    /* Generated from convert_proto_tree_add_text.pl */
-    { &hf_dlsw_version, { "Version", "dlsw.version", FT_UINT8, BASE_DEC, VALS(dlsw_version_vals), 0x0, NULL, HFILL }},
-    { &hf_dlsw_header_length, { "Header Length", "dlsw.header_length", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_message_length, { "Message Length", "dlsw.message_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_remote_dlc, { "Remote DLC", "dlsw.remote_dlc", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_remote_dlc_pid, { "Remote DLC PID", "dlsw.remote_dlc_pid", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_message_type, { "Message Type", "dlsw.message_type", FT_UINT8, BASE_HEX, VALS(dlsw_type_vals), 0x0, NULL, HFILL }},
-    { &hf_dlsw_flow_ctrl_byte, { "Flow ctrl byte", "dlsw.flow_ctrl_byte", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_protocol_id, { "Protocol ID", "dlsw.protocol_id", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_header_number, { "Header Number", "dlsw.header_number", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_old_message_type, { "Old message type", "dlsw.old_message_type", FT_UINT8, BASE_HEX, VALS(dlsw_type_vals), 0x0, NULL, HFILL }},
-    { &hf_dlsw_capex_type, { "Capability exchange type", "dlsw.capex_type", FT_UINT8, BASE_HEX, VALS(dlsw_capex_type_vals), 0x0, NULL, HFILL }},
-    { &hf_dlsw_largest_frame_size, { "Largest Frame size", "dlsw.largest_frame_size", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_ssp_flags, { "SSP Flags", "dlsw.flags", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_circuit_priority, { "Circuit priority", "dlsw.circuit_priority", FT_UINT8, BASE_DEC, VALS(dlsw_pri_vals), 0x7, NULL, HFILL }},
-    { &hf_dlsw_target_mac_address, { "Target MAC Address", "dlsw.target_mac_address", FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_origin_mac_address, { "Origin MAC Address", "dlsw.origin_mac_address", FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_origin_link_sap, { "Origin Link SAP", "dlsw.origin_link_sap", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_target_link_sap, { "Target Link SAP", "dlsw.target_link_sap", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_frame_direction, { "Frame direction", "dlsw.frame_direction", FT_UINT8, BASE_HEX, VALS(dlsw_frame_direction_vals), 0x0, NULL, HFILL }},
-    { &hf_dlsw_dlc_header_length, { "DLC Header Length", "dlsw.dlc_header_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_origin_dlc_port_id, { "Origin DLC Port ID", "dlsw.origin_dlc_port_id", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_origin_dlc, { "Origin DLC", "dlsw.origin_dlc", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_origin_transport_id, { "Origin Transport ID", "dlsw.origin_transport_id", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_target_dlc_port_id, { "Target DLC Port ID", "dlsw.target_dlc_port_id", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_target_dlc, { "Target DLC", "dlsw.target_dlc", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_target_transport_id, { "Target Transport ID", "dlsw.target_transport_id", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_dlc_header_ac_byte, { "DLC Header - AC byte", "dlsw.dlc_header.ac_byte", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_dlc_header_fc_byte, { "DLC Header - FC byte", "dlsw.dlc_header.fc_byte", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_dlc_header_da, { "DLC Header - DA", "dlsw.dlc_header.da", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_dlc_header_sa, { "DLC Header - SA", "dlsw.dlc_header.sa", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_dlc_header_rif, { "DLC Header - RIF", "dlsw.dlc_header.rif", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_dlc_header_dsap, { "DLC Header - DSAP", "dlsw.dlc_header.dsap", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_dlc_header_ssap, { "DLC Header - SSAP", "dlsw.dlc_header.ssap", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_dlc_header_ctrl, { "DLC Header - Ctrl", "dlsw.dlc_header.ctrl", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_capabilities_length, { "Capabilities Length", "dlsw.capabilities_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_error_pointer, { "Error pointer", "dlsw.error_pointer", FT_INT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_error_cause, { "Error cause", "dlsw.error_cause", FT_UINT16, BASE_HEX, VALS(dlsw_refuse_vals), 0x0, NULL, HFILL }},
-    { &hf_dlsw_vector_length, { "Vector Length", "dlsw.vector_length", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_vector_type, { "Vector Type", "dlsw.vector_type", FT_UINT8, BASE_HEX, VALS(dlsw_vector_vals), 0x0, NULL, HFILL }},
-    { &hf_dlsw_oui, { "OUI", "dlsw.oui", FT_UINT24, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_initial_pacing_window, { "Initial Pacing Window", "dlsw.initial_pacing_window", FT_INT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_version_string, { "Version String", "dlsw.version_string", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_tcp_connections, { "TCP connections", "dlsw.tcp_connections", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_mac_address_list, { "MAC Address List", "dlsw.mac_address_list", FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_netbios_name, { "NetBIOS name", "dlsw.netbios_name", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_vendor_oui, { "Vendor OUI", "dlsw.vendor_oui", FT_UINT24, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_multicast_version_number, { "Multicast Version Number", "dlsw.multicast_version_number", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_reserved, { "Reserved", "dlsw.reserved", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_data, { "Data", "dlsw.data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_vector_data, { "Data", "dlsw.vector_data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-    { &hf_dlsw_unknown_data, { "Data", "dlsw.unknown_data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+	  NULL, HFILL}},
+      /* Generated from convert_proto_tree_add_text.pl */
+      { &hf_dlsw_version, { "Version", "dlsw.version", FT_UINT8, BASE_DEC, VALS(dlsw_version_vals), 0x0, NULL, HFILL }},
+      { &hf_dlsw_header_length, { "Header Length", "dlsw.header_length", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_message_length, { "Message Length", "dlsw.message_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_remote_dlc, { "Remote DLC", "dlsw.remote_dlc", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_remote_dlc_pid, { "Remote DLC PID", "dlsw.remote_dlc_pid", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_message_type, { "Message Type", "dlsw.message_type", FT_UINT8, BASE_HEX, VALS(dlsw_type_vals), 0x0, NULL, HFILL }},
+      { &hf_dlsw_flow_ctrl_byte, { "Flow ctrl byte", "dlsw.flow_ctrl_byte", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_protocol_id, { "Protocol ID", "dlsw.protocol_id", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_header_number, { "Header Number", "dlsw.header_number", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_old_message_type, { "Old message type", "dlsw.old_message_type", FT_UINT8, BASE_HEX, VALS(dlsw_type_vals), 0x0, NULL, HFILL }},
+      { &hf_dlsw_capex_type, { "Capability exchange type", "dlsw.capex_type", FT_UINT8, BASE_HEX, VALS(dlsw_capex_type_vals), 0x0, NULL, HFILL }},
+      { &hf_dlsw_largest_frame_size, { "Largest Frame size", "dlsw.largest_frame_size", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_ssp_flags, { "SSP Flags", "dlsw.flags", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_circuit_priority, { "Circuit priority", "dlsw.circuit_priority", FT_UINT8, BASE_DEC, VALS(dlsw_pri_vals), 0x7, NULL, HFILL }},
+      { &hf_dlsw_target_mac_address, { "Target MAC Address", "dlsw.target_mac_address", FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_origin_mac_address, { "Origin MAC Address", "dlsw.origin_mac_address", FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_origin_link_sap, { "Origin Link SAP", "dlsw.origin_link_sap", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_target_link_sap, { "Target Link SAP", "dlsw.target_link_sap", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_frame_direction, { "Frame direction", "dlsw.frame_direction", FT_UINT8, BASE_HEX, VALS(dlsw_frame_direction_vals), 0x0, NULL, HFILL }},
+      { &hf_dlsw_dlc_header_length, { "DLC Header Length", "dlsw.dlc_header_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_origin_dlc_port_id, { "Origin DLC Port ID", "dlsw.origin_dlc_port_id", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_origin_dlc, { "Origin DLC", "dlsw.origin_dlc", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_origin_transport_id, { "Origin Transport ID", "dlsw.origin_transport_id", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_target_dlc_port_id, { "Target DLC Port ID", "dlsw.target_dlc_port_id", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_target_dlc, { "Target DLC", "dlsw.target_dlc", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_target_transport_id, { "Target Transport ID", "dlsw.target_transport_id", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_dlc_header_ac_byte, { "DLC Header - AC byte", "dlsw.dlc_header.ac_byte", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_dlc_header_fc_byte, { "DLC Header - FC byte", "dlsw.dlc_header.fc_byte", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_dlc_header_da, { "DLC Header - DA", "dlsw.dlc_header.da", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_dlc_header_sa, { "DLC Header - SA", "dlsw.dlc_header.sa", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_dlc_header_rif, { "DLC Header - RIF", "dlsw.dlc_header.rif", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_dlc_header_dsap, { "DLC Header - DSAP", "dlsw.dlc_header.dsap", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_dlc_header_ssap, { "DLC Header - SSAP", "dlsw.dlc_header.ssap", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_dlc_header_ctrl, { "DLC Header - Ctrl", "dlsw.dlc_header.ctrl", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_capabilities_length, { "Capabilities Length", "dlsw.capabilities_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_error_pointer, { "Error pointer", "dlsw.error_pointer", FT_INT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_error_cause, { "Error cause", "dlsw.error_cause", FT_UINT16, BASE_HEX, VALS(dlsw_refuse_vals), 0x0, NULL, HFILL }},
+      { &hf_dlsw_vector_length, { "Vector Length", "dlsw.vector_length", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_vector_type, { "Vector Type", "dlsw.vector_type", FT_UINT8, BASE_HEX, VALS(dlsw_vector_vals), 0x0, NULL, HFILL }},
+      { &hf_dlsw_oui, { "OUI", "dlsw.oui", FT_UINT24, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_initial_pacing_window, { "Initial Pacing Window", "dlsw.initial_pacing_window", FT_INT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_version_string, { "Version String", "dlsw.version_string", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_tcp_connections, { "TCP connections", "dlsw.tcp_connections", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_mac_address_list, { "MAC Address List", "dlsw.mac_address_list", FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_netbios_name, { "NetBIOS name", "dlsw.netbios_name", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_vendor_oui, { "Vendor OUI", "dlsw.vendor_oui", FT_UINT24, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+      { &hf_dlsw_multicast_version_number, { "Multicast Version Number", "dlsw.multicast_version_number", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
   };
 
   static gint *ett[] = {
@@ -625,7 +620,6 @@ proto_register_dlsw(void)
 
   static ei_register_info ei[] = {
     { &ei_dlsw_dlc_header_length, { "dlsw.dlc_header_length.bogus", PI_PROTOCOL, PI_WARN, "DLC Header Length bogus", EXPFILL }},
-    { &ei_dlsw_not_used_for_capex, { "dlsw.not_used_for_capex", PI_PROTOCOL, PI_NOTE, "Not used for CapEx", EXPFILL }},
   };
 
   expert_module_t* expert_dlsw;
@@ -649,16 +643,3 @@ proto_reg_handoff_dlsw(void)
   dlsw_tcp_handle = new_create_dissector_handle(dissect_dlsw_tcp, proto_dlsw);
   dissector_add_uint("tcp.port", TCP_PORT_DLSW, dlsw_tcp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

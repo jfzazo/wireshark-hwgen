@@ -26,11 +26,13 @@
  */
 
 #include "config.h"
+#include "ws_symbol_export.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -38,7 +40,7 @@
 #include <epan/addr_resolv.h>
 #include <epan/epan_dissect.h>
 #include <epan/follow.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/tap.h>
 #include <epan/tvbuff-int.h>
 
@@ -85,8 +87,8 @@ typedef struct
   guint32       chunkMax;
 
   /* stream chunk file */
-  FILE         *filep;
-  gchar        *filenamep;
+  FILE *        filep;
+  gchar *       filenamep;
 } follow_t;
 
 #define STR_FOLLOW      "follow,"
@@ -100,7 +102,7 @@ typedef struct
 
 static void
 followExit(
-  const char *strp
+  const char *  strp
   )
 {
   fprintf(stderr, "tshark: follow - %s\n", strp);
@@ -109,7 +111,7 @@ followExit(
 
 static const char *
 followStrType(
-  const follow_t *fp
+  const follow_t *      fp
   )
 {
   switch (fp->type)
@@ -126,7 +128,7 @@ followStrType(
 
 static const char *
 followStrMode(
-  const follow_t *fp
+  const follow_t *      fp
   )
 {
   switch (fp->mode)
@@ -143,13 +145,12 @@ followStrMode(
 
 static const char *
 followStrFilter(
-  const follow_t *fp
+  const follow_t *      fp
   )
 {
   static char   filter[512];
   int           len     = 0;
-  const gchar  *verp;
-  gchar        *udpfilter;
+  const gchar * verp;
   gchar         ip0[MAX_IP6_STR_LEN];
   gchar         ip1[MAX_IP6_STR_LEN];
 
@@ -163,10 +164,6 @@ followStrFilter(
                      "tcp.stream eq %d", fp->index);
       break;
     case type_UDP:
-      udpfilter = build_follow_index_filter(UDP_STREAM);
-      len = g_snprintf(filter, sizeof filter,
-                     "%s", udpfilter);
-      g_free(udpfilter);
       break;
     }
   }
@@ -222,7 +219,7 @@ followStrFilter(
 
 static void
 followFileClose(
-  follow_t *fp
+  follow_t *    fp
   )
 {
   if (fp->filep != NULL)
@@ -245,11 +242,11 @@ followFileClose(
 
 static void
 followFileOpen(
-  follow_t *fp
+  follow_t *    fp
   )
 {
-  int   fd;
-  char *tempfilep;
+  int           fd;
+  char *        tempfilep;
 
   if (fp->type == type_TCP && data_out_file != NULL)
   {
@@ -293,7 +290,7 @@ followAlloc(
   type_e        type
   )
 {
-  follow_t *fp;
+  follow_t *    fp;
 
   fp = (follow_t *)g_malloc0(sizeof *fp);
 
@@ -306,7 +303,7 @@ followAlloc(
 
 static void
 followFree(
-  follow_t *fp
+  follow_t *    fp
   )
 {
   followFileClose(fp);
@@ -315,16 +312,16 @@ followFree(
 
 static int
 followUdpPacket(
-  void           *contextp,
-  packet_info    *pip,
-  epan_dissect_t *edp _U_,
-  const void     *datap
+  void *                contextp,
+  packet_info *         pip,
+  epan_dissect_t *      edp _U_,
+  const void *          datap
   )
 {
-  follow_t         *fp   = (follow_t *)contextp;
-  const tvbuff_t   *tvbp = (const tvbuff_t *)datap;
-  tcp_stream_chunk  sc;
-  size_t            size;
+  follow_t *            fp      = (follow_t *)contextp;
+  const tvbuff_t *      tvbp    = (const tvbuff_t *)datap;
+  tcp_stream_chunk      sc;
+  size_t                size;
 
   if (tvbp->length > 0)
   {
@@ -351,18 +348,18 @@ followUdpPacket(
 
 static int
 followSslPacket(
-  void           *contextp,
-  packet_info    *pip,
-  epan_dissect_t *edp  _U_,
-  const void     *datap
+  void *                contextp,
+  packet_info *         pip,
+  epan_dissect_t *      edp _U_,
+  const void *          datap
   )
 {
-  follow_t         *fp   = (follow_t *)contextp;
-  SslPacketInfo    *spip = (SslPacketInfo *)p_get_proto_data(wmem_file_scope(), pip, GPOINTER_TO_INT(datap), 0);
-  SslDataInfo      *sdip;
-  gint              length;
-  tcp_stream_chunk  sc;
-  size_t            size;
+  follow_t *            fp      = (follow_t *)contextp;
+  SslPacketInfo *       spip    = (SslPacketInfo *)p_get_proto_data(wmem_file_scope(), pip, GPOINTER_TO_INT(datap), 0);
+  SslDataInfo *         sdip;
+  gint                  length;
+  tcp_stream_chunk      sc;
+  size_t                size;
 
   if (spip == NULL)
   {
@@ -435,10 +432,10 @@ static const char       bin2hex[] = {'0', '1', '2', '3', '4', '5', '6', '7',
                                      '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 static void
 followPrintHex(
-  const char *prefixp,
-  guint32     offset,
-  void       *datap,
-  int         len
+  const char *  prefixp,
+  guint32       offset,
+  void *        datap,
+  int           len
   )
 {
   int           ii;
@@ -494,29 +491,29 @@ followPrintHex(
 
 static void
 followDraw(
-  void *contextp
+  void *        contextp
   )
 {
   static const char     separator[] =
     "===================================================================\n";
 
-  follow_t         *fp = (follow_t *)contextp;
-  tcp_stream_chunk  sc;
-  int               node;
-  const address    *addr[2];
-  int               port[2];
-  gchar             buf[MAX_IP6_STR_LEN];
-  guint32           ii;
-  guint32           jj;
-  guint32           len;
-  guint32           chunk;
-  guint32           offset[2];
-  guint8            bin[4096];
-  char              data[(sizeof bin * 2) + 2];
+  follow_t *            fp      = (follow_t *)contextp;
+  tcp_stream_chunk      sc;
+  int                   node;
+  const address *       addr[2];
+  int                   port[2];
+  gchar                 buf[MAX_IP6_STR_LEN];
+  guint32               ii;
+  guint32               jj;
+  guint32               len;
+  guint32               chunk;
+  guint32               offset[2];
+  guint8                bin[4096];
+  char                  data[(sizeof bin * 2) + 2];
 
   g_assert(sizeof bin % BYTES_PER_LINE == 0);
 
-  if ((fp->type == type_TCP) || (fp->type == type_UDP))
+  if (fp->type == type_TCP)
   {
     static const guint8 ip_zero[MAX_IPADDR_LEN] = {0};
     follow_stats_t      stats;
@@ -724,8 +721,8 @@ done:
 
 static gboolean
 followArgStrncmp(
-  const char **opt_argp,
-  const char  *strp
+  const char ** opt_argp,
+  const char *  strp
   )
 {
   int           len     = (guint32)strlen(strp);
@@ -740,8 +737,8 @@ followArgStrncmp(
 
 static void
 followArgMode(
-  const char **opt_argp,
-  follow_t    *fp
+  const char ** opt_argp,
+  follow_t *    fp
   )
 {
   if (followArgStrncmp(opt_argp, STR_HEX))
@@ -764,8 +761,8 @@ followArgMode(
 
 static void
 followArgFilter(
-  const char **opt_argp,
-  follow_t    *fp
+  const char ** opt_argp,
+  follow_t *    fp
   )
 {
 #define _STRING(s)      # s
@@ -826,8 +823,8 @@ followArgFilter(
 
 static void
 followArgRange(
-  const char **opt_argp,
-  follow_t    *fp
+  const char ** opt_argp,
+  follow_t *    fp
   )
 {
   int           len;
@@ -862,7 +859,7 @@ followArgRange(
 
 static void
 followArgDone(
-  const char *opt_argp
+  const char * opt_argp
   )
 {
   if (*opt_argp != 0)
@@ -873,12 +870,12 @@ followArgDone(
 
 static void
 followTcp(
-  const char *opt_argp,
-  void       *userdata _U_
+  const char *  opt_argp,
+  void *        userdata _U_
   )
 {
-  follow_t *fp;
-  GString  *errp;
+  follow_t *    fp;
+  GString *     errp;
 
   opt_argp += strlen(STR_FOLLOW_TCP);
 
@@ -892,17 +889,17 @@ followTcp(
   reset_tcp_reassembly();
   if (fp->index != G_MAXUINT32)
   {
-    if (!follow_index(TCP_STREAM, fp->index))
+    if (!follow_tcp_index(fp->index))
     {
-      followExit("Can't follow TCP index.");
+      followExit("Can't follow tcp index.");
     }
   }
   else
   {
-    if (!follow_addr(TCP_STREAM, &fp->addr[0], fp->port[0],
-                     &fp->addr[1], fp->port[1]))
+    if (!follow_tcp_addr(&fp->addr[0], fp->port[0],
+                         &fp->addr[1], fp->port[1]))
     {
-      followExit("Can't follow TCP address/port pairs.");
+      followExit("Can't follow tcp address/port pairs.");
     }
   }
 
@@ -914,18 +911,18 @@ followTcp(
   {
     followFree(fp);
     g_string_free(errp, TRUE);
-    followExit("Error registering TCP tap listener.");
+    followExit("Error registering tcp tap listener.");
   }
 }
 
 static void
 followUdp(
-  const char *opt_argp,
-  void       *userdata _U_
+  const char *  opt_argp,
+  void *        userdata _U_
   )
 {
-  follow_t *fp;
-  GString  *errp;
+  follow_t *    fp;
+  GString *     errp;
 
   opt_argp += strlen(STR_FOLLOW_UDP);
 
@@ -936,21 +933,9 @@ followUdp(
   followArgRange(&opt_argp, fp);
   followArgDone(opt_argp);
 
-  reset_udp_follow();
   if (fp->index != G_MAXUINT32)
   {
-    if (!follow_index(UDP_STREAM, fp->index))
-    {
-      followExit("Can't follow UDP index.");
-    }
-  }
-  else
-  {
-    if (!follow_addr(UDP_STREAM, &fp->addr[0], fp->port[0],
-                     &fp->addr[1], fp->port[1]))
-    {
-      followExit("Can't follow UDP address/port pairs.");
-    }
+    followExit("UDP does not support index filters.");
   }
 
   followFileOpen(fp);
@@ -961,18 +946,18 @@ followUdp(
   {
     followFree(fp);
     g_string_free(errp, TRUE);
-    followExit("Error registering UDP tap listner.");
+    followExit("Error registering udp tap listner.");
   }
 }
 
 static void
 followSsl(
-  const char *opt_argp,
-  void       *userdata _U_
+  const char *  opt_argp,
+  void *        userdata _U_
   )
 {
-  follow_t *fp;
-  GString  *errp;
+  follow_t *    fp;
+  GString *     errp;
 
   opt_argp += strlen(STR_FOLLOW_SSL);
 
@@ -983,7 +968,6 @@ followSsl(
   followArgRange(&opt_argp, fp);
   followArgDone(opt_argp);
 
-  reset_tcp_reassembly();
   if (fp->index == G_MAXUINT32)
   {
     followExit("SSL only supports index filters.");
@@ -997,57 +981,14 @@ followSsl(
   {
     followFree(fp);
     g_string_free(errp, TRUE);
-    followExit("Error registering SSL tap listener.");
+    followExit("Error registering ssl tap listener.");
   }
 }
-
-static stat_tap_ui followTcp_ui = {
-  REGISTER_STAT_GROUP_GENERIC,
-  NULL,
-  STR_FOLLOW_TCP,
-  followTcp,
-  -1,
-  0,
-  NULL
-};
-
-static stat_tap_ui followUdp_ui = {
-  REGISTER_STAT_GROUP_GENERIC,
-  NULL,
-  STR_FOLLOW_UDP,
-  followUdp,
-  -1,
-  0,
-  NULL
-};
-
-static stat_tap_ui followSsl_ui = {
-  REGISTER_STAT_GROUP_GENERIC,
-  NULL,
-  STR_FOLLOW_SSL,
-  followSsl,
-  -1,
-  0,
-  NULL
-};
 
 void
 register_tap_listener_follow(void)
 {
-  register_stat_tap_ui(&followTcp_ui, NULL);
-  register_stat_tap_ui(&followUdp_ui, NULL);
-  register_stat_tap_ui(&followSsl_ui, NULL);
+  register_stat_cmd_arg(STR_FOLLOW_TCP, followTcp, NULL);
+  register_stat_cmd_arg(STR_FOLLOW_UDP, followUdp, NULL);
+  register_stat_cmd_arg(STR_FOLLOW_SSL, followSsl, NULL);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

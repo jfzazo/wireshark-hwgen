@@ -23,11 +23,14 @@
  */
 
 #include "config.h"
-
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/strutil.h>
 #include <epan/prefs.h>
+#include <epan/dissectors/packet-tcp.h>
 #include <epan/uat.h>
-#include "packet-tcp.h"
+#include <epan/address.h>
+#include <epan/conversation.h>
 #include "packet-lbm.h"
 
 void proto_register_lbmpdm_tcp(void);
@@ -100,9 +103,9 @@ static lbmtcp_transport_t * lbmtcp_transport_add(const address * address1, guint
         return (entry);
     }
     entry = wmem_new(wmem_file_scope(), lbmtcp_transport_t);
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &(entry->addr1), address1);
+    SE_COPY_ADDRESS(&(entry->addr1), address1);
     entry->port1 = port1;
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &(entry->addr2), address2);
+    SE_COPY_ADDRESS(&(entry->addr2), address2);
     entry->port2 = port2;
     lbmtcp_order_key(entry);
     entry->channel = lbm_channel_assign(LBM_CHANNEL_TCP);
@@ -153,7 +156,7 @@ static uat_field_t lbmpdm_tcp_tag_array[] =
 /*----------------------------------------------------------------------------*/
 /* UAT callback functions.                                                    */
 /*----------------------------------------------------------------------------*/
-static void lbmpdm_tcp_tag_update_cb(void * record, char * * error_string)
+static void lbmpdm_tcp_tag_update_cb(void * record, const char * * error_string)
 {
     lbmpdm_tcp_tag_entry_t * tag = (lbmpdm_tcp_tag_entry_t *)record;
 
@@ -243,8 +246,7 @@ static int ett_lbmpdm_tcp = -1;
 static int hf_lbmpdm_tcp_tag = -1;
 static int hf_lbmpdm_tcp_channel = -1;
 
-static guint get_lbmpdm_tcp_pdu_length(packet_info * pinfo _U_, tvbuff_t * tvb,
-                                       int offset, void *data _U_)
+static guint get_lbmpdm_tcp_pdu_length(packet_info * pinfo _U_, tvbuff_t * tvb, int offset)
 {
     int encoding;
     int packet_len = 0;
@@ -436,7 +438,7 @@ void proto_reg_handoff_lbmpdm_tcp(void)
     if (!already_registered)
     {
         lbmpdm_tcp_dissector_handle = create_dissector_handle(dissect_lbmpdm_tcp, lbmpdm_tcp_protocol_handle);
-        dissector_add_for_decode_as("tcp.port", lbmpdm_tcp_dissector_handle);
+        dissector_add_handle("tcp.port", lbmpdm_tcp_dissector_handle); /* for "decode as" */
         heur_dissector_add("tcp", test_lbmpdm_tcp_packet, lbmpdm_tcp_protocol_handle);
     }
 

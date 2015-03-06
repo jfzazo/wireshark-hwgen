@@ -29,7 +29,6 @@
 #include <epan/column-info.h>
 #include <epan/column.h>
 #include <epan/packet.h>
-#include <epan/prefs.h>
 
 #include "packet_list.h"
 #include "proto_tree.h"
@@ -39,30 +38,20 @@
 #include "qt_ui_utils.h"
 
 #include "ui/main_statusbar.h"
-#include "ui/packet_list_utils.h"
-#include "ui/preference_utils.h"
 #include "ui/recent.h"
 #include "ui/recent_utils.h"
 #include "ui/ui_util.h"
-#include "ui/utf8_entities.h"
 
 #include "wsutil/str_util.h"
 
 #include "frame_tvbuff.h"
 
-#include <QAction>
-#include <QActionGroup>
-#include <QContextMenuEvent>
-#include <QHeaderView>
-#include <QMessageBox>
-#include <QScrollBar>
+#include <QTreeWidget>
 #include <QTabWidget>
 #include <QTextEdit>
-#include <QTreeWidget>
-
-// To do:
-// - Heading context menus
-// - Catch column reordering and rebuild the column list accoringly.
+#include <QScrollBar>
+#include <QContextMenuEvent>
+#include <QMessageBox>
 
 // If we ever add the ability to open multiple capture files we might be
 // able to use something like QMap<capture_file *, PacketList *> to match
@@ -91,12 +80,11 @@ packet_list_append(column_info *cinfo, frame_data *fdata)
 // Copied from ui/gtk/packet_list.c
 void packet_list_resize_column(gint col)
 {
-    Q_UNUSED(col)
     // xxx qtshark
 //    gint col_width;
 //    const gchar *long_str;
 
-//g_log(NULL, G_LOG_LEVEL_DEBUG, "FIX: packet_list_resize_column %d", col);
+g_log(NULL, G_LOG_LEVEL_DEBUG, "FIX: packet_list_resize_column %d", col);
 //    long_str = packet_list_get_widest_column_string(packetlist, col);
 //    if(!long_str || strcmp("",long_str)==0)
 //        /* If we get an empty string leave the width unchanged */
@@ -164,9 +152,8 @@ packet_list_clear(void)
 void
 packet_list_enable_color(gboolean enable)
 {
-    Q_UNUSED(enable);
     if (gbl_cur_packet_list && gbl_cur_packet_list->packetListModel()) {
-        gbl_cur_packet_list->packetListModel()->resetColorized();
+        gbl_cur_packet_list->packetListModel()->setColorEnabled(enable);
         gbl_cur_packet_list->update();
     }
 }
@@ -218,7 +205,7 @@ void
 packet_list_queue_draw(void)
 {
     if (gbl_cur_packet_list)
-        gbl_cur_packet_list->redrawVisiblePackets();
+        gbl_cur_packet_list->updateAll();
 }
 
 void
@@ -231,8 +218,6 @@ packet_list_recent_write_all(FILE *rf) {
 
 #define MIN_COL_WIDTH_STR "...."
 
-Q_DECLARE_METATYPE(PacketList::ColumnActions)
-
 PacketList::PacketList(QWidget *parent) :
     QTreeView(parent),
     proto_tree_(NULL),
@@ -242,18 +227,17 @@ PacketList::PacketList(QWidget *parent) :
     ctx_column_(-1)
 {
     QMenu *submenu, *subsubmenu;
-    QAction *action;
 
-    setItemsExpandable(false);
-    setRootIsDecorated(false);
-    setSortingEnabled(true);
-    setUniformRowHeights(true);
+    setItemsExpandable(FALSE);
+    setRootIsDecorated(FALSE);
+    setSortingEnabled(TRUE);
+    setUniformRowHeights(TRUE);
     setAccessibleName("Packet list");
     setItemDelegateForColumn(0, &related_packet_delegate_);
 
     packet_list_model_ = new PacketListModel(this, cap_file_);
     setModel(packet_list_model_);
-    sortByColumn(-1, Qt::AscendingOrder);
+    packet_list_model_->setColorEnabled(recent.packet_list_colorize);
 
     // XXX We might want to reimplement setParent() and fill in the context
     // menu there.
@@ -264,55 +248,43 @@ PacketList::PacketList(QWidget *parent) :
     ctx_menu_.addAction(window()->findChild<QAction *>("actionEditPacketComment"));
 
     ctx_menu_.addSeparator();
-
-    action = window()->findChild<QAction *>("actionFollow");
-    submenu = new QMenu();
-    action->setMenu(submenu);
-    ctx_menu_.addAction(action);
+    submenu = new QMenu(tr("Follow..."));
+    ctx_menu_.addMenu(submenu);
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowTCPStream"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowUDPStream"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowSSLStream"));
-
-    action = window()->findChild<QAction *>("actionSCTP");
-    submenu = new QMenu();
-    action->setMenu(submenu);
-    ctx_menu_.addAction(action);
+    filter_actions_ << submenu->actions();
+    //    "     <menuitem name='FollowTCPStream' action='/Follow TCP Stream'/>\n"
+    //    "     <menuitem name='FollowUDPStream' action='/Follow UDP Stream'/>\n"
+    //    "     <menuitem name='FollowSSLStream' action='/Follow SSL Stream'/>\n"
+    submenu = new QMenu(tr("SCTP"));
     ctx_menu_.addMenu(submenu);
     submenu->addAction(window()->findChild<QAction *>("actionSCTPAnalyseThisAssociation"));
     submenu->addAction(window()->findChild<QAction *>("actionSCTPShowAllAssociations"));
     submenu->addAction(window()->findChild<QAction *>("actionSCTPFilterThisAssociation"));
-
+    filter_actions_ << submenu->actions();
     ctx_menu_.addSeparator();
-
 //    "     <menuitem name='ManuallyResolveAddress' action='/ManuallyResolveAddress'/>\n"
-//    ctx_menu_.addSeparator();
-
-    action = window()->findChild<QAction *>("actionApply_as_Filter");
-    submenu = new QMenu();
-    action->setMenu(submenu);
-    ctx_menu_.addAction(action);
+    ctx_menu_.addSeparator();
+    submenu = new QMenu(tr("Apply as Filter"));
+    ctx_menu_.addMenu(submenu);
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFNotSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFAndSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFOrSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFAndNotSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeAAFOrNotSelected"));
-
-    action = window()->findChild<QAction *>("actionPrepare_a_Filter");
-    submenu = new QMenu();
-    action->setMenu(submenu);
-    ctx_menu_.addAction(action);
+    filter_actions_ << submenu->actions();
+    submenu = new QMenu(tr("Prepare a Filter"));
+    ctx_menu_.addMenu(submenu);
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFNotSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFAndSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFOrSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFAndNotSelected"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzePAFOrNotSelected"));
-
-//    action = window()->findChild<QAction *>("actionColorize_with_Filter");
-//    submenu = new QMenu();
-//    action->setMenu(submenu);
-//    ctx_menu_.addAction(action);
+    filter_actions_ << submenu->actions();
+    submenu = new QMenu(tr("Colorize with Filter"));
 //    "     <menu name= 'ConversationFilter' action='/Conversation Filter'>\n"
 //    "       <menuitem name='Ethernet' action='/Conversation Filter/Ethernet'/>\n"
 //    "       <menuitem name='IP' action='/Conversation Filter/IP'/>\n"
@@ -387,24 +359,20 @@ PacketList::PacketList(QWidget *parent) :
 //    "     <menuitem name='FollowUDPStream' action='/Follow UDP Stream'/>\n"
 //    "     <menuitem name='FollowSSLStream' action='/Follow SSL Stream'/>\n"
     ctx_menu_.addSeparator();
-
-    action = window()->findChild<QAction *>("actionCopy");
-    submenu = new QMenu();
-    action->setMenu(submenu);
-    ctx_menu_.addAction(action);
+//    "     <menu name= 'Copy' action='/Copy'>\n"
+    submenu = new QMenu(tr("Copy"));
+    ctx_menu_.addMenu(submenu);
     //    "        <menuitem name='SummaryTxt' action='/Copy/SummaryTxt'/>\n"
     //    "        <menuitem name='SummaryCSV' action='/Copy/SummaryCSV'/>\n"
     submenu->addAction(window()->findChild<QAction *>("actionEditCopyAsFilter"));
+    filter_actions_ << window()->findChild<QAction *>("actionEditCopyAsFilter");
     submenu->addSeparator();
-
-    action = window()->findChild<QAction *>("actionBytes");
-    subsubmenu = new QMenu();
-    action->setMenu(subsubmenu);
-    submenu->addAction(action);
+    subsubmenu = new QMenu(tr("Bytes"));
+    submenu->addMenu(subsubmenu);
     //    "           <menuitem name='OffsetHexText' action='/Copy/Bytes/OffsetHexText'/>\n"
     //    "           <menuitem name='OffsetHex' action='/Copy/Bytes/OffsetHex'/>\n"
     //    "           <menuitem name='PrintableTextOnly' action='/Copy/Bytes/PrintableTextOnly'/>\n"
-//    ctx_menu_.addSeparator();
+    ctx_menu_.addSeparator();
 //    "           <menuitem name='HexStream' action='/Copy/Bytes/HexStream'/>\n"
 //    "           <menuitem name='BinaryStream' action='/Copy/Bytes/BinaryStream'/>\n"
     ctx_menu_.addSeparator();
@@ -414,16 +382,8 @@ PacketList::PacketList(QWidget *parent) :
 //    "     <menuitem name='Print' action='/Print'/>\n"
 //    "     <menuitem name='ShowPacketinNewWindow' action='/ShowPacketinNewWindow'/>\n"
 
-    initHeaderContextMenu();
-
     g_assert(gbl_cur_packet_list == NULL);
     gbl_cur_packet_list = this;
-
-    connect(packet_list_model_, SIGNAL(goToPacket(int)), this, SLOT(goToPacket(int)));
-    connect(wsApp, SIGNAL(addressResolutionChanged()), this, SLOT(redrawVisiblePackets()));
-    header()->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(header(), SIGNAL(customContextMenuRequested(QPoint)),
-                SLOT(showHeaderMenu(QPoint)));
 }
 
 void PacketList::setProtoTree (ProtoTree *proto_tree) {
@@ -447,20 +407,21 @@ PacketListModel *PacketList::packetListModel() const {
 void PacketList::showEvent (QShowEvent *event) {
     Q_UNUSED(event);
 
-    for (int i = 0; i < prefs.num_cols; i++) {
+    if (!cap_file_) return;
+
+    for (int i = 0; i < cap_file_->cinfo.num_cols; i++) {
         int fmt, col_width;
         const char *long_str;
 
         fmt = get_column_format(i);
         long_str = get_column_width_string(fmt, i);
         if (long_str) {
-            col_width = packet_list_model_->columnTextSize(long_str);
+            col_width = wsApp->monospaceTextSize(long_str);
         } else {
-            col_width = packet_list_model_->columnTextSize(MIN_COL_WIDTH_STR);
+            col_width = wsApp->monospaceTextSize(MIN_COL_WIDTH_STR);
         }
         setColumnWidth(i, col_width);
     }
-    setColumnVisibility();
 }
 
 void PacketList::selectionChanged (const QItemSelection & selected, const QItemSelection & deselected) {
@@ -489,15 +450,12 @@ void PacketList::selectionChanged (const QItemSelection & selected, const QItemS
     if (byte_view_tab_) {
         GSList *src_le;
         struct data_source *source;
-        char* source_name;
 
         byte_view_tab_->clear();
 
         for (src_le = cap_file_->edt->pi.data_src; src_le != NULL; src_le = src_le->next) {
             source = (struct data_source *)src_le->data;
-            source_name = get_data_source_name(source);
-            byte_view_tab_->addTab(source_name, get_data_source_tvb(source), cap_file_->edt->tree, proto_tree_, (packet_char_enc)cap_file_->current_frame->flags.encoding);
-            wmem_free(NULL, source_name);
+            byte_view_tab_->addTab(get_data_source_name(source), get_data_source_tvb(source), cap_file_->edt->tree, proto_tree_, (packet_char_enc)cap_file_->current_frame->flags.encoding);
         }
         byte_view_tab_->setCurrentIndex(0);
     }
@@ -505,44 +463,72 @@ void PacketList::selectionChanged (const QItemSelection & selected, const QItemS
 
 void PacketList::contextMenuEvent(QContextMenuEvent *event)
 {
-    QAction *action;
-    gboolean is_tcp = FALSE, is_udp = FALSE, is_sctp = FALSE;
+    bool fa_enabled = filter_actions_[0]->isEnabled();
+    QAction *act;
+    gboolean is_tcp = FALSE, is_udp = FALSE;
 
     /* walk the list of a available protocols in the packet to see what we have */
-    if (cap_file_ != NULL && cap_file_->edt != NULL)
-        proto_get_frame_protocols(cap_file_->edt->pi.layers, NULL, &is_tcp, &is_udp, &is_sctp, NULL);
+    if ((cap_file_ != NULL) && (cap_file_->edt != NULL))
+    {
+        proto_get_frame_protocols(cap_file_->edt->pi.layers, NULL, &is_tcp, &is_udp, NULL, NULL);
+    }
 
-    action = window()->findChild<QAction *>("actionSCTP");
-    if (cap_file_ != NULL && cap_file_->edt != NULL && is_sctp)
-        action->setEnabled(TRUE);
-    else
-        action->setEnabled(FALSE);
+    foreach (act, filter_actions_)
+    {
+        act->setEnabled(true);
 
-    action = window()->findChild<QAction *>("actionAnalyzeFollowTCPStream");
-    action->setEnabled(is_tcp);
+        // check SCTP
+        if (act->objectName().contains("SCTP"))
+        {
+            if ((cap_file_ != NULL) && (cap_file_->edt != NULL) && (cap_file_->edt->pi.ipproto == IP_PROTO_SCTP))
+            {
+                act->setEnabled(true);
+            }
+            else
+            {
+                act->setEnabled(false);
+            }
+        }
 
-    action = window()->findChild<QAction *>("actionAnalyzeFollowUDPStream");
-    action->setEnabled(is_udp);
+        // check follow stream
+        if (act->text().contains("TCP"))
+        {
+            act->setEnabled(is_tcp);
+        }
 
-    action = window()->findChild<QAction *>("actionAnalyzeFollowSSLStream");
 
-    if (cap_file_ != NULL && cap_file_->edt != NULL &&
-            epan_dissect_packet_contains_field(cap_file_->edt, "ssl"))
-        action->setEnabled(TRUE);
-    else
-        action->setEnabled(FALSE);
+        if (act->text().contains("UDP"))
+        {
+            act->setEnabled(is_udp);
+        }
 
+
+        if ((cap_file_ != NULL) && act->text().contains("SSL"))
+        {
+            if (epan_dissect_packet_contains_field(cap_file_->edt, "ssl"))
+            {
+                act->setEnabled(true);
+            }
+            else
+            {
+                act->setEnabled(false);
+            }
+        }
+    }
     decode_as_->setData(qVariantFromValue(true));
     ctx_column_ = columnAt(event->x());
     ctx_menu_.exec(event->globalPos());
     ctx_column_ = -1;
     decode_as_->setData(QVariant());
+    foreach (act, filter_actions_) {
+        act->setEnabled(fa_enabled);
+    }
 }
 
 void PacketList::markFramesReady()
 {
     packets_bar_update();
-    redrawVisiblePackets();
+    updateAll();
 }
 
 void PacketList::setFrameMark(gboolean set, frame_data *fdata)
@@ -576,89 +562,36 @@ void PacketList::setFrameReftime(gboolean set, frame_data *fdata)
         cap_file_->displayed_count--;
         packet_list_model_->recreateVisibleRows();
     }
-}
-
-void PacketList::setColumnVisibility()
-{
-    for (int i = 0; i < prefs.num_cols; i++) {
-        setColumnHidden(i, get_column_visible(i) ? false : true);
-    }
-}
-
-void PacketList::initHeaderContextMenu()
-{
-    header_ctx_menu_.clear();
-    header_actions_.clear();
-
-    // Leave these out for now since Qt doesn't have a "no sort" option
-    // and the user can sort by left-clicking on the header.
-//    header_actions_[] = header_ctx_menu_.addAction(tr("Sort Ascending"));
-//    header_actions_[] = header_ctx_menu_.addAction(tr("Sort Descending"));
-//    header_actions_[] = header_ctx_menu_.addAction(tr("Do Not Sort"));
-//    header_ctx_menu_.addSeparator();
-    header_actions_[caAlignLeft] = header_ctx_menu_.addAction(tr("Align Left"));
-    header_actions_[caAlignCenter] = header_ctx_menu_.addAction(tr("Align Center"));
-    header_actions_[caAlignRight] = header_ctx_menu_.addAction(tr("Align Right"));
-    header_ctx_menu_.addSeparator();
-    header_actions_[caColumnPreferences] = header_ctx_menu_.addAction(tr("Column Preferences" UTF8_HORIZONTAL_ELLIPSIS));
-    header_actions_[caEditColumn] = header_ctx_menu_.addAction(tr("Edit Column")); // XXX Create frame instead of dialog
-    header_actions_[caResizeToContents] = header_ctx_menu_.addAction(tr("Resize To Contents"));
-    header_actions_[caResolveNames] = header_ctx_menu_.addAction(tr("Resolve Names"));
-    header_ctx_menu_.addSeparator();
-//    header_actions_[caDisplayedColumns] = header_ctx_menu_.addAction(tr("Displayed Columns"));
-    show_hide_separator_ = header_ctx_menu_.addSeparator();
-//    header_actions_[caHideColumn] = header_ctx_menu_.addAction(tr("Hide This Column"));
-    header_actions_[caRemoveColumn] = header_ctx_menu_.addAction(tr("Remove This Column"));
-
-    foreach (ColumnActions ca, header_actions_.keys()) {
-        header_actions_[ca]->setData(qVariantFromValue(ca));
-        connect(header_actions_[ca], SIGNAL(triggered()), this, SLOT(headerMenuTriggered()));
-    }
-
-    checkable_actions_ = QList<ColumnActions>() << caAlignLeft << caAlignCenter << caAlignRight << caResolveNames;
-    foreach (ColumnActions ca, checkable_actions_) {
-        header_actions_[ca]->setCheckable(true);
-    }
+    updateAll();
 }
 
 // Redraw the packet list and detail
-void PacketList::redrawVisiblePackets() {
+void PacketList::updateAll() {
+    update();
+
     if (!cap_file_) return;
+
+    if (selectedIndexes().length() > 0) {
+        cf_select_packet(cap_file_, selectedIndexes()[0].row());
+    }
 
     if (cap_file_->edt && cap_file_->edt->tree) {
         proto_tree_->fillProtocolTree(cap_file_->edt->tree);
     }
 
-    int row = currentIndex().row();
-
-    prefs.num_cols = g_list_length(prefs.col_list);
-    build_column_format_array(&cap_file_->cinfo, prefs.num_cols, FALSE);
-
     packet_list_model_->resetColumns();
-    if (row > 0) {
-        setCurrentIndex(packet_list_model_->index(row, 0));
-    }
-
-    update();
-    header()->update();
 }
 
 void PacketList::freeze()
 {
     setUpdatesEnabled(false);
     setModel(NULL);
-    // It looks like GTK+ sends a cursor-changed signal at this point but Qt doesn't
-    // call selectionChanged.
-    related_packet_delegate_.clear();
-    proto_tree_->clear();
-    byte_view_tab_->clear();
 }
 
 void PacketList::thaw()
 {
     setModel(packet_list_model_);
     setUpdatesEnabled(true);
-    setColumnVisibility();
 }
 
 void PacketList::clear() {
@@ -671,8 +604,7 @@ void PacketList::clear() {
     /* XXX is this correct in all cases?
      * Reset the sort column, use packetlist as model in case the list is frozen.
      */
-    sortByColumn(-1, Qt::AscendingOrder);
-    setColumnVisibility();
+    sortByColumn(0, Qt::AscendingOrder);
 }
 
 void PacketList::writeRecent(FILE *rf) {
@@ -744,6 +676,7 @@ QString &PacketList::getFilterFromRowAndColumn()
              */
             if (strlen(cap_file_->cinfo.col_expr.col_expr[ctx_column_]) != 0 &&
                 strlen(cap_file_->cinfo.col_expr.col_expr_val[ctx_column_]) != 0) {
+                /* leak a little but safer than ep_ here */
                 if (cap_file_->cinfo.col_fmt[ctx_column_] == COL_CUSTOM) {
                     header_field_info *hfi = proto_registrar_get_byname(cap_file_->cinfo.col_custom_field[ctx_column_]);
                     if (hfi->parent == -1) {
@@ -773,7 +706,7 @@ QString &PacketList::getFilterFromRowAndColumn()
 QString PacketList::packetComment()
 {
     int row = currentIndex().row();
-    const frame_data *fdata;
+    frame_data *fdata;
     char *pkt_comment;
 
     if (!cap_file_ || !packet_list_model_) return NULL;
@@ -808,7 +741,7 @@ void PacketList::setPacketComment(QString new_comment)
 
     cf_set_user_packet_comment(cap_file_, fdata, new_packet_comment);
 
-    redrawVisiblePackets();
+    updateAll();
 }
 
 QString PacketList::allPacketComments()
@@ -845,12 +778,6 @@ void PacketList::setCaptureFile(capture_file *cf)
     packet_list_model_->setCaptureFile(cf);
 }
 
-void PacketList::setMonospaceFont(const QFont &mono_font)
-{
-    packet_list_model_->setMonospaceFont(mono_font);
-    redrawVisiblePackets();
-}
-
 void PacketList::goNextPacket(void) {
     setCurrentIndex(moveCursor(MoveDown, Qt::NoModifier));
 }
@@ -883,8 +810,6 @@ void PacketList::markFrame()
     if (!cap_file_ || !packet_list_model_) return;
 
     fdata = packet_list_model_->getRowFdata(row);
-
-    if (!fdata) return;
 
     setFrameMark(!fdata->flags.marked, fdata);
     markFramesReady();
@@ -950,15 +875,13 @@ void PacketList::setTimeReference()
                 timestamp_set_type(TS_RELATIVE);
                 recent.gui_time_format  = TS_RELATIVE;
                 cf_timestamp_auto_precision(cap_file_);
-                setFrameReftime(!cap_file_->current_frame->flags.ref_time,
-                                cap_file_->current_frame);
             }
         } else {
             setFrameReftime(!cap_file_->current_frame->flags.ref_time,
                             cap_file_->current_frame);
         }
     }
-    redrawVisiblePackets();
+    updateAll();
 }
 
 void PacketList::unsetAllTimeReferences()
@@ -974,121 +897,12 @@ void PacketList::unsetAllTimeReferences()
             setFrameReftime(FALSE, fdata);
         }
     }
-    redrawVisiblePackets();
+    updateAll();
 }
 
 void PacketList::addRelatedFrame(int related_frame)
 {
     related_packet_delegate_.addRelatedFrame(related_frame);
-}
-
-void PacketList::showHeaderMenu(QPoint pos)
-{
-    header_ctx_column_ = header()->logicalIndexAt(pos);
-    foreach (ColumnActions ca, checkable_actions_) {
-        header_actions_[ca]->setChecked(false);
-    }
-
-    switch (recent_get_column_xalign(header_ctx_column_)) {
-    case COLUMN_XALIGN_LEFT:
-        header_actions_[caAlignLeft]->setChecked(true);
-        break;
-    case COLUMN_XALIGN_CENTER:
-        header_actions_[caAlignCenter]->setChecked(true);\
-        break;
-    case COLUMN_XALIGN_RIGHT:
-        header_actions_[caAlignRight]->setChecked(true);
-        break;
-    default:
-        break;
-    }
-
-    bool can_resolve = resolve_column(header_ctx_column_, cap_file_);
-    header_actions_[caResolveNames]->setChecked(can_resolve && get_column_resolved(header_ctx_column_));
-    header_actions_[caResolveNames]->setEnabled(can_resolve);
-
-    foreach (QAction *action, show_hide_actions_) {
-        header_ctx_menu_.removeAction(action);
-        delete action;
-    }
-    show_hide_actions_.clear();
-    for (int i = 0; i < prefs.num_cols; i++) {
-        QAction *action = new QAction(get_column_title(i), &header_ctx_menu_);
-        action->setCheckable(true);
-        action->setChecked(get_column_visible(i));
-        action->setData(qVariantFromValue(i));
-        connect(action, SIGNAL(triggered()), this, SLOT(columnVisibilityTriggered()));
-        header_ctx_menu_.insertAction(show_hide_separator_, action);
-        show_hide_actions_ << action;
-    }
-
-    header_ctx_menu_.popup(header()->viewport()->mapToGlobal(pos));
-}
-
-void PacketList::headerMenuTriggered()
-{
-    QAction *ha = qobject_cast<QAction*>(sender());
-    if (!ha) return;
-
-    bool checked = ha->isChecked();
-    bool redraw = false;
-
-    switch(ha->data().value<ColumnActions>()) {
-    case caAlignLeft:
-        recent_set_column_xalign(header_ctx_column_, checked ? COLUMN_XALIGN_LEFT : COLUMN_XALIGN_DEFAULT);
-        break;
-    case caAlignCenter:
-        recent_set_column_xalign(header_ctx_column_, checked ? COLUMN_XALIGN_CENTER : COLUMN_XALIGN_DEFAULT);
-        break;
-    case caAlignRight:
-        recent_set_column_xalign(header_ctx_column_, checked ? COLUMN_XALIGN_RIGHT : COLUMN_XALIGN_DEFAULT);
-        break;
-    case caColumnPreferences:
-        emit showPreferences(PreferencesDialog::ppColumn);
-        break;
-    case caEditColumn:
-        emit editColumn(header_ctx_column_);
-        break;
-    case caResolveNames:
-        set_column_resolved(header_ctx_column_, checked);
-        redraw = true;
-        break;
-    case caResizeToContents:
-        resizeColumnToContents(header_ctx_column_);
-        break;
-    case caDisplayedColumns:
-        // No-op
-        break;
-    case caHideColumn:
-        set_column_visible(header_ctx_column_, FALSE);
-        hideColumn(header_ctx_column_);
-        break;
-    case caRemoveColumn:
-        column_prefs_remove_nth(header_ctx_column_);
-        if (!prefs.gui_use_pref_save) {
-            prefs_main_write();
-        }
-        setColumnVisibility();
-        redraw = true;
-        break;
-    default:
-        break;
-    }
-
-    if (redraw) {
-        redrawVisiblePackets();
-    } else {
-        update();
-    }
-}
-
-void PacketList::columnVisibilityTriggered()
-{
-    QAction *ha = qobject_cast<QAction*>(sender());
-    if (!ha) return;
-
-    set_column_visible(ha->data().toInt(), ha->isChecked());
-    setColumnVisibility();
 }
 
 /*

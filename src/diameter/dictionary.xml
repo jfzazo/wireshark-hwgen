@@ -12,9 +12,13 @@
 	<!ENTITY mobileipv4		SYSTEM "mobileipv4.xml">
 	<!ENTITY chargecontrol		SYSTEM "chargecontrol.xml">
 	<!ENTITY sunping		SYSTEM "sunping.xml">
-	<!ENTITY TGPP			SYSTEM "TGPP.xml">
-	<!ENTITY TGPP2			SYSTEM "TGPP2.xml">
+	<!ENTITY imscxdx		SYSTEM "imscxdx.xml">
+	<!ENTITY TGPPGmb		SYSTEM "TGPPGmb.xml">
+	<!ENTITY TGPPS9			SYSTEM "TGPPS9.xml">
+	<!ENTITY TGPPSh			SYSTEM "TGPPSh.xml">
+	<!ENTITY TGPPRx			SYSTEM "TGPPRx.xml">
 	<!ENTITY sip			SYSTEM "sip.xml">
+	<!ENTITY gqpolicy		SYSTEM "gqpolicy.xml">
 	<!ENTITY etsie2e4		SYSTEM "etsie2e4.xml">
 	<!ENTITY Ericsson		SYSTEM "Ericsson.xml">
 	<!ENTITY mobileipv6		SYSTEM "mobileipv6.xml">
@@ -23,11 +27,10 @@
 	<!ENTITY Vodafone		SYSTEM "Vodafone.xml">
 	<!ENTITY AlcatelLucent		SYSTEM "AlcatelLucent.xml">
 	<!ENTITY Nokia			SYSTEM "Nokia.xml">
-	<!ENTITY NokiaSolutionsAndNetworks	SYSTEM "NokiaSolutionsAndNetworks.xml">
+	<!ENTITY NokiaSiemensNetworks	SYSTEM "NokiaSiemensNetworks.xml">
 	<!ENTITY SKT			SYSTEM "SKT.xml">
 	<!ENTITY ChinaTelecom		SYSTEM "ChinaTelecom.xml">
 	<!ENTITY VerizonWireless	SYSTEM "VerizonWireless.xml">
-	<!ENTITY HP			SYSTEM "HP.xml">
 	<!ENTITY Custom			SYSTEM "Custom.xml">
 ]>
 <dictionary>
@@ -68,7 +71,18 @@
 		    288 PPR / PPA [RFC4740]      sip.xml
 		    289-299 Unassigned
 		    300-313 Allocated for 3GPP [RFC3589]
-		    TGPP.xml ( 300 - 309 )
+		    imscxdx.xml ( 300 - 305 )
+		    300	User-Authorization-Request/-Answer	UAR/UAA	29.229 [2]
+		    301	Server-Assignment-Request/-Answer	SAR/SAA
+		    302	Location-Info-Request/-Answer		LIR/LIA
+		    303	Multimedia-Auth-Request/-Answer		MAR/MAA
+		    304	Registration-Termination-Request/-Answer RTR/RTA
+		    305	Push-Profile-Request/-Answer		PPR/PPA
+		    TGPPSh.xml  ( 306 - 309 )
+		    306	User-Data-Request/-Answer		UDR/UDA
+		    307	Profile-Update-Request/-Answer		PUR/PUA
+		    308	Subscribe-Notifications-Request/-Answer	SNR/SNA
+		    309	Push-Notification-Request/-Answer	PNR/PNA
 		-->
 
 		<command name="Boostrapping-Info"	code="310" vendor-id="None"/>		<!-- BIR/BIA	29.109 [7] -->
@@ -175,7 +189,7 @@
 		<vendor vendor-id="Sun" code="42" name="Sun Microsystems, Inc."/>
 		<vendor vendor-id="Merit" code="61" name="Merit Networks"/>
 		<vendor vendor-id="Nokia" code="94" name="Nokia"/>
-		<vendor vendor-id="NokiaSolutionsAndNetworks" code="28458" name="Nokia Solutions and Networks"/>
+		<vendor vendor-id="NokiaSiemensNetworks" code="28458" name="Nokia Siemens Networks"/>
 		<vendor vendor-id="Ericsson"  code="193" name="Ericsson"/>
 		<vendor vendor-id="USR" code="429" name="US Robotics Corp."/>
 		<vendor vendor-id="ALU" code="637" name="ALU Network"/>
@@ -1637,7 +1651,7 @@
 			<enum name="3GPP MM10" code="16777226"/>
 			<enum name="Ericsson MSI" code="16777227"/>
 			<enum name="Ericsson Zx" code="16777228"/>
-			<enum name="3GPP Rx Release 6" code="16777229"/>
+			<enum name="3GPP Rx" code="16777229"/>
 			<enum name="3GPP Pr" code="16777230"/>
 			<enum name="ETSI e4" code="16777231"/>
 			<enum name="Ericsson Charging-CIP" code="16777232"/>
@@ -1709,40 +1723,18 @@
 			16777297 Vedicis LiveProxy [Francois-Frederic_Ozog]
 			16777298 Pi*3GPP2 Diameter Application [3GPP2 publication X.S0057A E-UTRAN eHRPD][Avi_Lior]
 			16777299 Sandvine Rf+ [Yoni_Eitan]
+			16777300 Subscription Information Application [Lars_Anglert]
+			16777301 Ericsson Charging-DCIP [Lars_Anglert]
 			-->
-			<enum name="Subscription Information Application" code="16777300"/>
-			<enum name="Ericsson Charging-DCIP" code="16777301"/>
 			<enum name="3GPP Sy" code="16777302"/>
 			<enum name="3GPP Sd" code="16777303"/>
 			<enum name="Ericsson Sy" code="16777304"/>
-			<enum name="HP DTD" code="16777305"/>
 			<!--
-			16777306 M9 interface between MLM-PE(P) and MLM-PE(C)[ITU-T Q5/Sg11][Jin_Seek_Choi]
-			16777307 ITU-T M13 [ITU-T Q.3230][Kwihoon_Kim]
+			16777305 HP DTD [Chiranjeev_Agrawal][J_V_Kishore]
 			-->
-			<enum name="3GPP S7a" code="16777308"/>
 			<enum name="3GPP Tsp" code="16777309"/>
 			<enum name="3GPP S6m" code="16777310"/>
 			<enum name="3GPP T4" code="16777311"/>
-			<enum name="3GPP S6c" code="16777312"/>
-			<enum name="3GPP SGd" code="16777313"/>
-			<enum name="Intrado-SLg" code="16777314"/>
-			<enum name="Ericsson Diameter Signalling Controller Application (DSC)" code="16777315"/>
-			<!--
-			16777316 Verizon-Femto-Loc [Niranjan_Avula]
-			16777317 Nokia Solutions and Networks (NSN) Hd Application [Hannes_Tschofenig]
-			16777318 3GPP S15 [3GPP TS 29.212][Kimmo_Kymalainen]
-			16777319 3GPP S9a [3GPP TS 29.215][Kimmo_Kymalainen]
-			16777320 3GPP S9a* [3GPP TS 29.215][Kimmo_Kymalainen]
-			16777321 Gateway Location Application [Steve_Donovan]
-			16777322 Verizon Session Recovery [Niranjan_Avula]
-			16777323 3GPP2 M1 Interface [3GPP2 X.S0068][Jun_Wang]
-			16777324 MAGIC Client Interface Protocol (CIP) [ARINC 839][Paul_Prisaznuk][Manfred_Benten]
-			16777325 ITU-T Nc [ITU-T Rec. Q.nacp.Nc][Kwihoon_Kim]
-			-->
-			<enum name="ITU-T Nc" code="16777325"/>
-			<enum name="ITU-T Ne" code="16777326"/>
-			<enum name="Ericsson Sx" code="16777327"/>
 			<enum name="Relay" code="4294967295"/>
 		</avp>
 		<avp name="Acct-Application-Id" code="259" mandatory="must" protected="mustnot" may-encrypt="no" vendor-bit="mustnot">
@@ -1769,7 +1761,7 @@
 			<enum name="3GPP MM10" code="16777226"/>
 			<enum name="Ericsson MSI" code="16777227"/>
 			<enum name="Ericsson Zx" code="16777228"/>
-			<enum name="3GPP Rx Release 6" code="16777229"/>
+			<enum name="3GPP Rx" code="16777229"/>
 			<enum name="3GPP Pr" code="16777230"/>
 			<enum name="ETSI e4" code="16777231"/>
 			<enum name="Ericsson Charging-CIP" code="16777232"/>
@@ -1847,7 +1839,6 @@
 			<enum name="3GPP Sy" code="16777302"/>
 			<enum name="3GPP Sd" code="16777303"/>
 			<enum name="Ericsson Sy" code="16777304"/>
-			<enum name="Ericsson Sx" code="16777327"/>
 			<!--
 			16777305 HP DTD [Chiranjeev_Agrawal][J_V_Kishore]
 			-->
@@ -2712,19 +2703,9 @@
 		Note: The AVP codes from 1 to 255 are reserved for backwards compatibility with 3GPP RADIUS Vendor
 		Specific Attributes (See TS 29.061 [13])
 		Note: The AVP codes from 256 to 299 are reserved for future use.
-    -->
-    <avp name="Authentication-Method" code="300" mandatory="must" vendor-bit="must" vendor-id="TGPP" may-encrypt="yes">
-      <type type-name="Enumerated"/>
-      <enum name="WLAN_EAP_SIM" code="0"/>
-      <enum name="WLAN_EAP_AKA" code="1"/>
-    </avp>
-    <avp name="Authentication-Information-SIM" code="301" mandatory="must" vendor-bit="must" vendor-id="TGPP" may-encrypt="yes">
-      <type type-name="OctetString"/>
-    </avp>
-    <avp name="Authorization-Information-SIM" code="302" mandatory="must" vendor-bit="must" vendor-id="TGPP" may-encrypt="yes">
-      <type type-name="OctetString"/>
-    </avp>
-    <!--
+		300 Authentication-Method Enumerated
+		301 Authentication-Information-SIM OctetString
+		302 Authorization -Information-SIM OctetString
 		303 WLAN-User-Data Grouped
 		304 Charging-Data Grouped
 		305 WLAN-Access Enumerated
@@ -2741,7 +2722,6 @@
 		316 Primary-OCS-Charging-Function-Name DiameterIdentity
 		317 Secondary-OCS-Charging-Function-Name DiameterIdentity
 		-->
-
 
 		<avp name="3GPP-AAA-Server-Name" code="318" vendor-bit="must" may-encrypt="no" vendor-id="TGPP">
 			<type type-name="OctetString"/>
@@ -2890,9 +2870,41 @@
 		Note: The AVP codes from 421 to 499 are reserved for TS 29.109
 		-->
 
-		<!-- Note: The AVP codes from 500 to 599 are reserved for TS 29.209, TS 29.211 and TS 29.214 (TGPP.xml)
-		     Note: The AVP codes from 600 to 699 are reserved for TS 29.229. (TGPP.xml)
-		     Note: The AVP codes from 700 to 799 are reserved for TS 29.329. (TGPP.xml)
+		<!-- Ref 3GPP TS 29.209 version 6.7.0 Release 6
+		NOTE AVP 500 - 523 is in gqpolicy.xml
+		AVP 524 - 532 is in TGPPRx.xml (3GPP TS 29.214)
+		-->
+
+		<avp name="Rx-Request-Type" code="533" mandatory="may"  may-encrypt="yes" protected="may" vendor-bit="must" vendor-id="TGPP">
+			<type type-name="Enumerated"/>
+			<enum name="INITIAL_REQUEST" code="0"/>
+			<enum name="UPDATE_REQUEST" code="1"/>
+		</avp>
+		<avp name="Min-Requested-Bandwidth-DL" code="534" mandatory="may"  may-encrypt="yes" protected="may" vendor-bit="must" vendor-id="TGPP">
+			<type type-name="Unsigned32"/>
+		</avp>
+		<avp name="Min-Requested-Bandwidth-UL" code="535" mandatory="may" may-encrypt="yes" protected="may" vendor-bit="must" vendor-id="TGPP">
+			<type type-name="Unsigned32"/>
+		</avp>
+		<avp name="Required-Access-Info" code="536" mandatory="may" may-encrypt="yes" protected="may" vendor-bit="must" vendor-id="TGPP">
+			<type type-name="Enumerated"/>
+			<enum name="USER_LOCATION" code="0"/>
+			<enum name="MS_TIME_ZONE" code="1"/>
+		</avp>
+		<avp name="IP-Domain-Id" code="537" mandatory="may" may-encrypt="yes" protected="may" vendor-bit="must" vendor-id="TGPP">
+			<type type-name="OctetString"/>
+		</avp>
+
+		<!-- Note: The AVP codes from 533 to 599 are reserved for TS 29.209 and TS 29.211
+		NOTE AVP 600 - 652 is in imscxdx.xml
+
+		Note: The AVP codes from 652 to 699 are reserved for TS 29.229.
+		************************** 3GPP Sh AVPS		**************************
+		************************** NOTE see TGPPSh.xml	**************************
+		************************** 3GPP TS 29.329	**************************
+		**************************   700 - 717		**************************
+		Note: The AVP codes from 717 to799 are reserved for TS 29.329.
+		Note: The AVP codes from 800 to 822 are reserved for TS 32.299.
 		-->
 
 		<!-- 3GPP Diameter charging applications (3GPP TS 32.299 version 7.0.0 Release 7)-->
@@ -3502,7 +3514,9 @@
 		</avp>
 
 		<!--
-		Note: The AVP codes from 900 to 999 are reserved for TS 29.061 (TGPP.xml)
+		Note: The AVP codes from 900 to 999 are reserved for TS 29.061
+		29.210 -> 3GPP TS 29.212
+		******** Found in TGPPGmb.xml ********
 		-->
 
 		<avp name="Bearer-Usage" code="1000" mandatory="must" may-encrypt="yes" protected="may" vendor-bit="must" vendor-id="TGPP">
@@ -3591,19 +3605,16 @@
 			<enum name="DEFAULT-EPS-BEARER-QOS_MODIFICATION_FAILURE"	code="34"/>
 			<enum name="USER_CSG_HYBRID_SUBSCRIBED_INFORMATION_CHANGE"	code="35"/>
 			<enum name="USER_CSG_ HYBRID_UNSUBSCRIBED_INFORMATION_CHANGE"	code="36"/>
-			<enum name="ROUTING_RULE_CHANGE"				                              code="37"/>
-			<enum name="MAX_MBR_APN_AMBR_CHANGE"				                          code="38"/>
-			<enum name="APPLICATION_START"					                              code="39"/>
-			<enum name="APPLICATION_STOP"					                                code="40"/>
-			<enum name="ADC_REVALIDATION_TIMEOUT"				                          code="41"/>
-			<enum name="CS_TO_PS_HANDOVER"					                              code="42"/>
-			<enum name="UE_LOCAL_IP_ADDRESS_CHANGE"				                        code="43"/>
-			<enum name="H(E)NB_LOCAL_IP_ADDRESS_CHANGE"			                      code="44"/>
-      <enum name="ACCESS_NETWORK_INFO_REPORT"				                        code="45"/>
-      <enum name="CREDIT_MANAGEMENT_SESSION_FAILURE"	                      code="46"/>
-      <enum name="DEFAULT_QOS_CHANGE"		          		                      code="47"/>
-      <enum name="CHANGE_OF_UE_PRESENCE_IN_PRESENCE_REPORTING_AREA_REPORT"	code="48"/>
-      <enum name="TIME_CHANGE"					code="100"/>
+			<enum name="ROUTING_RULE_CHANGE"				code="37"/>
+			<enum name="MAX_MBR_APN_AMBR_CHANGE"				code="38"/>
+			<enum name="APPLICATION_START"					code="39"/>
+			<enum name="APPLICATION_STOP"					code="40"/>
+			<enum name="ADC_REVALIDATION_TIMEOUT"				code="41"/>
+			<enum name="CS_TO_PS_HANDOVER"					code="42"/>
+			<enum name="UE_LOCAL_IP_ADDRESS_CHANGE"				code="43"/>
+			<enum name="H(E)NB_LOCAL_IP_ADDRESS_CHANGE"			code="44"/>
+			<enum name="ACCESS_NETWORK_INFO_REPORT"				code="45"/>
+			<enum name="TIME_CHANGE"					code="100"/>
 			<enum name="TFT DELETED"					code="1000"/>
 			<enum name="LOSS OF BEARER"					code="1001"/>
 			<enum name="RECOVERY OF BEARER"					code="1002"/>
@@ -6087,7 +6098,8 @@
 		32.299 [5]
 		Note: The AVP codes from 2118 to 2199 are reserved for TS 32.299
 
-		Note: The AVP codes from 2200 to 2299 are reserved for TS 29.215 (TGPP.xml)
+		Note: The AVP codes from 2200 to 2299 are reserved for TS 29.215
+		Found in TGPPS9.xml
 		-->
 
 		<avp name="Reserved" code="2300" vendor-bit="must" vendor-id="TGPP">
@@ -6411,27 +6423,8 @@
 		<!--
 		Note: The AVP codes from 2607 to 2699 are reserved for TS 32.299
 		-->
-    <!-- -->
-    <avp name="Presence-Reporting-Area-Elements-List" code="2820" mandatory="must" vendor-bit="must" vendor-id="TGPP" may-encrypt="yes">
-      <type type-name="OctetString"/>
-    </avp>
-    <avp name="Presence-Reporting-Area-Identifier" code="2821" mandatory="must" vendor-bit="must" vendor-id="TGPP" may-encrypt="yes">
-      <type type-name="OctetString"/>
-    </avp>
-    <avp name="Presence-Reporting-Area-Information" code="2822" mandatory="must" vendor-bit="must" vendor-id="TGPP" may-encrypt="yes">
-      <grouped>
-        <gavp name="Presence-Reporting-Area-Identifier"/>
-        <gavp name="Presence-Reporting-Area-Status"/>
-        <gavp name="Presence-Reporting-Area-Elements-List"/>
-      </grouped>
-    </avp>
-    <avp name="Presence-Reporting-Area-Status" code="2823" mandatory="must" vendor-bit="must" vendor-id="TGPP" may-encrypt="yes">
-      <type type-name="Enumerated"/>
-      <enum name="In area" code="0"/>
-      <enum name="Out of area" code="1"/>
-    </avp>
 
-    <avp name="Policy-Counter-Identifier" code="2901" mandatory="must" vendor-bit="must" vendor-id="TGPP">
+		<avp name="Policy-Counter-Identifier" code="2901" mandatory="must" vendor-bit="must" vendor-id="TGPP">
 			<type type-name="UTF8String"/>
 		</avp>
 		<avp name="Policy-Counter-Status" code="2902" mandatory="must" vendor-bit="must" vendor-id="TGPP">
@@ -6599,32 +6592,118 @@
 			<enum name="UNIDENTIFIED_SUBSCRIBER" code="5"/>
 		</avp>
 
+		<!--- TGPP2 AVP's X.S0013-014-0
+		http://www.3gcn.org/TGPP2/TSGX/Projects/X.P0013-B%20IP%20Network%20-%20MMD/X.S0013-014%20v0.3.0%20SBBC%20Ty%20Stage-3.doc
+		-->
+		<avp name="Bearer-Usage" code="1000" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="Enumerated"/>
+			<enum name="GENERAL" code="0"/>
+			<enum name="IMS_SIGNALLING" code="1"/>
+		</avp>
+		<avp name="Charging-Rule-Install" code="1001" vendor-bit="must" vendor-id="TGPP2">
+			<grouped>
+				<gavp name="Charging-Rule-Definition"/>
+				<gavp name="Charging-Rule-Name"/>
+				<gavp name="Charging-Rule-Base-Name"/>
+			</grouped>
+		</avp>
+		<avp name="Charging-Rule-Remove" code="1002" vendor-bit="must" vendor-id="TGPP2">
+			<grouped>
+				<gavp name="Charging-Rule-Name"/>
+				<gavp name="Charging-Rule-Base-Name"/>
+			</grouped>
+		</avp>
+		<avp name="Charging-Rule-Definition" code="1003" vendor-bit="must" vendor-id="TGPP2">
+			<grouped>
+				<gavp name="Charging-Rule-Name"/>
+				<gavp name="Service-Identifier"/>
+				<gavp name="Rating-Group"/>
+				<gavp name="Flow-Description"/>
+				<gavp name="Reporting-Level"/>
+				<gavp name="Online"/>
+				<gavp name="Offline"/>
+				<gavp name="Metering-Method"/>
+				<gavp name="Precedence"/>
+				<gavp name="AF-Charging-Identifier"/>
+				<gavp name="Flows"/>
+			</grouped>
+		</avp>
+		<avp name="Charging-Rule-Base-Name" code="1004" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="OctetString"/>
+		</avp>
+		<avp name="Charging-Rule-Name" code="1005" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="OctetString"/>
+		</avp>
+		<avp name="Event-Trigger" code="1006" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="Enumerated"/>
+			<enum name="SGSN_CHANGE" code="0"/>
+			<enum name="QOS_CHANGE" code="1"/>
+			<enum name="RAT_CHANGE" code="2"/>
+			<enum name="TFT_CHANGE" code="3"/>
+		</avp>
+		<avp name="Metering-Method" code="1007" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="Enumerated"/>
+			<enum name="DURATION" code="0"/>
+			<enum name="VOLUME" code="1"/>
+			<enum name="DURATION_VOLUME" code="2"/>
+		</avp>
+		<avp name="Offline" code="1008" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="Enumerated"/>
+			<enum name="DISABLE_OFFLINE" code="0"/>
+			<enum name="ENABLE_OFFLINE" code="1"/>
+		</avp>
+		<avp name="Online" code="1009" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="Enumerated"/>
+			<enum name="DISABLE_ONLINE" code="0"/>
+			<enum name="ENABLE_ONLINE" code="1"/>
+		</avp>
+		<avp name="Precedence" code="1010" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="Unsigned32"/>
+		</avp>
+		<avp name="Primary-CCF-Address" code="1011" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="DiameterURI"/>
+		</avp>
+		<avp name="Primary-OCS-Address" code="1012" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="DiameterURI"/>
+		</avp>
+		<avp name="Reporting-Level" code="1014" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="Enumerated"/>
+			<enum name="CHARGING_RULE_LEVEL" code="0"/>
+			<enum name="RATING_GROUP_LEVEL" code="1"/>
+		</avp>
+		<avp name="Secondary-CCF-Address" code="1015" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="DiameterURI"/>
+		</avp>
+		<avp name="Secondary-OCS-Address" code="1016" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="DiameterURI"/>
+		</avp>
+		<avp name="TFT-Filter" code="1017" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="IPFilterRule"/>
+		</avp>
+		<avp name="TFT-Packet-Filter-Information" code="1018" vendor-bit="must" vendor-id="TGPP2">
+			<grouped>
+				<gavp name="Precedence"/>
+				<gavp name="TFT-Filter"/>
+				<gavp name="ToS-Traffic-Class"/>
+			</grouped>
+		</avp>
+		<avp name="ToS-Traffic-Class" code="1019" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="OctetString"/>
+		</avp>
+		<avp name="3GPP2-BSID" code="9010" mandatory="must" may-encrypt="no" protected="may" vendor-bit="must" vendor-id="TGPP2">
+			<type type-name="UTF8String"/>
+		</avp>
 	</base>
 
-	<!---
-	Duplicates should be avoided
-	16777216 is defined in TGPP.xml
-	16777217 is defined in TGPP.xml
-	16777222 is defined in TGPP.xml
-	16777223 is defined in TGPP.xml
-	16777224 is defined in ChinaTelecom.xml
-	16777227 is defined in Ericsson.xml
-	16777228 is defined in starent.xml
-	16777234 is defined in Vodafone.xml
-	16777236 is defined in TGPP.xml
-	16777237 is defined in TGPP2.xml
-	16777238 is defined in Cisco.xml
-	16777267 is defined in TGPP.xml
-	16777292 is defined in TGPP.xml
-	16777302 is defined in NokiaSolutionsAndNetworks.xml
-	16777304 is defined in SKT.xml
-	16777317 is defined in NokiaSolutionsAndNetworks.xml
-	-->
 	<application id="0"		name="Diameter Common Messages"	uri="http://www.ietf.org/rfc/rfc3588.txt?number=3588"></application>
 	<application id="3"		name="Diameter Base Accounting"	uri="http://www.ietf.org/rfc/rfc3588.txt?number=3588"></application>
-	<application id="16777219"	name="3GPP Wx"	uri="http://www.3GPP.org/ftp/Specs/html-info/29234.htm"></application>
-	<application id="16777229"	name="3GPP Rx Release 6" 	uri="http://www.3GPP.org/ftp/Specs/html-info/29211.htm"></application>
+	<application id="16777216"	name="3GPP Cx"			uri="http://www.ietf.org/rfc/rfc3588.txt?number=3588"></application>
+	<application id="16777224"	name="3GPP Gx"			uri="http://www.3gpp.org/ftp/Specs/html-info/29210.htm"></application>
+	<application id="16777227"	name="Ericsson MSI"		uri="http://www.iana.org/assignments/aaa-parameters/aaa-parameters.xml"></application>
+	<application id="16777228"	name="Ericsson Zx"		uri="http://www.3GPP.org/ftp/Specs/html-info/29229.htm"></application>
+	<application id="16777229"	name="3GPP RX"		 	uri="http://www.3GPP.org/ftp/Specs/html-info/29229.htm"></application>
 	<application id="16777232"	name="Ericsson Charging-CIP"	uri="http://www.3gpp.org/ftp/Specs/html-info/29210.htm"></application>
+	<application id="16777238"	name="3GPP Gx"			uri="http://www.3gpp.org/ftp/Specs/html-info/29212.htm"></application>
 	<application id="16777250"	name="3GPP STa"			uri="http://www.3gpp.org/ftp/Specs/html-info/29273.htm"></application>
 	<application id="16777251"	name="3GPP S6a/S6d"		uri="http://www.ietf.org/rfc/rfc5516.txt?number=5516"></application>
 	<application id="16777252"	name="3GPP S13/S13'"		uri="http://www.ietf.org/rfc/rfc5516.txt?number=5516"></application>
@@ -6635,8 +6714,10 @@
 	<application id="16777269"	name="Ericsson HSI"		uri="http://www.iana.org/assignments/aaa-parameters/aaa-parameters.xml"></application>
 	<application id="16777272"	name="3GPP S6b"			uri="http://www.3gpp.org/ftp/Specs/html-info/29273.htm"></application>
 	<application id="16777291"	name="3GPP SLh"			uri="http://www.ietf.org/rfc/rfc3588.txt?number=3588"></application>
+	<application id="16777292"	name="3GPP SGmb"		uri="http://www.3gpp.org/ftp/Specs/html-info/29061.htm"></application>
+	<application id="16777302"	name="3GPP Sy"			uri="http://www.3gpp.org/ftp/Specs/html-info/29219.htm"></application>
+	<application id="16777304"	name="Ericsson Sy"		uri="http://www.iana.org/assignments/aaa-parameters/aaa-parameters.xml"></application>
 	<application id="16777315"	name="Ericsson Diameter Signalling Controller Application (DSC)"	uri="http://www.iana.org/assignments/aaa-parameters/aaa-parameters.xml"></application>
-	<application id="16777327"	name="Ericsson Sx"		uri="http://www.iana.org/assignments/aaa-parameters/aaa-parameters.xml"></application>
 	<application id="4294967295"	name="Relay"			uri="http://www.ietf.org/rfc/rfc6733.txt?number=6733"></application>
 
 	&nasreq;
@@ -6644,9 +6725,13 @@
 	&mobileipv4;
 	&chargecontrol;
 	&sunping;
-	&TGPP;
-	&TGPP2;
+	&imscxdx;
+	&TGPPGmb;
+	&TGPPS9;
+	&TGPPSh;
+	&TGPPRx;
 	&sip;
+	&gqpolicy;
 	&etsie2e4;
 	&Ericsson;
 	&mobileipv6;
@@ -6655,10 +6740,9 @@
 	&Vodafone;
 	&AlcatelLucent;
 	&Nokia;
-	&NokiaSolutionsAndNetworks;
+	&NokiaSiemensNetworks;
 	&SKT;
 	&ChinaTelecom;
 	&VerizonWireless;
-	&HP;
 	&Custom;
 </dictionary>

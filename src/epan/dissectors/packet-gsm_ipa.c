@@ -24,7 +24,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/ipproto.h>
 #include <epan/prefs.h>
 
 void proto_register_ipa(void);
@@ -75,8 +78,7 @@ void proto_reg_handoff_gsm_ipa(void);
 #define IPA_UDP_PORTS "3006"
 #define IPA_UDP_PORTS_DEFAULT "0"
 
-static dissector_handle_t ipa_tcp_handle;
-static dissector_handle_t ipa_udp_handle;
+static dissector_handle_t ipa_handle;
 static range_t *global_ipa_tcp_ports = NULL;
 static range_t *global_ipa_udp_ports = NULL;
 static gboolean global_ipa_in_root = FALSE;
@@ -95,7 +97,6 @@ static int hf_ipa_osmo_ctrl_data = -1;
 static int hf_ipaccess_msgtype = -1;
 static int hf_ipaccess_attr_tag = -1;
 static int hf_ipaccess_attr_string = -1;
-static int hf_ipaccess_attribute_unk = -1;
 
 /* Initialize the subtree pointers */
 static gint ett_ipa = -1;
@@ -197,7 +198,8 @@ dissect_ipa_attr(tvbuff_t *tvb, int base_offs, proto_tree *tree)
 			break;
 		default:
 			len = 0;
-			proto_tree_add_uint(tree, hf_ipaccess_attribute_unk, tvb, offset+1, 1,
+			proto_tree_add_text(tree, tvb, offset+1, 1,
+					    "unknown attribute type 0x%02x",
 					    attr_type);
 			break;
 		};
@@ -279,7 +281,7 @@ dissect_osmo(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ipatree, proto_tree 
 
 /* Code to actually dissect the packets */
 static void
-dissect_ipa(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean is_udp)
+dissect_ipa(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	gint remaining;
 	gint header_length = 3;
@@ -307,7 +309,7 @@ dissect_ipa(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean is_udp
 		 * We attempt to detect this by checking if the length from the
 		 * header + four bytes of the IPA header equals the remaining size.
 		 */
-		if (is_udp && (len + 4 == remaining)) {
+		if ((pinfo->ipproto == IP_PROTO_UDP) && (len + 4 == remaining)) {
 			header_length++;
 		}
 
@@ -324,7 +326,7 @@ dissect_ipa(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean is_udp
 					    tvb, offset+2, 1, ENC_BIG_ENDIAN);
 		}
 
-		next_tvb = tvb_new_subset_length(tvb, offset+header_length, len);
+		next_tvb = tvb_new_subset(tvb, offset+header_length, len, len);
 
 		switch (msg_type) {
 		case ABISIP_OML:
@@ -357,7 +359,7 @@ dissect_ipa(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean is_udp
 			}
 			if (global_ipa_in_info == TRUE)
 				col_append_fstr(pinfo->cinfo, COL_INFO, "%s ",
-						tvb_get_stringz_enc(wmem_packet_scope(), next_tvb, 0, NULL, ENC_ASCII));
+						tvb_get_stringz(wmem_packet_scope(), next_tvb, 0, NULL));
 			break;
 		default:
 			if (msg_type < ABISIP_RSL_MAX) {
@@ -368,18 +370,6 @@ dissect_ipa(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean is_udp
 		}
 		offset += len + header_length;
 	}
-}
-
-static void
-dissect_ipa_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
-{
-	dissect_ipa(tvb, pinfo, tree, FALSE);
-}
-
-static void
-dissect_ipa_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
-{
-	dissect_ipa(tvb, pinfo, tree, TRUE);
 }
 
 void proto_register_ipa(void)
@@ -431,11 +421,6 @@ void proto_register_ipa(void)
 		  FT_STRING, BASE_NONE, NULL, 0x0,
 		  "String attribute", HFILL}
 		 },
-		{&hf_ipaccess_attribute_unk,
-		 {"Unknown attribute type", "ipaccess.attr_unk",
-		  FT_UINT8, BASE_HEX, NULL, 0x0,
-		  NULL, HFILL}
-		 },
 	};
 
 	static gint *ett[] = {
@@ -443,12 +428,18 @@ void proto_register_ipa(void)
 		&ett_ipaccess,
 	};
 
-	proto_ipa = proto_register_protocol("GSM over IP protocol as used by ip.access", "GSM over IP", "gsm_ipa");
-	proto_ipaccess = proto_register_protocol("GSM over IP ip.access CCM sub-protocol", "IPA", "ipaccess");
+	proto_ipa =
+	    proto_register_protocol("GSM over IP protocol as used by ip.access",
+				    "GSM over IP", "gsm_ipa");
+	proto_ipaccess =
+	    proto_register_protocol("GSM over IP ip.access CCM sub-protocol",
+				    "IPA", "ipaccess");
 
 	proto_register_field_array(proto_ipa, hf, array_length(hf));
 	proto_register_field_array(proto_ipaccess, hf_ipa, array_length(hf_ipa));
 	proto_register_subtree_array(ett, array_length(ett));
+
+	register_dissector("gsm_ipa", dissect_ipa, proto_ipa);
 
 	/* Register table for subdissectors */
 	osmo_dissector_table = register_dissector_table("ipa.osmo.protocol",
@@ -492,32 +483,18 @@ void proto_reg_handoff_gsm_ipa(void)
 		sub_handles[SUB_MGCP] = find_dissector("mgcp");
 		sub_handles[SUB_DATA] = find_dissector("data");
 
-		ipa_tcp_handle = create_dissector_handle(dissect_ipa_tcp, proto_ipa);
-		ipa_udp_handle = create_dissector_handle(dissect_ipa_udp, proto_ipa);
+		ipa_handle = create_dissector_handle(dissect_ipa, proto_ipa);
 		ipa_initialized = TRUE;
 	} else {
-		dissector_delete_uint_range("tcp.port", ipa_tcp_ports, ipa_tcp_handle);
+		dissector_delete_uint_range("tcp.port", ipa_tcp_ports, ipa_handle);
 		g_free(ipa_tcp_ports);
-		dissector_delete_uint_range("udp.port", ipa_udp_ports, ipa_udp_handle);
+		dissector_delete_uint_range("udp.port", ipa_udp_ports, ipa_handle);
 		g_free(ipa_udp_ports);
 	}
 
 	ipa_tcp_ports = range_copy(global_ipa_tcp_ports);
 	ipa_udp_ports = range_copy(global_ipa_udp_ports);
 
-	dissector_add_uint_range("udp.port", ipa_udp_ports, ipa_udp_handle);
-	dissector_add_uint_range("tcp.port", ipa_tcp_ports, ipa_tcp_handle);
+	dissector_add_uint_range("udp.port", ipa_udp_ports, ipa_handle);
+	dissector_add_uint_range("tcp.port", ipa_tcp_ports, ipa_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

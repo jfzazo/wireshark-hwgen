@@ -33,6 +33,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/to_str.h>
 #include <epan/expert.h>
@@ -54,7 +56,6 @@ static int hf_dtp_tot = -1;
 static int hf_dtp_tat = -1;
 static int hf_dtp_tos = -1;
 static int hf_dtp_tas = -1;
-static int hf_dtp_data = -1;
 
 static gint ett_dtp = -1;
 static gint ett_dtp_tlv = -1;
@@ -185,9 +186,10 @@ dissect_dtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		type = tvb_get_ntohs(tvb, offset);
 		length = tvb_get_ntohs(tvb, offset + 2);
 
-		tlv_tree = proto_tree_add_subtree(dtp_tree, tvb, offset, length, ett_dtp_tlv, NULL,
+		ti = proto_tree_add_text(dtp_tree, tvb, offset, length, "%s",
 					 val_to_str(type, dtp_tlv_type_vals, "Unknown TLV type: 0x%02x"));
 
+		tlv_tree = proto_item_add_subtree(ti, ett_dtp_tlv);
 		proto_tree_add_uint(tlv_tree, hf_dtp_tlvtype, tvb, offset, 2, type);
 		offset+=2;
 
@@ -225,6 +227,7 @@ dissect_dtp_tlv(packet_info *pinfo, tvbuff_t *tvb, int offset, int length,
 
 	case DTP_TLV_TRSTATUS:
 		if (length == 1) { /* Value field length must be 1 byte */
+			proto_item * value_item = NULL;
 			proto_tree * field_tree = NULL;
 			guint8 trunk_status = tvb_get_guint8(tvb, offset);
 
@@ -233,12 +236,13 @@ dissect_dtp_tlv(packet_info *pinfo, tvbuff_t *tvb, int offset, int length,
 				val_to_str_const(DTP_TOSVALUE(trunk_status), dtp_tos_vals, "Unknown operating status"),
 				val_to_str_const(DTP_TASVALUE(trunk_status), dtp_tas_vals, "Unknown administrative status"),
 				trunk_status);
-			field_tree = proto_tree_add_subtree_format(tree, tvb, offset, length, ett_dtp_status, NULL, "Value: %s/%s (0x%02x)",
+			value_item = proto_tree_add_text(tree, tvb, offset, length, "Value: %s/%s (0x%02x)",
 				val_to_str_const(DTP_TOSVALUE(trunk_status), dtp_tos_vals, "Unknown operating status"),
 				val_to_str_const(DTP_TASVALUE(trunk_status), dtp_tas_vals, "Unknown administrative status"),
 				trunk_status);
-			proto_tree_add_item(field_tree, hf_dtp_tos, tvb, offset, length, ENC_BIG_ENDIAN);
-			proto_tree_add_item(field_tree, hf_dtp_tas, tvb, offset, length, ENC_BIG_ENDIAN);
+			field_tree = proto_item_add_subtree(value_item, ett_dtp_status);
+			proto_tree_add_item(field_tree, hf_dtp_tos, tvb, offset, length, ENC_NA);
+			proto_tree_add_item(field_tree, hf_dtp_tas, tvb, offset, length, ENC_NA);
 			}
 			else
 				expert_add_info(pinfo, tlv_length_item, &ei_dtp_tlv_length_invalid);
@@ -247,19 +251,21 @@ dissect_dtp_tlv(packet_info *pinfo, tvbuff_t *tvb, int offset, int length,
 
 	case DTP_TLV_TRTYPE:
 		if (length == 1) { /* Value field length must be 1 byte */
-			proto_tree * field_tree;
+			proto_item * value_item = NULL;
+			proto_tree * field_tree = NULL;
 			guint8 trunk_type = tvb_get_guint8(tvb, offset);
 			proto_item_append_text(ti,
 				" (Operating/Administrative): %s/%s (0x%02x)",
 				val_to_str_const(DTP_TOTVALUE(trunk_type), dtp_tot_vals, "Unknown operating type"),
 				val_to_str_const(DTP_TATVALUE(trunk_type), dtp_tat_vals, "Unknown administrative type"),
 				trunk_type);
-			field_tree = proto_tree_add_subtree_format(tree, tvb, offset, length, ett_dtp_type, NULL, "Value: %s/%s (0x%02x)",
+			value_item = proto_tree_add_text(tree, tvb, offset, length, "Value: %s/%s (0x%02x)",
 				val_to_str_const(DTP_TOTVALUE(trunk_type), dtp_tot_vals, "Unknown operating type"),
 				val_to_str_const(DTP_TATVALUE(trunk_type), dtp_tat_vals, "Unknown administrative type"),
 				trunk_type);
-			proto_tree_add_item(field_tree, hf_dtp_tot, tvb, offset, length, ENC_BIG_ENDIAN);
-			proto_tree_add_item(field_tree, hf_dtp_tat, tvb, offset, length, ENC_BIG_ENDIAN);
+			field_tree = proto_item_add_subtree(value_item, ett_dtp_type);
+			proto_tree_add_item(field_tree, hf_dtp_tot, tvb, offset, length, ENC_NA);
+			proto_tree_add_item(field_tree, hf_dtp_tat, tvb, offset, length, ENC_NA);
 			}
 			else
 				expert_add_info(pinfo, tlv_length_item, &ei_dtp_tlv_length_invalid);
@@ -278,7 +284,7 @@ dissect_dtp_tlv(packet_info *pinfo, tvbuff_t *tvb, int offset, int length,
 		break;
 
 	default:
-		proto_tree_add_item(tree, hf_dtp_data, tvb, offset, length, ENC_NA);
+		proto_tree_add_text(tree, tvb, offset, length, "Data");
 		break;
 	}
 }
@@ -323,9 +329,6 @@ proto_register_dtp(void)
 		{ "Sender ID", "dtp.senderid", FT_ETHER, BASE_NONE,
 		NULL, 0x0, "MAC Address of neighbor", HFILL }},
 
-	{ &hf_dtp_data,
-		{ "Data", "dtp.data", FT_ETHER, BASE_NONE,
-		NULL, 0x0, NULL, HFILL }},
 	};
 
 	static gint *ett[] = {

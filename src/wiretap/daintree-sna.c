@@ -46,11 +46,15 @@
 
 #include "config.h"
 
+#include <glib.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 
+#include "wtap.h"
 #include "wtap-int.h"
+#include <wsutil/buffer.h>
 #include "file_wrappers.h"
 #include "daintree-sna.h"
 
@@ -85,31 +89,34 @@ static gboolean daintree_sna_process_hex_data(struct wtap_pkthdr *phdr,
 	Buffer *buf, char *readData, int *err, gchar **err_info);
 
 /* Open a file and determine if it's a Daintree file */
-wtap_open_return_val daintree_sna_open(wtap *wth, int *err, gchar **err_info)
+int daintree_sna_open(wtap *wth, int *err, gchar **err_info)
 {
 	char readLine[DAINTREE_MAX_LINE_SIZE];
+	guint i;
 
 	/* get first line of file header */
 	if (file_gets(readLine, DAINTREE_MAX_LINE_SIZE, wth->fh)==NULL) {
 		*err = file_error(wth->fh, err_info);
 		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+			return -1;
+		return 0;
 	}
 
 	/* check magic text */
-	if (memcmp(readLine, daintree_magic_text, DAINTREE_MAGIC_TEXT_SIZE) != 0)
-		return WTAP_OPEN_NOT_MINE; /* not daintree format */
+	i = 0;
+	while (i < DAINTREE_MAGIC_TEXT_SIZE) {
+		if (readLine[i] != daintree_magic_text[i]) return 0; /* not daintree format */
+		i++;
+	}
 
 	/* read second header line */
 	if (file_gets(readLine, DAINTREE_MAX_LINE_SIZE, wth->fh)==NULL) {
 		*err = file_error(wth->fh, err_info);
 		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+			return -1;
+		return 0;
 	}
-	if (readLine[0] != COMMENT_LINE)
-		return WTAP_OPEN_NOT_MINE; /* daintree files have a two line header */
+	if (readLine[0] != COMMENT_LINE) return 0; /* daintree files have a two line header */
 
 	/* set up the pointers to the handlers for this file type */
 	wth->subtype_read = daintree_sna_read;
@@ -118,10 +125,10 @@ wtap_open_return_val daintree_sna_open(wtap *wth, int *err, gchar **err_info)
 	/* set up for file type */
 	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_DAINTREE_SNA;
 	wth->file_encap = WTAP_ENCAP_IEEE802_15_4_NOFCS;
-	wth->file_tsprec = WTAP_TSPREC_USEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_USEC;
 	wth->snapshot_length = 0; /* not available in header */
 
-	return WTAP_OPEN_MINE; /* it's a Daintree file */
+	return 1; /* it's a Daintree file */
 }
 
 /* Read the capture file sequentially
@@ -279,20 +286,7 @@ daintree_sna_process_hex_data(struct wtap_pkthdr *phdr, Buffer *buf,
 
 	phdr->caplen = bytes;
 
-	ws_buffer_assure_space(buf, bytes);
-	memcpy(ws_buffer_start_ptr(buf), readData, bytes);
+	buffer_assure_space(buf, bytes);
+	memcpy(buffer_start_ptr(buf), readData, bytes);
 	return TRUE;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -31,8 +31,8 @@ extern "C" {
 #endif /* __cplusplus */
 
 /* Types of addresses Wireshark knows about. */
-/* If a new address type is added here, a string representation procedure should also be */
-/* included in address_to_str_buf defined in address_to_str.c, for presentation purposes */
+/* If a new address type is added here, a string representation procedure should */
+/* also be included in address_to_str_buf defined in to_str.c, for presentation purposes */
 
 typedef enum {
     AT_NONE,               /* no link-layer address */
@@ -46,7 +46,6 @@ typedef enum {
     AT_OSI,                /* OSI NSAP */
     AT_ARCNET,             /* ARCNET */
     AT_FC,                 /* Fibre Channel */
-    AT_FCWWN,              /* Fibre Channel WWN */
     AT_SS7PC,              /* SS7 Point Code */
     AT_STRINGZ,            /* null-terminated string */
     AT_EUI64,              /* IEEE EUI-64 */
@@ -63,10 +62,10 @@ typedef enum {
 } address_type;
 
 typedef struct _address {
-    address_type  type;         /* type of address */
-    int           hf;           /* the specific field that this addr is */
-    int           len;          /* length of address, in bytes */
-    const void  *data;          /* pointer to address data */
+    address_type  type;		/* type of address */
+    int           hf;		/* the specific field that this addr is */
+    int           len;		/* length of address, in bytes */
+    const void	*data;		/* pointer to address data */
 } address;
 
 /** Initialize an address with the given values.
@@ -84,7 +83,7 @@ set_address(address *addr, address_type addr_type, int addr_len, const void * ad
     addr->hf   = -1;
     addr->len  = addr_len;
 }
-#define SET_ADDRESS(addr, addr_type, addr_len, addr_data) \
+#define	SET_ADDRESS(addr, addr_type, addr_len, addr_data) \
     set_address((addr), (addr_type), (addr_len), (addr_data))
 
 /** Initialize an address from TVB data.
@@ -102,7 +101,7 @@ set_address(address *addr, address_type addr_type, int addr_len, const void * ad
  * @param addr_len [in] The length in bytes of the address data. For example, 4 for
  *                     AT_IPv4 or sizeof(struct e_in6_addr) for AT_IPv6.
  */
-#define TVB_SET_ADDRESS(addr, addr_type, tvb, offset, addr_len) \
+#define	TVB_SET_ADDRESS(addr, addr_type, tvb, offset, addr_len) \
     do {                            \
         const void *TVB_SET_ADDRESS_data = (const void *)tvb_get_ptr(tvb, offset, addr_len); \
         set_address((addr), (addr_type), (addr_len), TVB_SET_ADDRESS_data); \
@@ -124,7 +123,7 @@ set_address_hf(address *addr, address_type addr_type, int addr_len, const void *
     addr->hf   = addr_hf;
     addr->len  = addr_len;
 }
-#define SET_ADDRESS_HF(addr, addr_type, addr_len, addr_data, addr_hf) \
+#define	SET_ADDRESS_HF(addr, addr_type, addr_len, addr_data, addr_hf) \
     set_address_hf((addr), (addr_type), (addr_len), (addr_data), (addr_hf))
 
 /** Initialize an address from TVB data including an associated field.
@@ -143,7 +142,7 @@ set_address_hf(address *addr, address_type addr_type, int addr_len, const void *
  *                     AT_IPv4 or sizeof(struct e_in6_addr) for AT_IPv6.
  * @param addr_hf [in] The header field index to associate with the address.
  */
-#define TVB_SET_ADDRESS_HF(addr, addr_type, tvb, offset, addr_len, addr_hf) \
+#define	TVB_SET_ADDRESS_HF(addr, addr_type, tvb, offset, addr_len, addr_hf) \
     do {                            \
         const void *TVB_SET_ADDRESS_data = (const void *) tvb_get_ptr(tvb, offset, addr_len); \
         set_address_hf((addr), (addr_type), (addr_len), TVB_SET_ADDRESS_data, (addr_hf)); \
@@ -228,18 +227,18 @@ copy_address_shallow(address *to, const address *from) {
 #define COPY_ADDRESS_SHALLOW(to, from) copy_address_shallow((to), (from))
 
 /** Copy an address, allocating a new buffer for the address data
- *  using wmem-scoped memory.
+ *  using seasonal memory.
  *
  * @param to [in,out] The destination address.
  * @param from [in] The source address.
  */
-#define WMEM_COPY_ADDRESS(scope, to, from)     \
+#define SE_COPY_ADDRESS(to, from)     \
     do {                              \
-        void *WMEM_COPY_ADDRESS_data; \
+        void *SE_COPY_ADDRESS_data; \
         copy_address_shallow((to), (from)); \
-        WMEM_COPY_ADDRESS_data = wmem_alloc(scope, (from)->len); \
-        memcpy(WMEM_COPY_ADDRESS_data, (from)->data, (from)->len); \
-        (to)->data = WMEM_COPY_ADDRESS_data; \
+        SE_COPY_ADDRESS_data = se_alloc((from)->len); \
+        memcpy(SE_COPY_ADDRESS_data, (from)->data, (from)->len); \
+        (to)->data = SE_COPY_ADDRESS_data; \
     } while (0)
 
 
@@ -285,35 +284,35 @@ add_address_to_hash64(guint64 hash_val, const address *addr) {
 
 /* Types of port numbers Wireshark knows about. */
 typedef enum {
-    PT_NONE,            /* no port number */
-    PT_SCTP,            /* SCTP */
-    PT_TCP,             /* TCP */
-    PT_UDP,             /* UDP */
-    PT_DCCP,            /* DCCP */
-    PT_IPX,             /* IPX sockets */
-    PT_NCP,             /* NCP connection */
-    PT_EXCHG,           /* Fibre Channel exchange */
-    PT_DDP,             /* DDP AppleTalk connection */
-    PT_SBCCS,           /* FICON */
-    PT_IDP,             /* XNS IDP sockets */
-    PT_TIPC,            /* TIPC PORT */
-    PT_USB,             /* USB endpoint 0xffff means the host */
+    PT_NONE,		/* no port number */
+    PT_SCTP,		/* SCTP */
+    PT_TCP,		/* TCP */
+    PT_UDP,		/* UDP */
+    PT_DCCP,		/* DCCP */
+    PT_IPX,		/* IPX sockets */
+    PT_NCP,		/* NCP connection */
+    PT_EXCHG,		/* Fibre Channel exchange */
+    PT_DDP,		/* DDP AppleTalk connection */
+    PT_SBCCS,		/* FICON */
+    PT_IDP,		/* XNS IDP sockets */
+    PT_TIPC,		/* TIPC PORT */
+    PT_USB,		/* USB endpoint 0xffff means the host */
     PT_I2C,
-    PT_IBQP,            /* Infiniband QP number */
+    PT_IBQP,		/* Infiniband QP number */
     PT_BLUETOOTH
 } port_type;
 
 /* Types of circuit IDs Wireshark knows about. */
 typedef enum {
-    CT_NONE,            /* no circuit type */
-    CT_DLCI,            /* Frame Relay DLCI */
-    CT_ISDN,            /* ISDN channel number */
-    CT_X25,             /* X.25 logical channel number */
-    CT_ISUP,            /* ISDN User Part CIC */
-    CT_IAX2,            /* IAX2 call id */
-    CT_H223,            /* H.223 logical channel number */
-    CT_BICC,            /* BICC Circuit identifier */
-    CT_DVBCI            /* DVB-CI session number|transport connection id */
+    CT_NONE,		/* no circuit type */
+    CT_DLCI,		/* Frame Relay DLCI */
+    CT_ISDN,		/* ISDN channel number */
+    CT_X25,		/* X.25 logical channel number */
+    CT_ISUP,		/* ISDN User Part CIC */
+    CT_IAX2,		/* IAX2 call id */
+    CT_H223,		/* H.223 logical channel number */
+    CT_BICC,		/* BICC Circuit identifier */
+    CT_DVBCI		/* DVB-CI session number|transport connection id */
     /* Could also have ATM VPI/VCI pairs */
 } circuit_type;
 

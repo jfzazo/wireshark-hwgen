@@ -34,6 +34,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include <epan/oids.h>
@@ -235,7 +236,7 @@ static int hf_cmp_PKIFailureInfo_systemFailure = -1;
 static int hf_cmp_PKIFailureInfo_duplicateCertReq = -1;
 
 /*--- End of included file: packet-cmp-hf.c ---*/
-#line 68 "../../asn1/cmp/packet-cmp-template.c"
+#line 69 "../../asn1/cmp/packet-cmp-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_cmp = -1;
@@ -291,7 +292,7 @@ static gint ett_cmp_PollRepContent = -1;
 static gint ett_cmp_PollRepContent_item = -1;
 
 /*--- End of included file: packet-cmp-ett.c ---*/
-#line 72 "../../asn1/cmp/packet-cmp-template.c"
+#line 73 "../../asn1/cmp/packet-cmp-template.c"
 
 /*--- Included file: packet-cmp-fn.c ---*/
 #line 1 "../../asn1/cmp/packet-cmp-fn.c"
@@ -1368,122 +1369,90 @@ dissect_cmp_SuppLangTagsValue(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int 
 
 /*--- PDUs ---*/
 
-static int dissect_PBMParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_PBMParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_PBMParameter(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_PBMParameter_PDU);
-  return offset;
+  dissect_cmp_PBMParameter(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_PBMParameter_PDU);
 }
-static int dissect_DHBMParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_DHBMParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_DHBMParameter(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_DHBMParameter_PDU);
-  return offset;
+  dissect_cmp_DHBMParameter(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_DHBMParameter_PDU);
 }
-static int dissect_CAProtEncCertValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CAProtEncCertValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_CAProtEncCertValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_CAProtEncCertValue_PDU);
-  return offset;
+  dissect_cmp_CAProtEncCertValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_CAProtEncCertValue_PDU);
 }
-static int dissect_SignKeyPairTypesValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SignKeyPairTypesValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_SignKeyPairTypesValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_SignKeyPairTypesValue_PDU);
-  return offset;
+  dissect_cmp_SignKeyPairTypesValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_SignKeyPairTypesValue_PDU);
 }
-static int dissect_EncKeyPairTypesValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_EncKeyPairTypesValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_EncKeyPairTypesValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_EncKeyPairTypesValue_PDU);
-  return offset;
+  dissect_cmp_EncKeyPairTypesValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_EncKeyPairTypesValue_PDU);
 }
-static int dissect_PreferredSymmAlgValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_PreferredSymmAlgValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_PreferredSymmAlgValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_PreferredSymmAlgValue_PDU);
-  return offset;
+  dissect_cmp_PreferredSymmAlgValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_PreferredSymmAlgValue_PDU);
 }
-static int dissect_CAKeyUpdateInfoValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CAKeyUpdateInfoValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_CAKeyUpdateInfoValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_CAKeyUpdateInfoValue_PDU);
-  return offset;
+  dissect_cmp_CAKeyUpdateInfoValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_CAKeyUpdateInfoValue_PDU);
 }
-static int dissect_CurrentCRLValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CurrentCRLValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_CurrentCRLValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_CurrentCRLValue_PDU);
-  return offset;
+  dissect_cmp_CurrentCRLValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_CurrentCRLValue_PDU);
 }
-static int dissect_UnsupportedOIDsValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_UnsupportedOIDsValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_UnsupportedOIDsValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_UnsupportedOIDsValue_PDU);
-  return offset;
+  dissect_cmp_UnsupportedOIDsValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_UnsupportedOIDsValue_PDU);
 }
-static int dissect_KeyPairParamReqValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_KeyPairParamReqValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_KeyPairParamReqValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_KeyPairParamReqValue_PDU);
-  return offset;
+  dissect_cmp_KeyPairParamReqValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_KeyPairParamReqValue_PDU);
 }
-static int dissect_KeyPairParamRepValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_KeyPairParamRepValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_KeyPairParamRepValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_KeyPairParamRepValue_PDU);
-  return offset;
+  dissect_cmp_KeyPairParamRepValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_KeyPairParamRepValue_PDU);
 }
-static int dissect_RevPassphraseValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_RevPassphraseValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_RevPassphraseValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_RevPassphraseValue_PDU);
-  return offset;
+  dissect_cmp_RevPassphraseValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_RevPassphraseValue_PDU);
 }
-static int dissect_ImplicitConfirmValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ImplicitConfirmValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_ImplicitConfirmValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_ImplicitConfirmValue_PDU);
-  return offset;
+  dissect_cmp_ImplicitConfirmValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_ImplicitConfirmValue_PDU);
 }
-static int dissect_ConfirmWaitTimeValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ConfirmWaitTimeValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_ConfirmWaitTimeValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_ConfirmWaitTimeValue_PDU);
-  return offset;
+  dissect_cmp_ConfirmWaitTimeValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_ConfirmWaitTimeValue_PDU);
 }
-static int dissect_OrigPKIMessageValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_OrigPKIMessageValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_OrigPKIMessageValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_OrigPKIMessageValue_PDU);
-  return offset;
+  dissect_cmp_OrigPKIMessageValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_OrigPKIMessageValue_PDU);
 }
-static int dissect_SuppLangTagsValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SuppLangTagsValue_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_cmp_SuppLangTagsValue(FALSE, tvb, offset, &asn1_ctx, tree, hf_cmp_SuppLangTagsValue_PDU);
-  return offset;
+  dissect_cmp_SuppLangTagsValue(FALSE, tvb, 0, &asn1_ctx, tree, hf_cmp_SuppLangTagsValue_PDU);
 }
 
 
 /*--- End of included file: packet-cmp-fn.c ---*/
-#line 73 "../../asn1/cmp/packet-cmp-template.c"
+#line 74 "../../asn1/cmp/packet-cmp-template.c"
 
 static int
 dissect_cmp_pdu(tvbuff_t *tvb, proto_tree *tree, asn1_ctx_t *actx)
@@ -1546,7 +1515,8 @@ static int dissect_cmp_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pa
 		proto_tree_add_item(tree, hf_cmp_tcptrans_type, tvb, offset++, 1, ENC_BIG_ENDIAN);
 	} else {
 		/* post RFC2510 TCP transport - the former "type" field is now "version" */
-		tcptrans_tree = proto_tree_add_subtree(tree, tvb, offset, 7, ett_cmp, NULL, "TCP transport");
+		ti = proto_tree_add_text(tree, tvb, offset, 7, "TCP transport");
+		tcptrans_tree = proto_item_add_subtree(ti, ett_cmp);
 		pdu_type=tvb_get_guint8(tvb, 6);
 		proto_tree_add_item(tcptrans_tree, hf_cmp_tcptrans_len, tvb, offset, 4, ENC_BIG_ENDIAN);
 		offset += 4;
@@ -1604,8 +1574,7 @@ static int dissect_cmp_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pa
 	return offset;
 }
 
-static guint get_cmp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                             int offset, void *data _U_)
+static guint get_cmp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
 	guint32 plen;
 
@@ -1672,7 +1641,7 @@ dissect_cmp_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void
 	tcp_dissect_pdus(tvb, pinfo, parent_tree, cmp_desegment, offset, get_cmp_pdu_len,
 			dissect_cmp_tcp_pdu, data);
 
-	return tvb_captured_length(tvb);
+	return tvb_length(tvb);
 }
 
 
@@ -2368,7 +2337,7 @@ void proto_register_cmp(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-cmp-hfarr.c ---*/
-#line 324 "../../asn1/cmp/packet-cmp-template.c"
+#line 326 "../../asn1/cmp/packet-cmp-template.c"
 	};
 
 	/* List of subtrees */
@@ -2426,7 +2395,7 @@ void proto_register_cmp(void) {
     &ett_cmp_PollRepContent_item,
 
 /*--- End of included file: packet-cmp-ettarr.c ---*/
-#line 330 "../../asn1/cmp/packet-cmp-template.c"
+#line 332 "../../asn1/cmp/packet-cmp-template.c"
 	};
 	module_t *cmp_module;
 
@@ -2501,26 +2470,26 @@ void proto_reg_handoff_cmp(void) {
 
 /*--- Included file: packet-cmp-dis-tab.c ---*/
 #line 1 "../../asn1/cmp/packet-cmp-dis-tab.c"
-  new_register_ber_oid_dissector("1.2.840.113533.7.66.13", dissect_PBMParameter_PDU, proto_cmp, "id-PasswordBasedMac");
-  new_register_ber_oid_dissector("1.2.640.113533.7.66.30", dissect_DHBMParameter_PDU, proto_cmp, "id-DHBasedMac");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.1", dissect_CAProtEncCertValue_PDU, proto_cmp, "id-it-caProtEncCert");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.2", dissect_SignKeyPairTypesValue_PDU, proto_cmp, "id-it-signKeyPairTypes");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.3", dissect_EncKeyPairTypesValue_PDU, proto_cmp, "id-it-encKeyPairTypes");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.4", dissect_PreferredSymmAlgValue_PDU, proto_cmp, "id-it-preferredSymmAlg");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.5", dissect_CAKeyUpdateInfoValue_PDU, proto_cmp, "id-it-caKeyUpdateInfo");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.6", dissect_CurrentCRLValue_PDU, proto_cmp, "id-it-currentCRL");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.7", dissect_UnsupportedOIDsValue_PDU, proto_cmp, "id-it-unsupportedOIDs");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.10", dissect_KeyPairParamReqValue_PDU, proto_cmp, "id-it-keyPairParamReq");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.11", dissect_KeyPairParamRepValue_PDU, proto_cmp, "id-it-keyPairParamRep");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.12", dissect_RevPassphraseValue_PDU, proto_cmp, "id-it-revPassphrase");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.13", dissect_ImplicitConfirmValue_PDU, proto_cmp, "id-it-implicitConfirm");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.14", dissect_ConfirmWaitTimeValue_PDU, proto_cmp, "id-it-confirmWaitTime");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.15", dissect_OrigPKIMessageValue_PDU, proto_cmp, "id-it-origPKIMessage");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.4.16", dissect_SuppLangTagsValue_PDU, proto_cmp, "id-it-suppLangTags");
+  register_ber_oid_dissector("1.2.840.113533.7.66.13", dissect_PBMParameter_PDU, proto_cmp, "id-PasswordBasedMac");
+  register_ber_oid_dissector("1.2.640.113533.7.66.30", dissect_DHBMParameter_PDU, proto_cmp, "id-DHBasedMac");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.1", dissect_CAProtEncCertValue_PDU, proto_cmp, "id-it-caProtEncCert");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.2", dissect_SignKeyPairTypesValue_PDU, proto_cmp, "id-it-signKeyPairTypes");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.3", dissect_EncKeyPairTypesValue_PDU, proto_cmp, "id-it-encKeyPairTypes");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.4", dissect_PreferredSymmAlgValue_PDU, proto_cmp, "id-it-preferredSymmAlg");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.5", dissect_CAKeyUpdateInfoValue_PDU, proto_cmp, "id-it-caKeyUpdateInfo");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.6", dissect_CurrentCRLValue_PDU, proto_cmp, "id-it-currentCRL");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.7", dissect_UnsupportedOIDsValue_PDU, proto_cmp, "id-it-unsupportedOIDs");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.10", dissect_KeyPairParamReqValue_PDU, proto_cmp, "id-it-keyPairParamReq");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.11", dissect_KeyPairParamRepValue_PDU, proto_cmp, "id-it-keyPairParamRep");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.12", dissect_RevPassphraseValue_PDU, proto_cmp, "id-it-revPassphrase");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.13", dissect_ImplicitConfirmValue_PDU, proto_cmp, "id-it-implicitConfirm");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.14", dissect_ConfirmWaitTimeValue_PDU, proto_cmp, "id-it-confirmWaitTime");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.15", dissect_OrigPKIMessageValue_PDU, proto_cmp, "id-it-origPKIMessage");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.4.16", dissect_SuppLangTagsValue_PDU, proto_cmp, "id-it-suppLangTags");
 
 
 /*--- End of included file: packet-cmp-dis-tab.c ---*/
-#line 402 "../../asn1/cmp/packet-cmp-template.c"
+#line 404 "../../asn1/cmp/packet-cmp-template.c"
 		inited = TRUE;
 	}
 

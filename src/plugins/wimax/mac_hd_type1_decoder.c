@@ -37,6 +37,7 @@
 #define DEBUG
 */
 
+#include <glib.h>
 #include <epan/packet.h>
 
 extern gint proto_mac_header_generic_decoder;
@@ -116,8 +117,8 @@ static const char *type1_subtype_abbrv[TYPE_I_SUBTYPE_MAX] =
 #define WIMAX_MAC_HEADER_TYPE_1_RSV_7        0x000FFF
 /* 4th to 6th bytes */
 /*#define WIMAX_MAC_HEADER_TYPE_1_CID          0xFFFF
- *#define WIMAX_MAC_HEADER_TYPE_1_HCS          0xFF
- */
+*#define WIMAX_MAC_HEADER_TYPE_1_HCS          0xFF
+*/
 /* Common Fields */
 static int hf_mac_header_type_1_ht = -1;
 static int hf_mac_header_type_1_ec = -1;
@@ -157,14 +158,14 @@ static int hf_mac_header_type_1_hcs = -1;
 /* MAC Header Type I Sub-Types */
 static const value_string sub_types[] =
 {
-	{ BR_INCREMENTAL,	      "Bandwidth Request Incremental" },
-	{ BR_AGGREGATE,		      "Bandwidth Request Aggregate" },
-	{ PHY_CHANNEL_REPORT,	      "PHY Channel Report" },
+	{ BR_INCREMENTAL, "Bandwidth Request Incremental" },
+	{ BR_AGGREGATE, "Bandwidth Request Aggregate" },
+	{ PHY_CHANNEL_REPORT, "PHY Channel Report" },
 	{ BR_WITH_UL_TX_POWER_REPORT, "Bandwidth Request with UL TX Power Report" },
-	{ BR_AND_CINR_REPORT,	      "Bandwidth Request and CINR Report" },
-	{ BR_WITH_UL_SLEEP_CONTROL,   "Bandwidth Request with Sleep Control" },
-	{ SN_REPORT,		      "SN Report" },
-	{ CQICH_ALLOCATION_REQUEST,   "CQICH Allocation Request" },
+	{ BR_AND_CINR_REPORT, "Bandwidth Request and CINR Report" },
+	{ BR_WITH_UL_SLEEP_CONTROL, "Bandwidth Request with Sleep Control" },
+	{ SN_REPORT, "SN Report" },
+	{ CQICH_ALLOCATION_REQUEST, "CQICH Allocation Request" },
 	{ 0,				NULL}
 };
 
@@ -206,7 +207,7 @@ static const value_string last_msgs[] =
 	{ 0,				NULL}
 };
 
-static void dissect_mac_header_type_1_decoder(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
+void dissect_mac_header_type_1_decoder(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	gint tvb_len, offset = 0;
 	guint first_byte, sub_type;
@@ -557,16 +558,3 @@ void proto_register_mac_header_type_1(void)
 
 	register_dissector("mac_header_type_1_handler", dissect_mac_header_type_1_decoder, -1);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

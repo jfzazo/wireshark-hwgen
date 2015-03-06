@@ -28,7 +28,7 @@
 
 #include "wslua.h"
 #include <math.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
 
 
 WSLUA_FUNCTION wslua_get_version(lua_State* L) { /* Gets a string of the Wireshark version. */
@@ -45,9 +45,8 @@ WSLUA_FUNCTION wslua_format_date(lua_State* LS) { /* Formats an absolute timesta
 
     then.secs = (guint32)(floor(timestamp));
     then.nsecs = (guint32) ( (timestamp-(double)(then.secs))*1000000000);
-    str = abs_time_to_str(NULL, &then, ABSOLUTE_TIME_LOCAL, TRUE);
+    str = abs_time_to_ep_str(&then, ABSOLUTE_TIME_LOCAL, TRUE);
     lua_pushstring(LS,str);
-    wmem_free(NULL, str);
 
     WSLUA_RETURN(1); /* A string with the formated date */
 }
@@ -60,9 +59,8 @@ WSLUA_FUNCTION wslua_format_time(lua_State* LS) { /* Formats a relative timestam
 
     then.secs = (guint32)(floor(timestamp));
     then.nsecs = (guint32) ( (timestamp-(double)(then.secs))*1000000000);
-    str = rel_time_to_str(NULL, &then);
+    str = rel_time_to_ep_str(&then);
     lua_pushstring(LS,str);
-    wmem_free(NULL, str);
 
     WSLUA_RETURN(1); /* A string with the formated time */
 }
@@ -207,8 +205,15 @@ WSLUA_FUNCTION wslua_dofile(lua_State* L) {
     in the current directory it will look for it in wireshark's user and system directories. */
 #define WSLUA_ARG_dofile_FILENAME 1 /* Name of the file to be run. */
     const char *given_fname = luaL_checkstring(L, WSLUA_ARG_dofile_FILENAME);
-    char* filename = wslua_get_actual_filename(given_fname);
+    char* filename;
     int n;
+
+    if (!given_fname) {
+        WSLUA_ARG_ERROR(dofile,FILENAME,"must be a string");
+        return 0;
+    }
+
+    filename = wslua_get_actual_filename(given_fname);
 
     if (!filename) {
         WSLUA_ARG_ERROR(dofile,FILENAME,"file does not exist");
@@ -264,21 +269,13 @@ WSLUA_FUNCTION wslua_register_stat_cmd_arg(lua_State* L) {
 #define WSLUA_OPTARG_register_stat_cmd_arg_ACTION 2 /* Action */
     const char* arg = luaL_checkstring(L,WSLUA_ARG_register_stat_cmd_arg_ARGUMENT);
     statcmd_t* sc = (statcmd_t *)g_malloc0(sizeof(statcmd_t)); /* XXX leaked */
-    stat_tap_ui ui_info;
 
     sc->L = L;
     lua_pushvalue(L, WSLUA_OPTARG_register_stat_cmd_arg_ACTION);
     sc->func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
     lua_remove(L,1);
 
-    ui_info.group = REGISTER_STAT_GROUP_UNSORTED;	/* XXX - need group for CLI-only? */
-    ui_info.title = NULL;
-    ui_info.cli_string = arg;
-    ui_info.tap_init_cb = statcmd_init;
-    ui_info.index = -1;
-    ui_info.nparams = 0;
-    ui_info.params = NULL;
-    register_stat_tap_ui(&ui_info, sc);
+    register_stat_cmd_arg(arg, statcmd_init, sc);
     return 0;
 }
 

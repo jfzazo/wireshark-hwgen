@@ -24,12 +24,15 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "packet-windows-common.h"
 #include <epan/asn1.h>
 #include "packet-x509af.h"
+#include "packet-x509if.h"
 
 void proto_register_gpef(void);
+void proto_reg_handoff_gpef(void);
 
 static int proto_gpef = -1;
 static int hf_gpef_keycount = -1;
@@ -97,7 +100,7 @@ dissect_gpef_efskey(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *p
 	dissect_nt_sid(tvb, old_offset+4+sid_offset, tree, "sid", NULL, -1);
 
 	/* certificate */
-	next_tvb = tvb_new_subset_length(tvb, old_offset+4+cert_offset, cert_length);
+	next_tvb = tvb_new_subset(tvb, old_offset+4+cert_offset, cert_length, cert_length);
 	(void)dissect_x509af_Certificate(FALSE, next_tvb, 0, &asn1_ctx, tree, hf_gpef_efskey_certificate);
 
 
@@ -111,12 +114,14 @@ static int
 dissect_gpef_efsblob(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *parent_tree, void *data _U_)
 {
 	int offset = 0;
-	proto_tree *tree;
-	proto_item *item;
+	proto_tree *tree = NULL;
+	proto_item *item = NULL;
 	guint32 count;
 
-	item = proto_tree_add_item(parent_tree, proto_gpef, tvb, 0, -1, ENC_NA);
-	tree = proto_item_add_subtree(item, ett_gpef);
+	if (parent_tree) {
+		item = proto_tree_add_item(parent_tree, proto_gpef, tvb, 0, -1, ENC_NA);
+		tree = proto_item_add_subtree(item, ett_gpef);
+	}
 
 	/* reserved, must be 0x01 0x00 0x01 0x00 */
 	offset += 4;
@@ -137,37 +142,37 @@ void
 proto_register_gpef(void)
 {
 	static hf_register_info hf[] = {
-		{ &hf_gpef_keycount,
-		  { "Key Count",   "gpef.key_count", FT_UINT32, BASE_DEC, NULL,
-		    0x0, NULL, HFILL }},
+	{ &hf_gpef_keycount,
+	{ "Key Count",   "gpef.key_count", FT_UINT32, BASE_DEC, NULL,
+		0x0, NULL, HFILL }},
 
-		{ &hf_gpef_efskey_length1,
-		  { "Length1",   "gpef.efskey.length1", FT_UINT32, BASE_DEC, NULL,
-		    0x0, NULL, HFILL }},
+	{ &hf_gpef_efskey_length1,
+	{ "Length1",   "gpef.efskey.length1", FT_UINT32, BASE_DEC, NULL,
+		0x0, NULL, HFILL }},
 
-		{ &hf_gpef_efskey_length2,
-		  { "Length2",   "gpef.efskey.length2", FT_UINT32, BASE_DEC, NULL,
-		    0x0, NULL, HFILL }},
+	{ &hf_gpef_efskey_length2,
+	{ "Length2",   "gpef.efskey.length2", FT_UINT32, BASE_DEC, NULL,
+		0x0, NULL, HFILL }},
 
-		{ &hf_gpef_efskey_sid_offset,
-		  { "SID Offset",   "gpef.efskey.sid_offset", FT_UINT32, BASE_DEC, NULL,
-		    0x0, NULL, HFILL }},
+	{ &hf_gpef_efskey_sid_offset,
+	{ "SID Offset",   "gpef.efskey.sid_offset", FT_UINT32, BASE_DEC, NULL,
+		0x0, NULL, HFILL }},
 
-		{ &hf_gpef_efskey_cert_offset,
-		  { "Cert Offset",   "gpef.efskey.cert_offset", FT_UINT32, BASE_DEC, NULL,
-		    0x0, NULL, HFILL }},
+	{ &hf_gpef_efskey_cert_offset,
+	{ "Cert Offset",   "gpef.efskey.cert_offset", FT_UINT32, BASE_DEC, NULL,
+		0x0, NULL, HFILL }},
 
-		{ &hf_gpef_efskey_cert_length,
-		  { "Cert Length",   "gpef.efskey.cert_length", FT_UINT32, BASE_DEC, NULL,
-		    0x0, NULL, HFILL }},
+	{ &hf_gpef_efskey_cert_length,
+	{ "Cert Length",   "gpef.efskey.cert_length", FT_UINT32, BASE_DEC, NULL,
+		0x0, NULL, HFILL }},
 
-		{ &hf_gpef_efskey,
-		  { "EfsKey",   "gpef.efskey", FT_NONE, BASE_NONE, NULL,
-		    0x0, NULL, HFILL }},
+	{ &hf_gpef_efskey,
+	{ "EfsKey",   "gpef.efskey", FT_NONE, BASE_NONE, NULL,
+		0x0, NULL, HFILL }},
 
-		{ &hf_gpef_efskey_certificate,
-		  { "Certificate", "gpef.efskey.certificate", FT_NONE, BASE_NONE, NULL,
-		    0x0, NULL, HFILL }},
+	{ &hf_gpef_efskey_certificate,
+	{ "Certificate", "gpef.efskey.certificate", FT_NONE, BASE_NONE, NULL,
+		0x0, NULL, HFILL }},
 
 	};
 
@@ -183,15 +188,7 @@ proto_register_gpef(void)
 	new_register_dissector("efsblob", dissect_gpef_efsblob, proto_gpef);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */
+void
+proto_reg_handoff_gpef(void)
+{
+}

@@ -26,9 +26,9 @@
 
 #include "config.h"
 
+#include <stddef.h>
 #include <errno.h>
-
-#include <epan/packet.h>
+#include <glib.h>
 #include <wsutil/pint.h>
 
 #define le16_to_cpu		GINT16_FROM_LE

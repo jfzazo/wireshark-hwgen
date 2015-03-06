@@ -27,25 +27,33 @@
 
 #include <string.h>
 
+#include <gtk/gtk.h>
 
+#include <epan/packet_info.h>
+#include <epan/epan.h>
 #include <epan/to_str.h>
 #include <epan/value_string.h>
 #include <epan/tap.h>
+#include <epan/dissectors/packet-sctp.h>
 
 #include "ui/simple_dialog.h"
+#include "../file.h"
+#include "../globals.h"
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_stat_util.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/tap_param_dlg.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/main.h"
+#include "ui/tap-sctp-analysis.h"
 #include "ui/gtk/sctp_stat_gtk.h"
 
 void register_tap_listener_sctpstat(void);
 static void sctpstat_init(const char *opt_arg, void *userdata);
 
 static tap_param sctp_stat_params[] = {
-	{ PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+	{ PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg sctp_stat_dlg = {
@@ -177,7 +185,6 @@ sctpstat_draw(void *phs)
 	sctp_ep_t* list = hs->ep_list, *tmp;
 	GtkListStore *store;
 	GtkTreeIter iter;
-	char *src_addr, *dst_addr;
 
 	/* Now print Message and Reason Counter Table */
 	/* clear list before printing */
@@ -186,14 +193,11 @@ sctpstat_draw(void *phs)
   	gtk_list_store_clear(store);
 
 	for(tmp = list ; tmp ; tmp=tmp->next) {
-		src_addr = (char*)address_to_str(NULL, &tmp->src);
-		dst_addr = (char*)address_to_str(NULL, &tmp->dst);
-
 		gtk_list_store_append(store, &iter);
 		gtk_list_store_set(store, &iter,
-		0,  src_addr,
+		0,  ep_address_to_str(&tmp->src),
 		1,  tmp->sport,
-		2,  dst_addr,
+		2,  ep_address_to_str(&tmp->dst),
 		3,  tmp->dport,
 		4,  tmp->chunk_count[SCTP_DATA_CHUNK_ID],
 		5,  tmp->chunk_count[SCTP_SACK_CHUNK_ID],
@@ -213,8 +217,6 @@ sctpstat_draw(void *phs)
 		19, tmp->chunk_count[OTHER_CHUNKS_INDEX],
 		-1
 		);
-		wmem_free(NULL, src_addr);
-		wmem_free(NULL, dst_addr);
 	}
 }
 

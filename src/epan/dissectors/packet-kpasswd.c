@@ -222,7 +222,7 @@ dissect_kpasswd_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboo
     offset+=6;
 
     /* AP-REQ / AP-REP data */
-    next_tvb=tvb_new_subset_length(tvb, offset, ap_req_len);
+    next_tvb=tvb_new_subset(tvb, offset, ap_req_len, ap_req_len);
     dissect_kpasswd_ap_req_data(pinfo, next_tvb, kpasswd_tree);
     offset+=ap_req_len;
 
@@ -330,16 +330,3 @@ proto_reg_handoff_kpasswd(void)
     dissector_add_uint("udp.port", UDP_PORT_KPASSWD, kpasswd_handle_udp);
     dissector_add_uint("tcp.port", TCP_PORT_KPASSWD, kpasswd_handle_tcp);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

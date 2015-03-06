@@ -32,15 +32,18 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
 #include <epan/conversation.h>
+#include <epan/prefs.h>
 #include <epan/reassemble.h>
+#include <epan/expert.h>
 #include <epan/asn1.h>
 #include <epan/uat.h>
+#include <epan/wmem/wmem.h>
 #include <epan/to_str.h>
-#include "packet-x509af.h"
-#include "packet-ssl-utils.h"
-#include "packet-reload.h"
+#include <epan/dissectors/packet-x509af.h>
+#include <packet-tcp.h>
+#include <packet-ssl-utils.h>
+#include <packet-reload.h>
 
 void proto_register_reload(void);
 void proto_reg_handoff_reload(void);
@@ -3825,7 +3828,7 @@ extern gint dissect_reload_messagecontents(tvbuff_t *tvb, packet_info *pinfo, pr
       if (error_code <= 19) {
         guint16 info_length = tvb_get_ntohs(tvb,offset+2);
         if (info_length>0) {
-          proto_item_append_text(ti_error, " (%s)", tvb_get_string_enc(wmem_packet_scope(), tvb, offset+4, info_length, ENC_ASCII));
+          proto_item_append_text(ti_error, " (%s)", tvb_get_string(wmem_packet_scope(), tvb, offset+4, info_length));
         }
       }
       break;

@@ -29,7 +29,7 @@
 #include "config.h"
 
 #include <string.h>
-
+#include <glib.h>
 #include <epan/packet.h>
 
 extern gint proto_wimax;
@@ -81,7 +81,7 @@ static const value_string repetition_coding_indications[] =
 	{ 1, "Repetition Coding of 2 Used" },
 	{ 2, "Repetition Coding of 4 Used" },
 	{ 3, "Repetition Coding of 6 Used" },
-	{ 0, NULL }
+	{ 4, NULL }
 };
 
 /* DL Frame Prefix Coding Indications */
@@ -243,16 +243,3 @@ void proto_register_wimax_fch(void)
 
 	register_dissector("wimax_fch_burst_handler", dissect_wimax_fch_decoder, -1);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -36,7 +36,6 @@
 #define BTL2CAP_PSM_UDI_C_PLANE       0x001d
 #define BTL2CAP_PSM_ATT               0x001f
 #define BTL2CAP_PSM_3DS               0x0021
-#define BTL2CAP_PSM_LE_IPSP           0x0023
 
 #define BTL2CAP_DYNAMIC_PSM_START   0x1000
 
@@ -50,26 +49,18 @@
 #define BTL2CAP_FIXED_CID_AMP_TEST  0x003F
 #define BTL2CAP_FIXED_CID_LAST      0x003F
 
-#define BTL2CAP_UNKNOWN_CID 0xFFFFFFFF
-
 typedef struct _btl2cap_data_t {
     guint32   interface_id;
     guint32   adapter_id;
-    guint32  *adapter_disconnect_in_frame;
     guint16   chandle;  /* only low 12 bits used */
-    guint32  *hci_disconnect_in_frame;
-    guint16   psm;
-    guint32  *disconnect_in_frame;
     guint16   cid;
-    guint32   local_cid;
-    guint32   remote_cid;
-
     gboolean  is_local_psm; /* otherwise it is PSM in remote device */
+    guint16   psm;
+    guint32   first_scid_frame;
+    guint32   first_dcid_frame;
     guint32   remote_bd_addr_oui;
     guint32   remote_bd_addr_id;
 } btl2cap_data_t;
-
-extern int proto_btl2cap;
 
 #endif
 

@@ -79,8 +79,11 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
+
 #include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
+#include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include "packet-x11.h" /* This contains the extern for the X11 value_string_ext
@@ -568,7 +571,7 @@ static guint vnc_h264_encoding(tvbuff_t *tvb, gint *offset, proto_tree *tree);
 		pinfo->destport == vnc_preference_alternate_port
 
 #define VNC_BYTES_NEEDED(a)					\
-	if((a) > (guint)tvb_reported_length_remaining(tvb, *offset))	\
+	if((a) > (guint)tvb_length_remaining(tvb, *offset))	\
 		return (a);
 
 /* Variables for our preferences */
@@ -681,7 +684,6 @@ static int hf_vnc_tight_auth_code = -1;
 /* TightVNC capabilities */
 static int hf_vnc_tight_server_message_type = -1;
 static int hf_vnc_tight_server_vendor = -1;
-static int hf_vnc_tight_signature = -1;
 static int hf_vnc_tight_server_name = -1;
 
 static int hf_vnc_tight_client_message_type = -1;
@@ -782,7 +784,6 @@ static int hf_vnc_server_cut_text = -1;
 /* LibVNCServer additions */
 static int hf_vnc_supported_messages_client2server = -1;
 static int hf_vnc_supported_messages_server2client = -1;
-static int hf_vnc_num_supported_encodings = -1;
 static int hf_vnc_supported_encodings = -1;
 static int hf_vnc_server_identity = -1;
 
@@ -854,8 +855,8 @@ static const int *vnc_fence_flags[] = {
 	&hf_vnc_fence_sync_next,
 	&hf_vnc_fence_block_after,
 	&hf_vnc_fence_block_before,
-	NULL
-};
+        NULL
+    };
 
 /* Context Information */
 static int hf_vnc_context_information_app_id = -1;
@@ -908,9 +909,6 @@ static expert_field ei_vnc_too_many_sub_rectangles = EI_INIT;
 static expert_field ei_vnc_invalid_encoding = EI_INIT;
 static expert_field ei_vnc_too_many_colors = EI_INIT;
 static expert_field ei_vnc_too_many_cut_text = EI_INIT;
-static expert_field ei_vnc_zrle_failed = EI_INIT;
-static expert_field ei_vnc_unknown_tight = EI_INIT;
-static expert_field ei_vnc_reassemble = EI_INIT;
 
 /* Global so they keep their value between packets */
 guint8 vnc_bytes_per_pixel;
@@ -967,7 +965,7 @@ dissect_vnc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	vnc_set_depth(pinfo, vnc_depth);
 
 	if (ret) {
-		return;  /* We're in a "startup" state; Cannot yet do "normal" processing */
+               return;  /* We're in a "startup" state; Cannot yet do "normal" processing */
 	}
 
 	if(DEST_PORT_VNC || per_conversation_info->server_port == pinfo->destport) {
@@ -986,7 +984,7 @@ process_vendor(proto_tree *tree, gint hfindex, tvbuff_t *tvb, gint offset)
 	proto_item *ti;
 
 	if (tree) {
-		vendor = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 4, ENC_ASCII);
+		vendor = tvb_get_string(wmem_packet_scope(), tvb, offset, 4);
 
 		ti = proto_tree_add_string(tree, hfindex, tvb, offset, 4, vendor);
 
@@ -1019,7 +1017,7 @@ process_tight_capabilities(proto_tree *tree,
 
 		offset = process_vendor(tree, vendor_index, tvb, offset);
 
-		name = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 8, ENC_ASCII);
+		name = tvb_get_string(wmem_packet_scope(), tvb, offset, 8);
 		proto_tree_add_string(tree, name_index, tvb, offset, 8, name);
 		offset += 8;
 	}
@@ -1037,6 +1035,8 @@ process_tight_capabilities(proto_tree *tree,
 static gboolean
 vnc_is_client_or_server_version_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
+	proto_item *bug_item;
+
 	if(tvb_length(tvb) != 12) {
 		return FALSE;
 	}
@@ -1059,7 +1059,8 @@ vnc_is_client_or_server_version_message(tvbuff_t *tvb, packet_info *pinfo, proto
 			* [1] http://git.gnome.org/browse/gtk-vnc/commit/?id=bc9e2b19167686dd381a0508af1a5113675d08a2
 			*/
 			if ((pinfo != NULL) && (tree != NULL)) {
-				proto_tree_add_expert(tree, pinfo, &ei_vnc_possible_gtk_vnc_bug, tvb, -1, 0);
+				bug_item = proto_tree_add_text(tree, tvb, -1, 0, "NULL found in greeting");
+				expert_add_info(pinfo, bug_item, &ei_vnc_possible_gtk_vnc_bug);
 			}
 
 			return TRUE;
@@ -1122,7 +1123,7 @@ vnc_startup_messages(tvbuff_t *tvb, packet_info *pinfo, gint offset,
 		proto_tree_add_item(tree, hf_vnc_server_proto_ver, tvb, 4,
 				    7, ENC_ASCII|ENC_NA);
 		per_conversation_info->server_proto_ver =
-			g_ascii_strtod((char *)tvb_get_string_enc(wmem_packet_scope(), tvb, 4, 7, ENC_ASCII), NULL);
+			g_ascii_strtod((char *)tvb_get_string(wmem_packet_scope(), tvb, 4, 7), NULL);
 		per_conversation_info->server_port = pinfo->srcport;
 
 		col_add_fstr(pinfo->cinfo, COL_INFO,
@@ -1139,7 +1140,7 @@ vnc_startup_messages(tvbuff_t *tvb, packet_info *pinfo, gint offset,
 		proto_tree_add_item(tree, hf_vnc_client_proto_ver, tvb,
 				    4, 7, ENC_ASCII|ENC_NA);
 		per_conversation_info->client_proto_ver =
-			g_ascii_strtod((char *)tvb_get_string_enc(wmem_packet_scope(), tvb, 4, 7, ENC_ASCII), NULL);
+			g_ascii_strtod((char *)tvb_get_string(wmem_packet_scope(), tvb, 4, 7), NULL);
 
 		col_add_fstr(pinfo->cinfo, COL_INFO,
 				     "Client protocol version: %s",
@@ -1291,11 +1292,11 @@ vnc_startup_messages(tvbuff_t *tvb, packet_info *pinfo, gint offset,
 				auth_code = tvb_get_ntohl(tvb, offset);
 				auth_item = proto_tree_add_item(tree, hf_vnc_tight_auth_code, tvb, offset, 4, ENC_BIG_ENDIAN);
 				offset += 4;
-				vendor = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 4, ENC_ASCII);
+				vendor = tvb_get_string(wmem_packet_scope(), tvb, offset, 4);
 				process_vendor(tree, hf_vnc_tight_server_vendor, tvb, offset);
 				offset += 4;
-				signature = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 8, ENC_ASCII);
-				proto_tree_add_string(tree, hf_vnc_tight_signature, tvb, offset, 8, signature);
+				signature = tvb_get_string(wmem_packet_scope(), tvb, offset, 8);
+				proto_tree_add_text(tree, tvb, offset, 8, "Signature: %s", signature);
 				offset += 8;
 
 				switch(auth_code) {
@@ -1382,7 +1383,8 @@ vnc_startup_messages(tvbuff_t *tvb, packet_info *pinfo, gint offset,
 	case VNC_SESSION_STATE_TIGHT_UNKNOWN_PACKET3 :
 		col_set_str(pinfo->cinfo, COL_INFO, "Unknown packet (TightVNC)");
 
-		proto_tree_add_expert(tree, pinfo, &ei_vnc_unknown_tight, tvb, offset, -1);
+		proto_tree_add_text(tree, tvb, offset, -1,
+				    "Unknown packet (TightVNC)");
 
 		per_conversation_info->vnc_next_state =
 			VNC_SESSION_STATE_VNC_AUTHENTICATION_CHALLENGE;
@@ -1746,7 +1748,7 @@ again:
 			  vnc_server_message_type_tree);
 		break;
 
-	default :
+        default :
 		col_append_sep_str(pinfo->cinfo, COL_INFO, "; ",
 				       "Unknown server message type");
 		*offset = tvb_reported_length(tvb);  /* Swallow the rest of the segment */
@@ -1754,7 +1756,8 @@ again:
 	}
 
 	if(bytes_needed > 0 && vnc_preference_desegment && pinfo->can_desegment) {
-		proto_tree_add_expert(vnc_server_message_type_tree, pinfo, &ei_vnc_reassemble, tvb, start_offset, -1);
+		proto_tree_add_text(vnc_server_message_type_tree, tvb, start_offset, -1,
+				    "[See further on for dissection of the complete (reassembled) PDU]");
 		pinfo->desegment_offset = start_offset;
 		pinfo->desegment_len = DESEGMENT_ONE_MORE_SEGMENT;
 		return;
@@ -1993,11 +1996,11 @@ vnc_server_framebuffer_update(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 	num_rects = tvb_get_ntohs(tvb, *offset);
 	ti = proto_tree_add_item(tree, hf_vnc_rectangle_num, tvb, *offset, 2, ENC_BIG_ENDIAN);
 
-	/* In some cases, TIGHT encoding ignores the "number of rectangles" field;	  */
+        /* In some cases, TIGHT encoding ignores the "number of rectangles" field;        */
 	/* VNC_ENCODING_TYPE_LAST_RECT is used to indicate the end of the rectangle list. */
-	/* (It appears that TIGHT encoding uses 0xFFFF for the num_rects field when the	  */
-	/*  field is not being used). For now: we'll assume that a value 0f 0xFFFF means  */
-	/*  that the field is not being used.						  */
+	/* (It appears that TIGHT encoding uses 0xFFFF for the num_rects field when the   */
+        /*  field is not being used). For now: we'll assume that a value 0f 0xFFFF means  */
+        /*  that the field is not being used.                                             */
 	if (num_rects == 0xFFFF) {
 		proto_item_append_text(ti, " [TIGHT encoding assumed (field is not used)]");
 	}
@@ -2017,9 +2020,11 @@ vnc_server_framebuffer_update(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 		}
 		VNC_BYTES_NEEDED(12);
 
-		vnc_rect_tree = proto_tree_add_subtree_format(tree, tvb, *offset, 12,
-					 ett_vnc_rect, NULL, "Rectangle #%d", ii+1);
+		ti = proto_tree_add_text(tree, tvb, *offset, 12,
+					 "Rectangle #%d", ii+1);
 
+		vnc_rect_tree =
+			proto_item_add_subtree(ti, ett_vnc_rect);
 
 		ti_x = proto_tree_add_item(vnc_rect_tree, hf_vnc_fb_update_x_pos,
 					   tvb, *offset, 2, ENC_BIG_ENDIAN);
@@ -2185,6 +2190,7 @@ vnc_extended_desktop_size(tvbuff_t *tvb, gint *offset, proto_tree *tree)
 {
 
 	guint8      i, num_of_screens;
+	proto_item *ti;
 	proto_tree *screen_tree;
 
 	num_of_screens = tvb_get_guint8(tvb, *offset);
@@ -2195,7 +2201,8 @@ vnc_extended_desktop_size(tvbuff_t *tvb, gint *offset, proto_tree *tree)
 	VNC_BYTES_NEEDED((guint32)(3 + (num_of_screens * 16)));
 	*offset += 3;
 	for(i = 0; i < num_of_screens; i++) {
-		screen_tree = proto_tree_add_subtree_format(tree, tvb, *offset, 16, ett_vnc_desktop_screen, NULL, "Screen #%u", i+1);
+		ti = proto_tree_add_text(tree, tvb, *offset, 16, "Screen #%u", i+1);
+		screen_tree = proto_item_add_subtree(ti, ett_vnc_desktop_screen);
 
 		proto_tree_add_item(screen_tree, hf_vnc_desktop_screen_id, tvb, *offset, 4, ENC_BIG_ENDIAN);
 		*offset += 4;
@@ -2283,8 +2290,10 @@ vnc_rre_encoding(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 	VNC_BYTES_NEEDED(bytes_needed * num_subrects);
 	for(i = 0; i < num_subrects; i++) {
 
-		subrect_tree = proto_tree_add_subtree_format(tree, tvb, *offset, bytes_per_pixel +
-					 8, ett_vnc_rre_subrect, NULL, "Subrectangle #%d", i+1);
+		ti = proto_tree_add_text(tree, tvb, *offset, bytes_per_pixel +
+					 8, "Subrectangle #%d", i+1);
+		subrect_tree =
+			proto_item_add_subtree(ti, ett_vnc_rre_subrect);
 
 		proto_tree_add_item(subrect_tree, hf_vnc_rre_subrect_pixel,
 				    tvb, *offset, bytes_per_pixel, ENC_NA);
@@ -2319,7 +2328,7 @@ vnc_hextile_encoding(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 	guint8      i, subencoding_mask, num_subrects, subrect_len, tile_height, tile_width;
 	guint32     raw_length;
 	proto_tree *tile_tree, *subencoding_mask_tree, *subrect_tree, *num_subrects_tree;
-	proto_item *ti;
+	proto_item *ti, *tile_item;
 	guint16     current_height  = 0, current_width;
 
 	while(current_height != height) {
@@ -2340,8 +2349,8 @@ vnc_hextile_encoding(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 			VNC_BYTES_NEEDED(1);
 			subencoding_mask = tvb_get_guint8(tvb, *offset);
 
-			tile_tree = proto_tree_add_subtree_format(tree, tvb, *offset, 1, ett_vnc_hextile_tile, NULL,
-							"Tile {%d:%d}, sub encoding mask %u", current_width, current_height, subencoding_mask);
+			tile_item = proto_tree_add_text(tree, tvb, *offset, 1, "Tile {%d:%d}, sub encoding mask %u", current_width, current_height, subencoding_mask);
+			tile_tree = proto_item_add_subtree(tile_item, ett_vnc_hextile_tile);
 
 			ti = proto_tree_add_item(tile_tree, hf_vnc_hextile_subencoding_mask, tvb,
 						 *offset, 1, ENC_BIG_ENDIAN);
@@ -2409,9 +2418,11 @@ vnc_hextile_encoding(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 						proto_item_add_subtree(ti, ett_vnc_hextile_num_subrects);
 
 					for(i = 0; i < num_subrects; i++) {
-						subrect_tree = proto_tree_add_subtree_format(num_subrects_tree, tvb,
-									 *offset, subrect_len, ett_vnc_hextile_subrect, NULL,
+						ti = proto_tree_add_text(num_subrects_tree, tvb,
+									 *offset, subrect_len,
 									 "Subrectangle #%d", i+1);
+						subrect_tree =
+							proto_item_add_subtree(ti, ett_vnc_hextile_subrect);
 
 						if(subencoding_mask & 0x10) {
 							/* Subrects Colored */
@@ -2468,7 +2479,8 @@ vnc_supported_encodings(tvbuff_t *tvb, gint *offset, proto_tree *tree,
 {
 	guint16 i = width;
 
-	proto_tree_add_uint(tree, hf_vnc_num_supported_encodings, tvb, *offset, 0, height);
+	proto_tree_add_text(tree, tvb, *offset, 0,
+			    "Number of supported encodings: %d", height);
 
 	VNC_BYTES_NEEDED(width);
 	for (; i >= 4; i -= 4) {
@@ -2501,6 +2513,7 @@ vnc_mirrorlink(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 	guint16 length;
 	guint16 num, i;
 	gint end;
+	proto_item *ti;
 	proto_tree *sub_tree;
 
 	/* Header */
@@ -2638,8 +2651,9 @@ vnc_mirrorlink(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 				    tvb, *offset, 2, ENC_BIG_ENDIAN);
 		*offset += 2;
 		VNC_BYTES_NEEDED((guint)(4 * num));
-		sub_tree = proto_tree_add_subtree(tree, tvb, *offset, 4 * num,
-					 ett_vnc_key_events, NULL, "Key Event List");
+		ti = proto_tree_add_text(tree, tvb, *offset, 4 * num,
+					 "Key Event List");
+		sub_tree = proto_item_add_subtree(ti, ett_vnc_key_events);
 		for (; num > 0; num--) {
 			proto_tree_add_item(sub_tree,
 					    hf_vnc_mirrorlink_key_symbol_value,
@@ -2745,8 +2759,10 @@ vnc_mirrorlink(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 		VNC_BYTES_NEEDED((guint)(6 * num));
 		/*sub_tree = proto_item_add_subtree(tree, ett_vnc_touch_events);*/
 		for (i = 0; i < num; i++) {
-			sub_tree = proto_tree_add_subtree_format(tree, tvb, *offset, 6,
-						 ett_vnc_touch_events, NULL, "Touch Event #%d", i + 1);
+			ti = proto_tree_add_text(tree, tvb, *offset, 6,
+						 "Touch Event #%d", i + 1);
+			sub_tree = proto_item_add_subtree(ti,
+							  ett_vnc_touch_events);
 
 			proto_tree_add_item(sub_tree, hf_vnc_mirrorlink_touch_x,
 					    tvb, *offset, 2, ENC_BIG_ENDIAN);
@@ -2822,7 +2838,7 @@ vnc_fence(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 	*offset += 4;
 
 	proto_tree_add_item(tree, hf_vnc_fence_payload_length,
-			    tvb, *offset, 1, ENC_BIG_ENDIAN);
+			    tvb, *offset, 1, ENC_NA);
 
 	*offset += 1;
 
@@ -2876,6 +2892,7 @@ vnc_slrle_encoding(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 	guint8 bytes_per_run;
 	guint16 num_runs, i;
 	guint length;
+	proto_item *ti;
 	proto_tree *sub_tree;
 
 	if (depth_mod <= 4)
@@ -2889,8 +2906,9 @@ vnc_slrle_encoding(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 
 		length = num_runs * bytes_per_run;
 
-		sub_tree = proto_tree_add_subtree_format(tree, tvb, *offset, 2 + length,
-					 ett_vnc_slrle_subline, NULL, "Scanline #%d", i+1);
+		ti = proto_tree_add_text(tree, tvb, *offset, 2 + length,
+					 "Scanline #%d", i+1);
+		sub_tree = proto_item_add_subtree(ti, ett_vnc_slrle_subline);
 
 		proto_tree_add_item(sub_tree, hf_vnc_slrle_run_num,
 				    tvb, *offset, 2, ENC_BIG_ENDIAN);
@@ -3018,7 +3036,8 @@ vnc_zrle_encoding(tvbuff_t *tvb, packet_info *pinfo _U_, gint *offset,
 		}
 
 	} else {
-		proto_tree_add_expert(tree, pinfo, &ei_vnc_zrle_failed, tvb, *offset, data_len);
+		proto_tree_add_text(tree, tvb, *offset, data_len,
+				    "Decompression of ZRLE data failed");
 	}
 #endif /* HAVE_LIBZ */
 
@@ -3354,9 +3373,13 @@ vnc_server_set_colormap_entries(tvbuff_t *tvb, packet_info *pinfo, gint *offset,
 		proto_item_add_subtree(ti, ett_vnc_colormap_num_groups);
 
 	for(counter = 0; counter < number_of_colors; counter++) {
-		vnc_colormap_color_group = proto_tree_add_subtree_format(vnc_colormap_num_groups, tvb,
-					 *offset, 6, ett_vnc_colormap_color_group, NULL,
+		ti = proto_tree_add_text(vnc_colormap_num_groups, tvb,
+					 *offset, 6,
 					 "Color group #%d", counter+1);
+
+		vnc_colormap_color_group =
+			proto_item_add_subtree(ti,
+					       ett_vnc_colormap_color_group);
 
 		proto_tree_add_item(vnc_colormap_color_group,
 				    hf_vnc_colormap_red, tvb,
@@ -3542,11 +3565,6 @@ proto_register_vnc(void)
 		  { "Server vendor code", "vnc.server_vendor",
 		    FT_STRING, BASE_NONE, NULL, 0x0,
 		    "Server vendor code specific to TightVNC", HFILL }
-		},
-		{ &hf_vnc_tight_signature,
-		  { "Signature", "vnc.signature",
-		    FT_STRING, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
 		},
 		{ &hf_vnc_tight_server_name,
 		  { "Server name", "vnc.server_name",
@@ -4309,11 +4327,6 @@ proto_register_vnc(void)
 		    FT_BYTES, BASE_NONE, NULL, 0x0,
 		    "Supported server to client messages (bit flags)", HFILL }
 		},
-		{ &hf_vnc_num_supported_encodings,
-		  { "Number of supported encodings", "vnc.num_supported_encodings",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
 		{ &hf_vnc_supported_encodings,
 		  { "Encoding", "vnc.supported_encodings",
 		    FT_UINT32, BASE_HEX, NULL, 0x0,
@@ -4730,7 +4743,7 @@ proto_register_vnc(void)
 	};
 
 	static ei_register_info ei[] = {
-		{ &ei_vnc_possible_gtk_vnc_bug, { "vnc.possible_gtk_vnc_bug", PI_MALFORMED, PI_ERROR, "NULL found in greeting. client -> server greeting must be 12 bytes (possible gtk-vnc bug)", EXPFILL }},
+		{ &ei_vnc_possible_gtk_vnc_bug, { "vnc.possible_gtk_vnc_bug", PI_MALFORMED, PI_ERROR, "client -> server greeting must be 12 bytes (possible gtk-vnc bug)", EXPFILL }},
 		{ &ei_vnc_auth_code_mismatch, { "vnc.auth_code_mismatch", PI_PROTOCOL, PI_WARN, "Authentication code does not match vendor or signature", EXPFILL }},
 		{ &ei_vnc_unknown_tight_vnc_auth, { "vnc.unknown_tight_vnc_auth", PI_PROTOCOL, PI_ERROR, "Unknown TIGHT VNC authentication", EXPFILL }},
 		{ &ei_vnc_too_many_rectangles, { "vnc.too_many_rectangles", PI_MALFORMED, PI_ERROR, "Too many rectangles, aborting dissection", EXPFILL }},
@@ -4738,9 +4751,6 @@ proto_register_vnc(void)
 		{ &ei_vnc_invalid_encoding, { "vnc.invalid_encoding", PI_MALFORMED, PI_ERROR, "Invalid encoding", EXPFILL }},
 		{ &ei_vnc_too_many_colors, { "vnc.too_many_colors", PI_MALFORMED, PI_ERROR, "Too many colors, aborting dissection", EXPFILL }},
 		{ &ei_vnc_too_many_cut_text, { "vnc.too_many_cut_text", PI_MALFORMED, PI_ERROR, "Too much cut text, aborting dissection", EXPFILL }},
-		{ &ei_vnc_zrle_failed, { "vnc.zrle_failed", PI_UNDECODED, PI_ERROR, "Decompression of ZRLE data failed", EXPFILL }},
-		{ &ei_vnc_unknown_tight, { "vnc.unknown_tight_packet", PI_UNDECODED, PI_WARN, "Unknown packet (TightVNC)", EXPFILL }},
-		{ &ei_vnc_reassemble, { "vnc.reassemble", PI_REASSEMBLE, PI_CHAT, "See further on for dissection of the complete (reassembled) PDU", EXPFILL }},
 	};
 
 	/* Register the protocol name and description */

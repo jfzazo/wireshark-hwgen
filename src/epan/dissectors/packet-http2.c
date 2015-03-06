@@ -26,9 +26,8 @@
 
 /*
  * The information used comes from:
- * Hypertext Transfer Protocol version 2 draft-ietf-httpbis-http2-16
- * HTTP Header Compression draft-ietf-httpbis-header-compression-10
- * HTTP Alternative Services draft-ietf-httpbis-alt-svc-04
+ * Hypertext Transfer Protocol version 2.0 draft-ietf-httpbis-http2-13
+ * HTTP Header Compression draft-ietf-httpbis-header-compression-08
  *
  * TODO
 * Enhance display of Data
@@ -40,63 +39,25 @@
 
 #include <stdio.h>
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/expert.h>
+#include <epan/conversation.h>
+#include <epan/follow.h>
 
 #include <epan/nghttp2/nghttp2.h>
 
 #include "packet-tcp.h"
-#include <epan/tap.h>
-#include <epan/stats_tree.h>
-
-#include "wsutil/pint.h"
-
-#define http2_header_repr_type_VALUE_STRING_LIST(XXX)                   \
-    XXX(HTTP2_HD_NONE, 0x00, "")                                        \
-    XXX(HTTP2_HD_INDEXED, 0x01, "Indexed Header Field")                 \
-    XXX(HTTP2_HD_LITERAL_INDEXING_INDEXED_NAME, 0x02, "Literal Header Field with Incremental Indexing - Indexed Name") \
-    XXX(HTTP2_HD_LITERAL_INDEXING_NEW_NAME, 0x03, "Literal Header Field with Incremental Indexing - New Name") \
-    XXX(HTTP2_HD_LITERAL_INDEXED_NAME, 0x04, "Literal Header Field without Indexing - Indexed Name") \
-    XXX(HTTP2_HD_LITERAL_NEW_NAME, 0x05, "Literal Header Field without Indexing - New Name") \
-    XXX(HTTP2_HD_LITERAL_NEVER_INDEXING_INDEXED_NAME, 0x06, "Literal Header Field never Indexed - Indexed Name") \
-    XXX(HTTP2_HD_LITERAL_NEVER_INDEXING_NEW_NAME, 0x07, "Literal Header Field never Indexed - New Name") \
-    XXX(HTTP2_HD_HEADER_TABLE_SIZE_UPDATE, 0x08, "Maximum Header Table Size Change")
-
-VALUE_STRING_ENUM(http2_header_repr_type);
-VALUE_STRING_ARRAY(http2_header_repr_type);
 
 /* Decompressed header field */
 typedef struct {
-    /* one of http2_header_repr_type */
-    gint type;
-    /* encoded (compressed) length */
-    gint length;
-    union {
-        struct {
-            /* header data */
-            char *data;
-            /* length of data */
-            guint datalen;
-            /* name index or name/value index if type is one of
-               HTTP2_HD_INDEXED and HTTP2_HD_*_INDEXED_NAMEs */
-            guint index;
-        } data;
-        /* header table size if type == HTTP2_HD_HEADER_TABLE_SIZE_UPDATE */
-        guint header_table_size;
-    } table;
+    /* header data */
+    char *data;
+    /* length of data */
+    guint datalen;
 } http2_header_t;
-
-/* Context to decode header representation */
-typedef struct {
-    /* one of http2_header_repr_type */
-    gint type;
-    /* final or temporal result of decoding integer */
-    guint integer;
-    /* next bit shift to made when decoding integer */
-    guint next_shift;
-    /* TRUE if integer decoding was completed */
-    gboolean complete;
-} http2_header_repr_info_t;
 
 /* Cached decompressed header data in one packet_info */
 typedef struct {
@@ -110,10 +71,8 @@ typedef struct {
 
 /* In-flight SETTINGS data. */
 typedef struct {
-    /* header table size last seen in SETTINGS */
-    guint32 header_table_size;
-    /* minimum header table size in SETTINGS */
-    guint32 min_header_table_size;
+    /* header table size */
+    uint32_t header_table_size;
     /* nonzero if header_table_size has effective value. */
     int has_header_table_size;
 } http2_settings_t;
@@ -132,24 +91,12 @@ typedef struct {
        hd_inflater[1]. */
     wmem_queue_t *settings_queue[2];
     nghttp2_hd_inflater *hd_inflater[2];
-    http2_header_repr_info_t header_repr_info[2];
     tcp_flow_t *fwd_flow;
 } http2_session_t;
 
 void proto_register_http2(void);
 void proto_reg_handoff_http2(void);
 
-struct HTTP2Tap {
-    guint8 type;
-};
-
-static int http2_tap = -1;
-
-static const guint8* st_str_http2 = "HTTP2";
-static const guint8* st_str_http2_type = "Type";
-
-static int st_node_http2 = -1;
-static int st_node_http2_type = -1;
 
 /* Heuristic dissection */
 static gboolean global_http2_heur = FALSE;
@@ -159,6 +106,7 @@ static gboolean global_http2_heur = FALSE;
 static int proto_http2 = -1;
 static int hf_http2 = -1;
 static int hf_http2_length = -1;
+static int hf_http2_len_rsv = -1;
 static int hf_http2_type = -1;
 static int hf_http2_r = -1;
 static int hf_http2_streamid = -1;
@@ -167,6 +115,7 @@ static int hf_http2_unknown = -1;
 /* Flags */
 static int hf_http2_flags = -1;
 static int hf_http2_flags_end_stream = -1;
+static int hf_http2_flags_end_segment = -1;
 static int hf_http2_flags_end_headers = -1;
 static int hf_http2_flags_padded = -1;
 static int hf_http2_flags_priority = -1;
@@ -200,10 +149,6 @@ static int hf_http2_header_name_length = -1;
 static int hf_http2_header_name = -1;
 static int hf_http2_header_value_length = -1;
 static int hf_http2_header_value = -1;
-static int hf_http2_header_repr = -1;
-static int hf_http2_header_index = -1;
-static int hf_http2_header_table_size_update = -1;
-static int hf_http2_header_table_size = -1;
 /* RST Stream */
 static int hf_http2_rst_stream_error = -1;
 /* Settings */
@@ -213,8 +158,6 @@ static int hf_http2_settings_header_table_size = -1;
 static int hf_http2_settings_enable_push = -1;
 static int hf_http2_settings_max_concurrent_streams = -1;
 static int hf_http2_settings_initial_window_size = -1;
-static int hf_http2_settings_max_frame_size = -1;
-static int hf_http2_settings_max_header_list_size = -1;
 static int hf_http2_settings_unknown = -1;
 /* Push Promise */
 static int hf_http2_push_promise_r = -1;
@@ -255,8 +198,10 @@ static gint ett_http2_settings = -1;
 static dissector_handle_t data_handle;
 static dissector_handle_t http2_handle;
 
-#define FRAME_HEADER_LENGTH     9
+#define FRAME_HEADER_LENGTH     8
 #define MAGIC_FRAME_LENGTH      24
+#define MASK_HTTP2_LENGTH       0X3FFF
+#define MASK_HTTP2_LEN_RSV      0XC000
 #define MASK_HTTP2_RESERVED     0x80000000
 #define MASK_HTTP2_STREAMID     0X7FFFFFFF
 #define MASK_HTTP2_PRIORITY     0X7FFFFFFF
@@ -295,21 +240,10 @@ static const value_string http2_type_vals[] = {
 #define HTTP2_FLAGS_ACK         0x01 /* for PING and SETTINGS */
 
 #define HTTP2_FLAGS_END_STREAM  0x01
+#define HTTP2_FLAGS_END_SEGMENT 0x02
 #define HTTP2_FLAGS_END_HEADERS 0x04
 #define HTTP2_FLAGS_PADDED      0x08
 #define HTTP2_FLAGS_PRIORITY    0x20
-
-#define HTTP2_FLAGS_UNUSED 0xFF
-#define HTTP2_FLAGS_UNUSED_SETTINGS (~HTTP2_FLAGS_ACK & 0xFF)
-#define HTTP2_FLAGS_UNUSED_PING (~HTTP2_FLAGS_ACK & 0xFF)
-#define HTTP2_FLAGS_UNUSED_CONTINUATION (~HTTP2_FLAGS_END_HEADERS & 0xFF)
-#define HTTP2_FLAGS_UNUSED_PUSH_PROMISE \
-    (~(HTTP2_FLAGS_END_HEADERS | HTTP2_FLAGS_PADDED) & 0xFF)
-#define HTTP2_FLAGS_UNUSED_DATA \
-    (~(HTTP2_FLAGS_END_STREAM | HTTP2_FLAGS_PADDED) & 0xFF)
-#define HTTP2_FLAGS_UNUSED_HEADERS \
-    (~(HTTP2_FLAGS_END_STREAM | HTTP2_FLAGS_END_HEADERS | \
-       HTTP2_FLAGS_PADDED | HTTP2_FLAGS_PRIORITY) & 0xFF)
 
 #define HTTP2_FLAGS_R           0xFF
 #define HTTP2_FLAGS_R1          0xFE
@@ -324,21 +258,19 @@ static    guint8 kMagicHello[] = {
 };
 
 /* Error Codes */
-#define EC_NO_ERROR             0x0
-#define EC_PROTOCOL_ERROR       0x1
-#define EC_INTERNAL_ERROR       0x2
-#define EC_FLOW_CONTROL_ERROR   0x3
-#define EC_SETTINGS_TIMEOUT     0x4
-#define EC_STREAM_CLOSED        0x5
-#define EC_FRAME_SIZE_ERROR     0x6
-#define EC_REFUSED_STREAM       0x7
-#define EC_CANCEL               0x8
-#define EC_COMPRESSION_ERROR    0x9
-#define EC_CONNECT_ERROR        0xa
-#define EC_ENHANCE_YOUR_CALM    0xb
-#define EC_INADEQUATE_SECURITY  0xc
-#define EC_HTTP_1_1_REQUIRED    0xd
-
+#define EC_NO_ERROR             0
+#define EC_PROTOCOL_ERROR       1
+#define EC_INTERNAL_ERROR       2
+#define EC_FLOW_CONTROL_ERROR   3
+#define EC_SETTINGS_TIMEOUT     4
+#define EC_STREAM_CLOSED        5
+#define EC_FRAME_SIZE_ERROR     6
+#define EC_REFUSED_STREAM       7
+#define EC_CANCEL               8
+#define EC_COMPRESSION_ERROR    9
+#define EC_CONNECT_ERROR        10
+#define EC_ENHANCE_YOUR_CALM    11
+#define EC_INADEQUATE_SECURITY  12
 
 static const value_string http2_error_codes_vals[] = {
     { EC_NO_ERROR,              "NO_ERROR" },
@@ -354,7 +286,6 @@ static const value_string http2_error_codes_vals[] = {
     { EC_CONNECT_ERROR,         "CONNECT_ERROR" },
     { EC_ENHANCE_YOUR_CALM,     "ENHANCE_YOUR_CALM" },
     { EC_INADEQUATE_SECURITY,   "INADEQUATE_SECURITY" },
-    { EC_HTTP_1_1_REQUIRED,     "HTTP_1_1_REQUIRED" },
     { 0, NULL }
 };
 
@@ -363,16 +294,12 @@ static const value_string http2_error_codes_vals[] = {
 #define HTTP2_SETTINGS_ENABLE_PUSH              2
 #define HTTP2_SETTINGS_MAX_CONCURRENT_STREAMS   3
 #define HTTP2_SETTINGS_INITIAL_WINDOW_SIZE      4
-#define HTTP2_SETTINGS_MAX_FRAME_SIZE           5
-#define HTTP2_SETTINGS_MAX_HEADER_LIST_SIZE     6
 
 static const value_string http2_settings_vals[] = {
     { HTTP2_SETTINGS_HEADER_TABLE_SIZE,      "Header table size" },
     { HTTP2_SETTINGS_ENABLE_PUSH,            "Enable PUSH" },
     { HTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, "Max concurrent streams" },
     { HTTP2_SETTINGS_INITIAL_WINDOW_SIZE,    "Initial Windows size" },
-    { HTTP2_SETTINGS_MAX_FRAME_SIZE,         "Max frame size" },
-    { HTTP2_SETTINGS_MAX_HEADER_LIST_SIZE,   "Max header list size" },
     { 0, NULL }
 };
 
@@ -472,149 +399,9 @@ apply_and_pop_settings(packet_info *pinfo, http2_session_t *h2session)
     settings = (http2_settings_t*)wmem_queue_pop(queue);
 
     if(settings->has_header_table_size) {
-        if(settings->min_header_table_size < settings->header_table_size) {
-            nghttp2_hd_inflate_change_table_size
-                (inflater, settings->min_header_table_size);
-        }
-
         nghttp2_hd_inflate_change_table_size(inflater,
                                              settings->header_table_size);
     }
-}
-
-/* Decode integer from buf at position p, using prefix bits.  This
-   function can be called several times if buf does not contain whole
-   integer.  header_repr_info remembers the result of previous call.
-   Returns the number bytes processed. */
-static guint read_integer(http2_header_repr_info_t *header_repr_info,
-                          const guint8 *buf, guint len, guint p, guint prefix)
-{
-    guint k = (1 << prefix) - 1;
-    guint n = header_repr_info->integer;
-    guint shift = header_repr_info->next_shift;
-
-    if(n == 0) {
-        DISSECTOR_ASSERT(p < len);
-
-        if((buf[p] & k) != k) {
-            header_repr_info->integer = buf[p] & k;
-            header_repr_info->complete = TRUE;
-            return p + 1;
-        }
-
-        n = k;
-
-        ++p;
-    }
-
-    for(; p < len; ++p, shift += 7) {
-        DISSECTOR_ASSERT(p < len);
-
-        n += (buf[p] & 0x7F) << shift;
-
-        if((buf[p] & 0x80) == 0) {
-            header_repr_info->complete = TRUE;
-            ++p;
-            break;
-        }
-    }
-
-    header_repr_info->integer = n;
-    header_repr_info->next_shift = shift;
-    return p;
-}
-
-static void
-reset_http2_header_repr_info(http2_header_repr_info_t *header_repr_info)
-{
-    header_repr_info->type = HTTP2_HD_NONE;
-    header_repr_info->integer = 0;
-    header_repr_info->next_shift = 0;
-    header_repr_info->complete = FALSE;
-}
-
-/* Reads zero or more header table size update and optionally header
-   representation information.  This function returns when first
-   header representation is decoded or buf is processed completely.
-   This function returns the number bytes processed for header table
-   size update. */
-static guint
-process_http2_header_repr_info(wmem_array_t *headers,
-                               http2_header_repr_info_t *header_repr_info,
-                               const guint8 *buf, guint len)
-{
-    guint i;
-    guint start;
-
-    if(header_repr_info->type != HTTP2_HD_NONE &&
-       header_repr_info->type != HTTP2_HD_HEADER_TABLE_SIZE_UPDATE &&
-       header_repr_info->complete) {
-        return 0;
-    }
-
-    start = 0;
-
-    for(i = 0; i < len;) {
-        if(header_repr_info->type == HTTP2_HD_NONE) {
-            guchar c = buf[i];
-            if((c & 0xE0) == 0x20) {
-                header_repr_info->type = HTTP2_HD_HEADER_TABLE_SIZE_UPDATE;
-
-                i = read_integer(header_repr_info, buf, len, i, 5);
-            } else if(c & 0x80) {
-                header_repr_info->type = HTTP2_HD_INDEXED;
-                i = read_integer(header_repr_info, buf, len, i, 7);
-            } else if(c == 0x40 || c == 0 || c == 0x10) {
-                /* New name */
-                header_repr_info->complete = TRUE;
-                if(c & 0x40) {
-                    header_repr_info->type = HTTP2_HD_LITERAL_INDEXING_NEW_NAME;
-                } else if((c & 0xF0) == 0x10) {
-                    header_repr_info->type = HTTP2_HD_LITERAL_NEVER_INDEXING_NEW_NAME;
-                } else {
-                    header_repr_info->type = HTTP2_HD_LITERAL_NEW_NAME;
-                }
-            } else {
-                /* indexed name */
-                if(c & 0x40) {
-                    header_repr_info->type = HTTP2_HD_LITERAL_INDEXING_INDEXED_NAME;
-                    i = read_integer(header_repr_info, buf, len, i, 6);
-                } else if((c & 0xF0) == 0x10) {
-                    header_repr_info->type = HTTP2_HD_LITERAL_NEVER_INDEXING_INDEXED_NAME;
-                    i = read_integer(header_repr_info, buf, len, i, 4);
-                } else {
-                    header_repr_info->type = HTTP2_HD_LITERAL_INDEXED_NAME;
-                    i = read_integer(header_repr_info, buf, len, i, 4);
-                }
-            }
-        } else {
-            i = read_integer(header_repr_info, buf, len, i, 8);
-        }
-
-        if(header_repr_info->complete) {
-            if(header_repr_info->type == HTTP2_HD_HEADER_TABLE_SIZE_UPDATE) {
-                http2_header_t *out;
-
-                out = wmem_new(wmem_file_scope(), http2_header_t);
-
-                out->type = header_repr_info->type;
-                out->length = i - start;
-                out->table.header_table_size = header_repr_info->integer;
-
-                wmem_array_append(headers, out, 1);
-
-                reset_http2_header_repr_info(header_repr_info);
-                /* continue to decode header table size update or
-                   first header encoding is encountered. */
-                start = i;
-            } else {
-                /* Break on first header encoding */
-                break;
-            }
-        }
-    }
-
-    return start;
 }
 
 static void
@@ -637,7 +424,6 @@ inflate_http2_header_block(tvbuff_t *tvb, packet_info *pinfo, guint offset,
     int final;
     int flow_index;
     http2_header_data_t *header_data;
-    http2_header_repr_info_t *header_repr_info;
     wmem_list_t *header_list;
     wmem_array_t *headers;
     guint i;
@@ -658,7 +444,6 @@ inflate_http2_header_block(tvbuff_t *tvb, packet_info *pinfo, guint offset,
 
         flow_index = select_http2_flow_index(pinfo, h2session);
         hd_inflater = h2session->hd_inflater[flow_index];
-        header_repr_info = &h2session->header_repr_info[flow_index];
 
         final = flags & HTTP2_FLAGS_END_HEADERS;
 
@@ -678,20 +463,14 @@ inflate_http2_header_block(tvbuff_t *tvb, packet_info *pinfo, guint offset,
             headbuf += rv;
             headlen -= rv;
 
-            rv -= process_http2_header_repr_info(headers, header_repr_info, headbuf - rv, rv);
-
             if(inflate_flags & NGHTTP2_HD_INFLATE_EMIT) {
                 char *str;
-                guint32 len;
+                uint32_t len;
                 http2_header_t *out;
 
                 out = wmem_new(wmem_file_scope(), http2_header_t);
 
-                out->type = header_repr_info->type;
-                out->length = rv;
-                out->table.data.index = header_repr_info->integer;
-
-                out->table.data.datalen = (guint)(4 + nv.namelen + 4 + nv.valuelen);
+                out->datalen = (guint)(4 + nv.namelen + 4 + nv.valuelen);
 
                 /* Prepare buffer... with the following format
                    name length (uint32)
@@ -699,24 +478,22 @@ inflate_http2_header_block(tvbuff_t *tvb, packet_info *pinfo, guint offset,
                    value length (uint32)
                    value (string)
                 */
-                str = wmem_alloc_array(wmem_file_scope(), char, out->table.data.datalen);
+                str = wmem_alloc_array(wmem_file_scope(), char, out->datalen);
 
                 /* nv.namelen and nv.valuelen are of size_t.  In order
                    to get length in 4 bytes, we have to copy it to
-                   guint32. */
-                len = (guint32)nv.namelen;
-                phton32(&str[0], len);
+                   uint32_t. */
+                len = (uint32_t)nv.namelen;
+                memcpy(&str[0], (char *)&len, sizeof(len));
                 memcpy(&str[4], nv.name, nv.namelen);
 
-                len = (guint32)nv.valuelen;
-                phton32(&str[4 + nv.namelen], len);
+                len = (uint32_t)nv.valuelen;
+                memcpy(&str[4 + nv.namelen], (char *)&len, sizeof(len));
                 memcpy(&str[4 + nv.namelen + 4], nv.value, nv.valuelen);
 
-                out->table.data.data = str;
+                out->data = str;
 
                 wmem_array_append(headers, out, 1);
-
-                reset_http2_header_repr_info(header_repr_info);
             }
             if(inflate_flags & NGHTTP2_HD_INFLATE_FINAL) {
                 nghttp2_hd_inflate_end_headers(hd_inflater);
@@ -755,17 +532,13 @@ inflate_http2_header_block(tvbuff_t *tvb, packet_info *pinfo, guint offset,
 
         in = (http2_header_t*)wmem_array_index(headers, i);
 
-        if(in->type == HTTP2_HD_HEADER_TABLE_SIZE_UPDATE) {
-            continue;
-        }
+        str = (char *)g_malloc(in->datalen);
+        memcpy(str, in->data, in->datalen);
 
-        str = (char *)g_malloc(in->table.data.datalen);
-        memcpy(str, in->table.data.data, in->table.data.datalen);
-
-        header_len += in->table.data.datalen;
+        header_len += in->datalen;
 
         /* Now setup the tvb buffer to have the new data */
-        next_tvb = tvb_new_child_real_data(tvb, str, in->table.data.datalen, in->table.data.datalen);
+        next_tvb = tvb_new_child_real_data(tvb, str, in->datalen, in->datalen);
         tvb_set_free_cb(next_tvb, g_free);
         tvb_composite_append(header_tvb, next_tvb);
     }
@@ -776,60 +549,34 @@ inflate_http2_header_block(tvbuff_t *tvb, packet_info *pinfo, guint offset,
     ti = proto_tree_add_uint(tree, hf_http2_header_length, header_tvb, hoffset, 1, header_len);
     PROTO_ITEM_SET_GENERATED(ti);
 
-    for(i = 0; i < wmem_array_get_count(headers); ++i) {
-        http2_header_t *in = (http2_header_t*)wmem_array_index(headers, i);
-
-        if(in->type == HTTP2_HD_HEADER_TABLE_SIZE_UPDATE) {
-            header = proto_tree_add_item(tree, hf_http2_header_table_size_update, tvb, offset, in->length, ENC_NA);
-
-            header_tree = proto_item_add_subtree(header, ett_http2_headers);
-
-            proto_tree_add_uint(header_tree, hf_http2_header_table_size, tvb, offset, in->length, in->table.header_table_size);
-
-            offset += in->length;
-            continue;
-        }
-
+    while (tvb_reported_length_remaining(header_tvb, hoffset) > 0) {
         /* Populate tree with header name/value details. */
         /* Add 'Header' subtree with description. */
-
-        header = proto_tree_add_item(tree, hf_http2_header, tvb, offset, in->length, ENC_NA);
-
+        header = proto_tree_add_item(tree, hf_http2_header, header_tvb, hoffset, -1, ENC_NA);
         header_tree = proto_item_add_subtree(header, ett_http2_headers);
 
         /* header value length */
-        header_name_length = tvb_get_ntohl(header_tvb, hoffset);
-        proto_tree_add_uint(header_tree, hf_http2_header_name_length, tvb, offset, in->length, header_name_length);
+        proto_tree_add_item(header_tree, hf_http2_header_name_length, header_tvb, hoffset, 4, ENC_LITTLE_ENDIAN);
+        header_name_length = tvb_get_letohl(header_tvb, hoffset);
         hoffset += 4;
 
         /* Add header name. */
+        proto_tree_add_item(header_tree, hf_http2_header_name, header_tvb, hoffset, header_name_length, ENC_ASCII|ENC_NA);
         header_name = (gchar *)tvb_get_string_enc(wmem_packet_scope(), header_tvb, hoffset, header_name_length, ENC_ASCII|ENC_NA);
-        proto_tree_add_string(header_tree, hf_http2_header_name, tvb, offset, in->length, header_name);
         hoffset += header_name_length;
 
         /* header value length */
-        header_value_length = tvb_get_ntohl(header_tvb, hoffset);
-        proto_tree_add_uint(header_tree, hf_http2_header_value_length, tvb, offset, in->length, header_value_length);
+        proto_tree_add_item(header_tree, hf_http2_header_value_length, header_tvb, hoffset, 4, ENC_LITTLE_ENDIAN);
+        header_value_length = tvb_get_letohl(header_tvb, hoffset);
         hoffset += 4;
 
         /* Add header value. */
+        proto_tree_add_item(header_tree, hf_http2_header_value, header_tvb, hoffset, header_value_length, ENC_ASCII|ENC_NA);
         header_value = (gchar *)tvb_get_string_enc(wmem_packet_scope(),header_tvb, hoffset, header_value_length, ENC_ASCII|ENC_NA);
-        proto_tree_add_string(header_tree, hf_http2_header_value, tvb, offset, in->length, header_value);
         hoffset += header_value_length;
 
-        /* Add encoding representation */
-        proto_tree_add_string(header_tree, hf_http2_header_repr, tvb, offset, in->length, http2_header_repr_type[in->type].strptr);
-
-        if(in->type == HTTP2_HD_INDEXED ||
-           in->type == HTTP2_HD_LITERAL_INDEXING_INDEXED_NAME ||
-           in->type == HTTP2_HD_LITERAL_INDEXED_NAME ||
-           in->type == HTTP2_HD_LITERAL_NEVER_INDEXING_INDEXED_NAME) {
-            proto_tree_add_uint(header_tree, hf_http2_header_index, tvb, offset, in->length, in->table.data.index);
-        }
-
         proto_item_append_text(header, ": %s: %s", header_name, header_value);
-
-        offset += in->length;
+        proto_item_set_len(header, 4 + header_name_length + 4 + header_value_length);
     }
 }
 
@@ -840,39 +587,41 @@ dissect_http2_header_flags(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *ht
     proto_tree *flags_tree;
     guint8 flags;
 
-    ti_flags = proto_tree_add_item(http2_tree, hf_http2_flags, tvb, offset, 1, ENC_BIG_ENDIAN);
+    ti_flags = proto_tree_add_item(http2_tree, hf_http2_flags, tvb, offset, 1, ENC_NA);
     flags_tree = proto_item_add_subtree(ti_flags, ett_http2_flags);
     flags = tvb_get_guint8(tvb, offset);
 
     switch(type){
         case HTTP2_DATA:
             proto_tree_add_item(flags_tree, hf_http2_flags_end_stream, tvb, offset, 1, ENC_NA);
+            proto_tree_add_item(flags_tree, hf_http2_flags_end_segment, tvb, offset, 1, ENC_NA);
             proto_tree_add_item(flags_tree, hf_http2_flags_padded, tvb, offset, 1, ENC_NA);
-            proto_tree_add_item(flags_tree, hf_http2_flags_unused_data, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(flags_tree, hf_http2_flags_unused_data, tvb, offset, 1, ENC_NA);
             break;
         case HTTP2_HEADERS:
             proto_tree_add_item(flags_tree, hf_http2_flags_end_stream, tvb, offset, 1, ENC_NA);
+            proto_tree_add_item(flags_tree, hf_http2_flags_end_segment, tvb, offset, 1, ENC_NA);
             proto_tree_add_item(flags_tree, hf_http2_flags_end_headers, tvb, offset, 1, ENC_NA);
             proto_tree_add_item(flags_tree, hf_http2_flags_padded, tvb, offset, 1, ENC_NA);
             proto_tree_add_item(flags_tree, hf_http2_flags_priority, tvb, offset, 1, ENC_NA);
-            proto_tree_add_item(flags_tree, hf_http2_flags_unused_headers, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(flags_tree, hf_http2_flags_unused_headers, tvb, offset, 1, ENC_NA);
             break;
         case HTTP2_SETTINGS:
             proto_tree_add_item(flags_tree, hf_http2_flags_settings_ack, tvb, offset, 1, ENC_NA);
-            proto_tree_add_item(flags_tree, hf_http2_flags_unused_settings, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(flags_tree, hf_http2_flags_unused_settings, tvb, offset, 1, ENC_NA);
             break;
         case HTTP2_PUSH_PROMISE:
             proto_tree_add_item(flags_tree, hf_http2_flags_end_headers, tvb, offset, 1, ENC_NA);
             proto_tree_add_item(flags_tree, hf_http2_flags_padded, tvb, offset, 1, ENC_NA);
-            proto_tree_add_item(flags_tree, hf_http2_flags_unused_push_promise, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(flags_tree, hf_http2_flags_unused_push_promise, tvb, offset, 1, ENC_NA);
             break;
         case HTTP2_CONTINUATION:
             proto_tree_add_item(flags_tree, hf_http2_flags_end_headers, tvb, offset, 1, ENC_NA);
-            proto_tree_add_item(flags_tree, hf_http2_flags_unused_continuation, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(flags_tree, hf_http2_flags_unused_continuation, tvb, offset, 1, ENC_NA);
             break;
         case HTTP2_PING:
             proto_tree_add_item(flags_tree, hf_http2_flags_ping_ack, tvb, offset, 1, ENC_NA);
-            proto_tree_add_item(flags_tree, hf_http2_flags_unused_ping, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(flags_tree, hf_http2_flags_unused_ping, tvb, offset, 1, ENC_NA);
             break;
         case HTTP2_PRIORITY:
         case HTTP2_RST_STREAM:
@@ -882,7 +631,7 @@ dissect_http2_header_flags(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *ht
         case HTTP2_BLOCKED:
         default:
             /* Does not define any flags */
-            proto_tree_add_item(flags_tree, hf_http2_flags_unused, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(flags_tree, hf_http2_flags_unused, tvb, offset, 1, ENC_NA);
             break;
     }
 
@@ -903,7 +652,7 @@ dissect_frame_padding(tvbuff_t *tvb, guint16 *padding, proto_tree *http2_tree,
     if(flags & HTTP2_FLAGS_PADDED)
     {
         *padding = tvb_get_guint8(tvb, offset); /* read a single octet */
-        proto_tree_add_item(http2_tree, hf_http2_padding, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(http2_tree, hf_http2_padding, tvb, offset, 1, ENC_NA);
         offset++;
         pad_len ++;
     }
@@ -924,9 +673,9 @@ dissect_frame_prio(tvbuff_t *tvb, proto_tree *http2_tree, guint offset, guint8 f
     if(flags & HTTP2_FLAGS_PRIORITY)
     {
         proto_tree_add_item(http2_tree, hf_http2_excl_dependency, tvb, offset, 4, ENC_NA);
-        proto_tree_add_item(http2_tree, hf_http2_stream_dependency, tvb, offset, 4, ENC_BIG_ENDIAN);
+        proto_tree_add_item(http2_tree, hf_http2_stream_dependency, tvb, offset, 4, ENC_NA);
         offset += 4;
-        proto_tree_add_item(http2_tree, hf_http2_weight, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(http2_tree, hf_http2_weight, tvb, offset, 1, ENC_NA);
         weight = tvb_get_guint8(tvb, offset);
         /* 6.2: Weight:  An 8-bit weight for the stream; Add one to the value to obtain a weight between 1 and 256 */
         ti = proto_tree_add_uint(http2_tree, hf_http2_weight_real, tvb, offset, 1, weight+1);
@@ -948,7 +697,7 @@ dissect_http2_data(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *http2_tree
 
     offset = dissect_frame_padding(tvb, &padding, http2_tree, offset, flags);
     datalen = tvb_reported_length_remaining(tvb, offset) - padding;
-    proto_tree_add_item(http2_tree, hf_http2_data_data, tvb, offset, datalen, ENC_NA);
+    proto_tree_add_item(http2_tree, hf_http2_data_data, tvb, offset, datalen, ENC_ASCII|ENC_NA);
     offset += datalen;
 
     proto_tree_add_item(http2_tree, hf_http2_data_padding, tvb, offset, padding, ENC_NA);
@@ -972,7 +721,7 @@ dissect_http2_headers(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *http2_t
     offset = dissect_frame_prio(tvb, http2_tree, offset, flags);
 
     headlen = tvb_reported_length_remaining(tvb, offset) - padding;
-    proto_tree_add_item(http2_tree, hf_http2_headers, tvb, offset, headlen, ENC_NA);
+    proto_tree_add_item(http2_tree, hf_http2_headers, tvb, offset, headlen, ENC_ASCII|ENC_NA);
 
     /* decompress the header block */
     inflate_http2_header_block(tvb, pinfo, offset, http2_tree, headlen, h2session, flags);
@@ -1001,7 +750,7 @@ static int
 dissect_http2_rst_stream(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *http2_tree, guint offset, guint8 flags _U_)
 {
 
-    proto_tree_add_item(http2_tree, hf_http2_rst_stream_error, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_rst_stream_error, tvb, offset, 4, ENC_NA);
     offset += 4;
 
     return offset;
@@ -1014,20 +763,18 @@ dissect_http2_settings(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *http2_
     guint32 settingsid;
     proto_item *ti_settings;
     proto_tree *settings_tree;
-    guint32 header_table_size;
-    guint32 min_header_table_size;
+    uint32_t header_table_size;
     int header_table_size_found;
     http2_session_t *h2session;
 
     header_table_size_found = 0;
     header_table_size = 0;
-    min_header_table_size = 0xFFFFFFFFu;
 
     while(tvb_reported_length_remaining(tvb, offset) > 0){
 
         ti_settings = proto_tree_add_item(http2_tree, hf_http2_settings, tvb, offset, 5, ENC_NA);
         settings_tree = proto_item_add_subtree(ti_settings, ett_http2_settings);
-        proto_tree_add_item(settings_tree, hf_http2_settings_identifier, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_item(settings_tree, hf_http2_settings_identifier, tvb, offset, 1, ENC_NA);
         settingsid = tvb_get_ntohs(tvb, offset);
         proto_item_append_text(ti_settings, " - %s",
                                val_to_str( settingsid, http2_settings_vals, "Unknown (%u)") );
@@ -1036,32 +783,23 @@ dissect_http2_settings(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *http2_
 
         switch(settingsid){
             case HTTP2_SETTINGS_HEADER_TABLE_SIZE:
-                proto_tree_add_item(settings_tree, hf_http2_settings_header_table_size, tvb, offset, 4, ENC_BIG_ENDIAN);
+                proto_tree_add_item(settings_tree, hf_http2_settings_header_table_size, tvb, offset, 4, ENC_NA);
 
                 /* We only care the last header table size in SETTINGS */
                 header_table_size_found = 1;
                 header_table_size = tvb_get_ntohl(tvb, offset);
-                if(min_header_table_size > header_table_size) {
-                    min_header_table_size = header_table_size;
-                }
             break;
             case HTTP2_SETTINGS_ENABLE_PUSH:
-                proto_tree_add_item(settings_tree, hf_http2_settings_enable_push, tvb, offset, 4, ENC_BIG_ENDIAN);
+                proto_tree_add_item(settings_tree, hf_http2_settings_enable_push, tvb, offset, 4, ENC_NA);
             break;
             case HTTP2_SETTINGS_MAX_CONCURRENT_STREAMS:
-                proto_tree_add_item(settings_tree, hf_http2_settings_max_concurrent_streams, tvb, offset, 4, ENC_BIG_ENDIAN);
+                proto_tree_add_item(settings_tree, hf_http2_settings_max_concurrent_streams, tvb, offset, 4, ENC_NA);
             break;
             case HTTP2_SETTINGS_INITIAL_WINDOW_SIZE:
-                proto_tree_add_item(settings_tree, hf_http2_settings_initial_window_size, tvb, offset, 4, ENC_BIG_ENDIAN);
-            break;
-            case HTTP2_SETTINGS_MAX_FRAME_SIZE:
-                proto_tree_add_item(settings_tree, hf_http2_settings_max_frame_size, tvb, offset, 4, ENC_BIG_ENDIAN);
-            break;
-            case HTTP2_SETTINGS_MAX_HEADER_LIST_SIZE:
-                proto_tree_add_item(settings_tree, hf_http2_settings_max_header_list_size, tvb, offset, 4, ENC_BIG_ENDIAN);
+                proto_tree_add_item(settings_tree, hf_http2_settings_initial_window_size, tvb, offset, 4, ENC_NA);
             break;
             default:
-                proto_tree_add_item(settings_tree, hf_http2_settings_unknown, tvb, offset, 4, ENC_BIG_ENDIAN);
+                proto_tree_add_item(settings_tree, hf_http2_settings_unknown, tvb, offset, 4, ENC_NA);
             break;
         }
         proto_item_append_text(ti_settings, " : %u", tvb_get_ntohl(tvb, offset));
@@ -1079,7 +817,6 @@ dissect_http2_settings(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *http2_
 
             settings = wmem_new(wmem_file_scope(), http2_settings_t);
 
-            settings->min_header_table_size = min_header_table_size;
             settings->header_table_size = header_table_size;
             settings->has_header_table_size = header_table_size_found;
 
@@ -1103,9 +840,9 @@ dissect_http2_push_promise(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *ht
 
     offset = dissect_frame_padding(tvb, &padding, http2_tree, offset, flags);
 
-    proto_tree_add_item(http2_tree, hf_http2_push_promise_r, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_push_promise_r, tvb, offset, 4, ENC_NA);
     proto_tree_add_item(http2_tree, hf_http2_push_promise_promised_stream_id, tvb,
-                        offset, 4, ENC_BIG_ENDIAN);
+                        offset, 4, ENC_NA);
     offset += 4;
 
     headlen = tvb_reported_length_remaining(tvb, offset) - padding;
@@ -1146,11 +883,11 @@ static int
 dissect_http2_goaway(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *http2_tree, guint offset, guint8 flags _U_)
 {
 
-    proto_tree_add_item(http2_tree, hf_http2_goaway_r, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(http2_tree, hf_http2_goaway_last_stream_id, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_goaway_r, tvb, offset, 4, ENC_NA);
+    proto_tree_add_item(http2_tree, hf_http2_goaway_last_stream_id, tvb, offset, 4, ENC_NA);
     offset += 4;
 
-    proto_tree_add_item(http2_tree, hf_http2_goaway_error, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_goaway_error, tvb, offset, 4, ENC_NA);
     offset += 4;
     if(tvb_reported_length_remaining(tvb, offset) > 0)
     {
@@ -1165,8 +902,8 @@ static int
 dissect_http2_window_update(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *http2_tree, guint offset, guint8 flags _U_)
 {
 
-    proto_tree_add_item(http2_tree, hf_http2_window_update_r, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(http2_tree, hf_http2_window_update_window_size_increment, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_window_update_r, tvb, offset, 4, ENC_NA);
+    proto_tree_add_item(http2_tree, hf_http2_window_update_window_size_increment, tvb, offset, 4, ENC_NA);
     offset += 4;
 
     return offset;
@@ -1207,20 +944,20 @@ dissect_http2_altsvc(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *http2_tr
     guint8 hostlen;
     int remain;
 
-    proto_tree_add_item(http2_tree, hf_http2_altsvc_maxage, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_altsvc_maxage, tvb, offset, 4, ENC_NA);
     offset+=4;
 
-    proto_tree_add_item(http2_tree, hf_http2_altsvc_port, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_altsvc_port, tvb, offset, 2, ENC_NA);
     offset += 2;
 
-    proto_tree_add_item(http2_tree, hf_http2_altsvc_proto_len, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_altsvc_proto_len, tvb, offset, 1, ENC_NA);
     pidlen = tvb_get_guint8(tvb, offset);
     offset ++;
 
     proto_tree_add_item(http2_tree, hf_http2_altsvc_protocol, tvb, offset, pidlen, ENC_ASCII|ENC_NA);
     offset += pidlen;
 
-    proto_tree_add_item(http2_tree, hf_http2_altsvc_host_len, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_altsvc_host_len, tvb, offset, 1, ENC_NA);
     hostlen = tvb_get_guint8(tvb, offset);
     offset ++;
 
@@ -1248,7 +985,6 @@ dissect_http2_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
     guint8 type, flags;
     guint16 length;
     guint32 streamid;
-    struct HTTP2Tap *http2_stats;
 
     if(!p_get_proto_data(wmem_file_scope(), pinfo, proto_http2, 0)) {
         http2_header_data_t *header_data;
@@ -1265,12 +1001,10 @@ dissect_http2_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
          0                   1                   2                   3
          0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-        |                 Length (24)                   |
-        +---------------+---------------+---------------+
-        |   Type (8)    |   Flags (8)   |
-        +-+-+-----------+---------------+-------------------------------+
+        |         Length (16)           |   Type (8)    |   Flags (8)   |
+        +-+-------------+---------------+-------------------------------+
         |R|                 Stream Identifier (31)                      |
-        +=+=============================================================+
+        +-+-------------------------------------------------------------+
         |                   Frame Payload (0...)                      ...
         +---------------------------------------------------------------+
     */
@@ -1280,9 +1014,9 @@ dissect_http2_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 
     /* 3.5 Connection Header
        Upon establishment of a TCP connection and determination that
-       HTTP/2 will be used by both peers, each endpoint MUST send a
-       connection preface as a final confirmation and to establish the
-       initial SETTINGS parameters for the HTTP/2 connection.
+       HTTP/2.0 will be used by both peers, each endpoint MUST send a
+       connection header as a final confirmation and to establish the
+       initial settings for the HTTP/2.0 connection.
      */
     /* tvb_memeql makes certain there are enough bytes in the buffer.
      * returns -1 if there are not enough bytes or if there is not a
@@ -1300,11 +1034,12 @@ dissect_http2_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
         return MAGIC_FRAME_LENGTH;
     }
 
-    proto_tree_add_item(http2_tree, hf_http2_length, tvb, offset, 3, ENC_BIG_ENDIAN);
-    length = tvb_get_ntoh24(tvb, offset);
-    offset += 3;
+    proto_tree_add_item(http2_tree, hf_http2_length, tvb, offset, 2, ENC_NA);
+    proto_tree_add_item(http2_tree, hf_http2_len_rsv, tvb, offset, 2, ENC_NA);
+    length = tvb_get_ntohs(tvb, offset) & MASK_HTTP2_LENGTH;
+    offset += 2;
 
-    proto_tree_add_item(http2_tree, hf_http2_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_type, tvb, offset, 1, ENC_NA);
     type = tvb_get_guint8(tvb, offset);
     col_append_sep_fstr( pinfo->cinfo, COL_INFO, ", ", "%s", val_to_str(type, http2_type_vals, "Unknown type (%d)"));
 
@@ -1313,15 +1048,11 @@ dissect_http2_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
     flags = dissect_http2_header_flags(tvb, pinfo, http2_tree, offset, type);
     offset += 1;
 
-    proto_tree_add_item(http2_tree, hf_http2_r, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(http2_tree, hf_http2_streamid, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(http2_tree, hf_http2_r, tvb, offset, 4, ENC_NA);
+    proto_tree_add_item(http2_tree, hf_http2_streamid, tvb, offset, 4, ENC_NA);
     streamid = tvb_get_ntohl(tvb, offset) & MASK_HTTP2_STREAMID;
     proto_item_append_text(ti, ": %s, Stream ID: %u, Length %u", val_to_str(type, http2_type_vals, "Unknown type (%d)"), streamid, length);
     offset += 4;
-
-    /* Collect stats */
-    http2_stats = wmem_new0(wmem_packet_scope(), struct HTTP2Tap);
-    http2_stats->type = type;
 
     switch(type){
         case HTTP2_DATA: /* Data (0) */
@@ -1376,21 +1107,16 @@ dissect_http2_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
             proto_tree_add_item(http2_tree, hf_http2_unknown, tvb, offset, -1, ENC_NA);
         break;
     }
-
-    tap_queue_packet(http2_tap, pinfo, http2_stats);
-
-
     return tvb_captured_length(tvb);
 }
 
-static guint get_http2_message_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                                   int offset, void *data _U_)
+static guint get_http2_message_len( packet_info *pinfo _U_, tvbuff_t *tvb, int offset )
 {
         if ( tvb_memeql( tvb, offset, kMagicHello, MAGIC_FRAME_LENGTH ) == 0 ) {
                 return MAGIC_FRAME_LENGTH;
         }
 
-        return (guint)tvb_get_ntoh24(tvb, offset) + FRAME_HEADER_LENGTH;
+        return (guint)tvb_get_ntohs(tvb, offset) + FRAME_HEADER_LENGTH;
 }
 
 
@@ -1409,7 +1135,7 @@ dissect_http2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     col_clear(pinfo->cinfo, COL_INFO);
 
     ti = proto_tree_add_item(tree, proto_http2, tvb, 0, -1, ENC_NA);
-    proto_item_append_text(ti, " (draft-16)");
+    proto_item_append_text(ti, " (draft-13)");
 
     http2_tree = proto_item_add_subtree(ti, ett_http2);
 
@@ -1435,8 +1161,7 @@ dissect_http2_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     if (tvb_memeql(tvb, 0, kMagicHello, MAGIC_FRAME_LENGTH) != 0) {
         /* we couldn't find the Magic Hello (PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n)
            see if there's a valid frame type (0-11 are defined at the moment) */
-        if (tvb_captured_length(tvb)<4 || tvb_get_guint8(tvb, 3)>HTTP2_BLOCKED)
-
+        if (tvb_reported_length(tvb)<2 || tvb_get_guint8(tvb, 2)>HTTP2_BLOCKED)
             return (FALSE);
     }
 
@@ -1458,8 +1183,13 @@ proto_register_http2(void)
         },
         { &hf_http2_length,
             { "Length", "http2.length",
-              FT_UINT24, BASE_DEC, NULL, 0x0,
-              "The length (24 bits) of the frame payload (The 9 octets of the frame header are not included)", HFILL }
+               FT_UINT16, BASE_DEC, NULL, MASK_HTTP2_LENGTH,
+              "The length (14 bits) of the frame payload (The 8 octets of the frame header are not included)", HFILL }
+        },
+        { &hf_http2_len_rsv,
+            { "Reserved", "http2.len.rsv",
+               FT_UINT16, BASE_DEC, NULL, MASK_HTTP2_LEN_RSV,
+              "Must be zero", HFILL }
         },
         { &hf_http2_type,
             { "Type", "http2.type",
@@ -1508,6 +1238,11 @@ proto_register_http2(void)
               FT_BOOLEAN, 8, NULL, HTTP2_FLAGS_END_STREAM,
               "Indicates that this frame is the last that the endpoint will send for the identified stream", HFILL }
         },
+        { &hf_http2_flags_end_segment,
+            { "End Segment", "http2.flags.end_segment",
+              FT_BOOLEAN, 8, NULL, HTTP2_FLAGS_END_SEGMENT,
+              "Indicates that this frame is the last for the current segment", HFILL }
+        },
         { &hf_http2_flags_end_headers,
             { "End Headers", "http2.flags.eh",
               FT_BOOLEAN, 8, NULL, HTTP2_FLAGS_END_HEADERS,
@@ -1531,37 +1266,37 @@ proto_register_http2(void)
         },
         { &hf_http2_flags_unused,
             { "Unused", "http2.flags.unused",
-               FT_UINT8, BASE_HEX, NULL, HTTP2_FLAGS_UNUSED,
+               FT_UINT8, BASE_HEX, NULL, 0xFF,
               "Must be zero", HFILL }
         },
         { &hf_http2_flags_unused_settings,
             { "Unused", "http2.flags.unused_settings",
-               FT_UINT8, BASE_HEX, NULL, HTTP2_FLAGS_UNUSED_SETTINGS,
+               FT_UINT8, BASE_HEX, NULL, 0xFE,
               "Must be zero", HFILL }
         },
         { &hf_http2_flags_unused_ping,
             { "Unused", "http2.flags.unused_ping",
-               FT_UINT8, BASE_HEX, NULL, HTTP2_FLAGS_UNUSED_PING,
+               FT_UINT8, BASE_HEX, NULL, 0xFE,
               "Must be zero", HFILL }
         },
         { &hf_http2_flags_unused_continuation,
             { "Unused", "http2.flags.unused_continuation",
-               FT_UINT8, BASE_HEX, NULL, HTTP2_FLAGS_UNUSED_CONTINUATION,
+               FT_UINT8, BASE_HEX, NULL, 0xFB,
               "Must be zero", HFILL }
         },
         { &hf_http2_flags_unused_push_promise,
             { "Unused", "http2.flags.unused_push_promise",
-               FT_UINT8, BASE_HEX, NULL, HTTP2_FLAGS_UNUSED_PUSH_PROMISE,
+               FT_UINT8, BASE_HEX, NULL, 0xF3,
               "Must be zero", HFILL }
         },
         { &hf_http2_flags_unused_data,
             { "Unused", "http2.flags.unused_data",
-               FT_UINT8, BASE_HEX, NULL, HTTP2_FLAGS_UNUSED_DATA,
+               FT_UINT8, BASE_HEX, NULL, 0xF4,
               "Must be zero", HFILL }
         },
         { &hf_http2_flags_unused_headers,
             { "Unused", "http2.flags.unused_headers",
-               FT_UINT8, BASE_HEX, NULL, HTTP2_FLAGS_UNUSED_HEADERS,
+               FT_UINT8, BASE_HEX, NULL, 0xD0,
               "Must be zero", HFILL }
         },
         { &hf_http2_flags_settings_ack,
@@ -1643,26 +1378,6 @@ proto_register_http2(void)
               FT_STRING, BASE_NONE, NULL, 0x0,
               NULL, HFILL }
         },
-        { &hf_http2_header_repr,
-            { "Representation", "http2.header.repr",
-              FT_STRING, BASE_NONE, NULL, 0x0,
-              NULL, HFILL }
-        },
-        { &hf_http2_header_index,
-            { "Index", "http2.header.index",
-              FT_UINT32, BASE_DEC, NULL, 0x0,
-              NULL, HFILL }
-        },
-        { &hf_http2_header_table_size_update,
-            { "Header table size update", "http2.header_table_size_update",
-               FT_NONE, BASE_NONE, NULL, 0x0,
-               NULL, HFILL }
-        },
-        { &hf_http2_header_table_size,
-            { "Header table size", "http2.header_table_size_update.header_table_size",
-               FT_UINT32, BASE_DEC, NULL, 0x0,
-               NULL, HFILL }
-        },
         /* RST Stream */
         { &hf_http2_rst_stream_error,
             { "Error", "http2.rst_stream.error",
@@ -1678,7 +1393,7 @@ proto_register_http2(void)
         },
         { &hf_http2_settings_identifier,
             { "Settings Identifier", "http2.settings.id",
-               FT_UINT16, BASE_DEC, VALS(http2_settings_vals), 0x0,
+               FT_UINT8, BASE_DEC, VALS(http2_settings_vals), 0x0,
               NULL, HFILL }
         },
         { &hf_http2_settings_header_table_size,
@@ -1700,16 +1415,6 @@ proto_register_http2(void)
             { "Initial Windows Size", "http2.settings.initial_window_size",
                FT_UINT32, BASE_DEC, NULL, 0x0,
               "Indicates the sender's initial window size (in bytes) for stream level flow control", HFILL }
-        },
-        { &hf_http2_settings_max_frame_size,
-            { "Max frame size", "http2.settings.max_frame_size",
-              FT_UINT32, BASE_DEC, NULL, 0x0,
-              "Indicates the size of the largest frame payload that the sender will allow", HFILL }
-        },
-        { &hf_http2_settings_max_header_list_size,
-            { "Max header list size", "http2.settings.max_header_list_size",
-              FT_UINT32, BASE_DEC, NULL, 0x0,
-              "This advisory setting informs a peer of the maximum size of header list that the sender is prepared to accept.", HFILL }
         },
         { &hf_http2_settings_unknown,
             { "Unknown Settings", "http2.settings.unknown",
@@ -1862,25 +1567,6 @@ proto_register_http2(void)
         &global_http2_heur);
 
     new_register_dissector("http2", dissect_http2, proto_http2);
-
-    http2_tap = register_tap("http2");
-}
-
-static void http2_stats_tree_init(stats_tree* st)
-{
-    st_node_http2 = stats_tree_create_node(st, st_str_http2, 0, TRUE);
-    st_node_http2_type = stats_tree_create_pivot(st, st_str_http2_type, st_node_http2);
-
-}
-
-static int http2_stats_tree_packet(stats_tree* st, packet_info* pinfo _U_, epan_dissect_t* edt _U_, const void* p)
-{
-    struct HTTP2Tap *pi = (struct HTTP2Tap *)p;
-    tick_stat_node(st, st_str_http2, 0, FALSE);
-    stats_tree_tick_pivot(st, st_node_http2_type,
-            val_to_str(pi->type, http2_type_vals, "Unknown type (%d)"));
-
-    return 1;
 }
 
 void
@@ -1889,12 +1575,10 @@ proto_reg_handoff_http2(void)
     data_handle = find_dissector("data");
 
     http2_handle = new_create_dissector_handle(dissect_http2, proto_http2);
-    dissector_add_for_decode_as("tcp.port", http2_handle);
+    dissector_add_handle("tcp.port", http2_handle);
 
     heur_dissector_add("ssl", dissect_http2_heur, proto_http2);
     heur_dissector_add("http", dissect_http2_heur, proto_http2);
-
-    stats_tree_register("http2", "http2", "HTTP2", 0, http2_stats_tree_packet, http2_stats_tree_init, NULL);
 }
 
 /*

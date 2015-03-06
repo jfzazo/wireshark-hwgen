@@ -24,11 +24,14 @@
 
 #include "config.h"
 
+#include <gtk/gtk.h>
 
 #include <stdlib.h>
 
 #include "globals.h"
+#include "wtap.h"
 #include "pcap-encap.h"
+#include "version_info.h"
 
 #include "ui/simple_dialog.h"
 #include "ui/alert_box.h"
@@ -44,10 +47,9 @@
 #include "ui/text_import.h"
 #include "ui/text_import_scanner.h"
 
+#include "file.h"
 #include "wsutil/file_util.h"
 #include "wsutil/tempfile.h"
-#include "wsutil/os_version_info.h"
-#include "wsutil/ws_version_info.h"
 
 #define INPUT_FRM_KEY                   "input_frame"
 
@@ -461,7 +463,7 @@ file_import_open(text_import_info_t *info)
     wtapng_iface_descriptions_t *idb_inf;
     wtapng_if_descr_t            int_data;
     GString                     *os_info_str;
-    char                        *appname;
+    char                         appname[100];
 
     /* Choose a random name for the temporary import buffer */
     import_file_fd = create_tempfile(&tmpname, "import");
@@ -471,27 +473,22 @@ file_import_open(text_import_info_t *info)
     os_info_str = g_string_new("");
     get_os_version_info(os_info_str);
 
-    appname = g_strdup_printf("Wireshark %s", get_ws_vcs_version_info());
+    g_snprintf(appname, sizeof(appname), "Wireshark " VERSION "%s", wireshark_gitversion);
 
     shb_hdr = g_new(wtapng_section_t,1);
     shb_hdr->section_length = -1;
     /* options */
     shb_hdr->opt_comment    = g_strdup_printf("File created by File->Import of file %s", info->import_text_filename);
-    /*
-     * UTF-8 string containing the description of the hardware used to create
-     * this section.
-     */
-    shb_hdr->shb_hardware   = NULL;
-    /*
-     * UTF-8 string containing the name of the operating system used to create
-     * this section.
-     */
-    shb_hdr->shb_os         = g_string_free(os_info_str, FALSE);
-    /*
-     * UTF-8 string containing the name of the application used to create
-     * this section.
-     */
-    shb_hdr->shb_user_appl  = appname;
+    shb_hdr->shb_hardware   = NULL;                    /* UTF-8 string containing the
+                                                       * description of the hardware used to create this section.
+                                                       */
+    shb_hdr->shb_os         = os_info_str->str;        /* UTF-8 string containing the name
+                                                       * of the operating system used to create this section.
+                                                       */
+    g_string_free(os_info_str, FALSE);                /* The actual string is not freed */
+    shb_hdr->shb_user_appl  = appname;                /* UTF-8 string containing the name
+                                                       *  of the application used to create this section.
+                                                       */
 
 
     /* Create fake IDB info */
@@ -567,8 +564,6 @@ end:
     g_free(info->date_timestamp_format);
     g_free(info);
     g_free(capfile_name);
-    g_free(shb_hdr);
-    g_free(appname);
     window_destroy(file_import_dlg_w);
 }
 

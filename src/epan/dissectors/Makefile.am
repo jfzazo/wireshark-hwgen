@@ -26,7 +26,9 @@ AM_CPPFLAGS = -I$(srcdir)/../.. -I$(srcdir)/.. \
 include Makefile.common
 
 libdirtydissectors_la_SOURCES = \
-	$(DIRTY_ASN1_DISSECTOR_SRC)
+	$(DIRTY_DISSECTOR_SRC)		\
+	$(DIRTY_ASN1_DISSECTOR_SRC)	\
+	$(DIRTY_PIDL_DISSECTOR_SRC)
 
 if HAVE_WARNINGS_AS_ERRORS
 AM_CLEAN_CFLAGS = -Werror
@@ -54,7 +56,7 @@ EXTRA_DIST = \
 	x11-fields
 
 packet-ncp2222.c : $(top_srcdir)/tools/ncp2222.py
-	$(PYTHON) $(top_srcdir)/tools/ncp2222.py -o $@
+	$(PYTHON) $< -o $@
 
 # Target to rebuild the X11 dissector header files.
 # See README.X11 before using this--it requires the xcb and mesa source.
@@ -84,17 +86,28 @@ x11-dissector: $(top_srcdir)/tools/process-x11-fields.pl x11-fields $(top_srcdir
 # pass only the first few names in the list to the shell, for some
 # reason.
 #
-# Therefore, we use a script to generate the register.c file.
+# Therefore, we have a script to generate the register.c file.
+# The shell script runs slowly, as multiple greps and seds are run
+# for each input file; this is especially slow on Windows. Therefore,
+# if Python is present (as indicated by PYTHON being defined), we run
+# a faster Python script to do that work instead.
+#
 # The first argument is the directory in which the source files live.
 # The second argument is "dissectors", to indicate that we should build
 # a register.c file for libwireshark.
 # All subsequent arguments are the files to scan.
 #
-register.c: $(plugin_src) $(ALL_DISSECTORS_SRC) Makefile.common Custom.common \
-	$(top_srcdir)/tools/make-dissector-reg.py
-	@echo Making register.c ; \
-	$(PYTHON) $(top_srcdir)/tools/make-dissector-reg.py $(srcdir) \
-		dissectors $(ALL_DISSECTORS_SRC) ;
+register.c: $(plugin_src) $(ALL_DISSECTORS_SRC) Makefile.common Custom.common $(top_srcdir)/tools/make-dissector-reg \
+    $(top_srcdir)/tools/make-dissector-reg.py
+	@if test -n "$(PYTHON)"; then \
+		echo Making register.c with python ; \
+		$(PYTHON) $(top_srcdir)/tools/make-dissector-reg.py $(srcdir) \
+		    dissectors $(ALL_DISSECTORS_SRC) ; \
+	else \
+		echo Making register.c with shell script ; \
+		$(top_srcdir)/tools/make-dissector-reg $(srcdir) \
+		   dissectors $(plugin_src) $(ALL_DISSECTORS_SRC) ; \
+	fi
 #
 # Currently register.c can be included in the distribution because
 # we always build all protocol dissectors. We used to have to check

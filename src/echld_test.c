@@ -22,7 +22,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
@@ -134,7 +134,7 @@ static char* new_child_cmd(char** params, char** err) {
 		return NULL;
 	}
 
-	child = echld_new(paramsets[ps_id],NULL,NULL);
+	child = echld_new(paramsets[ps_id],NULL);
 
 	if (child <= 0) {
 		*err = g_strdup("No child\n");
@@ -317,11 +317,14 @@ cmd_t commands[] = {
 static char* help_cmd(char** params _U_, char** err _U_) {
 	GString* out = g_string_new("Commands:\n");
 	cmd_t* c = commands;
+	char* s;
 
 	for (;c->txt;c++) {
 		g_string_append_printf(out,"%s\n",c->help);
 	}
-	return g_string_free(out,FALSE);
+	s = out->str;
+	g_string_free(out,FALSE);
+	return s;
 }
 
 
@@ -374,7 +377,7 @@ int got_param = 0;
 int main(int argc _U_, char** argv _U_) {
 	struct timeval tv;
 	int tot_cycles = 0;
-	echld_init_t init = {ECHLD_ENCODING_JSON,argv[0],main,NULL,NULL,NULL,NULL,NULL,NULL};
+	echld_init_t init = {ECHLD_ENCODING_JSON,argv[0],main,NULL,NULL,NULL,NULL};
 
 
 	tv.tv_sec = 5;
@@ -408,16 +411,3 @@ int main(int argc _U_, char** argv _U_) {
 	echld_terminate();
 	return 0;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

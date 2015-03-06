@@ -24,8 +24,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
-#include "packet-usb.h"
+#include <epan/dissectors/packet-usb.h>
 
 /* defines */
 #define tfp_PORT 4223

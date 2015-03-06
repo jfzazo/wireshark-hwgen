@@ -2,6 +2,8 @@
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
                 version="1.0">
 
+<!-- $Id$ -->
+
 <!-- import the main stylesheet -->
 <xsl:import href="http://docbook.sourceforge.net/release/xsl/current/fo/docbook.xsl"/>
 
@@ -14,8 +16,8 @@
 
 <!-- use graphics for admons (note, tip, ...) -->
 <xsl:param name="admon.graphics" select="1"/>
-<xsl:param name="admon.graphics.path">common_graphics/</xsl:param>
-<xsl:param name="admon.graphics.extension" select="'.svg'"/>
+<xsl:param name="admon.graphics.path">wsug_graphics/</xsl:param>
+<xsl:param name="admon.graphics.extension" select="'.png'"/>
 
 <!-- use numbering for sections (not only for chapters) -->
 <xsl:param name="section.autolabel" select="1"/>
@@ -40,7 +42,7 @@
   <xsl:attribute name="hyphenate">false</xsl:attribute>
 </xsl:attribute-set>
 
-<!-- put a page break after each section
+<!-- put a page break after each section 
 <xsl:attribute-set name="section.level1.properties">
   <xsl:attribute name="break-after">page</xsl:attribute>
 </xsl:attribute-set>

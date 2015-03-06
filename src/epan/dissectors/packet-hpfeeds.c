@@ -32,42 +32,15 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
-#include <epan/tap.h>
-#include <epan/stats_tree.h>
-#include <epan/wmem/wmem_list.h>
 
 #include "packet-tcp.h"
-
-struct HpfeedsTap {
-    guint payload_size;
-    guint8* channel;
-    guint8 opcode;
-};
-
-static int hpfeeds_tap = -1;
-
-static const guint8* st_str_channels_payload = "Payload size per channel";
-static const guint8* st_str_opcodes = "Opcodes";
-
-static int st_node_channels_payload = -1;
-static int st_node_opcodes = -1;
-
-static wmem_list_t* channels_list;
-
-struct channel_node {
-    guint8* channel;
-    guint st_node_channel_payload;
-};
 
 void proto_register_hpfeeds(void);
 void proto_reg_handoff_hpfeeds(void);
 
-static heur_dissector_list_t heur_subdissector_list;
-
 /* Preferences */
 static guint hpfeeds_port_pref = 0;
 static gboolean hpfeeds_desegment = TRUE;
-static gboolean try_heuristic = TRUE;
 
 static int proto_hpfeeds = -1;
 
@@ -88,12 +61,30 @@ static gint ett_hpfeeds = -1;
 
 static expert_field ei_hpfeeds_opcode_unknown = EI_INIT;
 
+static dissector_handle_t json_hdl;
+
 /* OPCODE */
 #define OP_ERROR       0         /* error message*/
 #define OP_INFO        1         /* server name, nonce */
 #define OP_AUTH        2         /* client id, sha1(nonce+authkey) */
 #define OP_PUBLISH     3         /* client id, channelname, payload */
 #define OP_SUBSCRIBE   4         /* client id, channelname*/
+
+
+/* WELL-KNOWN CHANNELS */
+#define CH_EINVAL               0
+/* Dionaea honeypot */
+#define CH_DIONAEA_CAPTURE      1
+#define CH_DIONAEA_DCE          2
+#define CH_DIONAEA_SHELLCODE    3
+#define CH_DIONAEA_UINQUE       4
+#define CH_DIONAEA_CONNECTIONS  5
+/* Kippo honeypot */
+#define CH_KIPPO_SESSIONS       10
+/* Glastopf honeypot */
+#define CH_GLASTOPF_EVENTS      20
+/* Honeymap geoloc channel */
+#define CH_GEOLOC_EVENTS        30
 
 /* OFFSET FOR HEADER */
 #define HPFEEDS_HDR_LEN  5
@@ -107,6 +98,25 @@ static const value_string opcode_vals[] = {
     { 0,              NULL },
 };
 
+/*
+*
+* These values are the channel used by "most" spread and used honeypots
+* In case we have publish message in one of these channel we can decode
+* payload completely
+*
+*/
+static const value_string chan_vals[] = {
+    { CH_DIONAEA_CAPTURE, "dionaea.capture" },
+    { CH_DIONAEA_DCE, "dionaea.dcerpcrequests" },
+    { CH_DIONAEA_SHELLCODE, "dionaea.shellcodeprofiles" },
+    { CH_DIONAEA_UINQUE, "mwbinary.dionaea.sensorunique" },
+    { CH_DIONAEA_CONNECTIONS, "dionaea.connections" },
+    { CH_KIPPO_SESSIONS, "kippo.sessions" },
+    { CH_GEOLOC_EVENTS, "geoloc.events" },
+    { CH_GLASTOPF_EVENTS, "glastopf.events" },
+    { CH_EINVAL, NULL }
+};
+
 static void
 dissect_hpfeeds_error_pdu(tvbuff_t *tvb, proto_tree *tree, guint offset)
 {
@@ -117,13 +127,15 @@ static void
 dissect_hpfeeds_info_pdu(tvbuff_t *tvb, proto_tree *tree, guint offset)
 {
     guint8 len = 0;
-    proto_tree *data_subtree;
+    proto_item *ti = NULL;
+    proto_tree *data_subtree = NULL;
     guint8 *strptr = NULL;
 
     len = tvb_get_guint8(tvb, offset);
     /* don't move the offset yet as we need to get data after this operation */
-    strptr = tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 1, len, ENC_ASCII);
-    data_subtree = proto_tree_add_subtree_format(tree, tvb, offset, -1, ett_hpfeeds, NULL, "Broker: %s", strptr);
+    strptr = tvb_get_string(wmem_packet_scope(), tvb, offset + 1, len);
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Broker: %s", strptr);
+    data_subtree = proto_item_add_subtree(ti, ett_hpfeeds);
 
     proto_tree_add_item(data_subtree, hf_hpfeeds_server_len, tvb, offset, 1,
         ENC_BIG_ENDIAN);
@@ -154,101 +166,55 @@ dissect_hpfeeds_auth_pdu(tvbuff_t *tvb, proto_tree *tree, guint offset)
                     offset, -1, ENC_NA);
 }
 
-static guint8*
-hpfeeds_get_channel_name(tvbuff_t* tvb, guint offset)
-{
-    guint8 len = tvb_get_guint8(tvb, offset);
-    offset += len + 1;
-    len = tvb_get_guint8(tvb, offset);
-    offset += 1;
-    return tvb_get_string_enc(wmem_file_scope(), tvb, offset, len, ENC_ASCII);
-}
-
-static guint
-hpfeeds_get_payload_size(tvbuff_t* tvb, guint offset)
-{
-    guint message_len = tvb_get_ntohl(tvb, offset);
-    guint ident_len = tvb_get_guint8(tvb, offset + 5);
-    guint channel_len = tvb_get_guint8(tvb, offset + 6 + ident_len);
-    return (message_len - 2 - ident_len - 1 - channel_len);
-}
-
 static void
 dissect_hpfeeds_publish_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     guint offset)
 {
     guint8 len = 0;
-    heur_dtbl_entry_t *hdtbl_entry;
     guint8 *strptr = NULL;
-    tvbuff_t *next_tvb;
+    gint8 channel = CH_EINVAL;
+    tvbuff_t *json_tvb = NULL;
 
     len = tvb_get_guint8(tvb, offset);
-    proto_tree_add_item(tree, hf_hpfeeds_ident_len, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_hpfeeds_ident_len, tvb, offset, 1,
+        ENC_BIG_ENDIAN);
     offset += 1;
-    proto_tree_add_item(tree, hf_hpfeeds_ident, tvb, offset, len, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_hpfeeds_ident, tvb, offset, len,
+        ENC_ASCII|ENC_NA);
     offset += len;
     len = tvb_get_guint8(tvb, offset);
-    proto_tree_add_item(tree, hf_hpfeeds_chan_len, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_hpfeeds_chan_len, tvb, offset, 1,
+        ENC_BIG_ENDIAN);
     offset += 1;
 
-    /* get the channel name as ephemeral string to pass it to the heuristic decoders */
-    strptr = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII);
-    proto_tree_add_item(tree, hf_hpfeeds_channel, tvb, offset, len, ENC_ASCII|ENC_NA);
+    /* get the channel name as ephemeral string just to make an attempt
+    *  in order to decode more payload if channel is "well known"
+    */
+    strptr = tvb_get_string(wmem_packet_scope(), tvb, offset, len);
+    proto_tree_add_item(tree, hf_hpfeeds_channel, tvb, offset, len,
+        ENC_ASCII|ENC_NA);
     offset += len;
-
-    next_tvb = tvb_new_subset_remaining(tvb, offset);
-
-    /* try the heuristic dissectors */
-    if (try_heuristic) {
-        if (dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &hdtbl_entry, strptr)) {
-            return;
-        }
+    channel = str_to_val(strptr, chan_vals, CH_EINVAL);
+    pinfo->private_data = strptr;
+    switch (channel) {
+        case CH_DIONAEA_CAPTURE:
+        case CH_DIONAEA_DCE:
+        case CH_DIONAEA_SHELLCODE:
+        case CH_DIONAEA_UINQUE:
+        case CH_DIONAEA_CONNECTIONS:
+        case CH_KIPPO_SESSIONS:
+        case CH_GLASTOPF_EVENTS:
+        case CH_GEOLOC_EVENTS:
+            json_tvb = tvb_new_subset(tvb, offset, -1, -1);
+            call_dissector(json_hdl, json_tvb, pinfo, tree);
+        break;
+        default:
+            proto_tree_add_item(tree, hf_hpfeeds_payload, tvb, offset, -1,
+                ENC_NA);
+        break;
     }
 
-    /* heuristic failed. Print remaining bytes as flat payload */
-    proto_tree_add_item(tree, hf_hpfeeds_payload, tvb, offset, -1, ENC_NA);
-}
 
-static void hpfeeds_stats_tree_init(stats_tree* st)
-{
-    st_node_channels_payload = stats_tree_create_node(st, st_str_channels_payload, 0, TRUE);
-    st_node_opcodes = stats_tree_create_pivot(st, st_str_opcodes, 0);
-
-    channels_list = wmem_list_new(wmem_epan_scope());
-}
-
-static int hpfeeds_stats_tree_packet(stats_tree* st _U_, packet_info* pinfo _U_, epan_dissect_t* edt _U_, const void* p)
-{
-    struct HpfeedsTap *pi = (struct HpfeedsTap *)p;
-    wmem_list_frame_t* head = wmem_list_head(channels_list);
-    wmem_list_frame_t* cur = head;
-    struct channel_node* ch_node;
-
-    if (pi->opcode == OP_PUBLISH) {
-        /* search an existing channel node and create it if it does not */
-        while(cur != NULL) {
-            ch_node = (struct channel_node*)wmem_list_frame_data(cur);
-            if (strncmp(ch_node->channel, pi->channel, strlen(pi->channel)) == 0) {
-                break;
-            }
-            cur = wmem_list_frame_next(cur);
-        }
-
-        if (cur == NULL) {
-            ch_node = (struct channel_node*)wmem_alloc0(wmem_file_scope(), sizeof(struct channel_node));
-            ch_node->channel = wmem_strdup(wmem_file_scope(), pi->channel);
-            ch_node->st_node_channel_payload = stats_tree_create_node(st, ch_node->channel,
-                st_node_channels_payload, FALSE);
-            wmem_list_append(channels_list, ch_node);
-        }
-
-        avg_stat_node_add_value(st, st_str_channels_payload, 0, FALSE, pi->payload_size);
-        avg_stat_node_add_value(st, ch_node->channel, 0, FALSE, pi->payload_size);
-    }
-
-    stats_tree_tick_pivot(st, st_node_opcodes,
-            val_to_str(pi->opcode, opcode_vals, "Unknown opcode (%d)"));
-    return 1;
 }
 
 static void
@@ -275,7 +241,7 @@ dissect_hpfeeds_subscribe_pdu(tvbuff_t *tvb, proto_tree *tree, guint offset)
  * by the routine to re-assemble the protocol spread on multiple TCP packets
  */
 static guint
-get_hpfeeds_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_hpfeeds_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     return tvb_get_ntohl(tvb, offset + 0);
 }
@@ -283,8 +249,6 @@ get_hpfeeds_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *dat
 static int
 dissect_hpfeeds_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
-    struct HpfeedsTap *hpfeeds_stats;
-
     /* We have already parsed msg length we need to skip to opcode offset */
     guint offset = 0;
 
@@ -339,16 +303,7 @@ dissect_hpfeeds_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
         }
     }
 
-    /* In publish, generate stats every packet, even not in tree */
-    hpfeeds_stats = wmem_new0(wmem_file_scope(), struct HpfeedsTap);
-    if (opcode == OP_PUBLISH) {
-        hpfeeds_stats->channel = hpfeeds_get_channel_name(tvb, offset);
-        hpfeeds_stats->payload_size = hpfeeds_get_payload_size(tvb, 0);
-    }
-
-    hpfeeds_stats->opcode = opcode;
-    tap_queue_packet(hpfeeds_tap, pinfo, hpfeeds_stats);
-    return tvb_captured_length(tvb);
+    return tvb_length(tvb);
 }
 
 static int
@@ -360,7 +315,7 @@ dissect_hpfeeds(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 
     tcp_dissect_pdus(tvb, pinfo, tree, hpfeeds_desegment, HPFEEDS_HDR_LEN,
         get_hpfeeds_pdu_len, dissect_hpfeeds_pdu, data);
-    return tvb_captured_length(tvb);
+    return tvb_length(tvb);
 }
 
 void
@@ -461,8 +416,6 @@ proto_register_hpfeeds(void)
         "hpfeeds"       /* abbrev     */
         );
 
-    heur_subdissector_list = register_heur_dissector_list("hpfeeds");
-
     proto_register_field_array(proto_hpfeeds, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
     expert_hpfeeds = expert_register_protocol(proto_hpfeeds);
@@ -482,13 +435,6 @@ proto_register_hpfeeds(void)
         "Dissector TCP port",
         "Set the TCP port for HPFEEDS messages",
         10, &hpfeeds_port_pref);
-
-    prefs_register_bool_preference(hpfeeds_module, "try_heuristic",
-        "Try heuristic sub-dissectors",
-        "Try to decode the payload using an heuristic sub-dissector",
-        &try_heuristic);
-
-    hpfeeds_tap = register_tap("hpfeeds");
 }
 
 void
@@ -500,7 +446,6 @@ proto_reg_handoff_hpfeeds(void)
 
     if (!hpfeeds_prefs_initialized) {
         hpfeeds_handle = new_create_dissector_handle(dissect_hpfeeds, proto_hpfeeds);
-        stats_tree_register("hpfeeds", "hpfeeds", "HPFEEDS", 0, hpfeeds_stats_tree_packet, hpfeeds_stats_tree_init, NULL);
         hpfeeds_prefs_initialized = TRUE;
     }
     else {
@@ -510,6 +455,8 @@ proto_reg_handoff_hpfeeds(void)
     hpfeeds_dissector_port = hpfeeds_port_pref;
 
     dissector_add_uint("tcp.port", hpfeeds_dissector_port,  hpfeeds_handle);
+
+    json_hdl = find_dissector("json");
 }
 
 /*

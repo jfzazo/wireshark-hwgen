@@ -28,6 +28,7 @@
 
 #include "packet-rpc.h"
 #include <epan/to_str.h>
+#include <epan/wmem/wmem.h>
 
 /*
  * For the protocol specifications, see
@@ -93,9 +94,6 @@
 
 #define VXI11_CORE_PROGRAM 0x0607AF
 #define VXI11_CORE_VERSION 1
-
-#define MAX_DATA_SHOW_SIZE 70
-
 
 void proto_register_vxi11_core(void);
 void proto_reg_handoff_vxi11_core(void);
@@ -560,16 +558,9 @@ dissect_device_read_resp(tvbuff_t *tvb,
                          proto_tree *tree, void* data _U_)
 {
     guint32 error;
-    guint32 datalength = 0;
 
     offset = dissect_error(tvb, offset, pinfo, tree, "Device_ReadResp", &error);
     offset = dissect_reason(tvb, offset, tree);
-
-    datalength = tvb_get_ntohl( tvb, offset);
-    if(MAX_DATA_SHOW_SIZE <=datalength)
-        datalength = MAX_DATA_SHOW_SIZE;
-    col_append_fstr( pinfo->cinfo, COL_INFO," %s",tvb_format_text(tvb, offset+4,(guint32) datalength));
-
     offset = dissect_rpc_opaque_data(tvb, offset, tree, NULL, hf_vxi11_core_data, FALSE, 0, FALSE, NULL, NULL);
 
     return offset;
@@ -606,10 +597,11 @@ dissect_device_remote_func(tvbuff_t *tvb,
                            packet_info *pinfo,
                            proto_tree *tree, void* data _U_)
 {
-    guint32 port;
+    guint32 addr, port;
     const gchar *addrstr;
 
-    addrstr = tvb_ip_to_str(tvb, offset);
+    addr   = tvb_get_ipv4(tvb, offset);
+    addrstr = ip_to_str((guint8 *)&addr);
     offset = dissect_rpc_uint32(tvb, tree, hf_vxi11_core_host_addr, offset);
 
     port   = tvb_get_ntohl(tvb, offset);
@@ -634,25 +626,19 @@ dissect_device_write_parms(tvbuff_t *tvb,
                            packet_info *pinfo,
                            proto_tree *tree, void* data _U_)
 {
-    guint32 datalength = 0;
     guint32 lid = tvb_get_ntohl(tvb, offset);
 
     offset = dissect_rpc_uint32(tvb, tree, hf_vxi11_core_lid, offset);
     offset = dissect_rpc_uint32(tvb, tree, hf_vxi11_core_io_timeout, offset);
     offset = dissect_rpc_uint32(tvb, tree, hf_vxi11_core_lock_timeout, offset);
     offset = dissect_flags(tvb, offset, tree);
-    col_append_fstr(pinfo->cinfo, COL_INFO, " LID=%d", lid);
-
-    datalength = tvb_get_ntohl( tvb, offset);
-    if(MAX_DATA_SHOW_SIZE <=datalength)
-        datalength = MAX_DATA_SHOW_SIZE;
-    col_append_fstr( pinfo->cinfo, COL_INFO," %s",tvb_format_text(tvb, offset+4,(guint32) datalength));
-
     offset = dissect_rpc_opaque_data(tvb, offset, tree, NULL, hf_vxi11_core_data, FALSE, 0, FALSE, NULL, NULL);
+
     if (tree)
     {
         proto_item_append_text(tree, " (Device_WriteParms) LID=%d", lid);
     }
+    col_append_fstr(pinfo->cinfo, COL_INFO, " LID=%d", lid);
 
     return offset;
 }
@@ -1051,16 +1037,3 @@ proto_reg_handoff_vxi11_intr(void)
                         vxi111_intr_proc,
                         hf_vxi11_intr_procedure_v1);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

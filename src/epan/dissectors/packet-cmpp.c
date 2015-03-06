@@ -24,7 +24,8 @@
 #include "config.h"
 
 #include <epan/packet.h>
-#include "packet-tcp.h"
+#include <epan/wmem/wmem.h>
+#include <epan/dissectors/packet-tcp.h>
 
 #define CMPP_FIX_HEADER_LENGTH  12
 #define CMPP_DELIVER_REPORT_LEN 71
@@ -148,7 +149,6 @@ static gboolean cmpp_desegment = TRUE;
 #define CMPP_PUSH_MT_ROUTE_UPDATE_RESP	0x80000015
 #define CMPP_PUSH_MO_ROUTE_UPDATE_RESP	0x80000016
 #define CMPP_GET_MO_ROUTE_RESP		0x80000017
-
 static const value_string vals_command_Id[] = {		/* Operation	*/
 	{ CMPP_CONNECT,                   "CMPP_CONNECT" },
 	{ CMPP_CONNECT_RESP,              "CMPP_CONNECT_RESP" },
@@ -256,7 +256,7 @@ cmpp_octet_string(proto_tree *tree, tvbuff_t *tvb, gint field, gint offset, gint
 {
 	char *display;
 
-	display = (char *)tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_ASCII);
+	display = (char *)tvb_get_string(wmem_packet_scope(), tvb, offset, length);
 	proto_tree_add_string(tree, field, tvb, offset, length, display);
 	return display;
 }
@@ -623,7 +623,7 @@ dissect_cmpp_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
 
 /* Get the CMPP PDU Length */
 static guint
-get_cmpp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_cmpp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, gint offset)
 {
 	return tvb_get_ntohl(tvb, offset);
 }
@@ -983,16 +983,3 @@ proto_reg_handoff_cmpp(void)
 	dissector_add_uint("tcp.port", CMPP_ISMG_LONG_PORT, cmpp_handle);
 	dissector_add_uint("tcp.port", CMPP_ISMG_SHORT_PORT, cmpp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

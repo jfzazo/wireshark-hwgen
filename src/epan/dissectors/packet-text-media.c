@@ -2,7 +2,7 @@
  * Routines for text-based media dissection.
  *
  * NOTE - The media type is either found in pinfo->match_string,
- *        or passed into the dissector
+ *        pinfo->private_data, or passed into the dissector (preferred)
  *
  * (C) Olivier Biot, 2004.
  *
@@ -31,6 +31,8 @@
 /* Edit this file with 4-space tabs */
 
 #include "config.h"
+
+#include <glib.h>
 
 #include <epan/packet.h>
 
@@ -69,7 +71,7 @@ dissect_text_lines(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 	if(length > 38){
 		if (tvb_strncaseeql(tvb, 0, "<?xml", 5) == 0){
 			call_dissector(xml_handle, tvb, pinfo, tree);
-			return length;
+			return tvb_length(tvb);
 		}
 	}
 
@@ -83,7 +85,13 @@ dissect_text_lines(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			/*
 			 * No information from dissector data
 			 */
-			data_name = NULL;
+			data_name = (char *)(pinfo->private_data);
+			if (! (data_name && data_name[0])) {
+				/*
+				 * No information from "private_data"
+				 */
+				data_name = NULL;
+			}
 		}
 	}
 
@@ -98,10 +106,10 @@ dissect_text_lines(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			proto_item_append_text(ti, ": %s", data_name);
 		subtree = proto_item_add_subtree(ti, ett_text_lines);
 		/* Read the media line by line */
-		while (tvb_reported_length_remaining(tvb, offset) != 0) {
+		while (tvb_offset_exists(tvb, offset)) {
 			/*
 			 * XXX - we need to be passed the parameters
-			 * of the content type via data parameter,
+			 * of the content type via "pinfo->private_data",
 			 * so that we know the character set.  We'd
 			 * have to handle that character set, which
 			 * might be a multibyte character set such
@@ -123,7 +131,7 @@ dissect_text_lines(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 		}
 	}
 
-	return length;
+	return tvb_length(tvb);
 }
 
 void
@@ -172,16 +180,3 @@ proto_reg_handoff_text_lines(void)
 	dissector_add_string("media_type", "application/x-rtsp-udp-packetpair", text_lines_handle);
 	xml_handle = find_dissector("xml");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

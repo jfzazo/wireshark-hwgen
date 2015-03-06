@@ -41,7 +41,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/addr_resolv.h>
+#include <epan/strutil.h>
 #include <epan/sctpppids.h>      /* include V5UA payload protocol ID */
 
 void proto_register_v5ua(void);
@@ -193,7 +197,7 @@ dissect_text_interface_identifier_parameter(tvbuff_t *parameter_tvb, proto_tree 
 
    proto_tree_add_item(parameter_tree, hf_text_if_id, parameter_tvb, TEXT_IF_ID_VALUE_OFFSET, if_id_length, ENC_ASCII|ENC_NA);
    proto_item_append_text(parameter_item, " (0x%.*s)", if_id_length,
-         tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, TEXT_IF_ID_VALUE_OFFSET, if_id_length, ENC_ASCII));
+         tvb_get_string(wmem_packet_scope(), parameter_tvb, TEXT_IF_ID_VALUE_OFFSET, if_id_length));
 }
 /*----------------------Text Interface Identifier (RFC)------------------------*/
 
@@ -503,7 +507,7 @@ dissect_asp_msg_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tree, p
 
    proto_tree_add_item(parameter_tree, hf_adaptation_layer_id, parameter_tvb, PARAMETER_VALUE_OFFSET, adaptation_layer_id_length, ENC_ASCII|ENC_NA);
    proto_item_append_text(parameter_item, " (%.*s)", adaptation_layer_id_length,
-         tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, PARAMETER_VALUE_OFFSET, adaptation_layer_id_length, ENC_ASCII));
+         tvb_get_string(wmem_packet_scope(), parameter_tvb, PARAMETER_VALUE_OFFSET, adaptation_layer_id_length));
 }
 
 static void
@@ -512,7 +516,7 @@ dissect_scn_protocol_id_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter
    guint16 id_length = tvb_get_ntohs(parameter_tvb, PARAMETER_LENGTH_OFFSET);
    proto_tree_add_item(parameter_tree, hf_scn_protocol_id, parameter_tvb, PARAMETER_VALUE_OFFSET, id_length, ENC_ASCII|ENC_NA);
    proto_item_append_text(parameter_item, " (%.*s)", id_length,
-         tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, PARAMETER_VALUE_OFFSET, id_length, ENC_ASCII));
+         tvb_get_string(wmem_packet_scope(), parameter_tvb, PARAMETER_VALUE_OFFSET, id_length));
 }
 
 /*----------------------ASP (Draft)--------------------------------------------*/
@@ -639,7 +643,7 @@ dissect_layer3_message(tvbuff_t *layer3_data_tvb, proto_tree *v5ua_tree,proto_it
       tvbuff_t *protocol_data_tvb;
 
       protocol_data_length = tvb_get_ntohs(layer3_data_tvb, PARAMETER_LENGTH_OFFSET) - PARAMETER_HEADER_LENGTH;
-      protocol_data_tvb    = tvb_new_subset_length(layer3_data_tvb, PARAMETER_VALUE_OFFSET, protocol_data_length);
+      protocol_data_tvb    = tvb_new_subset(layer3_data_tvb, PARAMETER_VALUE_OFFSET, protocol_data_length, protocol_data_length);
 
       call_dissector(v52_handle, protocol_data_tvb, pinfo, v5ua_tree);
 
@@ -651,7 +655,7 @@ dissect_layer3_message(tvbuff_t *layer3_data_tvb, proto_tree *v5ua_tree,proto_it
       tvbuff_t *protocol_data_tvb;
 
       protocol_data_length = tvb_get_ntohs(layer3_data_tvb, PARAMETER_LENGTH_OFFSET) - PARAMETER_HEADER_LENGTH;
-      protocol_data_tvb    = tvb_new_subset_length(layer3_data_tvb, PARAMETER_VALUE_OFFSET, protocol_data_length);
+      protocol_data_tvb    = tvb_new_subset(layer3_data_tvb, PARAMETER_VALUE_OFFSET, protocol_data_length, protocol_data_length);
       call_dissector(q931_handle, protocol_data_tvb, pinfo, v5ua_tree);
 
       proto_item_append_text(parameter_item, " (%u byte%s)", protocol_data_length, plurality(protocol_data_length, "", "s"));
@@ -804,7 +808,7 @@ dissect_info_string_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tre
       info_string_length -= PARAMETER_HEADER_LENGTH;
       proto_tree_add_item(parameter_tree, hf_info_string, parameter_tvb, INFO_STRING_OFFSET, info_string_length, ENC_ASCII|ENC_NA);
       proto_item_append_text(parameter_item, " (%.*s)", info_string_length,
-            tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, INFO_STRING_OFFSET, info_string_length, ENC_ASCII));
+            tvb_get_string(wmem_packet_scope(), parameter_tvb, INFO_STRING_OFFSET, info_string_length));
    }
 }
 
@@ -905,15 +909,17 @@ dissect_parameter(tvbuff_t *parameter_tvb, packet_info *pinfo, proto_tree *v5ua_
    /* create proto_tree stuff */
    switch(iua_version){
       case RFC:
-         parameter_tree   = proto_tree_add_subtree(v5ua_tree, parameter_tvb, PARAMETER_HEADER_OFFSET, -1, ett_v5ua_parameter, &parameter_item,
+         parameter_item   = proto_tree_add_text(v5ua_tree, parameter_tvb, PARAMETER_HEADER_OFFSET, tvb_length(parameter_tvb), "%s",
                val_to_str_const(tag, parameter_tag_values, "Unknown parameter"));
+         parameter_tree   = proto_item_add_subtree(parameter_item, ett_v5ua_parameter);
          /* add tag to the v5ua tree */
          proto_tree_add_item(parameter_tree, hf_parameter_tag, parameter_tvb, PARAMETER_TAG_OFFSET, PARAMETER_TAG_LENGTH, ENC_BIG_ENDIAN);
          break;
       case DRAFT:
       default:
-         parameter_tree   = proto_tree_add_subtree(v5ua_tree, parameter_tvb, PARAMETER_HEADER_OFFSET, -1, ett_v5ua_parameter, &parameter_item,
+         parameter_item   = proto_tree_add_text(v5ua_tree, parameter_tvb, PARAMETER_HEADER_OFFSET, tvb_length(parameter_tvb), "%s",
                val_to_str_const(tag, parameter_tag_draft_values, "Unknown parameter"));
+         parameter_tree   = proto_item_add_subtree(parameter_item, ett_v5ua_parameter);
 
          /* add tag to the v5ua tree */
          proto_tree_add_item(parameter_tree, hf_parameter_tag_draft, parameter_tvb, PARAMETER_TAG_OFFSET, PARAMETER_TAG_LENGTH, ENC_BIG_ENDIAN);
@@ -941,7 +947,7 @@ dissect_parameter(tvbuff_t *parameter_tvb, packet_info *pinfo, proto_tree *v5ua_
                   length_2 = msg_length - offset;
                   if(length_2 > 0){
                      if(tvb_get_guint8(parameter_tvb, offset) == 0x48){
-                        layer3_data_tvb = tvb_new_subset_length(parameter_tvb, offset, length_2);
+                        layer3_data_tvb = tvb_new_subset(parameter_tvb, offset, length_2, length_2);
                         dissect_layer3_message(layer3_data_tvb, v5ua_tree, parameter_item, pinfo);
                      }
                   }
@@ -1040,7 +1046,7 @@ dissect_parameters(tvbuff_t *parameters_tvb, packet_info *pinfo, proto_tree *tre
       if (remaining_length >= length)
          total_length = MIN(total_length, remaining_length);
       /* create a tvb for the parameter including the padding bytes */
-      parameter_tvb  = tvb_new_subset_length(parameters_tvb, offset, total_length);
+      parameter_tvb  = tvb_new_subset(parameters_tvb, offset, total_length, total_length);
       dissect_parameter(parameter_tvb, pinfo, v5ua_tree);
       /* get rid of the handled parameter */
       offset += total_length;
@@ -1312,8 +1318,8 @@ dissect_common_header(tvbuff_t *common_header_tvb, packet_info *pinfo, proto_tre
    if (v5ua_tree) {
 
       /* create proto_tree stuff */
-      common_header_tree   = proto_tree_add_subtree(v5ua_tree, common_header_tvb, COMMON_HEADER_OFFSET, -1,
-                                ett_v5ua_common_header, &common_header_item, "Common Msg-Header");
+      common_header_item   = proto_tree_add_text(v5ua_tree, common_header_tvb, COMMON_HEADER_OFFSET, tvb_length(common_header_tvb),"Common Msg-Header");
+      common_header_tree   = proto_item_add_subtree(common_header_item, ett_v5ua_common_header);
 
       /* add the components of the common header to the protocol tree */
       proto_tree_add_item(common_header_tree, hf_version, common_header_tvb, COMMON_HEADER_VERSION_OFFSET, COMMON_HEADER_VERSION_LENGTH, ENC_BIG_ENDIAN);
@@ -1345,7 +1351,7 @@ dissect_v5ua_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_
 {
    tvbuff_t *common_header_tvb, *parameters_tvb;
 
-   common_header_tvb = tvb_new_subset_length(tvb, COMMON_HEADER_OFFSET, COMMON_HEADER_LENGTH);
+   common_header_tvb = tvb_new_subset(tvb, COMMON_HEADER_OFFSET, COMMON_HEADER_LENGTH, COMMON_HEADER_LENGTH);
    dissect_common_header(common_header_tvb, pinfo, v5ua_tree);
 
    parameters_tvb    = tvb_new_subset_remaining(tvb, COMMON_HEADER_LENGTH);

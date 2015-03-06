@@ -2631,7 +2631,7 @@ Balint Reczey		<balint[AT]balintreczey.hu> {
 	Miscellaneous enhancements and fixes
 }
 
-Stephen Fisher		<sfisher[AT]sdf.org> {
+Stephen Fisher		<stephenfisher-wireshark[AT]outlook.com> {
 	REXEC support
 	Veritas Low Latency Transport support
 	MAPI new mail protocol support
@@ -3482,26 +3482,17 @@ Tobias Rutz		<tobias.rutz[AT]work-microwave.de> {
 	DVB-S2 Baseband Frame and GSE support
 }
 
-Michał Łabędzki		<michal.labedzki[AT]tieto.com> {
+Michal Labedzki		<michal.labedzki[AT]tieto.com> {
 	Bluetooth BNEP dissector
 	Bluetooth HID dissector
 	Bluetooth SAP dissector
 	Bluetooth AVCTP dissector
 	Bluetooth AVRCP dissector
 	Bluetooth HCI USB transport dissector
-	Bluetooth HCI Linux Monitor transport dissector
 	Bluetooth MCAP dissector
 	Bluetooth HCRP dissector
 	Bluetooth AVDTP/A2DP/VDP/SBC dissectors
-	Bluetooth SDP significant improvements
-	Ubertooth USB firmware dissector
-	ELF file dissector
-	Android ADB dissectors
-	Android Logcat binary logs support
-}
-
-Michał Orynicz		<michal.orynicz[AT]tieto.com> {
-	Android Logcat text logs support
+	Android Logcat logs support
 }
 
 Wido Kelling		<kellingwido[AT]aol.com> {
@@ -3572,88 +3563,6 @@ Anish Bhatt		<anish[at]chelsio.com> {
 	Dissector for IEEE DCBx (802.1az)
 	Dissector for Congestion Notification (802.1Qau)
 }
-
-Dmitry Bazhenov		<dima_b@[AT]pigeonpoint.com> {
-	Dissector for IPMI Trace
-}
-
-Masatake Yamato		<yamato[AT]redhat.com> {
-	Dissector Distributed Lock Manager (dlm3)
-	Dissector for pulse
-	Dissectors for totemnet and totemsrp (Corosync)
-}
-
-John Miner		<wiresharkdissectorcoder[AT]gmail.com> {
-	Dissector for OptoMMP
-}
-
-竹下 恵 (Megumi Takeshita)		<megumi@ikeriri.ne.jp> {
-	Japanese translation of the Qt User Interface
-}
-
-Remi Vichery		<remi.vichery[AT]gmail.com> {
-	Dissector for Stateless Transport Tunneling (STT)
-}
-
-Kevin Cox		<kevincox{AT]kevincox.ca> {
-	Dissector for Ceph
-}
-
-David Ameiss		<netshark[AT]ameissnet.com> {
-	29West/LBM dissectors
-}
-
-Sean O. Stalley		<sean.stalley[AT]intel.com> {
-	Dissector for Media Agnostic USB (MA USB)
-}
-
-Qiaoyin Yang		<qiaoyin.yang[AT]gmail.com> {
-	Dissector for CP 'Cooper' 2179
-}
-
-Thomas Wiens		<th.wiens[AT]gmx.de> {
-	Dissector for S7 Communication
-}
-
-Gilles Roudiere		<gilles[AT]roudiere.net> {
-	Dissector for the Dynamic Source Routing (DSR) protocol (RFC 4728)
-}
-
-Alexander Gaertner	<gaertner.alex[AT]gmx.de> {
-	KNXnetIP dissector
-}
-
-Raphaël Doursenaud	<rdoursenaud[AT]free.fr> {
-	Harman Pro HiQnet dissector
-}
-
-Ryan Doyle		<ryan[AT]doylenet.net> {
-	Dissector for Elasticsearch
-	Dissector for Performance Co-Pilot
-}
-
-Jesse Gross		<jesse[AT]nicira.com> {
-	Dissector for Geneve
-}
-
-Joe Fowler		<fowlerja[AT]us.ibm.com> {
-	Dissector for Shared Memory Communication over RDMA (SMC-R)
-}
-
-Enrico Jorns		<ejo[AT]pengutronix.de> {
-	CANopen dissector enhancements and fixes
-}
-
-Hitesh K Maisheri       <maisheri.hitesh[AT]gmail.com> {
-        EAPOL-MKA support
-}
-
-Dario Lombardo		<lomato[AT]gmail.com> {
-	chargen (Character Generator) dissector
-	Italian translation (QT)
-	HCrt (Hotline Command-Response Transaction) dissector
-}
-
 
 and by:
 
@@ -3863,9 +3772,11 @@ Krishnamurthy Mayya	<krishnamurthymayya[AT]gmail.com>
 Nikitha Malgi		<nikitha01[AT]gmail.com>
 Adam Butcher		<adam[AT]jessamine.co.uk>
 Hendrik Uhlmann		<Hendrik.Uhlmann[AT]rheinmetall.com>
+Alex Gaertner		<gaertner.alex[AT]gmx.de>
 Sebastiano Di Paola	<sebastiano.dipaola[AT]gmail.com>
 Steven J. Magnani	<steve[AT]digidescorp.com>
 David Arnold		<davida[AT]pobox.com>
+Dario Lombardo		<lomato[AT]gmail.com>
 Alexander Chemeris	<alexander.chemeris[AT]gmail.com>
 Ivan Klyuchnikov	<kluchnikovi[AT]gmail.com>
 Max Baker		<max[AT]warped.org>
@@ -3902,7 +3813,6 @@ Deon van der Westhuysen <deonvdw[AT]gmail.com>
 Ibrahim Can Yuce	<canyuce[AT]gmail.com>
 Robert Jongbloed	<robertj[AT]voxlucida.com.au>
 Pavel Moravec		<pmoravec[AT]redhat.com>
-Robert Long		<rlong[AT]sandia.gov>
 
 Dan Lasley <dlasley[AT]promus.com> gave permission for his
 dumpit() hex-dump routine to be used.

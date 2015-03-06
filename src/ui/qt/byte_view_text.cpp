@@ -19,74 +19,50 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-// Some code based on QHexView by Even Teran
-// https://code.google.com/p/qhexview/
-
 #include "byte_view_text.h"
 
 #include <epan/charsets.h>
 
-#include "color_utils.h"
 #include "wireshark_application.h"
-
-#include <QActionGroup>
+#include <QTextCursor>
+#include <QTextBlock>
+#include <QApplication>
 #include <QMouseEvent>
-#include <QPainter>
-#include <QScrollBar>
 
-// To do:
-// - Add recent settings and context menu items to show/hide the offset,
-//   hex/bits, and ASCII/EBCDIC.
-// - Add a UTF-8 and possibly UTF-xx option to the ASCII display.
-
-// We don't obey the gui.hex_dump_highlight_style preference. If you
-// would like to add support for this you'll probably have to call
-// QPainter::drawText for each individual character.
-
-Q_DECLARE_METATYPE(bytes_view_type)
+// XXX - Use KHexEdit instead?
+// http://api.kde.org/4.x-api/kdelibs-apidocs/interfaces/khexedit/html/index.html
 
 ByteViewText::ByteViewText(QWidget *parent, tvbuff_t *tvb, proto_tree *tree, QTreeWidget *tree_widget, packet_char_enc encoding) :
-    QAbstractScrollArea(parent),
+    QTextEdit(parent),
     tvb_(tvb),
     proto_tree_(tree),
     tree_widget_(tree_widget),
     bold_highlight_(false),
     encoding_(encoding),
     format_(BYTES_HEX),
-    format_actions_(new QActionGroup(this)),
-    p_bound_(0, 0),
-    f_bound_(0, 0),
-    fa_bound_(0, 0),
-    show_offset_(true),
-    show_hex_(true),
-    show_ascii_(true),
-    row_width_(16)
+    p_start_(-1),
+    p_end_(-1),
+    f_start_(-1),
+    f_end_(-1),
+    fa_start_(-1),
+    fa_end_(-1),
+    per_line_(16),
+    offset_width_(4)
 {
-    QAction *action;
+    setReadOnly(true);
+    setUndoRedoEnabled(false);
+    setLineWrapMode(QTextEdit::NoWrap);
+    setState(StateNormal);
 
-    action = format_actions_->addAction(tr("Show bytes as hexadecimal"));
-    action->setData(qVariantFromValue(BYTES_HEX));
-    action->setCheckable(true);
-    action->setChecked(true);
-    action = format_actions_->addAction(tr("Show bytes as bits"));
-    action->setData(qVariantFromValue(BYTES_BITS));
-    action->setCheckable(true);
-
-    ctx_menu_.addActions(format_actions_->actions());
-    ctx_menu_.addSeparator();
-
-    connect(format_actions_, SIGNAL(triggered(QAction*)), this, SLOT(setHexDisplayFormat(QAction*)));
-
-    setMouseTracking(true);
+    renderBytes();
 }
 
 void ByteViewText::setEncoding(packet_char_enc encoding)
 {
     encoding_ = encoding;
-    viewport()->update();
 }
 
-bool ByteViewText::hasDataSource(const tvbuff_t *ds_tvb) {
+bool ByteViewText::hasDataSource(tvbuff_t *ds_tvb) {
     if (ds_tvb != NULL && ds_tvb == tvb_)
         return true;
     return false;
@@ -94,434 +70,339 @@ bool ByteViewText::hasDataSource(const tvbuff_t *ds_tvb) {
 
 void ByteViewText::setProtocolHighlight(int start, int end)
 {
-    p_bound_ = QPair<guint, guint>(qMax(0, start), qMax(0, end));
-    p_bound_save_ = p_bound_;
-    viewport()->update();
+    p_start_ = start;
+    p_end_ = end;
 }
 
 void ByteViewText::setFieldHighlight(int start, int end, guint32 mask, int mask_le)
 {
     Q_UNUSED(mask);
     Q_UNUSED(mask_le);
-    f_bound_ = QPair<guint, guint>(qMax(0, start), qMax(0, end));
-    f_bound_save_ = f_bound_;
-    viewport()->update();
+    f_start_ = start;
+    f_end_ = end;
 }
 
 void ByteViewText::setFieldAppendixHighlight(int start, int end)
 {
-    fa_bound_ = QPair<guint, guint>(qMax(0, start), qMax(0, end));
-    fa_bound_save_ = f_bound_;
-    viewport()->update();
+    fa_start_ = start;
+    fa_end_ = end;
 }
 
-void ByteViewText::setMonospaceFont(const QFont &mono_font)
+void ByteViewText::renderBytes()
 {
-    mono_font_ = mono_font;
-//    mono_bold_font_ = QFont(mono_font);
-//    mono_bold_font_.setBold(true);
-
-    const QFontMetricsF fm(mono_font);
-    font_width_  = fm.width('M');
-    line_spacing_ = fm.lineSpacing() + 0.5;
-    one_em_ = fm.height();
-    margin_ = fm.height() / 2;
-
-    setFont(mono_font);
-
-    updateScrollbars();
-    viewport()->update();
-}
-
-void ByteViewText::paintEvent(QPaintEvent *)
-{
-    QPainter painter(viewport());
-    painter.translate(-horizontalScrollBar()->value() * font_width_, 0);
-
-    // Pixel offset of this row
-    int row_y = 0;
-
-    // Starting byte offset
-    guint offset = (guint) verticalScrollBar()->value() * row_width_;
-
-    // Clear the area
-    painter.fillRect(viewport()->rect(), palette().base());
-
-    // Offset background
-    offset_normal_fg_.setColor(ColorUtils::alphaBlend(palette().windowText(), palette().window(), 0.35));
-    offset_field_fg_.setColor(ColorUtils::alphaBlend(palette().windowText(), palette().window(), 0.65));
-    if (show_offset_) {
-        QRect offset_rect = QRect(viewport()->rect());
-        offset_rect.setWidth(offsetPixels());
-        painter.fillRect(offset_rect, palette().window());
-    }
+    int length;
+    int start_byte = 0;
 
     if (!tvb_) {
+        clear();
         return;
     }
 
-    // Map window coordinates to byte offsets
-    x_pos_to_column_.clear();
-    for (guint i = 0; i < row_width_; i++) {
-        int sep_width = (i / separator_interval_) * font_width_;
-        if (show_hex_) {
-            // Hittable pixels extend 1/2 space on either side of the hex digits
-            int pixels_per_byte = (format_ == BYTES_HEX ? 3 : 9) * font_width_;
-            int hex_x = offsetPixels() + margin_ + sep_width + (i * pixels_per_byte) - (font_width_ / 2);
-            for (int j = 0; j <= pixels_per_byte; j++) {
-                x_pos_to_column_[hex_x + j] = i;
-            }
-        }
-        if (show_ascii_) {
-            int ascii_x = offsetPixels() + hexPixels() + margin_ + sep_width + (i * font_width_);
-            for (int j = 0; j <= font_width_; j++) {
-                x_pos_to_column_[ascii_x + j] = i;
-            }
-        }
+    // XXX Even with updates and undo disabled this is slow. Instead of clearing
+    // and filling in the text each time we should probably fill it in once and
+    // use setExtraSelections to set highlighting.
+    setUpdatesEnabled(false);
+
+    textCursor().beginEditBlock();
+    clear();
+
+    length = tvb_length(tvb_);
+    for (int off = 0; off < length; off += per_line_) {
+        lineCommon(off);
     }
+    textCursor().endEditBlock();
 
-    // Data rows
-    int widget_height = height();
-    painter.save();
-    while(row_y + line_spacing_ < widget_height && offset < tvb_captured_length(tvb_)) {
-        drawOffsetLine(painter, offset, row_y);
-        offset += row_width_;
-        row_y += line_spacing_;
+    if (f_start_ > 0 && f_end_ > 0) {
+        start_byte = f_start_;
+    } else if (p_start_ > 0 && p_end_ > 0) {
+        start_byte = p_start_;
     }
-    painter.restore();
-}
+    scrollToByte(start_byte);
 
-void ByteViewText::resizeEvent(QResizeEvent *)
-{
-    updateScrollbars();
-}
-
-void ByteViewText::mousePressEvent (QMouseEvent *event) {
-    if (!tvb_ || !event || event->button() != Qt::LeftButton ) {
-        return;
-    }
-
-    QPoint pos = event->pos();
-    field_info *fi = fieldAtPixel(pos);
-
-    if (fi && tree_widget_) {
-        // XXX - This should probably be a ProtoTree method.
-        QTreeWidgetItemIterator iter(tree_widget_);
-        while (*iter) {
-            if (fi == (*iter)->data(0, Qt::UserRole).value<field_info *>()) {
-                tree_widget_->setCurrentItem((*iter));
-            }
-
-            iter++;
-        }
-    }
-}
-
-void ByteViewText::mouseMoveEvent(QMouseEvent *event)
-{
-    QString field_str;
-    if (!event) {
-        emit byteFieldHovered(field_str);
-        p_bound_ = p_bound_save_;
-        f_bound_ = f_bound_save_;
-        fa_bound_ = fa_bound_save_;
-        viewport()->update();
-        return;
-    }
-    QPoint pos = event->pos();
-    field_info *fi = fieldAtPixel(pos);
-    if (fi) {
-        if (fi->length < 2) {
-            field_str = QString(tr("Byte %1"))
-                    .arg(fi->start);
-        } else {
-            field_str = QString(tr("Bytes %1-%2"))
-                    .arg(fi->start)
-                    .arg(fi->start + fi->length - 1);
-        }
-        field_str += QString(": %1 (%2)")
-                .arg(fi->hfinfo->name)
-                .arg(fi->hfinfo->abbrev);
-        f_bound_ = QPair<guint, guint>(fi->start, fi->start + fi->length);
-        p_bound_ = QPair<guint, guint>(0, 0);
-        fa_bound_ = QPair<guint, guint>(0, 0);
-    } else {
-        p_bound_ = p_bound_save_;
-        f_bound_ = f_bound_save_;
-        fa_bound_ = fa_bound_save_;
-    }
-    emit byteFieldHovered(field_str);
-    viewport()->update();
-}
-
-void ByteViewText::leaveEvent(QEvent *event)
-{
-    QString empty;
-    emit byteFieldHovered(empty);
-    p_bound_ = p_bound_save_;
-    f_bound_ = f_bound_save_;
-    fa_bound_ = fa_bound_save_;
-    viewport()->update();
-    QAbstractScrollArea::leaveEvent(event);
-}
-
-void ByteViewText::contextMenuEvent(QContextMenuEvent *event)
-{
-    ctx_menu_.exec(event->globalPos());
+    setUpdatesEnabled(true);
 }
 
 // Private
 
-const int ByteViewText::separator_interval_ = 8; // Insert a space after this many bytes
+#define BYTE_VIEW_SEP    8      /* insert a space every BYTE_VIEW_SEP bytes */
 
-// Draw a line of byte view text for a given offset.
-// Text with different styles are split into fragments and passed to
-// flushOffsetFragment. Font character widths aren't necessarily whole
-// numbers so we track our X coordinate position using using floats.
-void ByteViewText::drawOffsetLine(QPainter &painter, const guint offset, const int row_y)
+void ByteViewText::lineCommon(const int org_off)
 {
-    if (!tvb_) {
-        return;
-    }
-    guint tvb_len = tvb_captured_length(tvb_);
-    guint max_pos = qMin(offset + row_width_, tvb_len);
-    const guint8 *pd = tvb_get_ptr(tvb_, 0, -1);
-
     static const guchar hexchars[16] = {
         '0', '1', '2', '3', '4', '5', '6', '7',
         '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
-    QString text;
-    highlight_state state = StateNormal, offset_state = StateOffsetNormal;
-    qreal hex_x = offsetPixels() + margin_;
-    qreal ascii_x = offsetPixels() + hexPixels() + margin_;
+    const guint8 *pd;
+    int len;
 
-    // Hex
-    if (show_hex_) {
-        for (guint tvb_pos = offset; tvb_pos < max_pos; tvb_pos++) {
-            highlight_state hex_state = StateNormal;
-            bool add_space = tvb_pos != offset;
+    highlight_state state;
 
-            if ((tvb_pos >= f_bound_.first && tvb_pos < f_bound_.second) || (tvb_pos >= fa_bound_.first && tvb_pos < fa_bound_.second)) {
-                hex_state = StateField;
-                offset_state = StateOffsetField;
-            } else if (tvb_pos >= p_bound_.first && tvb_pos < p_bound_.second) {
-                hex_state = StateProtocol;
+    QString str;
+
+    int off;
+    guchar c;
+    int byten;
+    int j;
+
+    g_assert(org_off >= 0);
+
+    if (!tvb_)
+        return;
+    len = tvb_length(tvb_);
+    pd = tvb_get_ptr(tvb_, 0, -1);
+
+    state = StateNormal;
+    setState(state);
+
+    /* Print the line number */
+    str += QString("%1  ").arg(org_off, offset_width_, 16, QChar('0'));
+
+    /* Print the hex bit */
+    for (byten = 0, off = org_off; byten < per_line_; byten++) {
+        highlight_state state_cur = StateNormal;
+        bool add_space = byten > 0;
+
+        if ((off >= f_start_ && off < f_end_) || (off >= fa_start_ && off < fa_end_)) {
+            state_cur = StateField;
+        } else if (off >= p_start_ && off < p_end_) {
+            state_cur = StateProtocol;
+        }
+
+        if (state_cur != state) {
+            if (state != StateField && add_space) {
+                add_space = false;
+                str += ' ';
+                /* insert a space every BYTE_VIEW_SEP bytes */
+                if ((off % BYTE_VIEW_SEP) == 0)
+                    str += ' ';
             }
 
-            if (hex_state != state) {
-                if ((state == StateNormal || (state == StateProtocol && hex_state == StateField)) && add_space) {
-                    add_space = false;
-                    text += ' ';
-                    /* insert a space every separator_interval_ bytes */
-                    if ((tvb_pos % separator_interval_) == 0)
-                        text += ' ';
-                }
-                hex_x += flushOffsetFragment(painter, hex_x, row_y, state, text);
-                state = hex_state;
-            }
+            if (flushBytes(str) < 0)
+                return;
+            setState(state_cur);
+            state = state_cur;
+        }
 
-            if (add_space) {
-                text += ' ';
-                /* insert a space every separator_interval_ bytes */
-                if ((tvb_pos % separator_interval_) == 0)
-                    text += ' ';
-            }
+        if (add_space) {
+            str += ' ';
+            /* insert a space every BYTE_VIEW_SEP bytes */
+            if ((off % BYTE_VIEW_SEP) == 0)
+                str += ' ';
+        }
 
+        if (off < len) {
             switch (format_) {
             case BYTES_HEX:
-                text += hexchars[(pd[tvb_pos] & 0xf0) >> 4];
-                text += hexchars[pd[tvb_pos] & 0x0f];
+                str += hexchars[(pd[off] & 0xf0) >> 4];
+                str += hexchars[pd[off] & 0x0f];
                 break;
             case BYTES_BITS:
                 /* XXX, bitmask */
-                for (int j = 7; j >= 0; j--)
-                    text += (pd[tvb_pos] & (1 << j)) ? '1' : '0';
+                for (j = 7; j >= 0; j--)
+                    str += (pd[off] & (1 << j)) ? '1' : '0';
+                break;
+            }
+        } else {
+            switch (format_) {
+            case BYTES_HEX:
+                str += "  ";
+                break;
+            case BYTES_BITS:
+                str += "       ";
                 break;
             }
         }
+        off++;
     }
-    if (text.length() > 0) {
-        flushOffsetFragment(painter, hex_x, row_y, state, text);
+
+    if (state != StateNormal) {
+        if (flushBytes(str) < 0)
+            return;
+        setState(StateNormal);
+        state = StateNormal;
     }
-    state = StateNormal;
 
-    // ASCII
-    if (show_ascii_) {
-        for (guint tvb_pos = offset; tvb_pos < max_pos; tvb_pos++) {
-            highlight_state ascii_state = StateNormal;
-            bool add_space = tvb_pos != offset;
+    /* Print some space at the end of the line */
+    str += "   ";
 
-            if ((tvb_pos >= f_bound_.first && tvb_pos < f_bound_.second) || (tvb_pos >= fa_bound_.first && tvb_pos < fa_bound_.second)) {
-                ascii_state = StateField;
-                offset_state = StateOffsetField;
-            } else if (tvb_pos >= p_bound_.first && tvb_pos < p_bound_.second) {
-                ascii_state = StateProtocol;
-            }
+    /* Print the ASCII bit */
+    for (byten = 0, off = org_off; byten < per_line_; byten++) {
+        highlight_state state_cur = StateNormal;
+        bool add_space = byten > 0;
 
-            if (ascii_state != state) {
-                if ((state == StateNormal || (state == StateProtocol && ascii_state == StateField)) && add_space) {
-                    add_space = false;
-                    /* insert a space every separator_interval_ bytes */
-                    if ((tvb_pos % separator_interval_) == 0)
-                        text += ' ';
-                }
-                ascii_x += flushOffsetFragment(painter, ascii_x, row_y, state, text);
-                state = ascii_state;
-            }
-
-            if (add_space) {
-                /* insert a space every separator_interval_ bytes */
-                if ((tvb_pos % separator_interval_) == 0)
-                    text += ' ';
-            }
-
-            guchar c = (encoding_ == PACKET_CHAR_ENC_CHAR_EBCDIC) ?
-                        EBCDIC_to_ASCII1(pd[tvb_pos]) :
-                        pd[tvb_pos];
-
-            text += g_ascii_isprint(c) ? c : '.';
+        if ((off >= f_start_ && off < f_end_) || (off >= fa_start_ && off < fa_end_)) {
+            state_cur = StateField;
+        } else if (off >= p_start_ && off < p_end_) {
+            state_cur = StateProtocol;
         }
-    }
-    if (text.length() > 0) {
-        flushOffsetFragment(painter, ascii_x, row_y, state, text);
-    }
-    state = StateNormal;
 
-    // Offset. Must be drawn last in order for offset_state to be set.
-    if (show_offset_) {
-        text = QString("%1").arg(offset, offsetChars(), 16, QChar('0'));
-        flushOffsetFragment(painter, margin_, row_y, offset_state, text);
+        if (state_cur != state) {
+            if (state != StateField && add_space) {
+                add_space = false;
+                /* insert a space every BYTE_VIEW_SEP bytes */
+                if ((off % BYTE_VIEW_SEP) == 0)
+                    str += ' ';
+            }
+
+            if (flushBytes(str) < 0)
+                return;
+            setState(state_cur);
+            state = state_cur;
+        }
+
+        if (add_space) {
+            /* insert a space every BYTE_VIEW_SEP bytes */
+            if ((off % BYTE_VIEW_SEP) == 0)
+                str += ' ';
+        }
+
+        if (off < len) {
+            c = (encoding_ == PACKET_CHAR_ENC_CHAR_EBCDIC) ?
+                        EBCDIC_to_ASCII1(pd[off]) :
+                        pd[off];
+
+            str += g_ascii_isprint(c) ? c : '.';
+        } else
+            str += ' ';
+
+        off++;
+    }
+
+    if (str.length() > 0) {
+        if (flushBytes(str) < 0)
+            return;
+    }
+
+    if (state != StateNormal) {
+        setState(StateNormal);
+        /* state = StateNormal; */
+    }
+    append("");
+}
+
+void ByteViewText::setState(ByteViewText::highlight_state state)
+{
+    QPalette pal = wsApp->palette();
+
+    moveCursor(QTextCursor::End);
+    setCurrentFont(wsApp->monospaceFont());
+    setTextColor(pal.text().color());
+    setTextBackgroundColor(pal.base().color());
+
+    switch (state) {
+    case StateProtocol:
+        setTextBackgroundColor(pal.alternateBase().color());
+        break;
+    case StateField:
+        if (bold_highlight_) {
+            setCurrentFont(wsApp->monospaceFont(true));
+        } else {
+            setTextColor(pal.base().color());
+            setTextBackgroundColor(pal.text().color());
+        }
+        break;
+    default:
+        break;
     }
 }
 
-// Draws a fragment of byte view text at the specifiec location using colors
-// for the specified state. Clears the text and returns the pixel width of the
-// drawn text.
-qreal ByteViewText::flushOffsetFragment(QPainter &painter, qreal x, int y, highlight_state state, QString &text)
+int ByteViewText::flushBytes(QString &str)
 {
-    if (text.length() < 1) {
-        return 0;
-    }
-    QFontMetricsF fm(mono_font_);
-    qreal width = fm.width(text);
-    // Background
-    if (state == StateField) {
-        painter.fillRect(QRectF(x, y, width, line_spacing_), palette().highlight());
-    } else if (state == StateProtocol) {
-        painter.fillRect(QRectF(x, y, width, line_spacing_), palette().window());
-    }
+    if (str.length() < 1) return 0;
 
-    // Text
-    QBrush text_brush;
-    switch (state) {
-    case StateNormal:
-    case StateProtocol:
-    default:
-        text_brush = palette().windowText();
-        break;
-    case StateField:
-        text_brush = palette().highlightedText();
-        break;
-    case StateOffsetNormal:
-        text_brush = offset_normal_fg_;
-        break;
-    case StateOffsetField:
-        text_brush = offset_field_fg_;
-        break;
-    }
-
-    painter.setPen(QPen(text_brush.color()));
-    painter.drawText(QRectF(x, y, width, line_spacing_), Qt::AlignTop, text);
-    text.clear();
-    return width;
+    insertPlainText(str);
+    str.clear();
+    return str.length();
 }
 
 void ByteViewText::scrollToByte(int byte)
 {
-    verticalScrollBar()->setValue(byte / row_width_);
+    QTextCursor cursor(textCursor());
+    cursor.setPosition(0);
+
+    cursor.setPosition(byte * cursor.block().length() / per_line_);
+    setTextCursor(cursor);
+    ensureCursorVisible();
 }
 
-// Offset character width
-int ByteViewText::offsetChars()
+int ByteViewText::byteFromRowCol(int row, int col)
 {
-    if (tvb_ && tvb_captured_length(tvb_) > 0xffff) {
-        return 8;
+    /* hex_pos_byte array generated with hex_view_get_byte(0, 0, 0...70) */
+    static const int hex_pos_byte[70] = {
+        -1, -1,
+        0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3,
+        4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7,
+        -1,
+        8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11,
+        12, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15,
+        -1, -1,
+        0, 1, 2, 3, 4, 5, 6, 7,
+        -1,
+        8, 9, 10, 11, 12, 13, 14, 15
+    };
+
+    /* bits_pos_byte array generated with bit_view_get_byte(0, 0, 0...84) */
+    static const int bits_pos_byte[84] = {
+        -1, -1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+        6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        -1, -1,
+        0, 1, 2, 3, 4, 5, 6, 7
+    };
+
+    int off_col = 1;
+    int off_row;
+
+    off_row = row * per_line_;
+
+    if (/* char_x < 0 || */ col < offset_width_)
+        return -1;
+    col -= offset_width_;
+
+    switch (format_) {
+        case BYTES_BITS:
+            g_return_val_if_fail(col >= 0 && col < (int) G_N_ELEMENTS(bits_pos_byte), -1);
+            off_col = bits_pos_byte[col];
+            break;
+
+        case BYTES_HEX:
+            g_return_val_if_fail(col >= 0 && col < (int) G_N_ELEMENTS(hex_pos_byte), -1);
+            off_col = hex_pos_byte[col];
+            break;
     }
-    return 4;
+
+    if (col == -1)
+        return -1;
+
+    return off_row + off_col;
 }
 
-// Offset pixel width
-int ByteViewText::offsetPixels()
-{
-    if (show_offset_) {
-        return offsetChars() * font_width_ + one_em_;
-    }
-    return 0;
-}
+void ByteViewText::mousePressEvent (QMouseEvent * event) {
+    if (event->button() == Qt::LeftButton) {
+        int byte;
+        QTextCursor cursor(cursorForPosition(event->pos()));
 
-// Hex pixel width
-int ByteViewText::hexPixels()
-{
-    if (show_hex_) {
-        int digits_per_byte = format_ == BYTES_HEX ? 3 : 9;
-        return (((row_width_ * digits_per_byte) + ((row_width_ - 1) / separator_interval_)) * font_width_) + one_em_;
-    }
-    return 0;
-}
+        byte = byteFromRowCol(cursor.blockNumber(), cursor.columnNumber());
+        if (byte >= 0) {
+            field_info *fi = proto_find_field_from_offset(proto_tree_, byte, tvb_);
 
-int ByteViewText::asciiPixels()
-{
-    if (show_ascii_) {
-        return ((row_width_ + ((row_width_ - 1) / separator_interval_)) * font_width_) + one_em_;
-    }
-    return 0;
-}
+            if (fi && tree_widget_) {
+                // XXX - This should probably be a ProtoTree method.
+                QTreeWidgetItemIterator iter(tree_widget_);
+                while (*iter) {
+                    if (fi == (*iter)->data(0, Qt::UserRole).value<field_info *>()) {
+                        tree_widget_->setCurrentItem((*iter));
+                    }
 
-int ByteViewText::totalPixels()
-{
-    return offsetPixels() + hexPixels() + asciiPixels();
-}
-
-void ByteViewText::updateScrollbars()
-{
-    const gint length = tvb_ ? tvb_captured_length(tvb_) : 0;
-    if (tvb_) {
+                    iter++;
+                }
+            }
+        }
     }
 
-    qint64 maxval = length / row_width_ + ((length % row_width_) ? 1 : 0) - viewport()->height() / line_spacing_;
-
-    verticalScrollBar()->setRange(0, qMax((qint64)0, maxval));
-    horizontalScrollBar()->setRange(0, qMax(0, static_cast<int>((totalPixels() - viewport()->width()) / font_width_)));
-}
-
-field_info *ByteViewText::fieldAtPixel(QPoint &pos)
-{
-    int byte = (verticalScrollBar()->value() + (pos.y() / line_spacing_)) * row_width_;
-    int x = (horizontalScrollBar()->value() * font_width_) + pos.x();
-    int col = x_pos_to_column_.value(x, -1);
-
-    if (col < 0) {
-        return NULL;
-    }
-
-    byte += col;
-    if ((guint) byte > tvb_captured_length(tvb_)) {
-        return NULL;
-    }
-
-    return proto_find_field_from_offset(proto_tree_, byte, tvb_);
-}
-
-void ByteViewText::setHexDisplayFormat(QAction *action)
-{
-    if (!action) {
-        return;
-    }
-
-    format_ = action->data().value<bytes_view_type>();
-    row_width_ = format_ == BYTES_HEX ? 16 : 8;
-    viewport()->update();
+    QWidget::mousePressEvent (event);
 }
 
 /*

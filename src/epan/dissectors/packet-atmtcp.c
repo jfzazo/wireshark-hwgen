@@ -28,6 +28,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 
@@ -61,7 +63,7 @@ dissect_atmtcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "ATMTCP");
 
-    col_add_str(pinfo->cinfo, COL_INFO, "ATMTCP");
+    col_set_str(pinfo->cinfo, COL_INFO, "ATMTCP");
 
     if (tree) {
         ti = proto_tree_add_item(tree, proto_atmtcp, tvb, 0, -1, ENC_NA);
@@ -69,26 +71,26 @@ dissect_atmtcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
         atmtcp_tree = proto_item_add_subtree(ti, ett_atmtcp);
 
         /* VPI */
-        proto_tree_add_item(atmtcp_tree, hf_atmtcp_vpi, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_item(atmtcp_tree, hf_atmtcp_vpi, tvb, offset, 2, ENC_NA);
     }
     offset += 2;
 
 
     if (tree) {
         /* VCI */
-        proto_tree_add_item(atmtcp_tree, hf_atmtcp_vci, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_item(atmtcp_tree, hf_atmtcp_vci, tvb, offset, 2, ENC_NA);
     }
     offset += 2;
 
 
     if (tree) {
         /* Length  */
-        proto_tree_add_item(atmtcp_tree, hf_atmtcp_length, tvb, offset, 4, ENC_BIG_ENDIAN);
+        proto_tree_add_item(atmtcp_tree, hf_atmtcp_length, tvb, offset, 4, ENC_NA);
     }
     length = tvb_get_ntohl(tvb, offset);
     if(length == ATMTCP_HDR_MAGIC)
     {
-        col_append_str(pinfo->cinfo, COL_INFO, " Command");
+   	col_append_str(pinfo->cinfo, COL_INFO, " Command");
     }
     else
     {
@@ -99,7 +101,7 @@ dissect_atmtcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
     /* Data (for the moment...) */
     next_tvb = tvb_new_subset_remaining(tvb, offset);
     call_dissector(data_handle, next_tvb, pinfo, tree);
-    return tvb_reported_length(tvb);
+    return tvb_length(tvb);
 }
 
 

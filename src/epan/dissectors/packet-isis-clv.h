@@ -32,8 +32,6 @@
  * all PDU Types.
  *
  * list taken from rfc3359 plus some memory from veterans ;-)
- *
- * http://www.iana.org/assignments/isis-tlv-codepoints/isis-tlv-codepoints.xhtml#tlv-codepoints
  */
 
 #define ISIS_CLV_AREA_ADDRESS        1   /* iso10589 */
@@ -60,10 +58,13 @@
 #define ISIS_CLV_EXTD_IP_REACH       135 /* draft-ietf-isis-traffic-05 */
 #define ISIS_CLV_HOSTNAME            137 /* rfc2763 */
 #define ISIS_CLV_SHARED_RISK_GROUP   138 /* draft-ietf-isis-gmpls-extensions */
-#define ISIS_GRP_ADDR                142 /* rfc7176 */
-#define ISIS_CLV_MT_PORT_CAP         143 /* rfc6165, rfc7176 */
-#define ISIS_CLV_MT_CAP              144 /* rfc6329, rfc7176 */
-#define ISIS_CLV_TRILL_NEIGHBOR      145 /* rfc7176 */
+#define ISIS_GRP_ADDR                142 /* draft-ieft-trill-isis-05*//* Our sub-packet dismantle structure for CLV's */
+#define ISIS_CLV_MT_PORT_CAP         143 /* MT port capability (draft-ietf-isis-layer2-11) */
+#define ISIS_CLV_MT_CAP              144 /* MT capability (draft-ietf-isis-ieee-aq-05)
+                                          *   also: IEEE P802.1aq/D3.6,
+                                          *         http://www.ietf.org/mail-archive/web/spb-isis/current/msg00007.html
+                                          *         http://www.iana.org/assignments/isis-tlv-codepoints/isis-tlv-codepoints.xml#tlv-143,
+                                          */
 #define ISIS_CLV_RESTART             211 /* draft-ietf-isis-restart-01 */
 #define ISIS_CLV_MT_IS_REACH         222 /* draft-ietf-isis-wg-multi-topology-05 */
 #define ISIS_CLV_MT_SUPPORTED        229 /* draft-ietf-isis-wg-multi-topology-05 */
@@ -73,7 +74,7 @@
 #define ISIS_CLV_MT_IP6_REACH        237 /* draft-ietf-isis-wg-multi-topology-05 */
 #define ISIS_CLV_PTP_ADJ_STATE       240 /* rfc3373 */
 #define ISIS_CLV_IIH_SEQNR           241 /* draft-shen-isis-iih-sequence-00 */
-#define ISIS_CLV_RT_CAPABLE          242 /* rfc4971, rfc7176 */
+#define ISIS_CLV_RT_CAPABLE          242 /* TRILL use of IS-IS RFC 6326 */
 #define ISIS_CLV_VENDOR_PRIVATE      250 /* draft-ietf-isis-proprietary-tlv-00 */
 
 /*
@@ -93,39 +94,28 @@ typedef struct {
  */
 extern void isis_dissect_clvs(tvbuff_t *tvb, packet_info* pinfo, proto_tree *tree, int offset,
         const isis_clv_handle_t *opts, expert_field* expert_short_len, int len, int id_length,
-        int unknown_tree_id,  int tree_type, int tree_length);
+        int unknown_tree_id);
 
 extern void isis_dissect_nlpid_clv(tvbuff_t *tvb, proto_tree *tree,
-        int hf_nlpid, int offset, int length);
+        int offset, int length);
 extern void isis_dissect_te_router_id_clv(proto_tree *tree, packet_info* pinfo, tvbuff_t *tvb, expert_field* expert,
         int offset, int length, int tree_id);
 extern void isis_dissect_ipv6_int_clv(proto_tree *tree, packet_info* pinfo, tvbuff_t *tvb, expert_field* expert,
         int offset, int length, int tree_id);
 extern void isis_dissect_ip_int_clv(proto_tree *tree, packet_info* pinfo, tvbuff_t *tvb, expert_field* expert,
         int offset, int length, int tree_id);
-extern void isis_dissect_mt_clv(tvbuff_t *tvb, packet_info* pinfo, proto_tree *tree,
-        int offset, int length, int tree_id, expert_field* mtid_expert);
+extern void isis_dissect_mt_clv(tvbuff_t *tvb, proto_tree *tree,
+        int offset, int length, int tree_id);
 extern void isis_dissect_hostname_clv(tvbuff_t *tvb, proto_tree *tree,
         int offset, int length, int tree_id);
 extern void isis_dissect_authentication_clv(proto_tree *tree, packet_info* pinfo, tvbuff_t *tvb,
-        int hf_auth_bytes, expert_field* auth_expert, int offset, int length);
+        expert_field* auth_expert, int offset, int length);
+extern void isis_dissect_ip_authentication_clv(tvbuff_t *tvb, proto_tree *tree,
+        int offset, int length);
 extern void isis_dissect_area_address_clv(proto_tree *tree, packet_info* pinfo, tvbuff_t *tvb,
-        expert_field* expert, int hf_area, int offset, int length);
+        expert_field* expert, int offset, int length);
 
 extern void isis_dissect_metric(tvbuff_t *tvb, proto_tree *tree, int offset,
         guint8 value, char *pstr, int force_supported);
 
 #endif /* _PACKET_ISIS_CLV_H */
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

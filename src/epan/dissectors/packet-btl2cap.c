@@ -30,17 +30,17 @@
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 #include <epan/decode_as.h>
 #include <wiretap/wtap.h>
 
-#include "packet-bluetooth.h"
+#include "packet-bluetooth-hci.h"
 #include "packet-bthci_acl.h"
 #include "packet-btsdp.h"
 #include "packet-btl2cap.h"
 
 /* Initialize the protocol and registered fields */
-int proto_btl2cap = -1;
-
+static int proto_btl2cap = -1;
 static int hf_btl2cap_length = -1;
 static int hf_btl2cap_cid = -1;
 static int hf_btl2cap_payload = -1;
@@ -152,8 +152,7 @@ static dissector_table_t l2cap_service_dissector_table;
 
 /* This table maps cid values to psm values.
  * The same table is used both for SCID and DCID.
- * For Remote CIDs (Receive Request SCID or Sent Response DCID)
- * we 'or' the CID with 0x80000000 in this table
+ * For received CIDs we 'or' the cid with 0x80000000 in this table
  */
 static wmem_tree_t *cid_to_psm_table  = NULL;
 
@@ -177,8 +176,10 @@ typedef struct _psm_data_t {
     guint32       interface_id;
     guint32       adapter_id;
     guint32       chandle;
-    guint32       local_cid;
-    guint32       remote_cid;
+    guint32       scid;
+    guint32       dcid;
+    guint32       first_scid_frame;
+    guint32       first_dcid_frame;
     guint16       psm;
     gboolean      local_service;
     guint32       disconnect_in_frame;
@@ -228,7 +229,6 @@ static const value_string psm_vals[] = {
     { 0x001D, "UDI_C-Plane" },
     { 0x001F, "ATT" },
     { 0x0021, "3DSP" },
-    { 0x0023, "IPSP" },
     { 0, NULL }
 };
 value_string_ext ext_psm_vals = VALUE_STRING_EXT_INIT(psm_vals);
@@ -405,71 +405,35 @@ void proto_reg_handoff_btl2cap(void);
 
 static void btl2cap_cid_prompt(packet_info *pinfo, gchar* result)
 {
-    gulong *value_data;
-
-    value_data = (gulong *) p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_CID_CONV);
-    if (value_data)
-        g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "L2CAP CID 0x%04x as", (guint) *value_data);
-    else
-        g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Unknown L2CAP CID");
+    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "L2CAP CID 0x%04x as",
+        GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_CID_CONV )));
 }
 
 static gpointer btl2cap_cid_value(packet_info *pinfo)
 {
-    gulong *value_data;
-
-    value_data = (gulong *) p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_CID_CONV);
-
-    if (value_data)
-        return (gpointer) *value_data;
-
-    return NULL;
+    return p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_CID_CONV );
 }
 
 static void btl2cap_psm_prompt(packet_info *pinfo, gchar* result)
 {
-    gulong *value_data;
-
-    value_data = (gulong *) p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV);
-    if (value_data)
-        g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "L2CAP PSM 0x%04x as", (guint) *value_data);
-    else
-        g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Unknown L2CAP PSM");
+    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "L2CAP PSM 0x%04x as",
+        GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV )));
 }
 
 static gpointer btl2cap_psm_value(packet_info *pinfo)
 {
-    gulong *value_data;
-
-    value_data = (gulong *) p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV);
-
-    if (value_data)
-        return (gpointer) *value_data;
-
-    return NULL;
+    return p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV );
 }
 
 static void btl2cap_serv_prompt(packet_info *pinfo, gchar* result)
 {
-    gulong *value_data;
-
-    value_data = (gulong *) p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV);
-    if (value_data)
-        g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "L2CAP SERVICE 0x%04x as", (guint) *value_data);
-    else
-        g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Unknown L2CAP SERVICE");
+    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "L2CAP SERVICE 0x%04x as",
+        GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV )));
 }
 
 static gpointer btl2cap_serv_value(packet_info *pinfo)
 {
-    gulong *value_data;
-
-    value_data = (gulong *) p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV);
-
-    if (value_data)
-        return (gpointer) *value_data;
-
-    return NULL;
+    return p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV );
 }
 
 static guint16
@@ -599,12 +563,7 @@ dissect_connrequest(tvbuff_t *tvb, int offset, packet_info *pinfo,
     psm = tvb_get_letohs(tvb, offset);
 
     if (p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV ) == NULL) {
-        gulong *value_data;
-
-        value_data = wmem_new(wmem_file_scope(), gulong);
-        *value_data = psm;
-
-        p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV, value_data);
+        p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV, GUINT_TO_POINTER((guint)psm));
     }
 
     if (psm < BTL2CAP_DYNAMIC_PSM_START) {
@@ -618,7 +577,7 @@ dissect_connrequest(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
         uuid = get_service_uuid(pinfo, l2cap_data, psm, (pinfo->p2p_dir == P2P_DIR_RECV) ? TRUE : FALSE);
         if (uuid) {
-            psm_str = val_to_str_ext_const(uuid, &bluetooth_uuid_vals_ext, "Unknown PSM");
+            psm_str = val_to_str_ext_const(uuid, &bt_sig_uuid_vals_ext, "Unknown PSM");
             proto_item_append_text(item, " (%s)", psm_str);
         }
     }
@@ -661,14 +620,11 @@ dissect_connrequest(tvbuff_t *tvb, int offset, packet_info *pinfo,
         k_frame_number = pinfo->fd->num;
 
         psm_data = wmem_new(wmem_file_scope(), psm_data_t);
-        if (pinfo->p2p_dir == P2P_DIR_RECV) {
-            psm_data->local_cid = BTL2CAP_UNKNOWN_CID;
-            psm_data->remote_cid = scid |  0x80000000;
-        } else {
-            psm_data->local_cid = scid;
-            psm_data->remote_cid = BTL2CAP_UNKNOWN_CID;
-        }
+        psm_data->scid = (scid | ((pinfo->p2p_dir == P2P_DIR_RECV) ? 0x80000000 : 0x00000000));
+        psm_data->dcid = 0;
         psm_data->psm  = psm;
+        psm_data->first_scid_frame = 0;
+        psm_data->first_dcid_frame = 0;
         psm_data->local_service = (pinfo->p2p_dir == P2P_DIR_RECV) ? TRUE : FALSE;
         psm_data->in.mode      = 0;
         psm_data->in.txwindow  = 0;
@@ -679,7 +635,7 @@ dissect_connrequest(tvbuff_t *tvb, int offset, packet_info *pinfo,
         psm_data->interface_id = k_interface_id;
         psm_data->adapter_id   = k_adapter_id;
         psm_data->chandle      = k_chandle;
-        psm_data->disconnect_in_frame = max_disconnect_in_frame;
+        psm_data->disconnect_in_frame = G_MAXUINT32;
 
         key[0].length = 1;
         key[0].key    = &k_interface_id;
@@ -725,11 +681,6 @@ dissect_options(tvbuff_t *tvb, int offset, packet_info *pinfo _U_, proto_tree *t
     proto_item *ti_option;
     proto_tree *ti_option_subtree;
     guint8      option_type, option_length;
-
-    if (config_data) {
-        config_data->mode     = 0;
-        config_data->txwindow = 0;
-    }
 
     while (length > 0) {
         option_type   = tvb_get_guint8(tvb, offset);
@@ -923,8 +874,7 @@ dissect_configrequest(tvbuff_t *tvb, int offset, packet_info *pinfo,
         if (psm_data && psm_data->interface_id == interface_id &&
                 psm_data->adapter_id == adapter_id &&
                 psm_data->chandle == chandle &&
-                ((pinfo->p2p_dir == P2P_DIR_SENT && psm_data->remote_cid == cid) ||
-                (pinfo->p2p_dir == P2P_DIR_RECV && psm_data->local_cid == cid)) &&
+                psm_data->dcid == cid &&
                 psm_data->disconnect_in_frame > pinfo->fd->num) {
             if (pinfo->p2p_dir == P2P_DIR_RECV)
                 config_data = &(psm_data->out);
@@ -1118,8 +1068,7 @@ dissect_configresponse(tvbuff_t *tvb, int offset, packet_info *pinfo,
         if (psm_data && psm_data->interface_id == interface_id &&
                 psm_data->adapter_id == adapter_id &&
                 psm_data->chandle == chandle &&
-                ((pinfo->p2p_dir == P2P_DIR_SENT && psm_data->local_cid == cid) ||
-                (pinfo->p2p_dir == P2P_DIR_RECV && psm_data->remote_cid == cid)) &&
+                psm_data->scid == cid &&
                 psm_data->disconnect_in_frame > pinfo->fd->num) {
             if (pinfo->p2p_dir == P2P_DIR_RECV)
                 config_data = &(psm_data->out);
@@ -1207,8 +1156,7 @@ dissect_connresponse(tvbuff_t *tvb, int offset, packet_info *pinfo,
         if (psm_data && psm_data->interface_id == interface_id &&
                 psm_data->adapter_id == adapter_id &&
                 psm_data->chandle == chandle &&
-                ((pinfo->p2p_dir == P2P_DIR_SENT && psm_data->remote_cid == cid) ||
-                (pinfo->p2p_dir == P2P_DIR_RECV && psm_data->local_cid == cid)) &&
+                psm_data->scid == (scid | ((pinfo->p2p_dir == P2P_DIR_RECV) ? 0x00000000 : 0x80000000)) &&
                 psm_data->disconnect_in_frame > pinfo->fd->num) {
             cid = dcid | ((pinfo->p2p_dir == P2P_DIR_RECV) ? 0x80000000 : 0x00000000);
 
@@ -1231,10 +1179,7 @@ dissect_connresponse(tvbuff_t *tvb, int offset, packet_info *pinfo,
             key[5].length = 0;
             key[5].key    = NULL;
 
-            if (pinfo->p2p_dir == P2P_DIR_RECV)
-                psm_data->remote_cid = cid;
-            else
-                psm_data->local_cid = cid;
+            psm_data->dcid = cid;
 
             wmem_tree_insert32_array(cid_to_psm_table, key, psm_data);
         }
@@ -1380,13 +1325,12 @@ dissect_disconnrequestresponse(tvbuff_t *tvb, int offset, packet_info *pinfo,
             interface_id = HCI_INTERFACE_DEFAULT;
         adapter_id   = (acl_data) ? acl_data->adapter_id : HCI_ADAPTER_DEFAULT;
         chandle      = (acl_data) ? acl_data->chandle : 0;
-        if ((is_request && pinfo->p2p_dir == P2P_DIR_SENT) ||
-                (!is_request && pinfo->p2p_dir == P2P_DIR_RECV)) {
-            key_dcid     = dcid | 0x80000000;
-            key_scid     = scid;
+        if (is_request) {
+            key_dcid     = dcid | ((pinfo->p2p_dir == P2P_DIR_RECV) ? 0x00000000 : 0x80000000);
+            key_scid     = scid | ((pinfo->p2p_dir == P2P_DIR_RECV) ? 0x80000000 : 0x00000000);
         } else {
-            key_dcid     = scid | 0x80000000;
-            key_scid     = dcid;
+            key_dcid     = dcid | ((pinfo->p2p_dir == P2P_DIR_RECV) ? 0x80000000 : 0x00000000);
+            key_scid     = scid | ((pinfo->p2p_dir == P2P_DIR_RECV) ? 0x00000000 : 0x80000000);
         }
 
         k_interface_id = interface_id;
@@ -1412,8 +1356,8 @@ dissect_disconnrequestresponse(tvbuff_t *tvb, int offset, packet_info *pinfo,
         if (psm_data && psm_data->interface_id == interface_id &&
                 psm_data->adapter_id == adapter_id &&
                 psm_data->chandle == chandle &&
-                psm_data->remote_cid == key_dcid &&
-                psm_data->disconnect_in_frame == max_disconnect_in_frame) {
+                psm_data->dcid == key_dcid &&
+                psm_data->disconnect_in_frame == G_MAXUINT32) {
             psm_data->disconnect_in_frame = pinfo->fd->num;
         }
 
@@ -1440,12 +1384,11 @@ dissect_disconnrequestresponse(tvbuff_t *tvb, int offset, packet_info *pinfo,
         if (psm_data && psm_data->interface_id == interface_id &&
                 psm_data->adapter_id == adapter_id &&
                 psm_data->chandle == chandle &&
-                psm_data->local_cid == key_scid &&
-                psm_data->disconnect_in_frame == max_disconnect_in_frame) {
+                psm_data->scid == key_scid &&
+                psm_data->disconnect_in_frame == G_MAXUINT32) {
             psm_data->disconnect_in_frame = pinfo->fd->num;
         }
     }
-
 
     return offset;
 }
@@ -1466,23 +1409,13 @@ dissect_b_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         guint16            uuid;
 
         if (p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV ) == NULL) {
-            gulong *value_data;
-
-            value_data = wmem_new(wmem_file_scope(), gulong);
-            *value_data = psm;
-
-            p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV, value_data);
+            p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV, GUINT_TO_POINTER((guint)psm));
         }
 
         uuid = get_service_uuid(pinfo, l2cap_data, psm, is_local_psm);
 
         if (p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV ) == NULL) {
-            gulong *value_data;
-
-            value_data = wmem_new(wmem_file_scope(), gulong);
-            *value_data = uuid;
-
-            p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV, value_data);
+            p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV, GUINT_TO_POINTER((guint)uuid));
         }
 
         if (psm < BTL2CAP_DYNAMIC_PSM_START) {
@@ -1492,7 +1425,7 @@ dissect_b_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             psm_item = proto_tree_add_uint(btl2cap_tree, hf_btl2cap_psm_dynamic, tvb, offset, 0, psm);
             if (uuid)
                 proto_item_append_text(psm_item, ": %s",
-                                       val_to_str_ext_const(uuid, &bluetooth_uuid_vals_ext, "Unknown service"));
+                                       val_to_str_ext_const(uuid, &bt_sig_uuid_vals_ext, "Unknown service"));
         }
         PROTO_ITEM_SET_GENERATED(psm_item);
 
@@ -1641,23 +1574,13 @@ dissect_i_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             guint16            uuid;
 
             if (p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV ) == NULL) {
-                gulong *value_data;
-
-                value_data = wmem_new(wmem_file_scope(), gulong);
-                *value_data = psm;
-
-                p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV, value_data);
+                p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV, GUINT_TO_POINTER((guint)psm));
             }
 
             uuid = get_service_uuid(pinfo, l2cap_data, psm, psm_data->local_service);
 
             if (p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV ) == NULL) {
-                gulong *value_data;
-
-                value_data = wmem_new(wmem_file_scope(), gulong);
-                *value_data = uuid;
-
-                p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV, value_data);
+                p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV, GUINT_TO_POINTER((guint)uuid));
             }
 
             if (psm < BTL2CAP_DYNAMIC_PSM_START) {
@@ -1666,7 +1589,7 @@ dissect_i_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                 psm_item = proto_tree_add_uint(btl2cap_tree, hf_btl2cap_psm_dynamic, tvb, offset, 0, psm);
                 if (uuid)
                     proto_item_append_text(psm_item, " (%s)",
-                                           val_to_str_ext_const(uuid, &bluetooth_uuid_vals_ext, "Unknown service"));
+                                           val_to_str_ext_const(uuid, &bt_sig_uuid_vals_ext, "Unknown service"));
             }
             PROTO_ITEM_SET_GENERATED(psm_item);
 
@@ -1760,7 +1683,8 @@ dissect_btl2cap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             col_set_str(pinfo->cinfo, COL_INFO, "Rcvd ");
             break;
         default:
-            col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection ");
+            col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction %d ",
+                pinfo->p2p_dir);
             break;
     }
 
@@ -1771,12 +1695,7 @@ dissect_btl2cap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     cid = tvb_get_letohs(tvb, offset);
     proto_tree_add_item(btl2cap_tree, hf_btl2cap_cid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     if (p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_CID_CONV ) == NULL) {
-        gulong *value_data;
-
-        value_data = wmem_new(wmem_file_scope(), gulong);
-        *value_data = cid;
-
-        p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_CID_CONV, value_data);
+        p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_CID_CONV, GUINT_TO_POINTER((guint)cid));
     }
     offset += 2;
 
@@ -1786,29 +1705,14 @@ dissect_btl2cap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         l2cap_data->interface_id = pinfo->phdr->interface_id;
     else
         l2cap_data->interface_id = HCI_INTERFACE_DEFAULT;
-    if (acl_data) {
-        l2cap_data->adapter_id                  = acl_data->adapter_id;
-        l2cap_data->adapter_disconnect_in_frame = acl_data->adapter_disconnect_in_frame;
-        l2cap_data->chandle                     = acl_data->chandle;
-        l2cap_data->hci_disconnect_in_frame     = acl_data->disconnect_in_frame;
-        l2cap_data->remote_bd_addr_oui          = acl_data->remote_bd_addr_oui;
-        l2cap_data->remote_bd_addr_id           = acl_data->remote_bd_addr_id;
-    } else {
-        l2cap_data->adapter_id                  = HCI_ADAPTER_DEFAULT;
-        l2cap_data->adapter_disconnect_in_frame = &max_disconnect_in_frame;
-        l2cap_data->chandle                     = 0;
-        l2cap_data->hci_disconnect_in_frame     = &max_disconnect_in_frame;
-        l2cap_data->remote_bd_addr_oui          = 0;
-        l2cap_data->remote_bd_addr_id           = 0;
-    }
-
-    l2cap_data->disconnect_in_frame         = &max_disconnect_in_frame;
-
+    l2cap_data->adapter_id       = (acl_data) ? acl_data->adapter_id : HCI_ADAPTER_DEFAULT;
+    l2cap_data->chandle          = (acl_data) ? acl_data->chandle : 0;
     l2cap_data->cid              = cid;
-    l2cap_data->local_cid        = BTL2CAP_UNKNOWN_CID;
-    l2cap_data->remote_cid       = BTL2CAP_UNKNOWN_CID;
     l2cap_data->is_local_psm     = FALSE;
     l2cap_data->psm              = 0;
+    l2cap_data->first_scid_frame = 0;
+    l2cap_data->remote_bd_addr_oui = (acl_data) ? acl_data->remote_bd_addr_oui : 0;
+    l2cap_data->remote_bd_addr_id = (acl_data) ? acl_data->remote_bd_addr_id : 0;
 
     if (cid == BTL2CAP_FIXED_CID_SIGNAL || cid == BTL2CAP_FIXED_CID_LE_SIGNAL) {
         /* This is a command packet*/
@@ -1976,23 +1880,10 @@ dissect_btl2cap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         col_append_str(pinfo->cinfo, COL_INFO, "Connectionless reception channel");
 
         psm = tvb_get_letohs(tvb, offset);
-        if (pinfo->p2p_dir == P2P_DIR_RECV) {
-            l2cap_data->local_cid = cid;
-            l2cap_data->remote_cid = BTL2CAP_UNKNOWN_CID;
-        } else {
-            l2cap_data->local_cid = BTL2CAP_UNKNOWN_CID;
-            l2cap_data->remote_cid = cid;
-        }
         l2cap_data->psm = psm;
-        l2cap_data->disconnect_in_frame = &max_disconnect_in_frame;
 
         if (p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV ) == NULL) {
-            gulong *value_data;
-
-            value_data = wmem_new(wmem_file_scope(), gulong);
-            *value_data = psm;
-
-            p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV, value_data);
+            p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_PSM_CONV, GUINT_TO_POINTER((guint)psm));
         }
 
         proto_tree_add_item(btl2cap_tree, hf_btl2cap_psm, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -2008,12 +1899,7 @@ dissect_btl2cap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             uuid = get_service_uuid(pinfo, l2cap_data, psm, (pinfo->p2p_dir == P2P_DIR_RECV) ? TRUE : FALSE );
 
             if (p_get_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV ) == NULL) {
-                gulong *value_data;
-
-                value_data = wmem_new(wmem_file_scope(), gulong);
-                *value_data = uuid;
-
-                p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV, value_data);
+                p_add_proto_data(pinfo->pool, pinfo, proto_btl2cap, BTL2CAP_SERV_CONV, GUINT_TO_POINTER((guint)uuid));
             }
 
             if (!dissector_try_uint_new(l2cap_service_dissector_table, uuid, next_tvb, pinfo, tree, TRUE, l2cap_data)) {
@@ -2104,17 +1990,26 @@ dissect_btl2cap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         if (psm_data && psm_data->interface_id == interface_id &&
                 psm_data->adapter_id == adapter_id &&
                 psm_data->chandle == chandle &&
-                (psm_data->local_cid == key_cid ||
-                psm_data->remote_cid == key_cid) &&
+                (psm_data->scid == key_cid ||
+                psm_data->dcid == key_cid) &&
                 psm_data->disconnect_in_frame > pinfo->fd->num) {
             config_data_t  *config_data;
 
+            if ((psm_data->scid == key_cid) &&
+                    psm_data->first_scid_frame == 0) {
+                psm_data->first_scid_frame = pinfo->fd->num;
+            }
+
+            if ((psm_data->dcid == key_cid) &&
+                    psm_data->first_dcid_frame == 0) {
+                psm_data->first_dcid_frame = pinfo->fd->num;
+            }
+
             psm = psm_data->psm;
-            l2cap_data->local_cid = psm_data->local_cid;
-            l2cap_data->remote_cid = psm_data->remote_cid;
             l2cap_data->psm = psm;
             l2cap_data->is_local_psm = psm_data->local_service;
-            l2cap_data->disconnect_in_frame = &psm_data->disconnect_in_frame;
+            l2cap_data->first_scid_frame = psm_data->first_scid_frame;
+            l2cap_data->first_dcid_frame = psm_data->first_dcid_frame;
 
             if (pinfo->p2p_dir == P2P_DIR_RECV)
                 config_data = &(psm_data->in);
@@ -2299,12 +2194,12 @@ proto_register_btl2cap(void)
         },
         { &hf_btl2cap_info_window,
           { "Extended Window Size", "btl2cap.info_window",
-            FT_UINT32, BASE_DEC, NULL, 0x01,
+            FT_UINT32, BASE_DEC, NULL, 0x0100,
             "Extended Window Size support", HFILL }
         },
         { &hf_btl2cap_info_unicast,
           { "Unicast Connectionless Data Reception", "btl2cap.info_unicast",
-            FT_UINT32, BASE_DEC, NULL, 0x02,
+            FT_UINT32, BASE_DEC, NULL, 0x0200,
             "Unicast Connectionless Data Reception support", HFILL }
         },
         { &hf_btl2cap_info_fixedchans,
@@ -2648,7 +2543,7 @@ proto_register_btl2cap(void)
     expert_btl2cap = expert_register_protocol(proto_btl2cap);
     expert_register_field_array(expert_btl2cap, ei, array_length(ei));
 
-    cid_to_psm_table     = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
+    cid_to_psm_table     = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope()); /* scid: psm */
 
     register_decode_as(&btl2cap_cid_da);
     register_decode_as(&btl2cap_psm_da);

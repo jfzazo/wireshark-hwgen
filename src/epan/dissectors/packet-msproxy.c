@@ -41,7 +41,13 @@
 
 #include "config.h"
 
+#include <string.h>
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/addr_resolv.h>
+#include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
 
 #include "packet-tcp.h"
@@ -84,16 +90,6 @@ static int hf_msproxy_server_int_addr = -1;
 static int hf_msproxy_server_int_port = -1;
 static int hf_msproxy_server_ext_addr = -1;
 static int hf_msproxy_server_ext_port = -1;
-
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_msproxy_host_name = -1;
-static int hf_msproxy_address_offset = -1;
-static int hf_msproxy_client_computer_name = -1;
-static int hf_msproxy_nt_domain = -1;
-static int hf_msproxy_req_resolve_length = -1;
-static int hf_msproxy_application_name = -1;
-static int hf_msproxy_user_name = -1;
-static int hf_msproxy_application = -1;
 
 static expert_field ei_msproxy_unknown = EI_INIT;
 static expert_field ei_msproxy_unhandled = EI_INIT;
@@ -191,6 +187,8 @@ typedef struct {
 /************** negotiated conversation hash stuff ***************/
 
 
+static guint32 last_row= 0;	/* used to see if packet is new */
+
 static void msproxy_sub_dissector( tvbuff_t *tvb, packet_info *pinfo,
 		proto_tree *tree) {
 
@@ -219,8 +217,8 @@ static void msproxy_sub_dissector( tvbuff_t *tvb, packet_info *pinfo,
 			 "UDP packets"));
 
 	if ( tree) {
-		ti = proto_tree_add_item( tree, proto_msproxy, tvb, 0, 0,
-					  ENC_NA );
+    		ti = proto_tree_add_item( tree, proto_msproxy, tvb, 0, 0,
+    			ENC_NA );
 
 		msp_tree = proto_item_add_subtree(ti, ett_msproxy);
 
@@ -235,11 +233,11 @@ static void msproxy_sub_dissector( tvbuff_t *tvb, packet_info *pinfo,
 /* set pinfo->{src/dst port} and call the TCP or UDP sub-dissector lookup */
 
 	if ( pinfo->srcport == redirect_info->clnt_port)
-		ptr = &pinfo->destport;
-	else
-		ptr = &pinfo->srcport;
+       		ptr = &pinfo->destport;
+   	else
+    		ptr = &pinfo->srcport;
 
-	*ptr = redirect_info->remote_port;
+        *ptr = redirect_info->remote_port;
 
 	if ( redirect_info->proto == PT_TCP)
 		decode_tcp_ports( tvb, 0, pinfo, tree, pinfo->srcport,
@@ -248,7 +246,7 @@ static void msproxy_sub_dissector( tvbuff_t *tvb, packet_info *pinfo,
 		decode_udp_ports( tvb, 0, pinfo, tree, pinfo->srcport,
 			pinfo->destport, -1);
 
-	*ptr = redirect_info->server_int_port;
+        *ptr = redirect_info->server_int_port;
 }
 
 
@@ -262,7 +260,7 @@ static void add_msproxy_conversation( packet_info *pinfo,
 /* conversation data structure with the info needed to call the TCP or 	*/
 /* UDP port decoder.							*/
 
-/* NOTE: Currently this assumes that the conversation will be created 	*/
+/* NOTE: Currently this assume that the conversation will be created 	*/
 /* 	during a packet from the server.  If that changes, pinfo->src	*/
 /*	and pinfo->dst will not be correct and this routine will have	*/
 /*	to change.							*/
@@ -313,7 +311,8 @@ static int display_application_name(tvbuff_t *tvb, int offset,
 	int length;
 
 	length = tvb_strnlen( tvb, offset, 255);
-	proto_tree_add_item(tree, hf_msproxy_application, tvb, offset, length, ENC_ASCII|ENC_NA);
+	proto_tree_add_text( tree, tvb, offset, length, "Application: %.*s",
+		length, tvb_get_string( wmem_packet_scope(),  tvb, offset, length));
 
 	return length;
 }
@@ -374,19 +373,25 @@ static void dissect_user_info_2(tvbuff_t *tvb, int offset,
 		length = tvb_strnlen( tvb, offset, 255);
 		if (length == -1)
 			return;
-		proto_tree_add_item(tree, hf_msproxy_user_name, tvb, offset, length + 1, ENC_ASCII|ENC_NA);
+		proto_tree_add_text( tree, tvb, offset, length + 1,
+			"User name: %.*s", length,
+			tvb_get_string( wmem_packet_scope(),  tvb, offset, length));
 		offset += length + 2;
 
 		length = tvb_strnlen( tvb, offset, 255);
 		if (length == -1)
 			return;
-		proto_tree_add_item(tree, hf_msproxy_application_name, tvb, offset, length + 1, ENC_ASCII|ENC_NA);
+		proto_tree_add_text( tree, tvb, offset, length + 1,
+			"Application name: %.*s", length,
+			tvb_get_string( wmem_packet_scope(),  tvb, offset, length));
 		offset += length + 1;
 
 		length = tvb_strnlen( tvb, offset, 255);
 		if (length == -1)
 			return;
-		proto_tree_add_item(tree, hf_msproxy_client_computer_name, tvb, offset, length + 1, ENC_ASCII|ENC_NA);
+		proto_tree_add_text( tree, tvb, offset, length + 1,
+			"Client computer name: %.*s", length,
+			tvb_get_string( wmem_packet_scope(),  tvb, offset, length));
 	}
 }
 
@@ -568,20 +573,25 @@ static void dissect_request_resolve(tvbuff_t *tvb, int offset,
 /* return the length of the string and the length byte */
 
 	proto_tree      *name_tree;
+	proto_item      *ti;
 
 	int length = tvb_get_guint8( tvb, offset);
 
 	if ( tree){
-		name_tree = proto_tree_add_subtree_format(tree, tvb, offset, length + 1,
-			ett_msproxy_name, NULL, "Host Name: %.*s", length,
-			tvb_get_string_enc( wmem_packet_scope(),  tvb, offset + 18, length, ENC_ASCII));
+  	 	ti = proto_tree_add_text(tree, tvb, offset, length + 1,
+   		 	"Host Name: %.*s", length,
+   		 	tvb_get_string( wmem_packet_scope(),  tvb, offset + 18, length));
 
-		proto_tree_add_item(name_tree, hf_msproxy_req_resolve_length, tvb, offset, 1, ENC_NA);
+		name_tree = proto_item_add_subtree(ti, ett_msproxy_name);
+
+		proto_tree_add_text( name_tree, tvb, offset, 1, "Length: %d",
+			length);
 
 		++offset;
 		offset += 17;
 
-		proto_tree_add_item(name_tree, hf_msproxy_host_name, tvb, offset, length, ENC_ASCII|ENC_NA);
+		proto_tree_add_text( name_tree, tvb, offset, length, "String: %s",
+   		 	tvb_get_string( wmem_packet_scope(),  tvb, offset, length));
 	}
 }
 
@@ -643,34 +653,38 @@ static void dissect_udp_assoc(tvbuff_t *tvb, int offset,
 }
 
 
-static void dissect_msproxy_request(tvbuff_t *tvb, packet_info *pinfo,
+static void dissect_msproxy_request(tvbuff_t *tvb,
 	proto_tree *tree, hash_entry_t *conv_info) {
 
 	int offset = 0;
 	int cmd;
-    proto_item* cmd_item;
 
-	proto_tree_add_item( tree, hf_msproxy_client_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-	offset += 4;
+	if ( tree) {
+		proto_tree_add_item( tree, hf_msproxy_client_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+		offset += 4;
 
-	proto_tree_add_item( tree, hf_msproxy_version, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-	offset += 4;
+		proto_tree_add_item( tree, hf_msproxy_version, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+		offset += 4;
 
-	proto_tree_add_item( tree, hf_msproxy_server_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-	offset += 4;
+		proto_tree_add_item( tree, hf_msproxy_server_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+		offset += 4;
 
-	proto_tree_add_item( tree, hf_msproxy_server_ack, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-	offset += 4;
+		proto_tree_add_item( tree, hf_msproxy_server_ack, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+		offset += 4;
 
-	proto_tree_add_item( tree, hf_msproxy_seq_num, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-	offset += 8;
+		proto_tree_add_item( tree, hf_msproxy_seq_num, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+		offset += 8;
 
-	proto_tree_add_item( tree, hf_msproxy_rwsp_signature, tvb, offset, 4, ENC_NA|ENC_ASCII);
-	offset += 12;
+		proto_tree_add_item( tree, hf_msproxy_rwsp_signature, tvb, offset, 4, ENC_NA|ENC_ASCII);
+		offset += 12;
+	}
+	else 			/* no tree */
+		offset += 36;
 
 	cmd = tvb_get_ntohs( tvb, offset);
 
-	cmd_item = proto_tree_add_uint_format_value( tree, hf_msproxy_cmd, tvb, offset, 2,
+	if ( tree)
+		proto_tree_add_uint_format_value( tree, hf_msproxy_cmd, tvb, offset, 2,
 			cmd, "%s (0x%02x)",
 			get_msproxy_cmd_name( cmd, FROM_CLIENT),
 			cmd);
@@ -718,7 +732,8 @@ static void dissect_msproxy_request(tvbuff_t *tvb, packet_info *pinfo,
 			dissect_udp_assoc( tvb, offset, tree, conv_info);
 			break;
 		default:
-			expert_add_info_format(pinfo, cmd_item, &ei_msproxy_unhandled,
+			if ( tree)
+				proto_tree_add_text( tree, tvb, offset, 0,
 					"Unhandled request command (report this, please)");
 	}
 }
@@ -731,9 +746,15 @@ static int dissect_hello_ack(tvbuff_t *tvb, int offset, proto_tree *tree) {
 
 	offset += 60;
 
-	proto_tree_add_item( tree, hf_msproxy_serverport, tvb, offset, 2, ENC_BIG_ENDIAN);
+	if ( tree) {
+		proto_tree_add_item( tree, hf_msproxy_serverport, tvb, offset, 2,
+			 ENC_BIG_ENDIAN);
+	}
 	offset += 2;
-	proto_tree_add_item( tree, hf_msproxy_serveraddr, tvb, offset, 4, ENC_BIG_ENDIAN);
+	if ( tree) {
+		proto_tree_add_item( tree, hf_msproxy_serveraddr, tvb, offset, 4,
+			ENC_BIG_ENDIAN);
+	}
 	offset += 4;
 
 	return offset;
@@ -789,7 +810,8 @@ static void dissect_auth_1_ack(tvbuff_t *tvb, int offset,
 		offset += 48;
 
 		/* XXX - always 255? */
-		proto_tree_add_item(tree, hf_msproxy_nt_domain, tvb, offset, 255, ENC_ASCII|ENC_NA);
+		proto_tree_add_text( tree, tvb, offset, 255, "NT domain: %.255s",
+			tvb_get_string( wmem_packet_scope(),  tvb, offset, 255));
 	}
 }
 
@@ -935,7 +957,8 @@ static void dissect_resolve(tvbuff_t *tvb, int offset, proto_tree *tree) {
 
 		addr_offset = tvb_get_guint8( tvb, offset);
 
-		proto_tree_add_item(tree, hf_msproxy_address_offset, tvb, offset, 1, ENC_NA);
+		proto_tree_add_text( tree, tvb, offset, 1, "Address offset: %d",
+			addr_offset);
 
 		++offset;
 
@@ -1064,7 +1087,7 @@ static void dissect_msproxy(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	hash_info = (hash_entry_t *)conversation_get_proto_data(conversation, proto_msproxy);
 	if ( !hash_info) {
-		hash_info = wmem_new(wmem_file_scope(), hash_entry_t);
+    		hash_info = wmem_new(wmem_file_scope(), hash_entry_t);
 		conversation_add_proto_data(conversation, proto_msproxy,
 			hash_info);
 	}
@@ -1084,8 +1107,19 @@ static void dissect_msproxy(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	if ( pinfo->srcport == UDP_PORT_MSPROXY)
 		dissect_msproxy_response( tvb, pinfo, msproxy_tree, hash_info);
 	else
-		dissect_msproxy_request( tvb, pinfo, msproxy_tree, hash_info);
+		dissect_msproxy_request( tvb, msproxy_tree, hash_info);
 }
+
+
+
+static void msproxy_reinit( void){
+
+/* Do the cleanup work when a new pass through the packet list is	*/
+/* performed. Reset the highest row seen counter			*/
+
+	last_row = 0;
+}
+
 
 
 void
@@ -1097,152 +1131,140 @@ proto_register_msproxy( void){
 		&ett_msproxy,
 		&ett_msproxy_name
 	};
-	static hf_register_info hf[] = {
+  	static hf_register_info hf[] = {
 
-		{ &hf_msproxy_cmd,
-		  { "Command", "msproxy.command", FT_UINT16, BASE_DEC,
-		    NULL, 0x0, NULL, HFILL
-		  }
+                { &hf_msproxy_cmd,
+                	{ "Command", "msproxy.command", FT_UINT16, BASE_DEC,
+                		 NULL, 0x0, NULL, HFILL
+                	}
 		},
 
  		{ &hf_msproxy_dstaddr,
-		  { "Destination Address", "msproxy.dstaddr", FT_IPv4, BASE_NONE, NULL,
-		    0x0, NULL, HFILL
-		  }
+			{ "Destination Address", "msproxy.dstaddr", FT_IPv4, BASE_NONE, NULL,
+			 	0x0, NULL, HFILL
+			}
 		},
 
 #if 0
 		{ &hf_msproxy_srcport,
-		  { "Source Port", "msproxy.srcport", FT_UINT16,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Source Port", "msproxy.srcport", FT_UINT16,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
 #endif
 		{ &hf_msproxy_dstport,
-		  { "Destination Port", "msproxy.dstport", FT_UINT16,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Destination Port", "msproxy.dstport", FT_UINT16,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_clntport,
-		  { "Client Port",	"msproxy.clntport", FT_UINT16,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Client Port",	"msproxy.clntport", FT_UINT16,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
  		{ &hf_msproxy_server_ext_addr,
-		  { "Server External Address", "msproxy.server_ext_addr", FT_IPv4, BASE_NONE, NULL,
-		    0x0, NULL, HFILL
-		  }
+			{ "Server External Address", "msproxy.server_ext_addr", FT_IPv4, BASE_NONE, NULL,
+			 	0x0, NULL, HFILL
+			}
 		},
 
 		{ &hf_msproxy_server_ext_port,
-		  { "Server External Port",	"msproxy.server_ext_port", FT_UINT16,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Server External Port",	"msproxy.server_ext_port", FT_UINT16,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
 
  		{ &hf_msproxy_server_int_addr,
-		  { "Server Internal Address", "msproxy.server_int_addr", FT_IPv4, BASE_NONE, NULL,
-		    0x0, NULL, HFILL
-		  }
+			{ "Server Internal Address", "msproxy.server_int_addr", FT_IPv4, BASE_NONE, NULL,
+			 	0x0, NULL, HFILL
+			}
 		},
 
 		{ &hf_msproxy_server_int_port,
-		  { "Server Internal Port",	"msproxy.server_int_port", FT_UINT16,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Server Internal Port",	"msproxy.server_int_port", FT_UINT16,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_serverport,
-		  { "Server Port",	"msproxy.serverport", FT_UINT16,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Server Port",	"msproxy.serverport", FT_UINT16,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_bindport,
-		  { "Bind Port",	"msproxy.bindport", FT_UINT16,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Bind Port",	"msproxy.bindport", FT_UINT16,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_boundport,
-		  { "Bound Port",	"msproxy.boundport", FT_UINT16,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Bound Port",	"msproxy.boundport", FT_UINT16,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
  		{ &hf_msproxy_serveraddr,
-		  { "Server Address", "msproxy.serveraddr", FT_IPv4, BASE_NONE, NULL,
-		    0x0, NULL, HFILL
-		  }
+			{ "Server Address", "msproxy.serveraddr", FT_IPv4, BASE_NONE, NULL,
+			 	0x0, NULL, HFILL
+			}
 		},
  		{ &hf_msproxy_bindaddr,
-		  { "Destination", "msproxy.bindaddr", FT_IPv4, BASE_NONE, NULL,
-		    0x0, NULL, HFILL
-		  }
+			{ "Destination", "msproxy.bindaddr", FT_IPv4, BASE_NONE, NULL,
+			 	0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_bind_id,
-		  { "Bound Port Id",	"msproxy.bindid", FT_UINT32,
-		    BASE_HEX, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Bound Port Id",	"msproxy.bindid", FT_UINT32,
+				BASE_HEX, NULL, 0x0, NULL, HFILL
+			}
 		},
  		{ &hf_msproxy_resolvaddr,
-		  { "Address", "msproxy.resolvaddr", FT_IPv4, BASE_NONE, NULL,
-		    0x0, NULL, HFILL
-		  }
+			{ "Address", "msproxy.resolvaddr", FT_IPv4, BASE_NONE, NULL,
+			 	0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_client_id,
-		  { "Client Id",	"msproxy.client_id", FT_UINT32,
-		    BASE_HEX, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Client Id",	"msproxy.client_id", FT_UINT32,
+				BASE_HEX, NULL, 0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_version,
-		  { "Version",	"msproxy.version", FT_UINT32,
-		    BASE_HEX, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Version",	"msproxy.version", FT_UINT32,
+				BASE_HEX, NULL, 0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_server_id,
-		  { "Server id",	"msproxy.server_id", FT_UINT32,
-		    BASE_HEX, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Server id",	"msproxy.server_id", FT_UINT32,
+				BASE_HEX, NULL, 0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_server_ack,
-		  { "Server ack",	"msproxy.server_ack", FT_UINT8,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Server ack",	"msproxy.server_ack", FT_UINT8,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_client_ack,
-		  { "Client ack",	"msproxy.client_ack", FT_UINT8,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Client ack",	"msproxy.client_ack", FT_UINT8,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
 		{ &hf_msproxy_seq_num,
-		  { "Sequence Number",	"msproxy.seq_num", FT_UINT8,
-		    BASE_DEC, NULL, 0x0, NULL, HFILL
-		  }
+			{ "Sequence Number",	"msproxy.seq_num", FT_UINT8,
+				BASE_DEC, NULL, 0x0, NULL, HFILL
+			}
 		},
  		{ &hf_msproxy_rwsp_signature,
-		  { "RWSP signature", "msproxy.rwsp_signature", FT_STRING, BASE_NONE, NULL,
-		    0x0, NULL, HFILL
-		  }
+			{ "RWSP signature", "msproxy.rwsp_signature", FT_STRING, BASE_NONE, NULL,
+			 	0x0, NULL, HFILL
+			}
 		},
  		{ &hf_msproxy_ntlmssp_signature,
-		  { "NTLMSSP signature", "msproxy.ntlmssp_signature", FT_STRING, BASE_NONE, NULL,
-		    0x0, NULL, HFILL
-		  }
+			{ "NTLMSSP signature", "msproxy.ntlmssp_signature", FT_STRING, BASE_NONE, NULL,
+			 	0x0, NULL, HFILL
+			}
 		},
-
-		/* Generated from convert_proto_tree_add_text.pl */
-		{ &hf_msproxy_application, { "Application", "msproxy.application", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_msproxy_user_name, { "User name", "msproxy.user_name", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_msproxy_application_name, { "Application name", "msproxy.application_name", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_msproxy_client_computer_name, { "Client computer name", "msproxy.client_computer_name", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_msproxy_req_resolve_length, { "Length", "msproxy.req_resolve.length", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-		{ &hf_msproxy_host_name, { "Host Name", "msproxy.host_name", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_msproxy_nt_domain, { "NT domain", "msproxy.nt_domain", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_msproxy_address_offset, { "Address offset", "msproxy.address_offset", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
 	};
 
 	static ei_register_info ei[] = {
-		{ &ei_msproxy_unknown,
-		  { "msproxy.unknown", PI_UNDECODED, PI_WARN, "No know information (help wanted)", EXPFILL }},
-		{ &ei_msproxy_unhandled,
-		  { "msproxy.command.unhandled", PI_UNDECODED, PI_WARN, "Unhandled response command (report this, please)", EXPFILL }},
+		{ &ei_msproxy_unknown, { "msproxy.unknown", PI_UNDECODED, PI_WARN, "No know information (help wanted)", EXPFILL }},
+		{ &ei_msproxy_unhandled, { "msproxy.command.unhandled", PI_UNDECODED, PI_WARN, "Unhandled response command (report this, please)", EXPFILL }},
 	};
 
 	expert_module_t* expert_msproxy;
@@ -1253,6 +1275,8 @@ proto_register_msproxy( void){
 	proto_register_subtree_array(ett, array_length(ett));
 	expert_msproxy = expert_register_protocol(proto_msproxy);
 	expert_register_field_array(expert_msproxy, ei, array_length(ei));
+
+	register_init_routine( &msproxy_reinit);	/* register re-init routine */
 
 	msproxy_sub_handle = create_dissector_handle(msproxy_sub_dissector,
 		proto_msproxy);
@@ -1270,16 +1294,3 @@ proto_reg_handoff_msproxy(void) {
 		proto_msproxy);
 	dissector_add_uint("udp.port", UDP_PORT_MSPROXY, msproxy_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

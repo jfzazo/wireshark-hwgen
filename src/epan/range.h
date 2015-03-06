@@ -28,7 +28,6 @@
 
 #include <glib.h>
 #include "ws_symbol_export.h"
-#include <epan/wmem/wmem.h>
 
 /** @file
  * Range strings a variant of value_strings
@@ -114,9 +113,9 @@ WS_DLL_PUBLIC gboolean ranges_are_equal(range_t *a, range_t *b);
 WS_DLL_PUBLIC void range_foreach(range_t *range, void (*callback)(guint32 val));
 
 /**
- * This function converts a range_t to a (wmem_alloc()-allocated) string.
+ * This function converts a range_t to a (ep_alloc()-allocated) string.
  */
-WS_DLL_PUBLIC char *range_convert_range(wmem_allocator_t *scope, range_t *range);
+WS_DLL_PUBLIC char *range_convert_range(range_t *range);
 
 /**
  * Create a copy of a range.

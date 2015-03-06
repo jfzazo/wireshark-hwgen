@@ -23,15 +23,17 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include <gtk/gtk.h>
 
+#include <epan/stat_cmd_args.h>
 
+#include "../file.h"
 #include "../globals.h"
-#include <epan/stat_groups.h>
+#include "../stat_menu.h"
 
-#include "ui/gtk/old-gtk-compat.h"
 #include "ui/gtk/stock_icons.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/filter_dlg.h"
@@ -41,6 +43,7 @@
 #include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/filter_autocomplete.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 typedef struct _tap_param_dlg_list_item {
     GtkWidget *dlg;
@@ -64,22 +67,14 @@ register_param_stat(tap_param_dlg *info, const char *name,
 {
     gchar *full_name;
     const gchar *stock_id = NULL;
-    stat_tap_ui ui_info;
+
+    register_stat_cmd_arg(info->init_string, info->tap_init_cb, NULL);
 
     /*
      * This menu item will pop up a dialog box, so append "..."
      * to it.
      */
     full_name = g_strdup_printf("%s...", name);
-
-    ui_info.group = group;
-    ui_info.title = full_name;
-    ui_info.cli_string = info->init_string;
-    ui_info.tap_init_cb = info->tap_init_cb;
-    ui_info.index = -1;
-    ui_info.nparams = info->nparams;
-    ui_info.params = info->params;
-    register_stat_tap_ui(&ui_info, NULL);
 
     switch (group) {
 
@@ -177,7 +172,6 @@ tap_param_dlg_start_button_clicked(GtkWidget *item _U_, gpointer dialog_data)
             break;
 
         case PARAM_STRING:
-        case PARAM_UUID:	/* XXX - do as multiple fixed-length boxes */
         case PARAM_FILTER:
             g_string_append(params,
                             gtk_entry_get_text(GTK_ENTRY(dlg_data->param_items[i])));
@@ -253,7 +247,7 @@ tap_param_dlg_cb(GtkAction *action _U_, gpointer data)
     title = g_strdup_printf("Wireshark: %s: %s", current_dlg->cont.win_title , display_name);
     g_free(display_name);
 
-    current_dlg->dlg=dlg_window_new_with_geom(title, current_dlg->cont.win_title, GTK_WIN_POS_CENTER_ON_PARENT);
+    current_dlg->dlg=dlg_window_new(title);
     gtk_window_set_default_size(GTK_WINDOW(current_dlg->dlg), 300, -1);
     g_free(title);
 
@@ -375,7 +369,6 @@ tap_param_dlg_cb(GtkAction *action _U_, gpointer data)
 
         case PARAM_STRING:
         case PARAM_FILTER:
-        case PARAM_UUID:
             dlg_set_activate(current_dlg->param_items[i], start_button);
             break;
         }

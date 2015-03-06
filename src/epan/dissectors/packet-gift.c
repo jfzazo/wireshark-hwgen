@@ -25,6 +25,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/strutil.h>
 
@@ -36,10 +38,6 @@ void proto_reg_handoff_gift(void);
 static int proto_gift = -1;
 static int hf_gift_response = -1;
 static int hf_gift_request = -1;
-static int hf_gift_response_cmd = -1;
-static int hf_gift_response_arg = -1;
-static int hf_gift_request_cmd = -1;
-static int hf_gift_request_arg = -1;
 
 static gint ett_gift = -1;
 static gint ett_gift_cmd = -1;
@@ -92,11 +90,13 @@ dissect_gift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		tokenlen = get_token_len(line, line + linelen, &next_token);
 		if (tokenlen != 0) {
 			if (is_request) {
-				proto_tree_add_string(cmd_tree, hf_gift_request_cmd, tvb, offset,
-						    tokenlen, format_text(line, tokenlen));
+				proto_tree_add_text(cmd_tree, tvb, offset,
+						    tokenlen, "Request Command: %s",
+						    format_text(line, tokenlen));
 			} else {
-				proto_tree_add_string(cmd_tree, hf_gift_response_cmd, tvb, offset,
-						    tokenlen, format_text(line, tokenlen));
+				proto_tree_add_text(cmd_tree, tvb, offset,
+						    tokenlen, "Response Command: %s",
+						    format_text(line, tokenlen));
 			}
 			offset += (gint) (next_token - line);
 			linelen -= (int) (next_token - line);
@@ -105,11 +105,13 @@ dissect_gift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 		if (linelen != 0) {
 			if (is_request) {
-				proto_tree_add_string(cmd_tree, hf_gift_request_arg, tvb, offset,
-						    linelen, format_text(line, linelen));
+				proto_tree_add_text(cmd_tree, tvb, offset,
+						    linelen, "Request Arg: %s",
+						    format_text(line, linelen));
 			} else {
-				proto_tree_add_string(cmd_tree, hf_gift_response_arg, tvb, offset,
-						    linelen, format_text(line, linelen));
+				proto_tree_add_text(cmd_tree, tvb, offset,
+						    linelen, "Response Arg: %s",
+						    format_text(line, linelen));
 			}
 		}
 	}
@@ -124,19 +126,7 @@ proto_register_gift(void)
 		},
 		{ &hf_gift_request,
 			{ "Request", "gift.request", FT_BOOLEAN, BASE_NONE, NULL, 0x0, "TRUE if giFT request", HFILL }
-		},
-		{ &hf_gift_response_cmd,
-			{ "Response Command", "gift.response_cmd", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
-		},
-		{ &hf_gift_response_arg,
-			{ "Response Arg", "gift.response_arg", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
-		},
-		{ &hf_gift_request_cmd,
-			{ "Request Command", "gift.request_cmd", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
-		},
-		{ &hf_gift_request_arg,
-			{ "Request Arg", "gift.request_arg", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
-		},
+		}
 	};
 
 	static gint *ett[] = {
@@ -159,16 +149,3 @@ proto_reg_handoff_gift(void)
 	gift_handle = create_dissector_handle(dissect_gift, proto_gift);
 	dissector_add_uint("tcp.port", TCP_PORT_GIFT, gift_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

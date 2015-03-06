@@ -30,8 +30,9 @@
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/strutil.h>
 #include <epan/to_str.h>
-#include "packet-tcp.h"
+#include <epan/dissectors/packet-tcp.h>
 
 void proto_reg_handoff_yami(void);
 void proto_register_yami(void);
@@ -231,7 +232,7 @@ dissect_yami_parameter(tvbuff_t *tvb, proto_tree *tree, int offset, proto_item *
 			offset += 4;
 
 			val = tvb_get_ptr(tvb, offset, val_len);
-			repr = bytes_to_str(wmem_packet_scope(), val, val_len);
+			repr = bytes_to_ep_str(val, val_len);
 
 			proto_item_append_text(ti, ", Type: binary, Value: %s", repr);
 			offset += (val_len + 3) & ~3;
@@ -395,7 +396,7 @@ dissect_yami_parameter(tvbuff_t *tvb, proto_tree *tree, int offset, proto_item *
 				offset += 4;
 
 				val = tvb_get_ptr(tvb, offset, val_len);
-				repr = bytes_to_str(wmem_packet_scope(), val, val_len);
+				repr = bytes_to_ep_str(val, val_len);
 
 				proto_item_append_text(ti, "%s, ", repr);
 				offset += (val_len + 3) & ~3;
@@ -528,8 +529,7 @@ dissect_yami_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 #define FRAME_HEADER_LEN 16
 
 static guint
-get_yami_message_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                     int offset, void *data _U_)
+get_yami_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
 	guint32 len = tvb_get_letohl(tvb, offset + 12);
 
@@ -621,15 +621,3 @@ proto_reg_handoff_yami(void)
 	dissector_add_uint("udp.port", yami_udp_port, yami_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

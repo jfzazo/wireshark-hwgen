@@ -35,7 +35,6 @@ public:
 
     SyntaxState syntaxState() const { return syntax_state_; }
     void setSyntaxState(SyntaxState state = Empty);
-    QString syntaxErrorMessage();
     QString styleSheet() const;
     QString deprecatedToken();
 
@@ -45,14 +44,12 @@ public slots:
     // Built-in syntax checks. Connect textChanged to these as needed.
     void checkDisplayFilter(QString filter);
     void checkFieldName(QString field);
-    void checkInteger(QString number);
 
 private:
     SyntaxState syntax_state_;
     QString style_sheet_;
     QString state_style_sheet_;
     QString deprecated_token_;
-    QString syntax_error_message_;
 
 signals:
 

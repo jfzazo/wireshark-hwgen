@@ -31,6 +31,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include "packet-ber.h"
@@ -66,7 +67,7 @@ static int hf_ns_cert_exts_CertType_smime_ca = -1;
 static int hf_ns_cert_exts_CertType_object_signing_ca = -1;
 
 /*--- End of included file: packet-ns_cert_exts-hf.c ---*/
-#line 40 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
+#line 41 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
 
 /* Initialize the subtree pointers */
 
@@ -75,7 +76,7 @@ static int hf_ns_cert_exts_CertType_object_signing_ca = -1;
 static gint ett_ns_cert_exts_CertType = -1;
 
 /*--- End of included file: packet-ns_cert_exts-ett.c ---*/
-#line 43 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
+#line 44 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
 
 
 /*--- Included file: packet-ns_cert_exts-fn.c ---*/
@@ -181,66 +182,50 @@ dissect_ns_cert_exts_CertType(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int 
 
 /*--- PDUs ---*/
 
-static int dissect_BaseUrl_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_BaseUrl_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ns_cert_exts_BaseUrl(FALSE, tvb, offset, &asn1_ctx, tree, hf_ns_cert_exts_BaseUrl_PDU);
-  return offset;
+  dissect_ns_cert_exts_BaseUrl(FALSE, tvb, 0, &asn1_ctx, tree, hf_ns_cert_exts_BaseUrl_PDU);
 }
-static int dissect_RevocationUrl_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_RevocationUrl_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ns_cert_exts_RevocationUrl(FALSE, tvb, offset, &asn1_ctx, tree, hf_ns_cert_exts_RevocationUrl_PDU);
-  return offset;
+  dissect_ns_cert_exts_RevocationUrl(FALSE, tvb, 0, &asn1_ctx, tree, hf_ns_cert_exts_RevocationUrl_PDU);
 }
-static int dissect_CaRevocationUrl_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CaRevocationUrl_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ns_cert_exts_CaRevocationUrl(FALSE, tvb, offset, &asn1_ctx, tree, hf_ns_cert_exts_CaRevocationUrl_PDU);
-  return offset;
+  dissect_ns_cert_exts_CaRevocationUrl(FALSE, tvb, 0, &asn1_ctx, tree, hf_ns_cert_exts_CaRevocationUrl_PDU);
 }
-static int dissect_CaPolicyUrl_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CaPolicyUrl_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ns_cert_exts_CaPolicyUrl(FALSE, tvb, offset, &asn1_ctx, tree, hf_ns_cert_exts_CaPolicyUrl_PDU);
-  return offset;
+  dissect_ns_cert_exts_CaPolicyUrl(FALSE, tvb, 0, &asn1_ctx, tree, hf_ns_cert_exts_CaPolicyUrl_PDU);
 }
-static int dissect_Comment_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_Comment_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ns_cert_exts_Comment(FALSE, tvb, offset, &asn1_ctx, tree, hf_ns_cert_exts_Comment_PDU);
-  return offset;
+  dissect_ns_cert_exts_Comment(FALSE, tvb, 0, &asn1_ctx, tree, hf_ns_cert_exts_Comment_PDU);
 }
-static int dissect_SslServerName_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SslServerName_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ns_cert_exts_SslServerName(FALSE, tvb, offset, &asn1_ctx, tree, hf_ns_cert_exts_SslServerName_PDU);
-  return offset;
+  dissect_ns_cert_exts_SslServerName(FALSE, tvb, 0, &asn1_ctx, tree, hf_ns_cert_exts_SslServerName_PDU);
 }
-static int dissect_CertRenewalUrl_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CertRenewalUrl_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ns_cert_exts_CertRenewalUrl(FALSE, tvb, offset, &asn1_ctx, tree, hf_ns_cert_exts_CertRenewalUrl_PDU);
-  return offset;
+  dissect_ns_cert_exts_CertRenewalUrl(FALSE, tvb, 0, &asn1_ctx, tree, hf_ns_cert_exts_CertRenewalUrl_PDU);
 }
-static int dissect_CertType_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CertType_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ns_cert_exts_CertType(FALSE, tvb, offset, &asn1_ctx, tree, hf_ns_cert_exts_CertType_PDU);
-  return offset;
+  dissect_ns_cert_exts_CertType(FALSE, tvb, 0, &asn1_ctx, tree, hf_ns_cert_exts_CertType_PDU);
 }
 
 
 /*--- End of included file: packet-ns_cert_exts-fn.c ---*/
-#line 45 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
+#line 46 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
 
 
 /*--- proto_register_ns_cert_exts -------------------------------------------*/
@@ -317,7 +302,7 @@ void proto_register_ns_cert_exts(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-ns_cert_exts-hfarr.c ---*/
-#line 53 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
+#line 54 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
   };
 
   /* List of subtrees */
@@ -328,7 +313,7 @@ void proto_register_ns_cert_exts(void) {
     &ett_ns_cert_exts_CertType,
 
 /*--- End of included file: packet-ns_cert_exts-ettarr.c ---*/
-#line 58 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
+#line 59 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
   };
 
   /* Register protocol */
@@ -346,17 +331,17 @@ void proto_reg_handoff_ns_cert_exts(void) {
 
 /*--- Included file: packet-ns_cert_exts-dis-tab.c ---*/
 #line 1 "../../asn1/ns_cert_exts/packet-ns_cert_exts-dis-tab.c"
-  new_register_ber_oid_dissector("2.16.840.1.113730.1.1", dissect_CertType_PDU, proto_ns_cert_exts, "ns_cert_exts.cert_type");
-  new_register_ber_oid_dissector("2.16.840.1.113730.1.2", dissect_BaseUrl_PDU, proto_ns_cert_exts, "ns_cert_exts.base_url");
-  new_register_ber_oid_dissector("2.16.840.1.113730.1.3", dissect_RevocationUrl_PDU, proto_ns_cert_exts, "ns_cert_exts.revocation-url");
-  new_register_ber_oid_dissector("2.16.840.1.113730.1.4", dissect_CaRevocationUrl_PDU, proto_ns_cert_exts, "ns_cert_exts.ca-revocation-url");
-  new_register_ber_oid_dissector("2.16.840.1.113730.1.7", dissect_CertRenewalUrl_PDU, proto_ns_cert_exts, "ns_cert_exts.cert-renewal-url");
-  new_register_ber_oid_dissector("2.16.840.1.113730.1.8", dissect_CaPolicyUrl_PDU, proto_ns_cert_exts, "ns_cert_exts.ca-policy-url");
-  new_register_ber_oid_dissector("2.16.840.1.113730.1.12", dissect_SslServerName_PDU, proto_ns_cert_exts, "ns_cert_exts.ssl-server-name");
-  new_register_ber_oid_dissector("2.16.840.1.113730.1.13", dissect_Comment_PDU, proto_ns_cert_exts, "ns_cert_exts.comment");
+  register_ber_oid_dissector("2.16.840.1.113730.1.1", dissect_CertType_PDU, proto_ns_cert_exts, "ns_cert_exts.cert_type");
+  register_ber_oid_dissector("2.16.840.1.113730.1.2", dissect_BaseUrl_PDU, proto_ns_cert_exts, "ns_cert_exts.base_url");
+  register_ber_oid_dissector("2.16.840.1.113730.1.3", dissect_RevocationUrl_PDU, proto_ns_cert_exts, "ns_cert_exts.revocation-url");
+  register_ber_oid_dissector("2.16.840.1.113730.1.4", dissect_CaRevocationUrl_PDU, proto_ns_cert_exts, "ns_cert_exts.ca-revocation-url");
+  register_ber_oid_dissector("2.16.840.1.113730.1.7", dissect_CertRenewalUrl_PDU, proto_ns_cert_exts, "ns_cert_exts.cert-renewal-url");
+  register_ber_oid_dissector("2.16.840.1.113730.1.8", dissect_CaPolicyUrl_PDU, proto_ns_cert_exts, "ns_cert_exts.ca-policy-url");
+  register_ber_oid_dissector("2.16.840.1.113730.1.12", dissect_SslServerName_PDU, proto_ns_cert_exts, "ns_cert_exts.ssl-server-name");
+  register_ber_oid_dissector("2.16.840.1.113730.1.13", dissect_Comment_PDU, proto_ns_cert_exts, "ns_cert_exts.comment");
 
 
 /*--- End of included file: packet-ns_cert_exts-dis-tab.c ---*/
-#line 73 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
+#line 74 "../../asn1/ns_cert_exts/packet-ns_cert_exts-template.c"
 }
 

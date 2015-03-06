@@ -34,9 +34,9 @@
 #include "ui/io_graph_item.h"
 
 #include "syntax_line_edit.h"
-#include "wireshark_dialog.h"
 
 #include <QComboBox>
+#include <QDialog>
 #include <QIcon>
 #include <QLineEdit>
 #include <QMenu>
@@ -90,7 +90,6 @@ public:
 
 public slots:
     void recalcGraphData(capture_file *cap_file);
-    void captureFileClosing();
 
 signals:
     void requestReplot();
@@ -128,12 +127,12 @@ namespace Ui {
 class IOGraphDialog;
 }
 
-class IOGraphDialog : public WiresharkDialog
+class IOGraphDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit IOGraphDialog(QWidget &parent, CaptureFile &cf);
+    explicit IOGraphDialog(QWidget *parent = 0, capture_file *cf = NULL);
     ~IOGraphDialog();
 
     void addGraph(bool checked, QString name, QString dfilter, int color_idx, IOGraph::PlotStyles style,
@@ -143,6 +142,7 @@ public:
     void syncGraphSettings(QTreeWidgetItem *item);
 
 public slots:
+    void setCaptureFile(capture_file *cf);
     void scheduleReplot(bool now = false);
     void scheduleRecalc(bool now = false);
     void scheduleRetap(bool now = false);
@@ -159,6 +159,7 @@ signals:
 private:
     Ui::IOGraphDialog *ui;
 
+    capture_file *cap_file_;
     QLineEdit *name_line_edit_;
     SyntaxLineEdit *dfilter_line_edit_;
     SyntaxLineEdit *yfield_line_edit_;
@@ -193,7 +194,6 @@ private:
     void loadProfileGraphs();
 
 private slots:
-    void updateWidgets();
     void graphClicked(QMouseEvent *event);
     void mouseMoved(QMouseEvent *event);
     void mouseReleased(QMouseEvent *event);

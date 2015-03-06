@@ -106,6 +106,7 @@ add_plugin_type(const char *type, plugin_callback callback)
  * add a new plugin to the list
  * returns :
  * - 0 : OK
+ * - ENOMEM : memory allocation problem
  * - EEXIST : the same plugin (i.e. name/version) was already registered.
  */
 static int
@@ -229,13 +230,16 @@ plugins_scan_dir(const char *dirname)
             /*
              * OK, attempt to add it to the list of plugins.
              */
-            cr = add_plugin(new_plug);
-            if (cr != 0)
+            if ((cr = add_plugin(new_plug)))
             {
-                g_assert(cr == EEXIST);
-                fprintf(stderr, "The plugin %s, version %s\n"
-                        "was found in multiple directories\n",
-                        new_plug->name, new_plug->version);
+                if (cr == EEXIST)
+                    fprintf(stderr, "The plugin %s, version %s\n"
+                            "was found in multiple directories\n",
+                            new_plug->name, new_plug->version);
+                else
+                    fprintf(stderr, "Memory allocation problem\n"
+                            "when processing plugin %s, version %s\n",
+                            new_plug->name, new_plug->version);
                 g_module_close(handle);
                 g_free(new_plug->name);
                 g_free(new_plug);
@@ -265,17 +269,17 @@ scan_plugins(void)
     {
         /*
          * Scan the global plugin directory.
-         * If we're running from a build directory, scan the "plugins"
-         * subdirectory, as that's where plugins are located in an
-         * out-of-tree build. If we find subdirectories scan those since
-         * they will contain plugins in the case of an in-tree build.
+         * If we're running from a build directory, scan the subdirectories
+         * of that directory, as the global plugin directory is the
+         * "plugins" directory of the source tree, and the subdirectories
+         * are the source directories for the plugins, with the plugins
+         * built in those subdirectories.
          */
         plugin_dir = get_plugin_dir();
         if (running_in_build_directory())
         {
             if ((dir = ws_dir_open(plugin_dir, 0, NULL)) != NULL)
             {
-                plugins_scan_dir(plugin_dir);
                 while ((file = ws_dir_read_name(dir)) != NULL)
                 {
                     name = ws_dir_get_name(file);

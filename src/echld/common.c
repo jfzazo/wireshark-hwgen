@@ -411,6 +411,7 @@ echld_bool_t paramset_apply_em(param_t* paramset, enc_msg_t* em, char** err) {
 char* paramset_get_params_list(param_t* paramsets,const char* fmt) {
 	param_t* p = paramsets;
 	GString* str = g_string_new("");
+	char* s;
 
 	for (;p->name;p++) {
 		g_string_append_printf(str,fmt,
@@ -419,7 +420,9 @@ char* paramset_get_params_list(param_t* paramsets,const char* fmt) {
 			p->desc);
 	}
 
-	return g_string_free(str,FALSE);
+	s = str->str;
+	g_string_free(str,FALSE);
+	return s;
 }
 
 

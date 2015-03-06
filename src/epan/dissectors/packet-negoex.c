@@ -25,6 +25,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/show_exception.h>
@@ -63,7 +64,6 @@ static int hf_negoex_checksum_vector_count = -1;
 static int hf_negoex_checksum_vector_pad = -1;
 static int hf_negoex_checksum = -1;
 static int hf_negoex_errorcode = -1;
-static int hf_negoex_data = -1;
 
 static gint ett_negoex = -1;
 static gint ett_negoex_msg = -1;
@@ -134,7 +134,7 @@ dissect_negoex_alert_message(tvbuff_t *tvb,
   offset += 4;
 
   /* The rest */
-  proto_tree_add_bytes_format(tree, hf_negoex_data, tvb, offset, -1, NULL,
+  proto_tree_add_text(tree, tvb, offset, tvb_length(tvb) - offset,
                       "The rest of the alert message");
 
 }
@@ -148,7 +148,9 @@ dissect_negoex_verify_message(tvbuff_t *tvb,
   guint32 offset;
   guint32 checksum_vector_offset;
   guint32 checksum_vector_count;
+  proto_item *pi;
   proto_tree *checksum;
+  proto_item *pi_chk;
   proto_tree *checksum_vector;
 
   offset = start_off;
@@ -158,7 +160,8 @@ dissect_negoex_verify_message(tvbuff_t *tvb,
   offset += 16;
 
   /* Checksum */
-  checksum = proto_tree_add_subtree(tree, tvb, offset, 20, ett_negoex_checksum, NULL, "Checksum");
+  pi = proto_tree_add_text(tree, tvb, offset, 20, "Checksum");
+  checksum = proto_item_add_subtree(pi, ett_negoex_checksum);
 
   /* cbHeaderLength */
   proto_tree_add_item(checksum, hf_negoex_header_len, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -176,10 +179,11 @@ dissect_negoex_verify_message(tvbuff_t *tvb,
   checksum_vector_offset = tvb_get_letohl(tvb, offset);
   checksum_vector_count = tvb_get_letohs(tvb, offset + 4);
 
-  checksum_vector = proto_tree_add_subtree_format(checksum, tvb, offset, 8,
-                               ett_negoex_checksum_vector, NULL, "Checksum Vector: %u at %u",
+  pi_chk = proto_tree_add_text(checksum, tvb, offset, 8,
+                               "Checksum Vector: %u at %u",
                                checksum_vector_count,
                                checksum_vector_offset);
+  checksum_vector = proto_item_add_subtree(pi_chk, ett_negoex_checksum_vector);
 
   proto_tree_add_item(checksum_vector, hf_negoex_checksum_vector_offset, tvb,
                       offset, 4, ENC_LITTLE_ENDIAN);
@@ -207,6 +211,7 @@ dissect_negoex_exchange_message(tvbuff_t *tvb,
   guint32 offset;
   guint32 exchange_vector_offset;
   guint32 exchange_vector_count;
+  proto_item *pi;
   proto_tree *exchange_vector;
 
   offset = start_off;
@@ -219,9 +224,9 @@ dissect_negoex_exchange_message(tvbuff_t *tvb,
   exchange_vector_offset = tvb_get_letohl(tvb, offset);
   exchange_vector_count = tvb_get_letohs(tvb, offset + 4);
 
-  exchange_vector = proto_tree_add_subtree_format(tree, tvb, offset, 8,
-                           ett_negoex_exchange, NULL, "Exchange: %u bytes at %u",
+  pi = proto_tree_add_text(tree, tvb, offset, 8, "Exchange: %u bytes at %u",
                            exchange_vector_count, exchange_vector_offset);
+  exchange_vector = proto_item_add_subtree(pi, ett_negoex_exchange);
 
   proto_tree_add_item(exchange_vector, hf_negoex_exchange_vector_offset, tvb,
                       offset, 4, ENC_LITTLE_ENDIAN);
@@ -258,6 +263,7 @@ dissect_negoex_nego_message(tvbuff_t *tvb,
   guint16 authscheme_vector_count;
   guint32 extension_vector_offset;
   guint32 extension_vector_count;
+  proto_item *pi, *ext_pi;
   proto_tree *authscheme_vector;
   proto_tree *extension_vector;
   guint32 i;
@@ -277,9 +283,9 @@ dissect_negoex_nego_message(tvbuff_t *tvb,
     authscheme_vector_offset = tvb_get_letohl(tvb, offset);
     authscheme_vector_count = tvb_get_letohs(tvb, offset + 4);
 
-    authscheme_vector = proto_tree_add_subtree_format(tree, tvb, offset, 8,
-                             ett_negoex_authscheme_vector, NULL, "AuthSchemes: %u at %u",
+    pi = proto_tree_add_text(tree, tvb, offset, 8, "AuthSchemes: %u at %u",
                              authscheme_vector_count, authscheme_vector_offset);
+    authscheme_vector = proto_item_add_subtree(pi, ett_negoex_authscheme_vector);
     proto_tree_add_item(authscheme_vector, hf_negoex_authscheme_vector_offset,
                         tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -301,9 +307,9 @@ dissect_negoex_nego_message(tvbuff_t *tvb,
     extension_vector_offset = tvb_get_letohl(tvb, offset);
     extension_vector_count = tvb_get_letohs(tvb, offset + 4);
 
-    extension_vector = proto_tree_add_subtree_format(tree, tvb, offset, 8,
-                                 ett_negoex_extension_vector, NULL, "Extensions: %u at %u",
+    ext_pi = proto_tree_add_text(tree, tvb, offset, 8, "Extensions: %u at %u",
                                  extension_vector_count, extension_vector_count);
+    extension_vector = proto_item_add_subtree(ext_pi, ett_negoex_extension_vector);
 
     proto_tree_add_item(extension_vector, hf_negoex_extension_vector_offset,
                         tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -319,6 +325,7 @@ dissect_negoex_nego_message(tvbuff_t *tvb,
 
     for (i = 0; i < extension_vector_count; i++) {
       guint32 byte_vector_offset, byte_vector_count;
+      proto_item *bv_pi;
       proto_tree *bv_tree;
 
       /*
@@ -328,10 +335,11 @@ dissect_negoex_nego_message(tvbuff_t *tvb,
       byte_vector_offset = tvb_get_letohl(tvb, offset);
       byte_vector_count = tvb_get_letohs(tvb, offset + 4);
 
-      bv_tree = proto_tree_add_subtree_format(extension_vector, tvb,
+      bv_pi = proto_tree_add_text(extension_vector, tvb,
                                   extension_vector_offset + i * 8, 8,
-                                  ett_negoex_byte_vector, NULL, "Extension: %u bytes at %u",
+                                  "Extension: %u bytes at %u",
                                   byte_vector_count, byte_vector_offset);
+      bv_tree = proto_item_add_subtree(bv_pi, ett_negoex_byte_vector);
 
       proto_tree_add_item(bv_tree, hf_negoex_extension, tvb,
                           byte_vector_offset, byte_vector_count, ENC_NA);
@@ -375,6 +383,7 @@ dissect_negoex(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     proto_tree *negoex_msg_tree;
     proto_tree *negoex_hdr_tree;
     proto_item *msg;
+    proto_item *hdr;
     tvbuff_t *msg_tvb;
     guint32 start_offset;
 
@@ -385,14 +394,18 @@ dissect_negoex(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       message_type = tvb_get_letohl(tvb, offset + 8);
 
       /* Add the message type tree ... set its length below */
-      negoex_msg_tree = proto_tree_add_subtree_format(negoex_tree, tvb, offset, -1,
-                                ett_negoex_msg, &msg, "NEGOEX %s",
+      msg = proto_tree_add_text(negoex_tree, tvb, offset, -1,
+                                "NEGOEX %s",
                                 val_to_str_const(message_type,
                                                  negoex_message_types,
                                                  "Unknown NEGOEX message type"));
 
+      /* Add a subtree for the message */
+      negoex_msg_tree = proto_item_add_subtree(msg, ett_negoex_msg);
+
       /* Add a subtree for the header */
-      negoex_hdr_tree = proto_tree_add_subtree(negoex_msg_tree, tvb, offset, 40, ett_negoex_hdr, NULL, "Header");
+      hdr = proto_tree_add_text(negoex_msg_tree, tvb, offset, 40, "Header");
+      negoex_hdr_tree = proto_item_add_subtree(hdr, ett_negoex_hdr);
 
       /* Signature, NEGOEXTS */
       proto_tree_add_item(negoex_hdr_tree, hf_negoex_sig,
@@ -485,7 +498,7 @@ dissect_negoex(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         break;
 
       default:
-        proto_tree_add_bytes_format(negoex_msg_tree, hf_negoex_data, tvb, offset, message_len - 40, NULL,
+        proto_tree_add_text(negoex_msg_tree, tvb, offset, message_len - 40,
                             "The rest of the message");
       }
 
@@ -588,9 +601,6 @@ proto_register_negoex(void)
         NULL, 0x0, NULL, HFILL}},
     { &hf_negoex_errorcode,
       { "ErrorCode", "negoex.errorcode", FT_UINT32, BASE_HEX,
-        NULL, 0x0, NULL, HFILL}},
-    { &hf_negoex_data,
-      { "Data", "negoex.data", FT_BYTES, BASE_NONE,
         NULL, 0x0, NULL, HFILL}},
   };
 

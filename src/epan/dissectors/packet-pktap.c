@@ -23,10 +23,14 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 #include <wsutil/pint.h>
 
+#include <wiretap/wtap.h>
 
 #include "packet-frame.h"
 #include "packet-eth.h"
@@ -198,7 +202,7 @@ dissect_pktap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	offset += 4;
 	proto_tree_add_item(pktap_tree, hf_pktap_ecmdname, tvb, offset, 20,
 	    ENC_UTF_8|ENC_NA);
-	/*offset += 20;*/
+	offset += 20;
 
 	if (rectype == PKT_REC_PACKET) {
 		next_tvb = tvb_new_subset_remaining(tvb, pkt_len);

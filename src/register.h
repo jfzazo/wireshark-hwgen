@@ -37,8 +37,10 @@ typedef enum {
   RA_LISTENERS,         /* Tap listeners */
   RA_REGISTER,          /* register */
   RA_PLUGIN_REGISTER,   /* plugin register */
+  RA_PYTHON_REGISTER,   /* python register */
   RA_HANDOFF,           /* handoff */
   RA_PLUGIN_HANDOFF,    /* plugin handoff */
+  RA_PYTHON_HANDOFF,    /* python handoff */
   RA_LUA_PLUGINS,       /* lua plugin register */
   RA_PREFERENCES,       /* module preferences */
   RA_CONFIGURATION      /* configuration files */
@@ -56,16 +58,3 @@ WS_DLL_PUBLIC gulong register_count(void);
 #endif /* __cplusplus */
 
 #endif /* __REGISTER_H__ */
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

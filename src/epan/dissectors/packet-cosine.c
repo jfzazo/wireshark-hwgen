@@ -29,6 +29,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 
@@ -41,8 +43,6 @@ static int hf_off = -1;
 static int hf_pri = -1;
 static int hf_rm = -1;
 static int hf_err = -1;
-static int hf_sar = -1;
-static int hf_channel_id = -1;
 
 static gint ett_raw = -1;
 
@@ -85,18 +85,20 @@ dissect_cosine(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         break;
       case COSINE_ENCAP_ATM:
       case COSINE_ENCAP_PPoATM:
-        proto_tree_add_item(fh_tree, hf_sar, tvb, 0, 16, ENC_NA);
+        proto_tree_add_text(fh_tree, tvb, 0, 16, "SAR header");
         break;
       case COSINE_ENCAP_PPP:
       case COSINE_ENCAP_FR:
       case COSINE_ENCAP_PPoFR:
-        proto_tree_add_item(fh_tree, hf_channel_id, tvb, 0, 4, ENC_NA);
+        proto_tree_add_text(fh_tree, tvb, 0, 4, "Channel handle ID");
         break;
       case COSINE_ENCAP_HDLC:
         if (pseudo_header->cosine.direction == COSINE_DIR_TX) {
-          proto_tree_add_item(fh_tree, hf_channel_id, tvb, 0, 2, ENC_NA);
+          proto_tree_add_text(fh_tree, tvb, 0, 2,
+                              "Channel handle ID");
         } else if (pseudo_header->cosine.direction == COSINE_DIR_RX) {
-          proto_tree_add_item(fh_tree, hf_channel_id, tvb, 0, 4, ENC_NA);
+          proto_tree_add_text(fh_tree, tvb, 0, 4,
+                              "Channel handle ID");
         }
         break;
       default:
@@ -155,10 +157,6 @@ proto_register_cosine(void)
       { "Rate Marking", "cosine.rm",  FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}},
     { &hf_err,
       { "Error Code", "cosine.err", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}},
-    { &hf_sar,
-      { "SAR header", "cosine.sar", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}},
-    { &hf_channel_id,
-      { "Channel handle ID", "cosine.channel_id", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}},
   };
 
   static gint *ett[] = {
@@ -189,16 +187,3 @@ proto_reg_handoff_cosine(void)
   cosine_handle = create_dissector_handle(dissect_cosine, proto_cosine);
   dissector_add_uint("wtap_encap", WTAP_ENCAP_COSINE, cosine_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

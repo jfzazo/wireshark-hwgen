@@ -21,11 +21,12 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
+#include <config.h>
 #include <epan/prefs.h>
-#include "packet-tcp.h"
+#include <epan/packet.h>
+#include <epan/dissectors/packet-tcp.h>
 
 void proto_register_pdc(void);
 void proto_reg_handoff_pdc(void);
@@ -178,25 +179,25 @@ static int dissect_simpdu(tvbuff_t *tvb, proto_tree *tree, guint16 offset, guint
 		{
 			/*Get the parameter code*/
 			paramCode  = tvb_get_guint8(tvb, offset + bytesProcessed);
-			simpduItem = proto_tree_add_item (simpduVarTree, hf_pdc_simpdu_param, tvb, offset + bytesProcessed,      1, ENC_BIG_ENDIAN);
+			simpduItem = proto_tree_add_item (simpduVarTree, hf_pdc_simpdu_param, tvb, offset + bytesProcessed,      1, ENC_NA);
 			simpduVarTree1 = proto_item_add_subtree (simpduItem, ett_pdc_simpdu_var);
 			bytesProcessed += 1;
 			switch (paramCode)
 			{
 			case PARAM_CODE_VERSION:
-				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_len,     tvb, offset + bytesProcessed,     1, ENC_BIG_ENDIAN);
-				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_version, tvb, offset + bytesProcessed + 1, 1, ENC_BIG_ENDIAN);
+				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_len,     tvb, offset + bytesProcessed,     1, ENC_NA);
+				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_version, tvb, offset + bytesProcessed + 1, 1, ENC_NA);
 				bytesProcessed += 2;
 				break;
 			case PARAM_CODE_REFERENCES:
-				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_len,     tvb, offset + bytesProcessed,     1, ENC_BIG_ENDIAN);
-				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_REFSRC,  tvb, offset + bytesProcessed + 1, 2, ENC_BIG_ENDIAN);
-				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_REFDEST, tvb, offset + bytesProcessed + 3, 2, ENC_BIG_ENDIAN);
+				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_len,     tvb, offset + bytesProcessed,     1, ENC_NA);
+				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_REFSRC,  tvb, offset + bytesProcessed + 1, 2, ENC_NA);
+				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_REFDEST, tvb, offset + bytesProcessed + 3, 2, ENC_NA);
 				bytesProcessed += 5;
 				break;
 			case PARAM_CODE_TRANSPORT:
-				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_len,     tvb, offset + bytesProcessed,     1, ENC_BIG_ENDIAN);
-				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_TSEL,    tvb, offset + bytesProcessed + 1, 2, ENC_BIG_ENDIAN);
+				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_len,     tvb, offset + bytesProcessed,     1, ENC_NA);
+				proto_tree_add_item(simpduVarTree1, hf_pdc_simpdu_var_TSEL,    tvb, offset + bytesProcessed + 1, 2, ENC_NA);
 				bytesProcessed += 3;
 				break;
 			}
@@ -213,10 +214,10 @@ static int dissect_rsmpdu(void)
 static int dissect_drmpdu(tvbuff_t *tvb, proto_tree *tree, guint16 offset)
 {
 	/*DR-MPDU*/
-	proto_tree_add_item(tree, hf_pdc_drmpdu_abort,  tvb, offset,     1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_pdc_drmpdu_mode,   tvb, offset,     1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_pdc_drmpdu_init,   tvb, offset,     1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_pdc_drmpdu_reason, tvb, offset + 1, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_item(tree, hf_pdc_drmpdu_abort,  tvb, offset,     1, ENC_NA);
+	proto_tree_add_item(tree, hf_pdc_drmpdu_mode,   tvb, offset,     1, ENC_NA);
+	proto_tree_add_item(tree, hf_pdc_drmpdu_init,   tvb, offset,     1, ENC_NA);
+	proto_tree_add_item(tree, hf_pdc_drmpdu_reason, tvb, offset + 1, 1, ENC_NA);
 
 	return (2);
 }
@@ -239,7 +240,7 @@ static int dissect_admpdu(tvbuff_t *tvb, proto_tree *parent_tree, proto_tree *tr
 		offset += 2;
 
 		returnLen = userDataLen + 6;
-		asterixTVB = tvb_new_subset_length(tvb, offset, userDataLen);
+		asterixTVB = tvb_new_subset(tvb, offset, userDataLen, userDataLen);
 
 		if (asterix_handle != NULL)
 			call_dissector(asterix_handle, asterixTVB, pinfo, parent_tree);
@@ -261,7 +262,7 @@ static int dissect_dtmpdu(tvbuff_t *tvb, proto_tree *parent_tree, proto_tree *tr
 		/* length of user data field */
 		userDataLen = tvb_get_ntohs(tvb, 2);
 		returnLen  = userDataLen + 2;
-		asterixTVB = tvb_new_subset_length(tvb, offset + 2, userDataLen);
+		asterixTVB = tvb_new_subset(tvb, offset + 2, userDataLen, userDataLen);
 
 		if (asterix_handle != NULL)
 			call_dissector(asterix_handle, asterixTVB, pinfo, parent_tree);
@@ -283,7 +284,7 @@ static int dissect_edmpdu(tvbuff_t *tvb, proto_tree *parent_tree, proto_tree *tr
 		/* length of user data field */
 		userDataLen = tvb_get_ntohs(tvb, 2);
 		returnLen   = userDataLen + 2;
-		asterixTVB  = tvb_new_subset_length(tvb, offset + 2, userDataLen);
+		asterixTVB  = tvb_new_subset(tvb, offset + 2, userDataLen, userDataLen);
 
 		if (asterix_handle != NULL)
 			call_dissector(asterix_handle, asterixTVB, pinfo, parent_tree);
@@ -376,8 +377,7 @@ static int dissect_pdc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
 }
 
 /* function to provide TCP split packet combiner with size of packet */
-static guint get_pdc_message_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                                 int offset, void *data _U_)
+static guint get_pdc_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
 	guint  size;
 	guint  extra;
@@ -584,7 +584,7 @@ void proto_reg_handoff_pdc(void)
 	{
 		asterix_handle = find_dissector("asterix");
 		pdc_tcp_handle = create_dissector_handle(tcp_dissect_pdc, proto_pdc);
-		dissector_add_for_decode_as("tcp.port", pdc_tcp_handle);
+		dissector_add_handle("tcp.port", pdc_tcp_handle); /* for "decode-as" */
 		initialized    = TRUE;
 	}
 	else

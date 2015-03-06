@@ -23,8 +23,9 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
 #include <wsutil/str_util.h>
+#include <epan/packet.h>
 
 /**********************************************************************/
 
@@ -95,10 +96,6 @@ static int hf_cups_ptype_bw = -1;
 static int hf_cups_ptype_remote = -1;
 static int hf_cups_ptype_class = -1;
 static int hf_cups_state = -1;
-static int hf_cups_uri = -1;
-static int hf_cups_location = -1;
-static int hf_cups_information = -1;
-static int hf_cups_make_model = -1;
 
 static gint ett_cups = -1;
 static gint ett_cups_ptype = -1;
@@ -184,7 +181,8 @@ dissect_cups(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     if (str == NULL)
         return;    /* separator/terminator not found */
 
-    proto_tree_add_string(cups_tree, hf_cups_uri, tvb, offset, len, str);
+    proto_tree_add_text(cups_tree, tvb, offset, len,
+            "URI: %.*s", (guint16) len, str);
     col_add_fstr(pinfo->cinfo, COL_INFO, "%.*s (%s)",
             (guint16) len, str, val_to_str(state, cups_state_values, "0x%x"));
     offset = next_offset;
@@ -199,7 +197,8 @@ dissect_cups(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     str = get_quoted_string(tvb, offset, &next_offset, &len);
     if (str == NULL)
         return;    /* separator/terminator not found */
-    proto_tree_add_string(cups_tree, hf_cups_location, tvb, offset+1, len, str);
+    proto_tree_add_text(cups_tree, tvb, offset+1, len,
+        "Location: \"%.*s\"", (guint16) len, str);
     offset = next_offset;
 
     if (!skip_space(tvb, offset, &next_offset))
@@ -209,7 +208,8 @@ dissect_cups(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     str = get_quoted_string(tvb, offset, &next_offset, &len);
     if (str == NULL)
         return;    /* separator/terminator not found */
-    proto_tree_add_string(cups_tree, hf_cups_information, tvb, offset+1, len, str);
+    proto_tree_add_text(cups_tree, tvb, offset+1, len,
+        "Information: \"%.*s\"", (guint16) len, str);
     offset = next_offset;
 
     if (!skip_space(tvb, offset, &next_offset))
@@ -219,7 +219,8 @@ dissect_cups(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     str = get_quoted_string(tvb, offset, &next_offset, &len);
     if (str == NULL)
         return;    /* separator/terminator not found */
-    proto_tree_add_string(cups_tree, hf_cups_make_model, tvb, offset+1, len, str);
+    proto_tree_add_text(cups_tree, tvb, offset+1, len,
+            "Make and model: \"%.*s\"", (guint16) len, str);
 }
 
 static guint
@@ -364,19 +365,7 @@ proto_register_cups(void)
                 TFS(&tfs_printer_class), CUPS_PRINTER_CLASS, NULL, HFILL }},
         { &hf_cups_state,
             { "State",    "cups.state", FT_UINT8, BASE_HEX,
-                VALS(cups_state_values), 0x0, NULL, HFILL }},
-        { &hf_cups_uri,
-            { "URI",    "cups.uri", FT_STRING, BASE_NONE,
-                NULL, 0x0, NULL, HFILL }},
-        { &hf_cups_location,
-            { "Location",    "cups.location", FT_STRING, BASE_NONE,
-                NULL, 0x0, NULL, HFILL }},
-        { &hf_cups_information,
-            { "Information",    "cups.information", FT_STRING, BASE_NONE,
-                NULL, 0x0, NULL, HFILL }},
-        { &hf_cups_make_model,
-            { "Make and model", "cups.make_model", FT_STRING, BASE_NONE,
-                NULL, 0x0, NULL, HFILL }},
+                VALS(cups_state_values), 0x0, NULL, HFILL }}
     };
 
     static gint *ett[] = {

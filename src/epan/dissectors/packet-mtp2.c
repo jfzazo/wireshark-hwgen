@@ -28,6 +28,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/crc16-tvb.h>
@@ -56,7 +58,6 @@ static int hf_mtp2_spare     = -1;
 static int hf_mtp2_ext_spare = -1;
 static int hf_mtp2_sf        = -1;
 static int hf_mtp2_sf_extra  = -1;
-static int hf_mtp2_fcs_16    = -1;
 
 static expert_field ei_mtp2_checksum_error = EI_INIT;
 
@@ -65,6 +66,7 @@ static gint ett_mtp2       = -1;
 
 static dissector_handle_t mtp3_handle;
 static gboolean use_extended_sequence_numbers_default = FALSE;
+static gboolean use_extended_sequence_numbers         = FALSE;
 
 #define BSN_BIB_LENGTH          1
 #define FSN_FIB_LENGTH          1
@@ -102,7 +104,7 @@ static gboolean use_extended_sequence_numbers_default = FALSE;
 #define EXTENDED_SPARE_MASK     0xfe00
 
 static void
-dissect_mtp2_header(tvbuff_t *su_tvb, proto_item *mtp2_tree, gboolean use_extended_sequence_numbers)
+dissect_mtp2_header(tvbuff_t *su_tvb, proto_item *mtp2_tree)
 {
   if (mtp2_tree) {
     if (use_extended_sequence_numbers) {
@@ -132,12 +134,12 @@ dissect_mtp2_header(tvbuff_t *su_tvb, proto_item *mtp2_tree, gboolean use_extend
 static guint16
 mtp2_fcs16(tvbuff_t * tvbuff)
 {
-  guint len = tvb_reported_length(tvbuff)-2;
+    guint len = tvb_length(tvbuff)-2;
 
-  /* Check for Invalid Length */
-  if (len == 0)
-    return (0x0000);
-  return crc16_ccitt_tvb(tvbuff, len);
+    /* Check for Invalid Length */
+    if (len == 0)
+        return (0x0000);
+    return crc16_ccitt_tvb(tvbuff, len);
 }
 
 /*
@@ -157,7 +159,7 @@ mtp2_decode_crc16(tvbuff_t *tvb, proto_tree *fh_tree, packet_info *pinfo)
   /*
    * Do we have the entire packet, and does it include a 2-byte FCS?
    */
-  len = tvb_reported_length_remaining(tvb, proto_offset);
+  len = tvb_length_remaining(tvb, proto_offset);
   reported_len = tvb_reported_length_remaining(tvb, proto_offset);
   if (reported_len < 2 || len < 0) {
     /*
@@ -194,12 +196,15 @@ mtp2_decode_crc16(tvbuff_t *tvb, proto_tree *fh_tree, packet_info *pinfo)
     rx_fcs_offset = proto_offset + len;
     rx_fcs_exp = mtp2_fcs16(tvb);
     rx_fcs_got = tvb_get_letohs(tvb, rx_fcs_offset);
-    cause=proto_tree_add_item(fh_tree, hf_mtp2_fcs_16, tvb, rx_fcs_offset, 2, ENC_LITTLE_ENDIAN);
     if (rx_fcs_got != rx_fcs_exp) {
-      proto_item_append_text(cause, " [incorrect, should be 0x%04x]", rx_fcs_exp);
+      cause=proto_tree_add_text(fh_tree, tvb, rx_fcs_offset, 2,
+				"FCS 16: 0x%04x [incorrect, should be 0x%04x]",
+				rx_fcs_got, rx_fcs_exp);
       expert_add_info(pinfo, cause, &ei_mtp2_checksum_error);
     } else {
-      proto_item_append_text(cause, " [correct]");
+      proto_tree_add_text(fh_tree, tvb, rx_fcs_offset, 2,
+			  "FCS 16: 0x%04x [correct]",
+			  rx_fcs_got);
     }
   }
   return next_tvb;
@@ -236,14 +241,13 @@ static const value_string status_field_acro_vals[] = {
 #define SF_OFFSET          (LI_OFFSET + LI_LENGTH)
 #define EXTENDED_SF_OFFSET (EXTENDED_LI_OFFSET + EXTENDED_LI_LENGTH)
 
-#define SF_LENGTH                       1
-#define SF_EXTRA_OFFSET                 (SF_OFFSET + SF_LENGTH)
-#define EXTENDED_SF_EXTRA_OFFSET        (EXTENDED_SF_OFFSET + SF_LENGTH)
-#define SF_EXTRA_LENGTH                 1
+#define SF_LENGTH			1
+#define SF_EXTRA_OFFSET			(SF_OFFSET + SF_LENGTH)
+#define EXTENDED_SF_EXTRA_OFFSET	(EXTENDED_SF_OFFSET + SF_LENGTH)
+#define SF_EXTRA_LENGTH			1
 
 static void
-dissect_mtp2_lssu(tvbuff_t *su_tvb, packet_info *pinfo, proto_item *mtp2_tree,
-                  gboolean use_extended_sequence_numbers)
+dissect_mtp2_lssu(tvbuff_t *su_tvb, packet_info *pinfo, proto_item *mtp2_tree)
 {
   guint8 sf = 0xFF;
   guint8 sf_offset, sf_extra_offset;
@@ -270,8 +274,7 @@ dissect_mtp2_lssu(tvbuff_t *su_tvb, packet_info *pinfo, proto_item *mtp2_tree,
 }
 
 static void
-dissect_mtp2_msu(tvbuff_t *su_tvb, packet_info *pinfo, proto_item *mtp2_item,
-                 proto_item *tree, gboolean use_extended_sequence_numbers)
+dissect_mtp2_msu(tvbuff_t *su_tvb, packet_info *pinfo, proto_item *mtp2_item, proto_item *tree)
 {
   gint sif_sio_length;
   tvbuff_t *sif_sio_tvb;
@@ -279,11 +282,11 @@ dissect_mtp2_msu(tvbuff_t *su_tvb, packet_info *pinfo, proto_item *mtp2_item,
   col_set_str(pinfo->cinfo, COL_INFO, "MSU ");
 
   if (use_extended_sequence_numbers) {
-    sif_sio_length = tvb_reported_length(su_tvb) - EXTENDED_HEADER_LENGTH;
-    sif_sio_tvb = tvb_new_subset_length(su_tvb, EXTENDED_SIO_OFFSET, sif_sio_length);
+    sif_sio_length = tvb_length(su_tvb) - EXTENDED_HEADER_LENGTH;
+    sif_sio_tvb = tvb_new_subset(su_tvb, EXTENDED_SIO_OFFSET, sif_sio_length, sif_sio_length);
   } else {
-    sif_sio_length = tvb_reported_length(su_tvb) - HEADER_LENGTH;
-    sif_sio_tvb = tvb_new_subset_length(su_tvb, SIO_OFFSET, sif_sio_length);
+    sif_sio_length = tvb_length(su_tvb) - HEADER_LENGTH;
+    sif_sio_tvb = tvb_new_subset(su_tvb, SIO_OFFSET, sif_sio_length, sif_sio_length);
   }
   call_dissector(mtp3_handle, sif_sio_tvb, pinfo, tree);
 
@@ -296,14 +299,12 @@ dissect_mtp2_msu(tvbuff_t *su_tvb, packet_info *pinfo, proto_item *mtp2_item,
 }
 
 static void
-dissect_mtp2_su(tvbuff_t *su_tvb, packet_info *pinfo, proto_item *mtp2_item,
-                proto_item *mtp2_tree, proto_tree *tree, gboolean validate_crc,
-                gboolean use_extended_sequence_numbers)
+dissect_mtp2_su(tvbuff_t *su_tvb, packet_info *pinfo, proto_item *mtp2_item, proto_item *mtp2_tree, proto_tree *tree,gboolean validate_crc)
 {
   guint16 li;
   tvbuff_t  *next_tvb = NULL;
 
-  dissect_mtp2_header(su_tvb, mtp2_tree, use_extended_sequence_numbers);
+  dissect_mtp2_header(su_tvb, mtp2_tree);
   if (validate_crc)
     next_tvb = mtp2_decode_crc16(su_tvb, mtp2_tree, pinfo);
 
@@ -318,60 +319,53 @@ dissect_mtp2_su(tvbuff_t *su_tvb, packet_info *pinfo, proto_item *mtp2_item,
   case 1:
   case 2:
     if (validate_crc)
-      dissect_mtp2_lssu(next_tvb, pinfo, mtp2_tree, use_extended_sequence_numbers);
+      dissect_mtp2_lssu(next_tvb, pinfo, mtp2_tree);
     else
-      dissect_mtp2_lssu(su_tvb, pinfo, mtp2_tree, use_extended_sequence_numbers);
+      dissect_mtp2_lssu(su_tvb, pinfo, mtp2_tree);
     break;
   default:
     /* In some capture files (like .rf5), CRC are not present */
     /* So, to avoid trouble, give the complete buffer if CRC validation is disabled */
     if (validate_crc)
-      dissect_mtp2_msu(next_tvb, pinfo, mtp2_item, tree, use_extended_sequence_numbers);
+      dissect_mtp2_msu(next_tvb, pinfo, mtp2_item, tree);
     else
-      dissect_mtp2_msu(su_tvb, pinfo, mtp2_item, tree, use_extended_sequence_numbers);
+      dissect_mtp2_msu(su_tvb, pinfo, mtp2_item, tree);
     break;
   }
 }
 
 static void
-dissect_mtp2_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-                    gboolean validate_crc, gboolean use_extended_sequence_numbers)
+dissect_mtp2_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean validate_crc)
 {
-  proto_item *mtp2_item;
-  proto_tree *mtp2_tree;
+  proto_item *mtp2_item = NULL;
+  proto_tree *mtp2_tree = NULL;
+
+  if (pinfo->annex_a_used == MTP2_ANNEX_A_USED_UNKNOWN)
+    use_extended_sequence_numbers = use_extended_sequence_numbers_default;
+  else
+    use_extended_sequence_numbers = (pinfo->annex_a_used == MTP2_ANNEX_A_USED);
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "MTP2");
 
-  mtp2_item = proto_tree_add_item(tree, proto_mtp2, tvb, 0, -1, ENC_NA);
-  mtp2_tree = proto_item_add_subtree(mtp2_item, ett_mtp2);
+  if (tree) {
+    mtp2_item = proto_tree_add_item(tree, proto_mtp2, tvb, 0, -1, ENC_NA);
+    mtp2_tree = proto_item_add_subtree(mtp2_item, ett_mtp2);
+  };
 
-  dissect_mtp2_su(tvb, pinfo, mtp2_item, mtp2_tree, tree, validate_crc,
-                  use_extended_sequence_numbers);
+  dissect_mtp2_su(tvb, pinfo, mtp2_item, mtp2_tree, tree, validate_crc);
 }
 
-/* Dissect MTP2 frame without CRC16 and with a pseudo-header */
-static void
-dissect_mtp2_with_phdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
-{
-  if (pinfo->pseudo_header->mtp2.annex_a_used == MTP2_ANNEX_A_USED_UNKNOWN)
-    dissect_mtp2_common(tvb, pinfo, tree, FALSE, use_extended_sequence_numbers_default);
-  else
-    dissect_mtp2_common(tvb, pinfo, tree, FALSE,
-                        (pinfo->pseudo_header->mtp2.annex_a_used == MTP2_ANNEX_A_USED));
-}
-
-/* Dissect MTP2 frame with CRC16 included at end of payload */
-static void
-dissect_mtp2_with_crc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
-{
-  dissect_mtp2_common(tvb, pinfo, tree, TRUE, use_extended_sequence_numbers_default);
-}
-
-/* Dissect MTP2 frame without CRC16 included at end of payload */
+/* Dissect MTP2 frame with/without CRC16 included at end of payload */
 static void
 dissect_mtp2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-  dissect_mtp2_common(tvb, pinfo, tree, FALSE, use_extended_sequence_numbers_default);
+  /* If the link extension indicates the FCS presence, then the Checkbits
+   * have to be proceeded in the MTP2 dissector */
+  if ( pinfo->fd->lnk_t == WTAP_ENCAP_ERF ) {
+    dissect_mtp2_common(tvb, pinfo, tree, TRUE);
+  } else {
+    dissect_mtp2_common(tvb, pinfo, tree, FALSE);
+  }
 }
 
 void
@@ -393,8 +387,7 @@ proto_register_mtp2(void)
     { &hf_mtp2_spare,     { "Spare",                    "mtp2.spare",    FT_UINT8,  BASE_DEC, NULL,                    SPARE_MASK,          NULL, HFILL } },
     { &hf_mtp2_ext_spare, { "Spare",                    "mtp2.spare",    FT_UINT16, BASE_DEC, NULL,                    EXTENDED_SPARE_MASK, NULL, HFILL } },
     { &hf_mtp2_sf,        { "Status field",             "mtp2.sf",       FT_UINT8,  BASE_DEC, VALS(status_field_vals), 0x0,                 NULL, HFILL } },
-    { &hf_mtp2_sf_extra,  { "Status field extra octet", "mtp2.sf_extra", FT_UINT8,  BASE_HEX, NULL,                    0x0,                 NULL, HFILL } },
-    { &hf_mtp2_fcs_16,    { "FCS 16",                   "mtp2.fcs_16",   FT_UINT16, BASE_HEX, NULL,                    0x0,                 NULL, HFILL } },
+    { &hf_mtp2_sf_extra,  { "Status field extra octet", "mtp2.sf_extra", FT_UINT8,  BASE_HEX, NULL,                    0x0,                 NULL, HFILL } }
   };
 
   static gint *ett[] = {
@@ -410,7 +403,6 @@ proto_register_mtp2(void)
 
   proto_mtp2 = proto_register_protocol("Message Transfer Part Level 2", "MTP2", "mtp2");
   mtp2_handle = register_dissector("mtp2", dissect_mtp2, proto_mtp2);
-  register_dissector("mtp2_with_crc", dissect_mtp2_with_crc, proto_mtp2);
 
   proto_register_field_array(proto_mtp2, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
@@ -430,26 +422,8 @@ proto_register_mtp2(void)
 void
 proto_reg_handoff_mtp2(void)
 {
-  dissector_handle_t mtp2_with_phdr_handle;
-
   dissector_add_uint("wtap_encap", WTAP_ENCAP_MTP2, mtp2_handle);
-  mtp2_with_phdr_handle = create_dissector_handle(dissect_mtp2_with_phdr,
-                                                  proto_mtp2);
-  dissector_add_uint("wtap_encap", WTAP_ENCAP_MTP2_WITH_PHDR,
-                                   mtp2_with_phdr_handle);
+  dissector_add_uint("wtap_encap", WTAP_ENCAP_MTP2_WITH_PHDR, mtp2_handle);
 
   mtp3_handle   = find_dissector("mtp3");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

@@ -30,9 +30,10 @@
 #include "ui/gtk/color_dlg.h"
 #include "ui/gtk/filter_utils.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void
-apply_selected_filter (guint callback_action, const char *filter)
+apply_selected_filter (guint callback_action, char *filter)
 {
  	int action, type;
 	char *str = NULL;

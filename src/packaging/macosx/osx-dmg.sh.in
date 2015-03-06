@@ -42,39 +42,20 @@ rw_name="RWwireshark.dmg"
 volume_name="Wireshark"
 tmp_dir="/tmp/dmg-$$"
 auto_open_opt=
-ws_bin="$app_bundle/Contents/MacOS/Wireshark"
-readme_name="Read_me_first_qt.rtf"
+utilities="Utilities"
+ws_bin="$app_bundle/Contents/Resources/bin/wireshark-bin"
+readme_name="Read_me_first_gtk.rtf"
 
-if [ -f /Applications/Xcode.app/Contents/Applications/PackageMaker.app/Contents/MacOS/PackageMaker ]
+if [ -d /Applications/Xcode.app/Developer ]
 then
-	#
-	# Xcode 4 and later, with the "Auxiliary Tools for Xcode"
-	# download from developer.apple.com.  (There are no such
-	# downloads for Mavericks or later, but PackageMaker from
-	# the Late July 2012 download for Mountain Lion appears to
-	# work on Yosemite.)
-	#
-	packagemaker=/Applications/Xcode.app//Contents/Applications/PackageMaker.app/Contents/MacOS/PackageMaker
-elif [ -f /Applications/Xcode.app/Developer/Tools/packagemaker ]
+	developer_path=/Applications/Xcode.app/Developer
+elif [ -d /Developer ]
 then
-	packagemaker=/Applications/Xcode.app/Developer/Tools/packagemaker
-elif [ -f /Applications/Xcode.app/Developer/usr/bin/packagemaker ]
-then
-	packagemaker=/Applications/Xcode.app/Developer/usr/bin/packagemaker
-elif [ -f /Developer/Tools/packagemaker ]
-then
-	packagemaker=/Developer/Tools/packagemaker
-elif [ -f /Developer/usr/bin/packagemaker ]
-then
-	packagemaker=/Developer/usr/bin/packagemaker
-elif [ -f /usr/bin/packagemaker ]
-then
-	packagemaker=/usr/bin/packagemaker
+	developer_path=/Developer
 fi
-if [ -z "$packagemaker" ]
+if [ ! -z $developer_path ]
 then
-	echo "$0: couldn't find PackageMaker" 1>&2
-	exit 1
+	PATH=$PATH:$developer_path/Tools:$developer_path/usr/bin
 fi
 
 # Help message
@@ -89,16 +70,14 @@ USAGE
 
 OPTIONS
 	-h,--help
-		Display this help message.
+		display this help message
 	-s
-		Set a new apperance (do not actually create a bundle).
+		set a new apperance (do not actually create a bundle)
 	-b,--app-bundle
-		Set the path to the Wireshark.app that should be copied
-		in the dmg.
+		set the path to the Wireshark.app that should be copied
+		in the dmg
 	-qt,--qt-flavor
-		Use the Qt flavor. This is the default.
-	-gtk,--gtk-flavor
-		Use the GTK+ flavor.
+		use the Qt flavor
 "
 }
 
@@ -118,10 +97,6 @@ do
 			readme_name="Read_me_first_qt.rtf"
 			ws_bin="$app_bundle/Contents/MacOS/Wireshark"
 			;;
-		-gtk|--gtk-flavor)
-			readme_name="Read_me_first_gtk.rtf"
-			ws_bin="$app_bundle/Contents/MacOS/wireshark-bin"
-			;;
 		*)
 			echo "Invalid command line option"
 			exit 2 ;;
@@ -132,6 +107,12 @@ done
 # Safety checks
 if [ ! -e "$app_bundle" ]; then
 	echo "Cannot find application bundle: $app_bundle"
+	exit 1
+fi
+
+# Safety checks
+if [ ! -e "$utilities" ]; then
+	echo "Cannot find utilities: $utilities"
 	exit 1
 fi
 
@@ -167,7 +148,7 @@ echo -e "\nCREATE WIRESHARK PACKAGE\n"
 pkg_title="$volume_name $version $architecture"
 pkg_file="$pkg_title.pkg"
 rm -rf "$pkg_file"
-$packagemaker --doc "Wireshark_package.pmdoc" \
+packagemaker --doc "Wireshark_package.pmdoc" \
     --title "$pkg_title" \
     --id "org.wireshark.pkg.Wireshark" \
     --version "$version" \
@@ -196,8 +177,14 @@ rm -rf "$tmp_dir"
 mkdir "$tmp_dir" || exit 1
 
 echo -e "Copying files to temp directory"
-# Copy the installer package
+# Wireshark itself
+# Copy Wireshark.app
 cp "$pkg_file" "$tmp_dir"/ || exit 1
+# Link to Applications in order to drag and drop wireshark onto it
+#ln -sf /Applications "$tmp_dir"/
+# Copy the utilites
+#cp -rf "$utilities" "$tmp_dir"/
+#ln -sf /Library/StartupItems "$tmp_dir/$utilities"/
 # Copy the readme
 cp "$readme_name" "$tmp_dir"/"Read me first.rtf" || exit 1
 

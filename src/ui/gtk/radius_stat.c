@@ -25,14 +25,18 @@
 
 #include <string.h>
 
+#include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
+#include <epan/epan.h>
 #include <epan/value_string.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-radius.h>
 
 #include "epan/timestats.h"
 #include "ui/simple_dialog.h"
+#include "../file.h"
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_stat_util.h"
 #include "ui/gtk/dlg_utils.h"
@@ -40,6 +44,7 @@
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkradiusstat(void);
 
@@ -237,7 +242,6 @@ radiusstat_draw(void *prs)
 	radiusstat_t *rs=(radiusstat_t *)prs;
 	int i;
 	char str[5][256];
-	gchar* tmp_str;
 	GtkListStore *store;
 	GtkTreeIter iter;
 
@@ -257,11 +261,10 @@ radiusstat_draw(void *prs)
 			rs->radius_rtd[i].stats.num?((double)rs->radius_rtd[i].req_dup_num*100)/(double)rs->radius_rtd[i].stats.num:0);
 		g_snprintf(str[4], 256, "%4u (%4.2f%%)", rs->radius_rtd[i].rsp_dup_num,
 			rs->radius_rtd[i].stats.num?((double)rs->radius_rtd[i].rsp_dup_num*100)/(double)rs->radius_rtd[i].stats.num:0);
-		tmp_str = val_to_str_wmem(NULL,i,radius_message_code,"Other (%d)");
 
 		gtk_list_store_append(store, &iter);
 		gtk_list_store_set(store, &iter,
-			0, tmp_str,
+			0, val_to_str(i, radius_message_code,"Other"),
 			1, rs->radius_rtd[i].stats.num,
 			2, str[0],
 			3, str[1],
@@ -273,7 +276,6 @@ radiusstat_draw(void *prs)
 			9, str[3],
 			10, str[4],
 			-1);
-		wmem_free(NULL, tmp_str);
 	}
 }
 
@@ -363,7 +365,7 @@ gtk_radiusstat_init(const char *opt_arg, void *userdata _U_)
 }
 
 static tap_param radius_stat_params[] = {
-	{ PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+	{ PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg radius_srt_dlg = {

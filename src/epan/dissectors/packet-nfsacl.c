@@ -25,7 +25,9 @@
 
 #include "config.h"
 
+#include <epan/wmem/wmem.h>
 
+#include "packet-rpc.h"
 #include "packet-nfs.h"
 
 void proto_register_nfsacl(void);
@@ -103,23 +105,23 @@ dissect_nfsacl_mask(tvbuff_t *tvb, int offset, proto_tree *tree)
 
 static const value_string names_nfsacl_aclent_type[] = {
 #define NA_USER_OBJ 0x1
-	{ NA_USER_OBJ,			 "NA_USER_OBJ" },
+	{ NA_USER_OBJ, "NA_USER_OBJ" },
 #define NA_USER 0x2
-	{ NA_USER,			 "NA_USER" },
+	{ NA_USER, "NA_USER" },
 #define NA_GROUP_OBJ 0x4
-	{ NA_GROUP_OBJ,			 "NA_GROUP_OBJ" },
+	{ NA_GROUP_OBJ, "NA_GROUP_OBJ" },
 #define NA_GROUP 0x8
-	{ NA_GROUP,			 "NA_GROUP" },
+	{ NA_GROUP, "NA_GROUP" },
 #define NA_CLASS_OBJ 0x10
-	{ NA_CLASS_OBJ,			 "NA_CLASS_OBJ" },
+	{ NA_CLASS_OBJ, "NA_CLASS_OBJ" },
 #define NA_OTHER_OBJ 0x20
-	{ NA_OTHER_OBJ,			 "NA_OTHER_OBJ" },
+	{ NA_OTHER_OBJ, "NA_OTHER_OBJ" },
 #define NA_ACL_DEFAULT 0x1000
-	{ NA_ACL_DEFAULT,		 "NA_ACL_DEFAULT" },
-	{ NA_ACL_DEFAULT | NA_USER_OBJ,	 "Default NA_USER_OBJ" },
-	{ NA_ACL_DEFAULT | NA_USER,	 "Default NA_USER" },
+	{ NA_ACL_DEFAULT, "NA_ACL_DEFAULT" },
+	{ NA_ACL_DEFAULT | NA_USER_OBJ, "Default NA_USER_OBJ" },
+	{ NA_ACL_DEFAULT | NA_USER, "Default NA_USER" },
 	{ NA_ACL_DEFAULT | NA_GROUP_OBJ, "Default NA_GROUP_OBJ" },
-	{ NA_ACL_DEFAULT | NA_GROUP,	 "Default NA_GROUP" },
+	{ NA_ACL_DEFAULT | NA_GROUP, "Default NA_GROUP" },
 	{ NA_ACL_DEFAULT | NA_CLASS_OBJ, "Default NA_CLASS_OBJ" },
 	{ NA_ACL_DEFAULT | NA_OTHER_OBJ, "Default NA_OTHER_OBJ" },
 	{ 0, NULL },
@@ -162,15 +164,20 @@ dissect_nfsacl_secattr(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
 {
 	guint32 aclcnt, dfaclcnt;
 	guint32 i;
-	proto_tree *entry_tree;
+	proto_item *entry_item = NULL;
+	proto_tree *entry_tree = NULL;
 
 	offset = dissect_nfsacl_mask(tvb, offset, tree);
 	offset = dissect_rpc_uint32(tvb, tree, hf_nfsacl_aclcnt, offset);
 
 	aclcnt = tvb_get_ntohl(tvb, offset);
 
-	entry_tree = proto_tree_add_subtree_format(tree, tvb, offset, 4,
-			ett_nfsacl_aclent_entries, NULL, "Total ACL entries: %d", aclcnt);
+	entry_item = proto_tree_add_text(tree, tvb, offset, 4,
+			"Total ACL entries: %d", aclcnt);
+
+	if (entry_item)
+		entry_tree = proto_item_add_subtree(entry_item,
+				ett_nfsacl_aclent_entries);
 
 	offset += 4;
 
@@ -186,8 +193,12 @@ dissect_nfsacl_secattr(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
 
 	dfaclcnt = tvb_get_ntohl(tvb, offset);
 
-	entry_tree = proto_tree_add_subtree_format(tree, tvb, offset, 4,
-			ett_nfsacl_aclent_entries, NULL, "Total default ACL entries: %d", dfaclcnt);
+	entry_item = proto_tree_add_text(tree, tvb, offset, 4,
+			"Total default ACL entries: %d", dfaclcnt);
+
+	if (entry_item)
+		entry_tree = proto_item_add_subtree(entry_item,
+				ett_nfsacl_aclent_entries);
 
 	offset += 4;
 
@@ -400,26 +411,33 @@ dissect_nfsacl3_getacl_reply(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
 			     proto_tree *tree, void* data _U_)
 {
 	guint32 status;
-	proto_item *entry_item;
-	proto_tree *entry_tree;
+	proto_item *entry_item = NULL;
+	proto_tree *entry_tree = NULL;
 
 	status = tvb_get_ntohl(tvb, offset + 0);
 
-	proto_tree_add_uint(tree, hf_nfs_status, tvb, offset + 0, 4,
+	if (tree)
+		proto_tree_add_uint(tree, hf_nfs_status, tvb, offset + 0, 4,
 				status);
 
 	offset += 4;
 
-	entry_item = proto_tree_add_item(tree, hf_nfsacl_entry, tvb,
+	if (tree)
+	{
+		entry_item = proto_tree_add_item(tree, hf_nfsacl_entry, tvb,
 				offset + 0, -1, ENC_NA);
-	entry_tree = proto_item_add_subtree(entry_item, ett_nfsacl_entry);
+		if (entry_item)
+			entry_tree = proto_item_add_subtree(entry_item, ett_nfsacl_entry);
+	}
 
-	offset = dissect_nfs3_post_op_attr(tvb, offset, pinfo, entry_tree, "attr");
+	if (entry_tree)
+		offset = dissect_nfs3_post_op_attr(tvb, offset, pinfo, entry_tree, "attr");
 
 	if (status != ACL3_OK)
 		return offset;
 
-	offset = dissect_nfsacl_secattr(tvb, offset, pinfo, entry_tree);
+	if (entry_tree)
+		offset = dissect_nfsacl_secattr(tvb, offset, pinfo, entry_tree);
 
 	return offset;
 }
@@ -429,16 +447,22 @@ dissect_nfsacl3_setacl_call(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
 			    proto_tree *tree, void* data)
 
 {
-	proto_item *acl_item;
-	proto_tree *acl_tree;
+	proto_item *acl_item = NULL;
+	proto_tree *acl_tree = NULL;
 
 	offset = dissect_nfs3_fh(tvb, offset, pinfo, tree, "fhandle", NULL, (rpc_call_info_value*)data);
 
-	acl_item = proto_tree_add_item(tree, hf_nfsacl_entry, tvb, offset + 0,
+	if (tree)
+	{
+		acl_item = proto_tree_add_item(tree, hf_nfsacl_entry, tvb, offset + 0,
 				-1, ENC_NA);
-	acl_tree = proto_item_add_subtree(acl_item, ett_nfsacl_entry);
 
-	offset = dissect_nfsacl_secattr(tvb, offset, pinfo, acl_tree);
+		if (acl_item)
+			acl_tree = proto_item_add_subtree(acl_item, ett_nfsacl_entry);
+	}
+
+	if (acl_tree)
+		offset = dissect_nfsacl_secattr(tvb, offset, pinfo, acl_tree);
 
 	return offset;
 }
@@ -602,16 +626,3 @@ proto_reg_handoff_nfsacl(void)
 	rpc_init_proc_table(NFSACL_PROGRAM, 2, nfsacl2_proc, hf_nfsacl_procedure_v2);
 	rpc_init_proc_table(NFSACL_PROGRAM, 3, nfsacl3_proc, hf_nfsacl_procedure_v3);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

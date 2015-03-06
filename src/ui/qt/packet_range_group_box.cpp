@@ -29,7 +29,6 @@ PacketRangeGroupBox::PacketRangeGroupBox(QWidget *parent) :
     syntax_state_(SyntaxLineEdit::Empty)
 {
     pr_ui_->setupUi(this);
-    setFlat(true);
 
     pr_ui_->displayedButton->setChecked(true);
     pr_ui_->allButton->setChecked(true);
@@ -52,9 +51,7 @@ void PacketRangeGroupBox::initRange(packet_range_t *range) {
     }
 
     if (range_->user_range) {
-        char* tmp_str = range_convert_range(NULL, range_->user_range);
-        pr_ui_->rangeLineEdit->setText(tmp_str);
-        wmem_free(NULL, tmp_str);
+        pr_ui_->rangeLineEdit->setText(range_convert_range(range_->user_range));
     }
     updateCounts();
 }

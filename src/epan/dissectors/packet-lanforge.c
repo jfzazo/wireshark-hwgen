@@ -31,6 +31,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 void proto_register_lanforge(void);
@@ -147,9 +149,15 @@ static gboolean dissect_lanforge(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 
         proto_tree_add_time(lanforge_tree, hf_lanforge_timestamp, tvb, offset - 8, 8, &tstamp);
 
+#if 0
+        if(tvb_reported_length_remaining(tvb, offset) > 0) /* random data */
+            proto_tree_add_text(lanforge_tree, tvb, offset, -1, "Data (%u bytes)",
+                                tvb_length_remaining(tvb, offset));
+#else
         if(tvb_reported_length_remaining(tvb, offset) > 0) /* random data */
             call_dissector(data_handle, tvb_new_subset_remaining(tvb, offset), pinfo,
                 lanforge_tree);
+#endif
     }
 
     return TRUE;
@@ -286,16 +294,3 @@ void proto_reg_handoff_lanforge(void)
     /* Find data dissector handle */
     data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

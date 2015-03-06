@@ -31,15 +31,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <glib.h>
+
+#include <wsutil/report_err.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/sminmpec.h>
 #include <epan/addr_resolv.h>
 #include <epan/ipproto.h>
 #include <epan/expert.h>
-#include <epan/eap.h>
 #include <wsutil/filesystem.h>
-#include <wsutil/report_err.h>
+#include <epan/eap.h>
 
 #include "wimaxasncp_dict.h"
 
@@ -102,7 +105,6 @@ static gint ett_wimaxasncp_tlv_ip_address_mask_list              = -1;
 static gint ett_wimaxasncp_tlv_ip_address_mask                   = -1;
 static gint ett_wimaxasncp_tlv_eap                               = -1;
 static gint ett_wimaxasncp_tlv_vendor_specific_information_field = -1;
-static gint ett_wimaxasncp_port_range                            = -1;
 
 static expert_field ei_wimaxasncp_tlv_type = EI_INIT;
 static expert_field ei_wimaxasncp_function_type = EI_INIT;
@@ -596,7 +598,7 @@ static void wimaxasncp_proto_tree_add_tlv_ipv4_value(
 
     ip = tvb_get_ipv4(tvb, offset);
     hostname = get_hostname(ip);
-    ip_str = tvb_ip_to_str(tvb, offset);
+    ip_str = ip_to_str((guint8 *)&ip);
 
     proto_tree_add_ipv4_format(
         tree, hf_value,
@@ -633,7 +635,7 @@ static void wimaxasncp_proto_tree_add_tlv_ipv6_value(
 
     tvb_get_ipv6(tvb, offset, &ip);
     hostname = get_hostname6(&ip);
-    ip_str = tvb_ip6_to_str(tvb, offset);
+    ip_str = ip6_to_str(&ip);
 
     proto_tree_add_ipv6_format(
         tree, hf_value,
@@ -671,7 +673,7 @@ static void wimaxasncp_proto_tree_add_ether_value(
 
     p = tvb_get_ptr(tvb, offset, length);
     ether_name = get_ether_name(p);
-    ether_str = tvb_ether_to_str(tvb, offset);
+    ether_str = ether_to_str(p);
 
     proto_tree_add_ether_format(
         tree, hf_value,
@@ -1321,9 +1323,12 @@ static void wimaxasncp_dissect_tlv_value(
             proto_item  *item;
             const guint  max_protocols_in_tlv_item = 8; /* arbitrary */
 
-            protocol_list_tree = proto_tree_add_subtree(
+            item = proto_tree_add_text(
                 tree, tvb, offset, length,
-                ett_wimaxasncp_tlv_protocol_list, NULL, "Value");
+                "Value");
+
+            protocol_list_tree = proto_item_add_subtree(
+                item, ett_wimaxasncp_tlv_protocol_list);
 
             /* hidden item for filtering */
             item = proto_tree_add_item(
@@ -1378,9 +1383,12 @@ static void wimaxasncp_dissect_tlv_value(
             proto_item  *item;
             const guint  max_port_ranges_in_tlv_item = 3; /* arbitrary */
 
-            port_range_list_tree = proto_tree_add_subtree(
+            item = proto_tree_add_text(
                 tree, tvb, offset, length,
-                ett_wimaxasncp_tlv_port_range_list, NULL, "Value");
+                "Value");
+
+            port_range_list_tree = proto_item_add_subtree(
+                item, ett_wimaxasncp_tlv_port_range_list);
 
             /* hidden item for filtering */
             item = proto_tree_add_item(
@@ -1393,25 +1401,24 @@ static void wimaxasncp_dissect_tlv_value(
             {
                 guint16 portLow;
                 guint16 portHigh;
-                proto_tree* range_tree;
 
                 portLow  = tvb_get_ntohs(tvb, offset);
                 portHigh = tvb_get_ntohs(tvb, offset + 2);
 
-                range_tree = proto_tree_add_subtree_format(
+                proto_tree_add_text(
                     port_range_list_tree, tvb, offset, 4,
-                    ett_wimaxasncp_port_range, NULL, "Port Range: %u-%u", portLow, portHigh);
+                    "Port Range: %u-%u", portLow, portHigh);
 
                 /* hidden items are for filtering */
 
                 item = proto_tree_add_item(
-                    range_tree, tlv_info->hf_port_low,
+                    port_range_list_tree, tlv_info->hf_port_low,
                     tvb, offset, 2, ENC_BIG_ENDIAN);
 
                 PROTO_ITEM_SET_HIDDEN(item);
 
                 item = proto_tree_add_item(
-                    range_tree, tlv_info->hf_port_high,
+                    port_range_list_tree, tlv_info->hf_port_high,
                     tvb, offset + 2, 2, ENC_BIG_ENDIAN);
 
                 PROTO_ITEM_SET_HIDDEN(item);
@@ -1461,9 +1468,12 @@ static void wimaxasncp_dissect_tlv_value(
             proto_tree *ip_address_mask_list_tree;
             proto_item *item;
 
-            ip_address_mask_list_tree = proto_tree_add_subtree(
+            item = proto_tree_add_text(
                 tree, tvb, offset, length,
-                ett_wimaxasncp_tlv_ip_address_mask_list, NULL, "Value");
+                "Value");
+
+            ip_address_mask_list_tree = proto_item_add_subtree(
+                item, ett_wimaxasncp_tlv_ip_address_mask_list);
 
             /* hidden item for filtering */
             item = proto_tree_add_item(
@@ -1482,15 +1492,22 @@ static void wimaxasncp_dissect_tlv_value(
                 while (offset < tvb_length(tvb))
                 {
                     proto_tree        *ip_address_mask_tree;
+                    struct e_in6_addr  ip;
+                    const gchar       *s;
 
-                    ip_address_mask_tree = proto_tree_add_subtree(
+                    item = proto_tree_add_text(
                         ip_address_mask_list_tree, tvb, offset, 32,
-                        ett_wimaxasncp_tlv_ip_address_mask, NULL, "IPv6 Address and Mask");
+                        "IPv6 Address and Mask");
+
+                    ip_address_mask_tree = proto_item_add_subtree(
+                        item, ett_wimaxasncp_tlv_ip_address_mask);
 
                     /* --------------------------------------------------------
                      * address
                      * --------------------------------------------------------
                      */
+
+                    tvb_get_ipv6(tvb, offset, &ip);
 
                     proto_tree_add_item(
                         ip_address_mask_tree,
@@ -1509,10 +1526,16 @@ static void wimaxasncp_dissect_tlv_value(
                      * mask
                      * --------------------------------------------------------
                      */
-                    proto_tree_add_item(
+
+                    tvb_get_ipv6(tvb, offset, &ip);
+
+                    s = ip6_to_str(&ip);
+
+                    proto_tree_add_ipv6_format_value(
                         ip_address_mask_tree,
                         tlv_info->hf_ipv6_mask,
-                        tvb, offset, 16, ENC_NA);
+                        tvb, offset, 16, (const guint8*)&ip,
+                        "%s", s);
 
                     /* too long to display ?
                     proto_item_append_text(
@@ -1535,9 +1558,12 @@ static void wimaxasncp_dissect_tlv_value(
                     guint32      ip;
                     const gchar *s;
 
-                    ip_address_mask_tree = proto_tree_add_subtree(
+                    item = proto_tree_add_text(
                         ip_address_mask_list_tree, tvb, offset, 8,
-                        ett_wimaxasncp_tlv_ip_address_mask, NULL, "IPv4 Address and Mask");
+                        "IPv4 Address and Mask");
+
+                    ip_address_mask_tree = proto_item_add_subtree(
+                        item, ett_wimaxasncp_tlv_ip_address_mask);
 
                     /* --------------------------------------------------------
                      * address
@@ -1553,7 +1579,7 @@ static void wimaxasncp_dissect_tlv_value(
 
                     proto_item_append_text(
                         item, " - %s (%s)",
-                        get_hostname(ip), tvb_ip_to_str(tvb, offset));
+                        get_hostname(ip), ip_to_str((guint8 *)&ip));
 
                     offset += 4;
 
@@ -1562,12 +1588,15 @@ static void wimaxasncp_dissect_tlv_value(
                      * --------------------------------------------------------
                      */
 
-                    s = tvb_ip_to_str(tvb, offset);
+                    ip = tvb_get_ipv4(tvb, offset);
 
-                    proto_tree_add_item(
+                    s = ip_to_str((guint8 *)&ip);
+
+                    proto_tree_add_ipv4_format_value(
                         ip_address_mask_tree,
                         tlv_info->hf_ipv4_mask,
-                        tvb, offset, 4, ENC_BIG_ENDIAN);
+                        tvb, offset, 4, ip,
+                        "%s", s);
 
                     proto_item_append_text(
                         item, " / %s", s);
@@ -1681,9 +1710,12 @@ static void wimaxasncp_dissect_tlv_value(
             guint32 vendorId;
             const gchar *vendorName;
 
-            vsif_tree = proto_tree_add_subtree(
+            item = proto_tree_add_text(
                 tree, tvb, offset, length,
-                ett_wimaxasncp_tlv_vendor_specific_information_field, NULL, "Value");
+                "Value");
+
+            vsif_tree = proto_item_add_subtree(
+                item, ett_wimaxasncp_tlv_vendor_specific_information_field);
 
             /* hidden item for filtering */
             item = proto_tree_add_item(
@@ -3230,8 +3262,7 @@ register_wimaxasncp_fields(const char* unused _U_)
             &ett_wimaxasncp_tlv_ip_address_mask_list,
             &ett_wimaxasncp_tlv_ip_address_mask,
             &ett_wimaxasncp_tlv_eap,
-            &ett_wimaxasncp_tlv_vendor_specific_information_field,
-            &ett_wimaxasncp_port_range
+            &ett_wimaxasncp_tlv_vendor_specific_information_field
     };
 
     static ei_register_info ei[] = {
@@ -3501,16 +3532,3 @@ proto_reg_handoff_wimaxasncp(void)
     dissector_add_uint("udp.port", currentPort, wimaxasncp_handle);
 }
 
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

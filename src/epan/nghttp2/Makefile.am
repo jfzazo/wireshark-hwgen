@@ -47,8 +47,7 @@ libnghttp2_la_SOURCES =	\
 
 EXTRA_DIST = \
 	Makefile.common	\
-	Makefile.nmake	\
-	README.nghttp2
+	Makefile.nmake
 
 #
 # Editor modelines  -  https://www.wireshark.org/tools/modelines.html

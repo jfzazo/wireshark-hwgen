@@ -24,11 +24,14 @@
  */
 
 #include "config.h"
-
+#include <glib.h>
+#include <epan/conversation.h>
 #include <epan/packet.h>
+#include <epan/tap.h>
 #include <epan/stats_tree.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
 #include "packet-tcp.h"
 
 void proto_register_hartip(void);
@@ -829,7 +832,7 @@ dissect_hartip_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                       gint offset)
 {
   proto_tree      *hartip_tree, *hdr_tree, *body_tree;
-  proto_item      *hart_item;
+  proto_item      *ti, *hart_item;
   gint             bodylen;
   guint8           message_type, message_id;
   guint16          transaction_id, length;
@@ -844,8 +847,8 @@ dissect_hartip_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   hart_item = proto_tree_add_item(tree, proto_hartip, tvb, 0, length, ENC_NA);
   hartip_tree = proto_item_add_subtree(hart_item, ett_hartip);
 
-  hdr_tree = proto_tree_add_subtree(hartip_tree, tvb, offset, HARTIP_HEADER_LENGTH,
-                      ett_hartip_hdr, NULL, "HART_IP Header");
+  ti = proto_tree_add_text(hartip_tree, tvb, offset, HARTIP_HEADER_LENGTH, "HART_IP Header");
+  hdr_tree = proto_item_add_subtree(ti, ett_hartip_hdr);
 
   proto_tree_add_item(hdr_tree, hf_hartip_hdr_version, tvb, offset, 1, ENC_BIG_ENDIAN);
   offset += 1;
@@ -893,9 +896,9 @@ dissect_hartip_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   bodylen = length - HARTIP_HEADER_LENGTH;
 
   /* add body elements. */
-  body_tree = proto_tree_add_subtree_format(hartip_tree, tvb, offset, bodylen,
-                           ett_hartip_body, NULL,
+  ti = proto_tree_add_text(hartip_tree, tvb, offset, bodylen,
                            "HART_IP Body, %s, %s", msg_id_str, msg_type_str);
+  body_tree = proto_item_add_subtree(ti, ett_hartip_body);
 
   if (message_type == ERROR_MSG_TYPE) {
     offset += dissect_error(body_tree, tvb, offset, bodylen);
@@ -925,8 +928,7 @@ dissect_hartip_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 }
 
 static guint
-get_dissect_hartip_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                       int offset, void *data _U_)
+get_dissect_hartip_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   return tvb_get_ntohs(tvb, offset+6);
 }

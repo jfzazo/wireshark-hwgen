@@ -25,8 +25,10 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
+
 #include <epan/arptypes.h>
+#include <epan/packet.h>
 #include <wiretap/wtap.h>
 
 #include "packet-netlink.h"
@@ -40,37 +42,37 @@ void proto_reg_handoff_netlink(void);
 #define SLL_HEADER_SIZE	16		/* total header length */
 
 static const value_string netlink_family_vals[] = {
-	{ WS_NETLINK_ROUTE,	     "Route" },
-	{ WS_NETLINK_UNUSED,	     "Unused" },
-	{ WS_NETLINK_USERSOCK,	     "user-mode" },
-	{ WS_NETLINK_FIREWALL,	     "Unused (formerly: ip_queue)" },
-	{ WS_NETLINK_SOCK_DIAG,	     "socket monitoring" },
-	{ WS_NETLINK_NFLOG,	     "Netfilter ULOG" },
-	{ WS_NETLINK_XFRM,	     "IPsec" },
-	{ WS_NETLINK_SELINUX,	     "SELinux events" },
-	{ WS_NETLINK_ISCSI,	     "Open-iSCSI" },
-	{ WS_NETLINK_AUDIT,	     "Auditing" },
-	{ WS_NETLINK_FIB_LOOKUP,     "FIB lookup" },
-	{ WS_NETLINK_CONNECTOR,	     "Kernel connector" },
-	{ WS_NETLINK_NETFILTER,	     "Netfilter" },
-	{ WS_NETLINK_IP6_FW,	     "Unused (formerly: ip6_queue)" },
-	{ WS_NETLINK_DNRTMSG,	     "DECnet routing messages" },
+	{ WS_NETLINK_ROUTE,       "Route" },
+	{ WS_NETLINK_UNUSED,      "Unused" },
+	{ WS_NETLINK_USERSOCK,    "user-mode" },
+	{ WS_NETLINK_FIREWALL,    "Unused (formerly: ip_queue)" },
+	{ WS_NETLINK_SOCK_DIAG,   "socket monitoring" },
+	{ WS_NETLINK_NFLOG,       "Netfilter ULOG" },
+	{ WS_NETLINK_XFRM,        "IPsec" },
+	{ WS_NETLINK_SELINUX,     "SELinux events" },
+	{ WS_NETLINK_ISCSI,       "Open-iSCSI" },
+	{ WS_NETLINK_AUDIT,       "Auditing" },
+	{ WS_NETLINK_FIB_LOOKUP,  "FIB lookup" },
+	{ WS_NETLINK_CONNECTOR,   "Kernel connector" },
+	{ WS_NETLINK_NETFILTER,   "Netfilter" },
+	{ WS_NETLINK_IP6_FW,      "Unused (formerly: ip6_queue)" },
+	{ WS_NETLINK_DNRTMSG,     "DECnet routing messages" },
 	{ WS_NETLINK_KOBJECT_UEVENT, "Kernel messages" },
-	{ WS_NETLINK_GENERIC,	     "Generic" },
-	{ WS_NETLINK_SCSITRANSPORT,  "SCSI Transports" },
-	{ WS_NETLINK_ECRYPTFS,	     "ecryptfs" },
-	{ WS_NETLINK_RDMA,	     "RDMA" },
-	{ WS_NETLINK_CRYPTO,	     "Crypto layer" },
+	{ WS_NETLINK_GENERIC,      "Generic" },
+	{ WS_NETLINK_SCSITRANSPORT, "SCSI Transports" },
+	{ WS_NETLINK_ECRYPTFS,     "ecryptfs" },
+	{ WS_NETLINK_RDMA,         "RDMA" },
+	{ WS_NETLINK_CRYPTO,       "Crypto layer" },
 	{ 0, NULL }
 };
 
 value_string_ext netlink_family_vals_ext = VALUE_STRING_EXT_INIT(netlink_family_vals);
 
 static const value_string type_vals[] = {
-	{ WS_NLMSG_NOOP,    "nothing" },
-	{ WS_NLMSG_ERROR,   "error" },
-	{ WS_NLMSG_DONE,    "end of a dump" },
-	{ WS_NLMSG_OVERRUN, "data lost" },
+	{ WS_NLMSG_NOOP,	"nothing" },
+	{ WS_NLMSG_ERROR,	"error" },
+	{ WS_NLMSG_DONE,	"end of a dump" },
+	{ WS_NLMSG_OVERRUN,	"data lost" },
 	{ 0, NULL }
 };
 
@@ -110,10 +112,6 @@ static header_field_info hfi_netlink_hdr_pid NETLINK_HFI_INIT =
 	{ "Port ID", "netlink.hdr_pid", FT_UINT32, BASE_HEX,
 	  NULL, 0x00, NULL, HFILL };
 
-static header_field_info hfi_netlink_attr_len NETLINK_HFI_INIT =
-	{ "Len", "netlink.attr_len", FT_UINT16, BASE_DEC,
-	  NULL, 0x00, NULL, HFILL };
-
 static gint ett_netlink_cooked = -1;
 static gint ett_netlink_msghdr = -1;
 static gint ett_netlink_msg = -1;
@@ -142,9 +140,10 @@ dissect_netlink_attributes(tvbuff_t *tvb, header_field_info *hfi_type, int ett, 
 
 		end_offset = (offset + rta_len + 3) & ~3;
 
-		attr_tree = proto_tree_add_subtree(tree, tvb, offset, end_offset - offset, ett, &ti, "Attribute");
+		ti = proto_tree_add_text(tree, tvb, offset, end_offset - offset, "Attribute");
+		attr_tree = proto_item_add_subtree(ti, ett);
 
-		proto_tree_add_item(attr_tree, &hfi_netlink_attr_len, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+		proto_tree_add_text(attr_tree, tvb, offset, 2, "Len: %d", rta_len);
 		offset += 2;
 
 		rta_type = tvb_get_letohs(tvb, offset);
@@ -175,9 +174,9 @@ dissect_netlink_attributes(tvbuff_t *tvb, header_field_info *hfi_type, int ett, 
 static int
 dissect_netlink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *_data _U_)
 {
-	guint16     protocol, hatype;
+	guint16 protocol, hatype;
 	proto_item *ti;
-	tvbuff_t   *next_tvb;
+	tvbuff_t *next_tvb;
 	proto_tree *fh_tree = NULL;
 
 	int offset;
@@ -226,9 +225,11 @@ dissect_netlink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *_data
 
 		pkt_end_offset = offset + pkt_len;
 
-		fh_msg = proto_tree_add_subtree(tree, tvb, offset, pkt_len, ett_netlink_msg, NULL, "Netlink message");
+		ti = proto_tree_add_text(tree, tvb, offset, pkt_len, "Netlink message");
+		fh_msg = proto_item_add_subtree(ti, ett_netlink_msg);
 
-		fh_hdr = proto_tree_add_subtree(fh_msg, tvb, offset, 16, ett_netlink_msghdr, NULL, "Header");
+		ti = proto_tree_add_text(fh_msg, tvb, offset, 16, "Header");
+		fh_hdr = proto_item_add_subtree(ti, ett_netlink_msghdr);
 
 		proto_tree_add_item(fh_hdr, &hfi_netlink_hdr_len, tvb, offset, 4, encoding);
 		offset += 4;
@@ -288,9 +289,6 @@ proto_register_netlink(void)
 		&hfi_netlink_hdr_flags,
 		&hfi_netlink_hdr_seq,
 		&hfi_netlink_hdr_pid,
-
-	/* Netlink message attribute */
-		&hfi_netlink_attr_len,
 	};
 #endif
 
@@ -325,16 +323,3 @@ proto_reg_handoff_netlink(void)
 
 	dissector_add_uint("wtap_encap", WTAP_ENCAP_NETLINK, netlink_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

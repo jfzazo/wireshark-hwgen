@@ -27,6 +27,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #define ECHO_PORT  7
@@ -117,15 +118,3 @@ void proto_reg_handoff_echo(void)
 
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

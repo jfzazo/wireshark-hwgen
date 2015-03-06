@@ -23,12 +23,11 @@
 
 #include "config.h"
 
+#include <string.h>
 
 #include <epan/packet.h>
 
 #include "packet-ipmi.h"
-
-void proto_register_ipmi_app(void);
 
 static gint ett_ipmi_app_01_byte2 = -1;
 static gint ett_ipmi_app_01_byte3 = -1;
@@ -974,79 +973,79 @@ static const value_string cc62[] = {
 };
 
 static ipmi_cmd_t cmd_app[] = {
-	/* IPM Device Global Commands */
-	{ 0x01, NULL, rs01, NULL, NULL, "Get Device ID", 0 },
-	{ 0x02, NULL, NULL, NULL, NULL, "Cold Reset", 0 },
-	{ 0x03, NULL, NULL, NULL, NULL, "Warm Reset", 0 },
-	{ 0x04, NULL, rs04, NULL, NULL, "Get Self Test Results", 0 },
-	{ 0x05, rq05, NULL, NULL, NULL, "Manufacturing Test On", 0 },
-	{ 0x06, rq06, NULL, NULL, NULL, "Set ACPI Power State", 0 },
-	{ 0x07, NULL, rs07, NULL, NULL, "Get ACPI Power State", 0 },
-	{ 0x08, NULL, rs08, NULL, NULL, "Get Device GUID", 0 },
-	{ 0x09, IPMI_TBD,   NULL, NULL, "Get NetFn Support", 0 },
-	{ 0x0a, IPMI_TBD,   NULL, NULL, "Get Command Support", 0 },
-	{ 0x0b, IPMI_TBD,   NULL, NULL, "Get Command Sub-function Support", 0 },
-	{ 0x0c, IPMI_TBD,   NULL, NULL, "Get Configurable Commands", 0 },
-	{ 0x0d, IPMI_TBD,   NULL, NULL, "Get Configurable Command Sub-functions", 0 },
+  /* IPM Device Global Commands */
+  { 0x01, NULL, rs01, NULL, NULL, "Get Device ID", 0 },
+  { 0x02, NULL, NULL, NULL, NULL, "Cold Reset", 0 },
+  { 0x03, NULL, NULL, NULL, NULL, "Warm Reset", 0 },
+  { 0x04, NULL, rs04, NULL, NULL, "Get Self Test Results", 0 },
+  { 0x05, rq05, NULL, NULL, NULL, "Manufacturing Test On", 0 },
+  { 0x06, rq06, NULL, NULL, NULL, "Set ACPI Power State", 0 },
+  { 0x07, NULL, rs07, NULL, NULL, "Get ACPI Power State", 0 },
+  { 0x08, NULL, rs08, NULL, NULL, "Get Device GUID", 0 },
+  { 0x09, IPMI_TBD,   NULL, NULL, "Get NetFn Support", 0 },
+  { 0x0a, IPMI_TBD,   NULL, NULL, "Get Command Support", 0 },
+  { 0x0b, IPMI_TBD,   NULL, NULL, "Get Command Sub-function Support", 0 },
+  { 0x0c, IPMI_TBD,   NULL, NULL, "Get Configurable Commands", 0 },
+  { 0x0d, IPMI_TBD,   NULL, NULL, "Get Configurable Command Sub-functions", 0 },
 
-	/* BMC Watchdog Timer Commands */
-	{ 0x22, NULL, NULL, cc22, NULL, "Reset Watchdog Timer", 0 },
-	{ 0x24, rq24, NULL, NULL, NULL, "Set Watchdog Timer", 0 },
-	{ 0x25, NULL, rs25, NULL, NULL, "Get Watchdog Timer", 0 },
+  /* BMC Watchdog Timer Commands */
+  { 0x22, NULL, NULL, cc22, NULL, "Reset Watchdog Timer", 0 },
+  { 0x24, rq24, NULL, NULL, NULL, "Set Watchdog Timer", 0 },
+  { 0x25, NULL, rs25, NULL, NULL, "Get Watchdog Timer", 0 },
 
-	/* BMC Device and Messaging Commands */
-	{ 0x2e, rq2e, NULL, NULL, NULL, "Set BMC Global Enables", 0 },
-	{ 0x2f, NULL, rs2f, NULL, NULL, "Get BMC Global Enables", 0 },
-	{ 0x30, rq30, NULL, NULL, NULL, "Clear Message Flags", 0 },
-	{ 0x31, NULL, rs31, NULL, NULL, "Get Message Flags", 0 },
-	{ 0x32, rq32, rs32, NULL, NULL, "Enable Message Channel Receive", 0 },
-	{ 0x33, NULL, rs33, cc33, NULL, "Get Message", CMD_CALLRQ },
-	{ 0x34, rq34, rs34, cc34, NULL, "Send Message", CMD_CALLRQ },
-	{ 0x35, IPMI_TBD,   cc35, NULL, "Read Event Message Buffer", 0 },
-	{ 0x36, IPMI_TBD,   NULL, NULL, "Get BT Interface Capabilities", 0 },
-	{ 0x37, IPMI_TBD,   NULL, NULL, "Get System GUID", 0 },
-	{ 0x38, rq38, rs38, NULL, NULL, "Get Channel Authentication Capabilities", 0 },
-	{ 0x39, rq39, rs39, cc39, NULL, "Get Session Challenge", 0 },
-	{ 0x3a, rq3a, rs3a, cc3a, NULL, "Activate Session", 0 },
-	{ 0x3b, rq3b, rs3b, cc3b, NULL, "Set Session Privilege Level", 0 },
-	{ 0x3c, rq3c, NULL, cc3c, NULL, "Close Session", 0 },
-	{ 0x3d, IPMI_TBD,   NULL, NULL, "Get Session Info", 0 },
-	{ 0x3f, IPMI_TBD,   NULL, NULL, "Get AuthCode", 0 },
-	{ 0x40, IPMI_TBD,   cc40, NULL, "Set Channel Access", 0 },
-	{ 0x41, IPMI_TBD,   cc41, NULL, "Get Channel Access", 0 },
-	{ 0x42, IPMI_TBD,   NULL, NULL, "Get Channel Info", 0 },
-	{ 0x43, IPMI_TBD,   NULL, NULL, "Set User Access", 0 },
-	{ 0x44, IPMI_TBD,   NULL, NULL, "Get User Access", 0 },
-	{ 0x45, IPMI_TBD,   NULL, NULL, "Set User Name", 0 },
-	{ 0x46, IPMI_TBD,   NULL, NULL, "Get User Name", 0 },
-	{ 0x47, IPMI_TBD,   cc47, NULL, "Set User Password", 0 },
-	{ 0x48, IPMI_TBD,   cc48, NULL, "Activate Payload", 0 },
-	{ 0x49, IPMI_TBD,   cc49, NULL, "Deactivate Payload", 0 },
-	{ 0x4a, IPMI_TBD,   NULL, NULL, "Get Payload Activation Status", 0 },
-	{ 0x4b, IPMI_TBD,   NULL, NULL, "Get Payload Instance Info", 0 },
-	{ 0x4c, IPMI_TBD,   NULL, NULL, "Set User Payload Access", 0 },
-	{ 0x4d, IPMI_TBD,   NULL, NULL, "Get User Payload Access", 0 },
-	{ 0x4e, IPMI_TBD,   NULL, NULL, "Get Channel Payload Support", 0 },
-	{ 0x4f, IPMI_TBD,   cc4f, NULL, "Get Channel Payload Version", 0 },
-	{ 0x50, IPMI_TBD,   cc50, NULL, "Get Channel OEM Payload Info", 0 },
-	{ 0x52, IPMI_TBD,   cc52, NULL, "Master Write-Read", 0 },
-	{ 0x54, IPMI_TBD,   NULL, NULL, "Get Channel Cipher Suites", 0 },
-	{ 0x55, IPMI_TBD,   cc55, NULL, "Suspend/Resume Payload Encryption", 0 },
-	{ 0x56, IPMI_TBD,   cc56, NULL, "Set Channel Security Keys", 0 },
-	{ 0x57, IPMI_TBD,   NULL, NULL, "Get System Interface Capabilities", 0 },
-	{ 0x58, IPMI_TBD,   cc58, NULL, "Set System Info Parameters", 0 },
-	{ 0x59, IPMI_TBD,   cc59, NULL, "Get System Info Parameters", 0 },
+  /* BMC Device and Messaging Commands */
+  { 0x2e, rq2e, NULL, NULL, NULL, "Set BMC Global Enables", 0 },
+  { 0x2f, NULL, rs2f, NULL, NULL, "Get BMC Global Enables", 0 },
+  { 0x30, rq30, NULL, NULL, NULL, "Clear Message Flags", 0 },
+  { 0x31, NULL, rs31, NULL, NULL, "Get Message Flags", 0 },
+  { 0x32, rq32, rs32, NULL, NULL, "Enable Message Channel Receive", 0 },
+  { 0x33, NULL, rs33, cc33, NULL, "Get Message", CMD_CALLRQ },
+  { 0x34, rq34, rs34, cc34, NULL, "Send Message", CMD_CALLRQ },
+  { 0x35, IPMI_TBD,   cc35, NULL, "Read Event Message Buffer", 0 },
+  { 0x36, IPMI_TBD,   NULL, NULL, "Get BT Interface Capabilities", 0 },
+  { 0x37, IPMI_TBD,   NULL, NULL, "Get System GUID", 0 },
+  { 0x38, rq38, rs38, NULL, NULL, "Get Channel Authentication Capabilities", 0 },
+  { 0x39, rq39, rs39, cc39, NULL, "Get Session Challenge", 0 },
+  { 0x3a, rq3a, rs3a, cc3a, NULL, "Activate Session", 0 },
+  { 0x3b, rq3b, rs3b, cc3b, NULL, "Set Session Privilege Level", 0 },
+  { 0x3c, rq3c, NULL, cc3c, NULL, "Close Session", 0 },
+  { 0x3d, IPMI_TBD,   NULL, NULL, "Get Session Info", 0 },
+  { 0x3f, IPMI_TBD,   NULL, NULL, "Get AuthCode", 0 },
+  { 0x40, IPMI_TBD,   cc40, NULL, "Set Channel Access", 0 },
+  { 0x41, IPMI_TBD,   cc41, NULL, "Get Channel Access", 0 },
+  { 0x42, IPMI_TBD,   NULL, NULL, "Get Channel Info", 0 },
+  { 0x43, IPMI_TBD,   NULL, NULL, "Set User Access", 0 },
+  { 0x44, IPMI_TBD,   NULL, NULL, "Get User Access", 0 },
+  { 0x45, IPMI_TBD,   NULL, NULL, "Set User Name", 0 },
+  { 0x46, IPMI_TBD,   NULL, NULL, "Get User Name", 0 },
+  { 0x47, IPMI_TBD,   cc47, NULL, "Set User Password", 0 },
+  { 0x48, IPMI_TBD,   cc48, NULL, "Activate Payload", 0 },
+  { 0x49, IPMI_TBD,   cc49, NULL, "Deactivate Payload", 0 },
+  { 0x4a, IPMI_TBD,   NULL, NULL, "Get Payload Activation Status", 0 },
+  { 0x4b, IPMI_TBD,   NULL, NULL, "Get Payload Instance Info", 0 },
+  { 0x4c, IPMI_TBD,   NULL, NULL, "Set User Payload Access", 0 },
+  { 0x4d, IPMI_TBD,   NULL, NULL, "Get User Payload Access", 0 },
+  { 0x4e, IPMI_TBD,   NULL, NULL, "Get Channel Payload Support", 0 },
+  { 0x4f, IPMI_TBD,   cc4f, NULL, "Get Channel Payload Version", 0 },
+  { 0x50, IPMI_TBD,   cc50, NULL, "Get Channel OEM Payload Info", 0 },
+  { 0x52, IPMI_TBD,   cc52, NULL, "Master Write-Read", 0 },
+  { 0x54, IPMI_TBD,   NULL, NULL, "Get Channel Cipher Suites", 0 },
+  { 0x55, IPMI_TBD,   cc55, NULL, "Suspend/Resume Payload Encryption", 0 },
+  { 0x56, IPMI_TBD,   cc56, NULL, "Set Channel Security Keys", 0 },
+  { 0x57, IPMI_TBD,   NULL, NULL, "Get System Interface Capabilities", 0 },
+  { 0x58, IPMI_TBD,   cc58, NULL, "Set System Info Parameters", 0 },
+  { 0x59, IPMI_TBD,   cc59, NULL, "Get System Info Parameters", 0 },
 
-	/* Device "Global" commands, continued */
-	{ 0x60, IPMI_TBD,   cc60, NULL, "Set Command Enables", 0 },
-	{ 0x61, IPMI_TBD,   NULL, NULL, "Get Command Enables", 0 },
-	{ 0x62, IPMI_TBD,   cc62, NULL, "Set Command Sub-function Enables", 0 },
-	{ 0x63, IPMI_TBD,   NULL, NULL, "Get Command Sub-function Enables", 0 },
-	{ 0x64, IPMI_TBD,   NULL, NULL, "Get OEM NetFn IANA Support", 0 },
+  /* Device "Global" commands, continued */
+  { 0x60, IPMI_TBD,   cc60, NULL, "Set Command Enables", 0 },
+  { 0x61, IPMI_TBD,   NULL, NULL, "Get Command Enables", 0 },
+  { 0x62, IPMI_TBD,   cc62, NULL, "Set Command Sub-function Enables", 0 },
+  { 0x63, IPMI_TBD,   NULL, NULL, "Get Command Sub-function Enables", 0 },
+  { 0x64, IPMI_TBD,   NULL, NULL, "Get OEM NetFn IANA Support", 0 },
 };
 
 void
-proto_register_ipmi_app(void)
+ipmi_register_app(gint proto_ipmi)
 {
 	static hf_register_info hf[] = {
 		{ &hf_ipmi_app_01_dev_id,
@@ -1106,7 +1105,7 @@ proto_register_ipmi_app(void)
 
 		{ &hf_ipmi_app_04_result,
 			{ "Self test result",
-				"ipmi.app04.self_test_result", FT_UINT8, BASE_HEX, VALS(vals_04_result), 0, NULL, HFILL }},
+				"ipmi.app04.self_test_result", FT_UINT8, BASE_HEX, vals_04_result, 0, NULL, HFILL }},
 		{ &hf_ipmi_app_04_fail,
 			{ "Self-test error bitfield",
 				"ipmi.app04.fail", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
@@ -1144,20 +1143,20 @@ proto_register_ipmi_app(void)
 				"ipmi.app06.syspwr.set", FT_BOOLEAN, 8, TFS(&tfs_06_pwr), 0x80, NULL, HFILL }},
 		{ &hf_ipmi_app_06_syspwr_enum,
 			{ "System Power State enumeration",
-				"ipmi.app06.syspwr.enum", FT_UINT8, BASE_HEX, VALS(vals_06_syspwr), 0x7f, NULL, HFILL }},
+				"ipmi.app06.syspwr.enum", FT_UINT8, BASE_HEX, vals_06_syspwr, 0x7f, NULL, HFILL }},
 		{ &hf_ipmi_app_06_devpwr_set,
 			{ "Device Power State",
 				"ipmi.app06.devpwr.set", FT_BOOLEAN, 8, TFS(&tfs_06_pwr), 0x80, NULL, HFILL }},
 		{ &hf_ipmi_app_06_devpwr_enum,
 			{ "Device Power State enumeration",
-				"ipmi.app06.devpwr.enum", FT_UINT8, BASE_HEX, VALS(vals_06_devpwr), 0x7f, NULL, HFILL }},
+				"ipmi.app06.devpwr.enum", FT_UINT8, BASE_HEX, vals_06_devpwr, 0x7f, NULL, HFILL }},
 
 		{ &hf_ipmi_app_07_syspwr_enum,
 			{ "ACPI System Power State",
-				"ipmi.app07.syspwr", FT_UINT8, BASE_HEX, VALS(vals_07_syspwr), 0x7f, NULL, HFILL }},
+				"ipmi.app07.syspwr", FT_UINT8, BASE_HEX, vals_07_syspwr, 0x7f, NULL, HFILL }},
 		{ &hf_ipmi_app_07_devpwr_enum,
 			{ "ACPI Device Power State",
-				"ipmi.app07.devpwr", FT_UINT8, BASE_HEX, VALS(vals_07_devpwr), 0x7f, NULL, HFILL }},
+				"ipmi.app07.devpwr", FT_UINT8, BASE_HEX, vals_07_devpwr, 0x7f, NULL, HFILL }},
 
 		{ &hf_ipmi_app_08_guid,
 			{ "GUID",
@@ -1171,13 +1170,13 @@ proto_register_ipmi_app(void)
 				"ipmi.app24.timer_use.dont_stop", FT_BOOLEAN, 8, NULL, 0x40, NULL, HFILL }},
 		{ &hf_ipmi_app_24_timer_use_timer_use,
 			{ "Timer use",
-				"ipmi.app24.timer_use.timer_use", FT_UINT8, BASE_HEX, VALS(vals_24_timer_use), 0x07, NULL, HFILL }},
+				"ipmi.app24.timer_use.timer_use", FT_UINT8, BASE_HEX, vals_24_timer_use, 0x07, NULL, HFILL }},
 		{ &hf_ipmi_app_24_timer_action_interrupt,
 			{ "Pre-timeout interrupt",
-				"ipmi.app24.timer_action.interrupt", FT_UINT8, BASE_HEX, VALS(vals_24_timer_action_interrupt), 0x70, NULL, HFILL }},
+				"ipmi.app24.timer_action.interrupt", FT_UINT8, BASE_HEX, vals_24_timer_action_interrupt, 0x70, NULL, HFILL }},
 		{ &hf_ipmi_app_24_timer_action_timeout_action,
 			{ "Timeout action",
-				"ipmi.app24.timer_action.timeout", FT_UINT8, BASE_HEX, VALS(vals_24_timer_action_timeout), 0x07, NULL, HFILL }},
+				"ipmi.app24.timer_action.timeout", FT_UINT8, BASE_HEX, vals_24_timer_action_timeout, 0x07, NULL, HFILL }},
 		{ &hf_ipmi_app_24_pretimeout,
 			{ "Pre-timeout interval",
 				"ipmi.app24.pretimeout", FT_UINT8, BASE_CUSTOM, ipmi_fmt_1s_1based, 0, NULL, HFILL }},
@@ -1208,13 +1207,13 @@ proto_register_ipmi_app(void)
 				"ipmi.app25.timer_use.started", FT_BOOLEAN, 8, NULL, 0x40, NULL, HFILL }},
 		{ &hf_ipmi_app_25_timer_use_timer_use,
 			{ "Timer user",
-				"ipmi.app25.timer_use.timer_use", FT_UINT8, BASE_HEX, VALS(vals_24_timer_use), 0x07, NULL, HFILL }},
+				"ipmi.app25.timer_use.timer_use", FT_UINT8, BASE_HEX, vals_24_timer_use, 0x07, NULL, HFILL }},
 		{ &hf_ipmi_app_25_timer_action_interrupt,
 			{ "Pre-timeout interrupt",
-				"ipmi.app25.timer_action.interrupt", FT_UINT8, BASE_HEX, VALS(vals_24_timer_action_interrupt), 0x70, NULL, HFILL }},
+				"ipmi.app25.timer_action.interrupt", FT_UINT8, BASE_HEX, vals_24_timer_action_interrupt, 0x70, NULL, HFILL }},
 		{ &hf_ipmi_app_25_timer_action_timeout_action,
 			{ "Timeout action",
-				"ipmi.app25.timer_action.timeout", FT_UINT8, BASE_HEX, VALS(vals_24_timer_action_timeout), 0x07, NULL, HFILL }},
+				"ipmi.app25.timer_action.timeout", FT_UINT8, BASE_HEX, vals_24_timer_action_timeout, 0x07, NULL, HFILL }},
 		{ &hf_ipmi_app_25_pretimeout,
 			{ "Pre-timeout interval",
 				"ipmi.app25.pretimeout", FT_UINT8, BASE_CUSTOM, ipmi_fmt_1s_1based, 0, NULL, HFILL }},
@@ -1327,7 +1326,7 @@ proto_register_ipmi_app(void)
 				"ipmi.app32.rq_chno", FT_UINT8, BASE_CUSTOM, ipmi_fmt_channel, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_app_32_rq_state,
 			{ "Channel State",
-				"ipmi.app32.rq_state", FT_UINT8, BASE_HEX, VALS(vals_32_state), 0x03, NULL, HFILL }},
+				"ipmi.app32.rq_state", FT_UINT8, BASE_HEX, vals_32_state, 0x03, NULL, HFILL }},
 		{ &hf_ipmi_app_32_rs_chno,
 			{ "Channel",
 				"ipmi.app32.rs_chno", FT_UINT8, BASE_CUSTOM, ipmi_fmt_channel, 0x0f, NULL, HFILL }},
@@ -1347,7 +1346,7 @@ proto_register_ipmi_app(void)
 
 		{ &hf_ipmi_app_34_track,
 			{ "Tracking",
-				"ipmi.app34.track", FT_UINT8, BASE_HEX, VALS(vals_34_track), 0xc0, NULL, HFILL }},
+				"ipmi.app34.track", FT_UINT8, BASE_HEX, vals_34_track, 0xc0, NULL, HFILL }},
 		{ &hf_ipmi_app_34_encrypt,
 			{ "Encryption required",
 				"ipmi.app34.encrypt", FT_BOOLEAN, 8, NULL, 0x20, NULL, HFILL }},
@@ -1369,13 +1368,13 @@ proto_register_ipmi_app(void)
 				"ipmi.app38.rq_chan", FT_UINT8, BASE_CUSTOM, ipmi_fmt_channel, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_app_38_rq_priv,
 			{ "Requested privilege level",
-				"ipmi.app38.rq_priv", FT_UINT8, BASE_HEX, VALS(vals_XX_priv), 0x0f, NULL, HFILL }},
+				"ipmi.app38.rq_priv", FT_UINT8, BASE_HEX, vals_XX_priv, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_app_38_rs_chan,
 			{ "Channel",
 				"ipmi.app38.rs_chan", FT_UINT8, BASE_CUSTOM, ipmi_fmt_channel, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_app_38_rs_ipmi20,
 			{ "Version compatibility",
-				"ipmi.app38.rs_ipmi20", FT_UINT8, BASE_DEC, VALS(vals_38_ipmi20), 0x80, NULL, HFILL }},
+				"ipmi.app38.rs_ipmi20", FT_UINT8, BASE_DEC, vals_38_ipmi20, 0x80, NULL, HFILL }},
 		{ &hf_ipmi_app_38_rs_auth_oem,
 			{ "OEM Proprietary authentication",
 				"ipmi.app38.rs_auth_oem", FT_BOOLEAN, 8, TFS(&tfs_38_supp), 0x20, NULL, HFILL }},
@@ -1424,7 +1423,7 @@ proto_register_ipmi_app(void)
 
 		{ &hf_ipmi_app_39_authtype,
 			{ "Authentication Type",
-				"ipmi.app39.authtype", FT_UINT8, BASE_HEX, VALS(vals_XX_auth), 0x0f, NULL, HFILL }},
+				"ipmi.app39.authtype", FT_UINT8, BASE_HEX, vals_XX_auth, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_app_39_user,
 			{ "User Name",
 				"ipmi.app39.user", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
@@ -1437,10 +1436,10 @@ proto_register_ipmi_app(void)
 
 		{ &hf_ipmi_app_3a_authtype,
 			{ "Authentication Type",
-				"ipmi.app3a.authtype", FT_UINT8, BASE_HEX, VALS(vals_XX_auth), 0x0f, NULL, HFILL }},
+				"ipmi.app3a.authtype", FT_UINT8, BASE_HEX, vals_XX_auth, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_app_3a_privlevel,
 			{ "Requested Maximum Privilege Level",
-				"ipmi.app3a.privlevel", FT_UINT8, BASE_HEX, VALS(vals_XX_priv), 0x0f, NULL, HFILL }},
+				"ipmi.app3a.privlevel", FT_UINT8, BASE_HEX, vals_XX_priv, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_app_3a_authcode,
 			{ "Challenge string/Auth Code",
 				"ipmi.app3a.authcode", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
@@ -1449,7 +1448,7 @@ proto_register_ipmi_app(void)
 				"ipmi.app3a.outbound_seq", FT_UINT32, BASE_HEX, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_app_3a_authtype_session,
 			{ "Authentication Type for session",
-				"ipmi.app3a.authtype_session", FT_UINT8, BASE_HEX, VALS(vals_XX_auth), 0x0f, NULL, HFILL }},
+				"ipmi.app3a.authtype_session", FT_UINT8, BASE_HEX, vals_XX_auth, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_app_3a_session_id,
 			{ "Session ID",
 				"ipmi.app3a.session_id", FT_UINT32, BASE_HEX, NULL, 0, NULL, HFILL }},
@@ -1458,14 +1457,14 @@ proto_register_ipmi_app(void)
 				"ipmi.app3a.inbound_seq", FT_UINT32, BASE_HEX, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_app_3a_maxpriv_session,
 			{ "Maximum Privilege Level for session",
-				"ipmi.app3a.maxpriv_session", FT_UINT8, BASE_HEX, VALS(vals_XX_priv), 0x0f, NULL, HFILL }},
+				"ipmi.app3a.maxpriv_session", FT_UINT8, BASE_HEX, vals_XX_priv, 0x0f, NULL, HFILL }},
 
 		{ &hf_ipmi_app_3b_req_priv,
 			{ "Requested Privilege Level",
-				"ipmi.app3b.req_priv", FT_UINT8, BASE_HEX, VALS(vals_XX_priv), 0x0f, NULL, HFILL }},
+				"ipmi.app3b.req_priv", FT_UINT8, BASE_HEX, vals_XX_priv, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_app_3b_new_priv,
 			{ "New Privilege Level",
-				"ipmi.app3b.new_priv", FT_UINT8, BASE_HEX, VALS(vals_XX_priv), 0x0f, NULL, HFILL }},
+				"ipmi.app3b.new_priv", FT_UINT8, BASE_HEX, vals_XX_priv, 0x0f, NULL, HFILL }},
 
 		{ &hf_ipmi_app_3c_session_id,
 			{ "Session ID",
@@ -1521,16 +1520,3 @@ proto_register_ipmi_app(void)
 	ipmi_register_netfn_cmdtab(IPMI_APP_REQ, IPMI_OEM_NONE, NULL, 0, NULL,
 			cmd_app, array_length(cmd_app));
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -23,6 +23,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 void proto_register_gdsdb(void);
@@ -440,7 +442,7 @@ gdsdb_connect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 							offset, 4, ENC_BIG_ENDIAN);
 		offset += 4;
 		proto_tree_add_item(tree, hf_gdsdb_connect_filename, tvb,
-							offset, 4, ENC_ASCII|ENC_BIG_ENDIAN);
+							offset, 4, ENC_ASCII|ENC_NA);
 		length = tvb_get_ntohl(tvb, offset);
 		offset += length + 6;
 		proto_tree_add_item(tree, hf_gdsdb_connect_count, tvb,
@@ -448,7 +450,7 @@ gdsdb_connect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		count = tvb_get_ntohl(tvb, offset);
 		offset += 4;
 		proto_tree_add_item(tree, hf_gdsdb_connect_userid, tvb,
-							offset, 4, ENC_ASCII|ENC_BIG_ENDIAN);
+							offset, 4, ENC_ASCII|ENC_NA);
 		length = tvb_get_ntohl(tvb, offset);
 		offset += length + 5;
 		for(i=0;i<count;i++){
@@ -536,18 +538,18 @@ gdsdb_attach(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 		return 0;
 	}
 
-	col_append_str(pinfo->cinfo, COL_INFO, ": ");
+    col_append_str(pinfo->cinfo, COL_INFO, ": ");
 	col_append_str(pinfo->cinfo, COL_INFO,
 			tvb_format_text(tvb, 12,
 				tvb_get_ntohl(tvb, 8)));
 
-	if (tree) {
+    if (tree) {
 		offset = 4;
 		proto_tree_add_item(tree, hf_gdsdb_attach_database, tvb,
 							offset, 4, ENC_BIG_ENDIAN);
 		offset += 4;
 		proto_tree_add_item(tree, hf_gdsdb_attach_filename, tvb,
-							offset, 4, ENC_ASCII|ENC_BIG_ENDIAN);
+							offset, 4, ENC_ASCII|ENC_NA);
 		length = tvb_get_ntohl(tvb, offset);
 		offset += length + 6;
 		proto_tree_add_uint_format_value(tree,
@@ -572,7 +574,7 @@ gdsdb_compile(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 							offset, 4, ENC_BIG_ENDIAN);
 		offset += 4;
 		proto_tree_add_item(tree, hf_gdsdb_compile_blr, tvb,
-							offset, 4, ENC_ASCII|ENC_BIG_ENDIAN);
+							offset, 4, ENC_ASCII|ENC_NA);
 	}
 
 	return tvb_length(tvb);
@@ -663,7 +665,7 @@ gdsdb_response(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 							offset, 8, ENC_BIG_ENDIAN);
 		offset += 8;
 		proto_tree_add_item(tree, hf_gdsdb_response_data, tvb,
-							offset, 4, ENC_ASCII|ENC_BIG_ENDIAN);
+							offset, 4, ENC_ASCII|ENC_NA);
 		length = tvb_get_ntohl(tvb, offset);
 		offset += length + 4;
 		proto_tree_add_item(tree, hf_gdsdb_response_status, tvb,
@@ -723,7 +725,7 @@ gdsdb_open_blob2(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 	if (tree) {
 		offset = 4;
 		proto_tree_add_item(tree, hf_gdsdb_openblob2_bpb, tvb, offset,
-								4, ENC_ASCII|ENC_BIG_ENDIAN);
+								4, ENC_ASCII|ENC_NA);
 		length = tvb_get_ntohl(tvb, offset);
 		offset += length + 6;
 		proto_tree_add_item(tree, hf_gdsdb_openblob_transaction, tvb,
@@ -827,7 +829,7 @@ gdsdb_info(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 		offset += 4;
 		if(opcode == op_service_info) {
 			proto_tree_add_item(tree, hf_gdsdb_info_items, tvb,
-							offset, 4, ENC_ASCII|ENC_BIG_ENDIAN);
+							offset, 4, ENC_ASCII|ENC_NA);
 			length = tvb_get_ntohl(tvb, offset);
 			offset += length + 6;
 		}
@@ -1022,7 +1024,7 @@ gdsdb_prepare(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 			tvb_format_text(tvb, 20,
 				tvb_get_ntohl(tvb, 16)));
 
-	if(tree) {
+    if(tree) {
 		offset = 4;
 		proto_tree_add_item(tree, hf_gdsdb_prepare_transaction, tvb,
 							offset, 4, ENC_BIG_ENDIAN);
@@ -1034,7 +1036,7 @@ gdsdb_prepare(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 							offset, 4, ENC_BIG_ENDIAN);
 		offset += 4;
 		proto_tree_add_item(tree, hf_gdsdb_prepare_querystr, tvb,
-							offset, 4, ENC_ASCII|ENC_BIG_ENDIAN);
+							offset, 4, ENC_ASCII|ENC_NA);
 		length = tvb_get_ntohl(tvb, offset);
 		offset += length + 6;
 		proto_tree_add_uint_format_value(tree,
@@ -1849,16 +1851,3 @@ proto_reg_handoff_gdsdb(void)
 								 proto_gdsdb);
 	dissector_add_uint("tcp.port", TCP_PORT, gdsdb_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

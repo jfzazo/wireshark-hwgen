@@ -1,8 +1,5 @@
 #
 MACRO(REGISTER_DISSECTOR_FILES _outputfile _registertype )
-	include(LocatePythonModule)
-	locate_python_module(make-dissector-reg REQUIRED PATHS ${CMAKE_SOURCE_DIR}/tools)
-
 	if(${_registertype} STREQUAL "dissectors" )
 	    set( _makeregistertype "dissectorsinfile" )
 	    set( _ftmp "${CMAKE_CURRENT_BINARY_DIR}/_regc.tmp" )
@@ -21,12 +18,14 @@ MACRO(REGISTER_DISSECTOR_FILES _outputfile _registertype )
 	    OUTPUT
 	      ${_outputfile}
 	    COMMAND ${PYTHON_EXECUTABLE}
-	      ${PY_MAKE-DISSECTOR-REG}
+	      ${CMAKE_SOURCE_DIR}/tools/make-dissector-reg.py
 	      ${CMAKE_CURRENT_SOURCE_DIR}
 	      ${_makeregistertype}
 	      ${_sources}
 	    DEPENDS
 	      ${_depends}
-	      ${PY_MAKE-DISSECTOR-REG}
+	      ${CMAKE_SOURCE_DIR}/tools/make-dissector-reg
+	      ${CMAKE_SOURCE_DIR}/tools/make-dissector-reg.py
 	)
 ENDMACRO(REGISTER_DISSECTOR_FILES)
+

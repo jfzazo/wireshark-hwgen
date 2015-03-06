@@ -24,6 +24,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
@@ -46,7 +48,6 @@ void proto_reg_handoff_ccsds(void);
 static int proto_ccsds = -1;
 
 /* primary ccsds header */
-static int hf_ccsds_header_flags = -1;
 static int hf_ccsds_apid = -1;
 static int hf_ccsds_version = -1;
 static int hf_ccsds_secheader = -1;
@@ -77,8 +78,6 @@ static int hf_ccsds_format_version_id = -1;
 static int hf_ccsds_extended_format_id = -1;
 /* static int hf_ccsds_spare3 = -1; */
 static int hf_ccsds_frame_id = -1;
-static int hf_ccsds_embedded_time = -1;
-static int hf_ccsds_user_data = -1;
 
 /* ccsds checkword (checksum) */
 static int hf_ccsds_checkword = -1;
@@ -86,14 +85,12 @@ static int hf_ccsds_checkword_good = -1;
 static int hf_ccsds_checkword_bad = -1;
 
 /* Initialize the subtree pointers */
-static gint ett_ccsds_primary_header_flags = -1;
 static gint ett_ccsds = -1;
 static gint ett_ccsds_primary_header = -1;
 static gint ett_ccsds_secondary_header = -1;
 static gint ett_ccsds_checkword = -1;
 
 static expert_field ei_ccsds_length_error = EI_INIT;
-static expert_field ei_ccsds_checkword = EI_INIT;
 
 /* Dissectot table */
 static dissector_table_t ccsds_dissector_table;
@@ -293,7 +290,7 @@ static const char* embedded_time_to_string ( int coarse_time, int fine_time )
     fraction = ( multiplier * ( (int)fine_time & 0xff ) ) / 256;
     t.nsecs = fraction*1000000; /* msecs to nsecs */
 
-    return abs_time_to_str(wmem_packet_scope(), &t, ABSOLUTE_TIME_DOY_UTC, TRUE);
+    return abs_time_to_ep_str(&t, ABSOLUTE_TIME_DOY_UTC, TRUE);
 }
 
 
@@ -317,18 +314,12 @@ dissect_ccsds(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     gint         reported_length;
     guint8       checkword_flag  = 0;
     gint         counter         = 0;
-    proto_item  *item, *checkword_item = NULL;
+    proto_item  *item;
     proto_tree  *checkword_tree;
     guint16      checkword_field = 0;
     guint16      checkword_sum   = 0;
     tvbuff_t    *next_tvb;
-    static const int * header_flags[] = {
-        &hf_ccsds_version,
-        &hf_ccsds_type,
-        &hf_ccsds_secheader,
-        &hf_ccsds_apid,
-        NULL
-    };
+
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "CCSDS");
     col_set_str(pinfo->cinfo, COL_INFO, "CCSDS Packet");
@@ -355,11 +346,13 @@ dissect_ccsds(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     ccsds_tree   = proto_item_add_subtree(ccsds_packet, ett_ccsds);
 
             /* build the ccsds primary header tree */
-    primary_header_tree = proto_tree_add_subtree(ccsds_tree, tvb, offset, CCSDS_PRIMARY_HEADER_LENGTH,
-                            ett_ccsds_primary_header, &primary_header, "Primary CCSDS Header");
+    primary_header = proto_tree_add_text(ccsds_tree, tvb, offset, CCSDS_PRIMARY_HEADER_LENGTH, "Primary CCSDS Header");
+    primary_header_tree = proto_item_add_subtree(primary_header, ett_ccsds_primary_header);
 
-    proto_tree_add_bitmask(primary_header_tree, tvb, offset, hf_ccsds_header_flags,
-                    ett_ccsds_primary_header_flags, header_flags, ENC_BIG_ENDIAN);
+    proto_tree_add_uint(primary_header_tree, hf_ccsds_version, tvb, offset, 2, first_word);
+    proto_tree_add_uint(primary_header_tree, hf_ccsds_type, tvb, offset, 2, first_word);
+    proto_tree_add_boolean(primary_header_tree, hf_ccsds_secheader, tvb, offset, 2, first_word);
+    proto_tree_add_uint(primary_header_tree, hf_ccsds_apid, tvb, offset, 2, first_word);
     offset += 2;
 
     proto_tree_add_item(primary_header_tree, hf_ccsds_seqflag, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -378,8 +371,8 @@ dissect_ccsds(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     /* build the ccsds secondary header tree */
     if ( first_word & HDR_SECHDR )
     {
-        secondary_header_tree = proto_tree_add_subtree(ccsds_tree, tvb, offset, CCSDS_SECONDARY_HEADER_LENGTH,
-                        ett_ccsds_secondary_header, &secondary_header, "Secondary CCSDS Header");
+        secondary_header = proto_tree_add_text(ccsds_tree, tvb, offset, CCSDS_SECONDARY_HEADER_LENGTH, "Secondary CCSDS Header");
+        secondary_header_tree = proto_item_add_subtree(secondary_header, ett_ccsds_secondary_header);
 
                     /* command ccsds secondary header flags */
             coarse_time = tvb_get_ntohl(tvb, offset);
@@ -391,10 +384,10 @@ dissect_ccsds(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         ++offset;
 
         time_string = embedded_time_to_string ( coarse_time, fine_time );
-        proto_tree_add_string(secondary_header_tree, hf_ccsds_embedded_time, tvb, offset-5, 5, time_string);
+        proto_tree_add_text(secondary_header_tree, tvb, offset-5, 5, "%s = Embedded Time", time_string);
 
         proto_tree_add_item(secondary_header_tree, hf_ccsds_timeid, tvb, offset, 1, ENC_BIG_ENDIAN);
-        checkword_item = proto_tree_add_item(secondary_header_tree, hf_ccsds_checkword_flag, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(secondary_header_tree, hf_ccsds_checkword_flag, tvb, offset, 1, ENC_BIG_ENDIAN);
 
         /* Global Preference: how to handle checkword flag */
         switch (global_dissect_checkword) {
@@ -455,10 +448,10 @@ dissect_ccsds(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     if (reported_length < ccsds_length || ccsds_length < CCSDS_PRIMARY_HEADER_LENGTH + CCSDS_SECONDARY_HEADER_LENGTH) {
         /* Label CCSDS payload 'User Data' */
         if (length > offset)
-            proto_tree_add_item(ccsds_tree, hf_ccsds_user_data, tvb, offset, length-offset, ENC_NA);
+            proto_tree_add_text(ccsds_tree, tvb, offset, length-offset, "User Data");
         offset += length-offset;
         if (checkword_flag == 1)
-            expert_add_info(pinfo, checkword_item, &ei_ccsds_checkword);
+            proto_tree_add_text(ccsds_tree, tvb, offset, 0, "Packet does not contain a Checkword");
     }
     /*  Handle checkword according to CCSDS preference setting. */
     else {
@@ -466,7 +459,7 @@ dissect_ccsds(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         /* Look for a subdissector for the CCSDS payload */
         if (!dissector_try_uint(ccsds_dissector_table, first_word&HDR_APID, next_tvb, pinfo, tree)) {
           /* If no subdissector is found, label the CCSDS payload as 'User Data' */
-          proto_tree_add_item(ccsds_tree, hf_ccsds_user_data, tvb, offset, length-offset-2*checkword_flag, ENC_NA);
+          proto_tree_add_text(ccsds_tree, tvb, offset, length-offset-2*checkword_flag, "User Data");
         }
         offset += length-offset-2*checkword_flag;
 
@@ -512,11 +505,6 @@ proto_register_ccsds(void)
     static hf_register_info hf[] = {
 
             /* primary ccsds header flags */
-        { &hf_ccsds_header_flags,
-            { "Header Flags",           "ccsds.header_flags",
-            FT_UINT16, BASE_HEX, NULL, 0x0,
-            NULL, HFILL }
-        },
         { &hf_ccsds_version,
             { "Version",           "ccsds.version",
             FT_UINT16, BASE_DEC, NULL, HDR_VERSION,
@@ -652,16 +640,6 @@ proto_register_ccsds(void)
             FT_UINT8, BASE_DEC, NULL, 0xff,
             NULL, HFILL }
         },
-        { &hf_ccsds_embedded_time,
-            { "Embedded Time",        "ccsds.embedded_time",
-            FT_STRING, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }
-        },
-        { &hf_ccsds_user_data,
-            { "User Data",        "ccsds.user_data",
-            FT_BYTES, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }
-        },
         { &hf_ccsds_checkword,
             { "CCSDS checkword",   "ccsds.checkword",
             FT_UINT16, BASE_HEX, NULL, 0x0,
@@ -681,7 +659,6 @@ proto_register_ccsds(void)
 
     /* Setup protocol subtree array */
     static gint *ett[] = {
-        &ett_ccsds_primary_header_flags,
         &ett_ccsds,
         &ett_ccsds_primary_header,
         &ett_ccsds_secondary_header,
@@ -690,7 +667,6 @@ proto_register_ccsds(void)
 
     static ei_register_info ei[] = {
         { &ei_ccsds_length_error, { "ccsds.length.error", PI_MALFORMED, PI_ERROR, "Length field value is greater than the packet seen on the wire", EXPFILL }},
-        { &ei_ccsds_checkword, { "ccsds.no_checkword", PI_PROTOCOL, PI_WARN, "Packet does not contain a Checkword", EXPFILL }},
     };
 
     /* Define the CCSDS preferences module */
@@ -724,7 +700,7 @@ proto_register_ccsds(void)
 void
 proto_reg_handoff_ccsds(void)
 {
-    dissector_add_for_decode_as ( "udp.port", find_dissector("ccsds") );
+    dissector_add_handle ( "udp.port", find_dissector("ccsds") ); /* for 'decode as' */
     data_handle = find_dissector("data");
 }
 

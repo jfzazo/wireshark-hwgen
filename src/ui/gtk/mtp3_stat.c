@@ -36,18 +36,23 @@
 #include <gtk/gtk.h>
 
 #include "epan/packet_info.h"
+#include "epan/epan.h"
 #include "epan/value_string.h"
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/tap.h>
+#include <epan/emem.h>
 #include <epan/dissectors/packet-mtp3.h>
 
+#include "../stat_menu.h"
 #include "ui/simple_dialog.h"
 
 #include "ui/gtk/gui_stat_menu.h"
 #include "ui/gtk/dlg_utils.h"
+#include "ui/gtk/filter_dlg.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/mtp3_stat.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkmtp3_stat(void);
 
@@ -233,7 +238,7 @@ mtp3_stat_packet(
     const mtp3_tap_rec_t  *data_p = (const mtp3_tap_rec_t *)data;
     int                    i;
 
-    if (data_p->mtp3_si_code >= MTP3_NUM_SI_CODE)
+    if (data_p->si_code >= MTP3_NUM_SI_CODE)
     {
         /*
          * we thought this si_code was not used ?
@@ -274,8 +279,8 @@ mtp3_stat_packet(
 
     (*stat_p)[i].addr_opc = data_p->addr_opc;
     (*stat_p)[i].addr_dpc = data_p->addr_dpc;
-    (*stat_p)[i].mtp3_si_code[data_p->mtp3_si_code].num_msus++;
-    (*stat_p)[i].mtp3_si_code[data_p->mtp3_si_code].size += data_p->size;
+    (*stat_p)[i].si_code[data_p->si_code].num_msus++;
+    (*stat_p)[i].si_code[data_p->si_code].size += data_p->size;
 
     return(TRUE);
 }
@@ -287,7 +292,7 @@ mtp3_stat_draw(
 {
     mtp3_stat_t   (*stat_p)[MTP3_MAX_NUM_OPC_DPC] = (mtp3_stat_t(*)[MTP3_MAX_NUM_OPC_DPC])tapdata;
     int           i,j;
-    char          str[256];
+    char         *str;
     float         avg;
     GtkListStore *list_store = NULL;
     GtkTreeIter   iter;
@@ -297,6 +302,7 @@ mtp3_stat_draw(
         return;
     }
 
+    str=(char *)ep_alloc(256);
     i = 0;
 
     list_store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW (dlg.table))); /* Get store */
@@ -316,8 +322,8 @@ mtp3_stat_draw(
              * should generally be preferred when inserting rows in a sorted list store.
              */
              avg = 0.0f;
-             if ((*stat_p)[i].mtp3_si_code[j].num_msus !=0){
-                 avg = (float)(*stat_p)[i].mtp3_si_code[j].size/(float)(*stat_p)[i].mtp3_si_code[j].num_msus;
+             if ((*stat_p)[i].si_code[j].num_msus !=0){
+                 avg = (float)(*stat_p)[i].si_code[j].size/(float)(*stat_p)[i].si_code[j].num_msus;
              }
 
 
@@ -325,8 +331,8 @@ mtp3_stat_draw(
                OPC_COLUMN,       dlg.entries[0],
                DPC_COLUMN,       dlg.entries[1],
                SI_COLUMN,        mtp3_service_indicator_code_short_vals[j].strptr,
-               NUM_MSUS_COLUMN,  (*stat_p)[i].mtp3_si_code[j].num_msus,
-               NUM_BYTES_COLUMN, (*stat_p)[i].mtp3_si_code[j].size,
+               NUM_MSUS_COLUMN,  (*stat_p)[i].si_code[j].num_msus,
+               NUM_BYTES_COLUMN, (*stat_p)[i].si_code[j].size,
                AVG_BYTES_COLUMN, avg,
                -1);
         }
@@ -414,16 +420,6 @@ mtp3_stat_gtk_init( const char *opt_arg _U_, void* userdata _U_)
 }
 
 
-static stat_tap_ui mtp3_stat_ui = {
-    REGISTER_STAT_GROUP_GENERIC,
-    NULL,
-    "mtp3,msus",
-    mtp3_stat_gtk_init,
-    -1,
-    0,
-    NULL
-};
-
 void
 register_tap_listener_gtkmtp3_stat(void)
 {
@@ -445,5 +441,5 @@ register_tap_listener_gtkmtp3_stat(void)
 
         exit(1);
     }
-    register_stat_tap_ui(&mtp3_stat_ui, NULL);
+    register_stat_cmd_arg("mtp3,msus", mtp3_stat_gtk_init,NULL);
 }

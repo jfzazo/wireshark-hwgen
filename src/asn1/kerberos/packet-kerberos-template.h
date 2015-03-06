@@ -26,10 +26,6 @@
 
 #include "ws_symbol_export.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 /* This is a list of callback functions a caller can use to specify that
    octet strings in kerberos to be passed back to application specific
    dissectors, outside of kerberos.
@@ -93,9 +89,6 @@ decrypt_krb5_data(proto_tree *tree, packet_info *pinfo,
 extern gboolean krb_decrypt;
 
 WS_DLL_PUBLIC
-void read_keytab_file(const char *);
-
-WS_DLL_PUBLIC
 void read_keytab_file_from_preferences(void);
 
 #endif /* HAVE_KERBEROS */
@@ -103,8 +96,6 @@ void read_keytab_file_from_preferences(void);
 
 #include "packet-kerberos-exp.h"
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
-
 #endif  /* __PACKET_KERBEROS_H */
+
+

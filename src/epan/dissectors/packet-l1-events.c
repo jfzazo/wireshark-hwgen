@@ -29,8 +29,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
+#include <epan/strutil.h>
 
 void proto_register_l1_events(void);
 void proto_reg_handoff_l1_events(void);
@@ -64,7 +67,13 @@ dissect_l1_events(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 			/*
 			 * No information from dissector data
 			 */
-			data_name = NULL;
+			data_name = (char *)(pinfo->private_data);
+			if (! (data_name && data_name[0])) {
+				/*
+				 * No information from "private_data"
+				 */
+				data_name = NULL;
+			}
 		}
 	}
 
@@ -83,10 +92,10 @@ dissect_l1_events(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 			proto_item_append_text(ti, ": %s", data_name);
 		subtree = proto_item_add_subtree(ti, ett_l1_events);
 		/* Read the media line by line */
-		while (tvb_reported_length_remaining(tvb, offset) != 0) {
+		while (tvb_offset_exists(tvb, offset)) {
 			/*
 			 * XXX - we need to be passed the parameters
-			 * of the content type via data parameter,
+			 * of the content type via "pinfo->private_data",
 			 * so that we know the character set.  We'd
 			 * have to handle that character set, which
 			 * might be a multibyte character set such
@@ -133,18 +142,5 @@ proto_reg_handoff_l1_events(void)
 	dissector_handle_t l1_events_handle;
 
 	l1_events_handle = find_dissector("data-l1-events");
-	dissector_add_uint("wtap_encap", WTAP_ENCAP_LAYER1_EVENT, l1_events_handle); /* for text msgs from trace files */
+        dissector_add_uint("wtap_encap", WTAP_ENCAP_LAYER1_EVENT, l1_events_handle); /* for text msgs from trace files */
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

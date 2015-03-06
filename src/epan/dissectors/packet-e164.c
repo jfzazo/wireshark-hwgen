@@ -23,757 +23,625 @@
  *
  * Ref ITU-T E.164 05/97
  *     Annex to ITU Operational Bulletin No. 991 - 1.XI.2011
- *     Amendment No. 10 ITU Operational Bulletin No. 1057 - 1.VIII.2014
- * Find the bulletins here:
- * http://www.itu.int/pub/T-SP-OB
+ *     Amendment No. 6 ITU Operational Bulletin No. 1038 - 15.X.2013
  */
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "packet-e164.h"
-#include "expert.h"
 
 void proto_register_e164(void);
 
 const value_string E164_country_code_value[] = {
-	{ 0,	"Reserved"},
-	{ 1,	"Americas"},
-	{ 7,	"Russian Federation, Kazakstan (Republic of)"},
-	{ 20,	"Egypt (Arab Republic of)"},
-	{ 27,	"South Africa (Republic of)"},
-	{ 30,	"Greece"},
-	{ 31,	"Netherlands (Kingdom of the)"},
-	{ 32,	"Belgium"},
-	{ 33,	"France"},
-	{ 34,	"Spain"},
-	{ 36,	"Hungary (Republic of)"},
-	{ 39,	"Italy"},
-	{ 40,	"Romania"},
-	{ 41,	"Switzerland (Confederation of)"},
-	{ 43,	"Austria"},
-	{ 44,	"United Kingdom of Great Britain and Northern Ireland"},
-	{ 45,	"Denmark"},
-	{ 46,	"Sweden"},
-	{ 47,	"Norway"},
-	{ 48,	"Poland (Republic of)"},
-	{ 49,	"Germany (Federal Republic of)"},
-	{ 51,	"Peru"},
-	{ 52,	"Mexico"},
-	{ 53,	"Cuba"},
-	{ 54,	"Argentine Republic"},
-	{ 55,	"Brazil (Federative Republic of)"},
-	{ 56,	"Chile"},
-	{ 57,	"Colombia (Republic of)"},
-	{ 58,	"Venezuela(Bolivarian Republic of)"},
-	{ 60,	"Malaysia"},
-	{ 61,	"Australia"},
-	{ 62,	"Indonesia (Republic of)"},
-	{ 63,	"Philippines (Republic of the)"},
-	{ 64,	"New Zealand"},
-	{ 65,	"Singapore (Republic of)"},
-	{ 66,	"Thailand"},
-	{ 81,	"Japan"},
-	{ 82,	"Korea (Republic of)"},
-	{ 84,	"Viet Nam (Socialist Republic of)"},
-	{ 86,	"China (People's Republic of)"},
-	{ 90,	"Turkey"},
-	{ 91,	"India (Republic of)"},
-	{ 92,	"Pakistan (Islamic Republic of)"},
-	{ 93,	"Afghanistan"},
-	{ 94,	"Sri Lanka (Democratic Socialist Republic of)"},
-	{ 95,	"Myanmar (the Republic of the Union of)"},
-	{ 98,	"Iran (Islamic Republic of)"},
-	{ 210,	"Spare code"},
-	{ 211,	"South Sudan (Republic of)"},
-	{ 212,	"Morocco (Kingdom of)"},
-	{ 213,	"Algeria (People's Democratic Republic of)"},
-	{ 214,	"Spare code"},
-	{ 215,	"Spare code"},
-	{ 216,	"Tunisia"},
-	{ 217,	"Spare code"},
-	{ 218,	"Libya (Socialist People's Libyan Arab Jamahiriya)"},
-	{ 219,	"Spare code"},
-	{ 220,	"Gambia (Republic of)"},
-	{ 221,	"Senegal (Republic of)"},
-	{ 222,	"Mauritania (Islamic Republic of)"},
-	{ 223,	"Mali (Republic of)"},
-	{ 224,	"Guinea (Republic of)"},
-	{ 225,	"Cote d'Ivoire (Republic of)"},
-	{ 226,	"Burkina Faso"},
-	{ 227,	"Niger (Republic of the)"},
-	{ 228,	"Togolese Republic"},
-	{ 229,	"Benin (Republic of)"},
-	{ 230,	"Mauritius (Republic of)"},
-	{ 231,	"Liberia (Republic of)"},
-	{ 232,	"Sierra Leone"},
-	{ 233,	"Ghana"},
-	{ 234,	"Nigeria (Federal Republic of)"},
-	{ 235,	"Chad (Republic of)"},
-	{ 236,	"Central African Republic"},
-	{ 237,	"Cameroon (Republic of)"},
-	{ 238,	"Cape Verde (Republic of)"},
-	{ 239,	"Sao Tome and Principe (Democratic Republic of)"},
-	{ 240,	"Equatorial Guinea (Republic of)"},
-	{ 241,	"Gabonese Republic"},
-	{ 242,	"Congo (Republic of the)"},
-	{ 243,	"Democratic Republic of Congo"},
-	{ 244,	"Angola (Republic of)"},
-	{ 245,	"Guinea-Bissau (Republic of)"},
-	{ 246,	"Diego Garcia"},
-	{ 247,	"Saint Helena, Ascension and Tristan da Cunha"},
-	{ 248,	"Seychelles (Republic of)"},
-	{ 249,	"Sudan (Republic of the)"},
-	{ 250,	"Rwanda (Republic of)"},
-	{ 251,	"Ethiopia (Federal Democratic Republic of)"},
-	{ 252,	"Somali Democratic Republic"},
-	{ 253,	"Djibouti (Republic of)"},
-	{ 254,	"Kenya (Republic of)"},
-	{ 255,	"Tanzania (United Republic of)"},
-	{ 256,	"Uganda (Republic of)"},
-	{ 257,	"Burundi (Republic of)"},
-	{ 258,	"Mozambique (Republic of)"},
-	{ 259,	"Spare code"},
-	{ 260,	"Zambia (Republic of)"},
-	{ 261,	"Madagascar (Republic of)"},
-	{ 262,	"French Departments and Territories in the Indian Ocean"},
-	{ 263,	"Zimbabwe (Republic of)"},
-	{ 264,	"Namibia (Republic of)"},
-	{ 265,	"Malawi"},
-	{ 266,	"Lesotho (Kingdom of)"},
-	{ 267,	"Botswana (Republic of)"},
-	{ 268,	"Swaziland (Kingdom of)"},
-	{ 269,	"Comoros (Union of the)"},
-	{ 280,	"Spare code"},
-	{ 281,	"Spare code"},
-	{ 282,	"Spare code"},
-	{ 283,	"Spare code"},
-	{ 284,	"Spare code"},
-	{ 285,	"Spare code"},
-	{ 286,	"Spare code"},
-	{ 287,	"Spare code"},
-	{ 288,	"Spare code"},
-	{ 289,	"Spare code"},
-	{ 290,	"Saint Helena, Ascension and Tristan da Cunha"},
-	{ 291,	"Eritrea"},
-	{ 292,	"Spare code"},
-	{ 293,	"Spare code"},
-	{ 294,	"Spare code"},
-	{ 295,	"Spare code"},
-	{ 296,	"Spare code"},
-	{ 297,	"Aruba"},
-	{ 298,	"Faroe Islands"},
-	{ 299,	"Greenland (Denmark)"},
-	{ 350,	"Gibraltar"},
-	{ 351,	"Portugal"},
-	{ 352,	"Luxembourg"},
-	{ 353,	"Ireland"},
-	{ 354,	"Iceland"},
-	{ 355,	"Albania (Republic of)"},
-	{ 356,	"Malta"},
-	{ 357,	"Cyprus (Republic of)"},
-	{ 358,	"Finland"},
-	{ 359,	"Bulgaria (Republic of)"},
-	{ 370,	"Lithuania (Republic of)"},
-	{ 371,	"Latvia (Republic of)"},
-	{ 372,	"Estonia (Republic of)"},
-	{ 373,	"Moldova (Republic of)"},
-	{ 374,	"Armenia (Republic of)"},
-	{ 375,	"Belarus (Republic of)"},
-	{ 376,	"Andorra (Principality of)"},
-	{ 377,	"Monaco (Principality of)"},
-	{ 378,	"San Marino (Republic of)"},
-	{ 379,	"Vatican City State"},
-	{ 380,	"Ukraine"},
-	{ 381,	"Serbia (Republic of)"},
-	{ 382,	"Montenegro (Republic of)"},
-	{ 383,	"Spare code"},
-	{ 384,	"Spare code"},
-	{ 385,	"Croatia (Republic of)"},
-	{ 386,	"Slovenia (Republic of)"},
-	{ 387,	"Bosnia and Herzegovina"},
-	{ 388,	"Group of countries, shared code"},
-	{ 389,	"The Former Yugoslav Republic of Macedonia"},
-	{ 420,	"Czech Republic"},
-	{ 421,	"Slovak Republic"},
-	{ 422,	"Spare code"},
-	{ 423,	"Liechtenstein (Principality of)"},
-	{ 424,	"Spare code"},
-	{ 425,	"Spare code"},
-	{ 426,	"Spare code"},
-	{ 427,	"Spare code"},
-	{ 428,	"Spare code"},
-	{ 429,	"Spare code"},
-	{ 500,	"Falkland Islands (Malvinas)"},
-	{ 501,	"Belize"},
-	{ 502,	"Guatemala (Republic of)"},
-	{ 503,	"El Salvador (Republic of)"},
-	{ 504,	"Honduras (Republic of)"},
-	{ 505,	"Nicaragua"},
-	{ 506,	"Costa Rica"},
-	{ 507,	"Panama (Republic of)"},
-	{ 508,	"Saint Pierre and Miquelon (Collectivite territoriale de la Republique francaise)"},
-	{ 509,	"Haiti (Republic of)"},
-	{ 590,	"Guadeloupe (French Department of)"},
-	{ 591,	"Bolivia (Plurinational State of)"},
-	{ 592,	"Guyana"},
-	{ 593,	"Ecuador"},
-	{ 594,	"French Guiana (French Department of)"},
-	{ 595,	"Paraguay (Republic of)"},
-	{ 596,	"Martinique (French Department of)"},
-	{ 597,	"Suriname (Republic of)"},
-	{ 598,	"Uruguay (Eastern Republic of)"},
-	{ 599,	"Bonaire, Saint Eustatius and Saba, Curacao"},
-	{ 670,	"Democratic Republic of Timor-Leste"},
-	{ 671,	"Spare code"},
-	{ 672,	"Australian External Territories"},
-	{ 673,	"Brunei Darussalam"},
-	{ 674,	"Nauru (Republic of)"},
-	{ 675,	"Papua New Guinea"},
-	{ 676,	"Tonga (Kingdom of)"},
-	{ 677,	"Solomon Islands"},
-	{ 678,	"Vanuatu (Republic of)"},
-	{ 679,	"Fiji (Republic of)"},
-	{ 680,	"Palau (Republic of)"},
-	{ 681,	"Wallis and Futuna (Territoire francais d'outre-mer)"},
-	{ 682,	"Cook Islands"},
-	{ 683,	"Niue"},
-	{ 684,	"Spare code"},
-	{ 685,	"Samoa (Independent State of)"},
-	{ 686,	"Kiribati (Republic of)"},
-	{ 687,	"New Caledonia (Territoire francais d'outre-mer)"},
-	{ 688,	"Tuvalu"},
-	{ 689,	"French Polynesia (Territoire francais d'outre-mer)"},
-	{ 690,	"Tokelau"},
-	{ 691,	"Micronesia (Federated States of)"},
-	{ 692,	"Marshall Islands (Republic of the)"},
-	{ 693,	"Spare code"},
-	{ 694,	"Spare code"},
-	{ 695,	"Spare code"},
-	{ 696,	"Spare code"},
-	{ 697,	"Spare code"},
-	{ 698,	"Spare code"},
-	{ 699,	"Spare code"},
-	{ 800,	"International Freephone Service"},
-	{ 801,	"Spare code"},
-	{ 802,	"Spare code"},
-	{ 803,	"Spare code"},
-	{ 804,	"Spare code"},
-	{ 805,	"Spare code"},
-	{ 806,	"Spare code"},
-	{ 807,	"Spare code"},
-	{ 808,	"International Shared Cost Service (ISCS)"},
-	{ 809,	"Spare code"},
-	{ 830,	"Spare code"},
-	{ 831,	"Spare code"},
-	{ 832,	"Spare code"},
-	{ 833,	"Spare code"},
-	{ 834,	"Spare code"},
-	{ 835,	"Spare code"},
-	{ 836,	"Spare code"},
-	{ 837,	"Spare code"},
-	{ 838,	"Spare code"},
-	{ 839,	"Spare code"},
-	{ 850,	"Democratic People's Republic of Korea"},
-	{ 851,	"Spare code"},
-	{ 852,	"Hong Kong, China"},
-	{ 853,	"Macau, China"},
-	{ 854,	"Spare code"},
-	{ 855,	"Cambodia (Kingdom of)"},
-	{ 856,	"Lao People's Democratic Republic"},
-	{ 857,	"Spare code"},
-	{ 858,	"Spare code"},
-	{ 859,	"Spare code"},
-	{ 870,	"Inmarsat SNAC"},
-	{ 871,	"Spare code"},
-	{ 872,	"Spare code"},
-	{ 873,	"Spare code"},
-	{ 874,	"Spare code"},
-	{ 875,	"Reserved - Maritime Mobile Service Applications"},
-	{ 876,	"Reserved - Maritime Mobile Service Applications"},
-	{ 877,	"Reserved - Maritime Mobile Service Applications"},
-	{ 878,	"Universal Personal Telecommunication Service (UPT)"},
-	{ 879,	"Reserved for national non-commercial purposes"},
-	{ 880,	"Bangladesh"},
-	{ 881,	"Global Mobile Satellite System (GMSS), shared code"},
-	{ 882,	"International Networks, shared code"},
-	{ 883,	"International Networks, shared code"},
-	{ 884,	"Spare code"},
-	{ 885,	"Spare code"},
-	{ 886,	"Taiwan, China"},
-	{ 887,	"Spare code"},
-	{ 888,	"Telecommunications for Disaster Relief (TDR)"},
-	{ 889,	"Spare code"},
-	{ 890,	"Spare code"},
-	{ 891,	"Spare code"},
-	{ 892,	"Spare code"},
-	{ 893,	"Spare code"},
-	{ 894,	"Spare code"},
-	{ 895,	"Spare code"},
-	{ 896,	"Spare code"},
-	{ 897,	"Spare code"},
-	{ 898,	"Spare code"},
-	{ 899,	"Spare code"},
-	{ 960,	"Maldives (Republic of)"},
-	{ 961,	"Lebanon"},
-	{ 962,	"Jordan (Hashemite Kingdom of)"},
-	{ 963,	"Syrian Arab Republic"},
-	{ 964,	"Iraq (Republic of)"},
-	{ 965,	"Kuwait (State of)"},
-	{ 966,	"Saudi Arabia (Kingdom of)"},
-	{ 967,	"Yemen (Republic of)"},
-	{ 968,	"Oman (Sultanate of)"},
-	{ 969,	"Reserved - reservation currently under investigation"},
-	{ 970,	"Reserved"},
-	{ 971,	"United Arab Emirates"},
-	{ 972,	"Israel (State of)"},
-	{ 973,	"Bahrain (Kingdom of)"},
-	{ 974,	"Qatar (State of)"},
-	{ 975,	"Bhutan (Kingdom of)"},
-	{ 976,	"Mongolia"},
-	{ 977,	"Nepal (Federal Democratic Republic of)"},
-	{ 978,	"Spare code"},
-	{ 979,	"International Premium Rate Service (IPRS)"},
-	{ 990,	"Spare code"},
-	{ 991,	"Trial of a proposed new international telecommunication public correspondence service, shared code"},
-	{ 992,	"Tajikstan (Republic of)"},
-	{ 993,	"Turkmenistan"},
-	{ 994,	"Azerbaijan"},
-	{ 995,	"Georgia"},
-	{ 996,	"Kyrgyz Republic"},
-	{ 997,	"Spare code"},
-	{ 998,	"Uzbekistan (Republic of)"},
-	{ 999,	"Reserved for future global service"},
+	{ 0x00, "Reserved"},
+	{ 0x01, "Americas"},
+	{ 0x07, "Russian Federation, Kazakstan (Republic of)"},
+	{ 0x020, "Egypt (Arab Republic of)"},
+	{ 0x027, "South Africa (Republic of)"},
+	{ 0x030, "Greece"},
+	{ 0x031, "Netherlands (Kingdom of the)"},
+	{ 0x032, "Belgium"},
+	{ 0x033, "France"},
+	{ 0x034, "Spain"},
+	{ 0x036, "Hungary (Republic of)"},
+	{ 0x039, "Italy"},
+	{ 0x040, "Romania"},
+	{ 0x041, "Switzerland (Confederation of)"},
+	{ 0x043, "Austria"},
+	{ 0x044, "United Kingdom of Great Britain and Northern Ireland"},
+	{ 0x045, "Denmark"},
+	{ 0x046, "Sweden"},
+	{ 0x047, "Norway"},
+	{ 0x048, "Poland (Republic of)"},
+	{ 0x049, "Germany (Federal Republic of)"},
+	{ 0x051, "Peru"},
+	{ 0x052, "Mexico"},
+	{ 0x053, "Cuba"},
+	{ 0x054, "Argentine Republic"},
+	{ 0x055, "Brazil (Federative Republic of)"},
+	{ 0x056, "Chile"},
+	{ 0x057, "Colombia (Republic of)"},
+	{ 0x058, "Venezuela(Bolivarian Republic of)"},
+	{ 0x060, "Malaysia"},
+	{ 0x061, "Australia"},
+	{ 0x062, "Indonesia (Republic of)"},
+	{ 0x063, "Philippines (Republic of the)"},
+	{ 0x064, "New Zealand"},
+	{ 0x065, "Singapore (Republic of)"},
+	{ 0x066, "Thailand"},
+	{ 0x081, "Japan"},
+	{ 0x082, "Korea (Republic of)"},
+	{ 0x084, "Viet Nam (Socialist Republic of)"},
+	{ 0x086, "China (People's Republic of)"},
+	{ 0x090, "Turkey"},
+	{ 0x091, "India (Republic of)"},
+	{ 0x092, "Pakistan (Islamic Republic of)"},
+	{ 0x093, "Afghanistan"},
+	{ 0x094, "Sri Lanka (Democratic Socialist Republic of)"},
+	{ 0x095, "Myanmar (the Republic of the Union of)"},
+	{ 0x098, "Iran (Islamic Republic of)"},
+	{ 0x0210, "Spare code"},
+	{ 0x0211, "South Sudan (Republic of)"},
+	{ 0x0212, "Morocco (Kingdom of)"},
+	{ 0x0213, "Algeria (People's Democratic Republic of)"},
+	{ 0x0214, "Spare code"},
+	{ 0x0215, "Spare code"},
+	{ 0x0216, "Tunisia"},
+	{ 0x0217, "Spare code"},
+	{ 0x0218, "Libya (Socialist People's Libyan Arab Jamahiriya)"},
+	{ 0x0219, "Spare code"},
+	{ 0x0220, "Gambia (Republic of)"},
+	{ 0x0221, "Senegal (Republic of)"},
+	{ 0x0222, "Mauritania (Islamic Republic of)"},
+	{ 0x0223, "Mali (Republic of)"},
+	{ 0x0224, "Guinea (Republic of)"},
+	{ 0x0225, "Cote d'Ivoire (Republic of)"},
+	{ 0x0226, "Burkina Faso"},
+	{ 0x0227, "Niger (Republic of the)"},
+	{ 0x0228, "Togolese Republic"},
+	{ 0x0229, "Benin (Republic of)"},
+	{ 0x0230, "Mauritius (Republic of)"},
+	{ 0x0231, "Liberia (Republic of)"},
+	{ 0x0232, "Sierra Leone"},
+	{ 0x0233, "Ghana"},
+	{ 0x0234, "Nigeria (Federal Republic of)"},
+	{ 0x0235, "Chad (Republic of)"},
+	{ 0x0236, "Central African Republic"},
+	{ 0x0237, "Cameroon (Republic of)"},
+	{ 0x0238, "Cape Verde (Republic of)"},
+	{ 0x0239, "Sao Tome and Principe (Democratic Republic of)"},
+	{ 0x0240, "Equatorial Guinea (Republic of)"},
+	{ 0x0241, "Gabonese Republic"},
+	{ 0x0242, "Congo (Republic of the)"},
+	{ 0x0243, "Democratic Republic of Congo"},
+	{ 0x0244, "Angola (Republic of)"},
+	{ 0x0245, "Guinea-Bissau (Republic of)"},
+	{ 0x0246, "Diego Garcia"},
+	{ 0x0247, "Saint Helena, Ascension and Tristan da Cunha"},
+	{ 0x0248, "Seychelles (Republic of)"},
+	{ 0x0249, "Sudan (Republic of the)"},
+	{ 0x0250, "Rwanda (Republic of)"},
+	{ 0x0251, "Ethiopia (Federal Democratic Republic of)"},
+	{ 0x0252, "Somali Democratic Republic"},
+	{ 0x0253, "Djibouti (Republic of)"},
+	{ 0x0254, "Kenya (Republic of)"},
+	{ 0x0255, "Tanzania (United Republic of)"},
+	{ 0x0256, "Uganda (Republic of)"},
+	{ 0x0257, "Burundi (Republic of)"},
+	{ 0x0258, "Mozambique (Republic of)"},
+	{ 0x0259, "Spare code"},
+	{ 0x0260, "Zambia (Republic of)"},
+	{ 0x0261, "Madagascar (Republic of)"},
+	{ 0x0262, "French Departments and Territories in the Indian Ocean"},
+	{ 0x0263, "Zimbabwe (Republic of)"},
+	{ 0x0264, "Namibia (Republic of)"},
+	{ 0x0265, "Malawi"},
+	{ 0x0266, "Lesotho (Kingdom of)"},
+	{ 0x0267, "Botswana (Republic of)"},
+	{ 0x0268, "Swaziland (Kingdom of)"},
+	{ 0x0269, "Comoros (Union of the)"},
+	{ 0x0280, "Spare code"},
+	{ 0x0281, "Spare code"},
+	{ 0x0282, "Spare code"},
+	{ 0x0283, "Spare code"},
+	{ 0x0284, "Spare code"},
+	{ 0x0285, "Spare code"},
+	{ 0x0286, "Spare code"},
+	{ 0x0287, "Spare code"},
+	{ 0x0288, "Spare code"},
+	{ 0x0289, "Spare code"},
+	{ 0x0290, "Saint Helena, Ascension and Tristan da Cunha"},
+	{ 0x0291, "Eritrea"},
+	{ 0x0292, "Spare code"},
+	{ 0x0293, "Spare code"},
+	{ 0x0294, "Spare code"},
+	{ 0x0295, "Spare code"},
+	{ 0x0296, "Spare code"},
+	{ 0x0297, "Aruba"},
+	{ 0x0298, "Faroe Islands"},
+	{ 0x0299, "Greenland (Denmark)"},
+	{ 0x0350, "Gibraltar"},
+	{ 0x0351, "Portugal"},
+	{ 0x0352, "Luxembourg"},
+	{ 0x0353, "Ireland"},
+	{ 0x0354, "Iceland"},
+	{ 0x0355, "Albania (Republic of)"},
+	{ 0x0356, "Malta"},
+	{ 0x0357, "Cyprus (Republic of)"},
+	{ 0x0358, "Finland"},
+	{ 0x0359, "Bulgaria (Republic of)"},
+	{ 0x0370, "Lithuania (Republic of)"},
+	{ 0x0371, "Latvia (Republic of)"},
+	{ 0x0372, "Estonia (Republic of)"},
+	{ 0x0373, "Moldova (Republic of)"},
+	{ 0x0374, "Armenia (Republic of)"},
+	{ 0x0375, "Belarus (Republic of)"},
+	{ 0x0376, "Andorra (Principality of)"},
+	{ 0x0377, "Monaco (Principality of)"},
+	{ 0x0378, "San Marino (Republic of)"},
+	{ 0x0379, "Vatican City State"},
+	{ 0x0380, "Ukraine"},
+	{ 0x0381, "Serbia (Republic of)"},
+	{ 0x0382, "Montenegro (Republic of)"},
+	{ 0x0383, "Spare code"},
+	{ 0x0384, "Spare code"},
+	{ 0x0385, "Croatia (Republic of)"},
+	{ 0x0386, "Slovenia (Republic of)"},
+	{ 0x0387, "Bosnia and Herzegovina"},
+	{ 0x0388, "Group of countries, shared code"},
+	{ 0x0389, "The Former Yugoslav Republic of Macedonia"},
+	{ 0x0420, "Czech Republic"},
+	{ 0x0421, "Slovak Republic"},
+	{ 0x0422, "Spare code"},
+	{ 0x0423, "Liechtenstein (Principality of)"},
+	{ 0x0424, "Spare code"},
+	{ 0x0425, "Spare code"},
+	{ 0x0426, "Spare code"},
+	{ 0x0427, "Spare code"},
+	{ 0x0428, "Spare code"},
+	{ 0x0429, "Spare code"},
+	{ 0x0500, "Falkland Islands (Malvinas)"},
+	{ 0x0501, "Belize"},
+	{ 0x0502, "Guatemala (Republic of)"},
+	{ 0x0503, "El Salvador (Republic of)"},
+	{ 0x0504, "Honduras (Republic of)"},
+	{ 0x0505, "Nicaragua"},
+	{ 0x0506, "Costa Rica"},
+	{ 0x0507, "Panama (Republic of)"},
+	{ 0x0508, "Saint Pierre and Miquelon (Collectivite territoriale de la Republique francaise)"},
+	{ 0x0509, "Haiti (Republic of)"},
+	{ 0x0590, "Guadeloupe (French Department of)"},
+	{ 0x0591, "Bolivia (Plurinational State of)"},
+	{ 0x0592, "Guyana"},
+	{ 0x0593, "Ecuador"},
+	{ 0x0594, "French Guiana (French Department of)"},
+	{ 0x0595, "Paraguay (Republic of)"},
+	{ 0x0596, "Martinique (French Department of)"},
+	{ 0x0597, "Suriname (Republic of)"},
+	{ 0x0598, "Uruguay (Eastern Republic of)"},
+	{ 0x0599, "Bonaire, Saint Eustatius and Saba, Curacao"},
+	{ 0x0670, "Democratic Republic of Timor-Leste"},
+	{ 0x0671, "Spare code"},
+	{ 0x0672, "Australian External Territories"},
+	{ 0x0673, "Brunei Darussalam"},
+	{ 0x0674, "Nauru (Republic of)"},
+	{ 0x0675, "Papua New Guinea"},
+	{ 0x0676, "Tonga (Kingdom of)"},
+	{ 0x0677, "Solomon Islands"},
+	{ 0x0678, "Vanuatu (Republic of)"},
+	{ 0x0679, "Fiji (Republic of)"},
+	{ 0x0680, "Palau (Republic of)"},
+	{ 0x0681, "Wallis and Futuna (Territoire francais d'outre-mer)"},
+	{ 0x0682, "Cook Islands"},
+	{ 0x0683, "Niue"},
+	{ 0x0684, "Spare code"},
+	{ 0x0685, "Samoa (Independent State of)"},
+	{ 0x0686, "Kiribati (Republic of)"},
+	{ 0x0687, "New Caledonia (Territoire francais d'outre-mer)"},
+	{ 0x0688, "Tuvalu"},
+	{ 0x0689, "French Polynesia (Territoire francais d'outre-mer)"},
+	{ 0x0690, "Tokelau"},
+	{ 0x0691, "Micronesia (Federated States of)"},
+	{ 0x0692, "Marshall Islands (Republic of the)"},
+	{ 0x0693, "Spare code"},
+	{ 0x0694, "Spare code"},
+	{ 0x0695, "Spare code"},
+	{ 0x0696, "Spare code"},
+	{ 0x0697, "Spare code"},
+	{ 0x0698, "Spare code"},
+	{ 0x0699, "Spare code"},
+	{ 0x0800, "International Freephone Service"},
+	{ 0x0801, "Spare code"},
+	{ 0x0802, "Spare code"},
+	{ 0x0803, "Spare code"},
+	{ 0x0804, "Spare code"},
+	{ 0x0805, "Spare code"},
+	{ 0x0806, "Spare code"},
+	{ 0x0807, "Spare code"},
+	{ 0x0808, "International Shared Cost Service (ISCS)"},
+	{ 0x0809, "Spare code"},
+	{ 0x0830, "Spare code"},
+	{ 0x0831, "Spare code"},
+	{ 0x0832, "Spare code"},
+	{ 0x0833, "Spare code"},
+	{ 0x0834, "Spare code"},
+	{ 0x0835, "Spare code"},
+	{ 0x0836, "Spare code"},
+	{ 0x0837, "Spare code"},
+	{ 0x0838, "Spare code"},
+	{ 0x0839, "Spare code"},
+	{ 0x0850, "Democratic People's Republic of Korea"},
+	{ 0x0851, "Spare code"},
+	{ 0x0852, "Hong Kong, China"},
+	{ 0x0853, "Macau, China"},
+	{ 0x0854, "Spare code"},
+	{ 0x0855, "Cambodia (Kingdom of)"},
+	{ 0x0856, "Lao People's Democratic Republic"},
+	{ 0x0857, "Spare code"},
+	{ 0x0858, "Spare code"},
+	{ 0x0859, "Spare code"},
+	{ 0x0870, "Inmarsat SNAC"},
+	{ 0x0871, "Spare code"},
+	{ 0x0872, "Spare code"},
+	{ 0x0873, "Spare code"},
+	{ 0x0874, "Spare code"},
+	{ 0x0875, "Reserved - Maritime Mobile Service Applications"},
+	{ 0x0876, "Reserved - Maritime Mobile Service Applications"},
+	{ 0x0877, "Reserved - Maritime Mobile Service Applications"},
+	{ 0x0878, "Universal Personal Telecommunication Service (UPT)"},
+	{ 0x0879, "Reserved for national non-commercial purposes"},
+	{ 0x0880, "Bangladesh"},
+	{ 0x0881, "Global Mobile Satellite System (GMSS), shared code"},
+	{ 0x0882, "International Networks, shared code"},
+	{ 0x0883, "International Networks, shared code"},
+	{ 0x0884, "Spare code"},
+	{ 0x0885, "Spare code"},
+	{ 0x0886, "Taiwan, China"},
+	{ 0x0887, "Spare code"},
+	{ 0x0888, "Telecommunications for Disaster Relief (TDR)"},
+	{ 0x0889, "Spare code"},
+	{ 0x0890, "Spare code"},
+	{ 0x0891, "Spare code"},
+	{ 0x0892, "Spare code"},
+	{ 0x0893, "Spare code"},
+	{ 0x0894, "Spare code"},
+	{ 0x0895, "Spare code"},
+	{ 0x0896, "Spare code"},
+	{ 0x0897, "Spare code"},
+	{ 0x0898, "Spare code"},
+	{ 0x0899, "Spare code"},
+	{ 0x0960, "Maldives (Republic of)"},
+	{ 0x0961, "Lebanon"},
+	{ 0x0962, "Jordan (Hashemite Kingdom of)"},
+	{ 0x0963, "Syrian Arab Republic"},
+	{ 0x0964, "Iraq (Republic of)"},
+	{ 0x0965, "Kuwait (State of)"},
+	{ 0x0966, "Saudi Arabia (Kingdom of)"},
+	{ 0x0967, "Yemen (Republic of)"},
+	{ 0x0968, "Oman (Sultanate of)"},
+	{ 0x0969, "Reserved - reservation currently under investigation"},
+	{ 0x0970, "Reserved"},
+	{ 0x0971, "United Arab Emirates"},
+	{ 0x0972, "Israel (State of)"},
+	{ 0x0973, "Bahrain (Kingdom of)"},
+	{ 0x0974, "Qatar (State of)"},
+	{ 0x0975, "Bhutan (Kingdom of)"},
+	{ 0x0976, "Mongolia"},
+	{ 0x0977, "Nepal (Federal Democratic Republic of)"},
+	{ 0x0978, "Spare code"},
+	{ 0x0979, "International Premium Rate Service (IPRS)"},
+	{ 0x0990, "Spare code"},
+	{ 0x0991, "Trial of a proposed new international telecommunication public correspondence service, shared code"},
+	{ 0x0992, "Tajikstan (Republic of)"},
+	{ 0x0993, "Turkmenistan"},
+	{ 0x0994, "Azerbaijan"},
+	{ 0x0995, "Georgia"},
+	{ 0x0996, "Kyrgyz Republic"},
+	{ 0x0997, "Spare code"},
+	{ 0x0998, "Uzbekistan (Republic of)"},
+	{ 0x0999, "Reserved for future global service"},
 	{ 0,	NULL }
 };
 static value_string_ext E164_country_code_value_ext = VALUE_STRING_EXT_INIT(E164_country_code_value);
-
 const value_string E164_GMSS_vals[] = {
-	{ 6,	"Iridium Satellite LLC"},
-	{ 7,	"Iridium Satellite LLC"},
-	{ 8,	"Globalstar"},
-	{ 9,	"Globalstar"},
+	{ 0x6, "Iridium Satellite LLC"},
+	{ 0x7, "Iridium Satellite LLC"},
+	{ 0x8, "Globalstar"},
+	{ 0x9, "Globalstar"},
 	{ 0,	NULL }
 };
-
 const value_string E164_International_Networks_882_vals[] = {
-	{ 10,	"Global Office Application"},
-	{ 12,	"HyperStream International (HSI) Data Network"},
-	{ 13,	"EMS Regional Mobile Satellite System"},
-	{ 15,	"Global international ATM Network"},
-	{ 16,	"Thuraya RMSS Network"},
-	{ 20,	"Garuda Mobile Telecommunication Satellite System"},
-	{ 22,	"Cable & Wireless Global Network"},
-	{ 23,	"Sita-Equant Network"},
-	{ 24,	"TeliaSonera Sverige AB"},
-	{ 28,	"Deutsche Telekom's Next Generation Network"},
-	{ 31,	"Global International ATM Network"},
-	{ 32,	"MCP network"},
-	{ 33,	"Oration Technologies Network"},
-	{ 34,	"BebbiCell AG"},
-	{ 35,	"Jasper System"},
-	{ 36,	"Jersey Telecom"},
-	{ 37,	"Cingular Wireless netwok"},
-	{ 39,	"Vodafone Malta"},
-	{ 40,	"Oy Communications"},
-	{ 41,	"Intermatica"},
-	{ 42,	"Seanet Maritime Communication"},
-	{ 43,	"Beeline"},
-	{ 45,	"Telecom Italia"},
-	{ 46,	"Tyntec GmbH"},
-	{ 47,	"Transatel"},
-	{ 97,	"Smart Communications Inc"},
-	{ 98,	"Onair GSM services"},
-	{ 99,	"Telenor GSM network - services in aircraft"},
+	{ 0x10, "Global Office Application"},
+	{ 0x12, "HyperStream International (HSI) Data Network"},
+	{ 0x13, "EMS Regional Mobile Satellite System"},
+	{ 0x15, "Global international ATM Network"},
+	{ 0x16, "Thuraya RMSS Network"},
+	{ 0x20, "Garuda Mobile Telecommunication Satellite System"},
+	{ 0x22, "Cable & Wireless Global Network"},
+	{ 0x23, "Sita-Equant Network"},
+	{ 0x24, "TeliaSonera Sverige AB"},
+	{ 0x28, "Deutsche Telekom's Next Generation Network"},
+	{ 0x31, "Global International ATM Network"},
+	{ 0x32, "MCP network"},
+	{ 0x33, "Oration Technologies Network"},
+	{ 0x34, "BebbiCell AG"},
+	{ 0x35, "Jasper System"},
+	{ 0x36, "Jersey Telecom"},
+	{ 0x37, "Cingular Wireless netwok"},
+	{ 0x39, "Vodafone Malta"},
+	{ 0x40, "Oy Communications"},
+	{ 0x41, "Intermatica"},
+	{ 0x42, "Seanet Maritime Communication"},
+	{ 0x43, "Beeline"},
+	{ 0x45, "Telecom Italia"},
+	{ 0x46, "Tyntec GmbH"},
+	{ 0x47, "Transatel"},
+	{ 0x97, "Smart Communications Inc"},
+	{ 0x98, "Onair GSM services"},
+	{ 0x99, "Telenor GSM network - services in aircraft"},
 	{ 0,	NULL }
 };
 static value_string_ext E164_International_Networks_882_vals_ext = VALUE_STRING_EXT_INIT(E164_International_Networks_882_vals);
-
 const value_string E164_International_Networks_883_vals[] = {
-	{ 100,	"MediaLincc Ltd"},
-	{ 110,	"Aicent Inc"},
-	{ 120,	"Telenor Connexion AB"},
-	{ 130,	"France Telecom Orange"},
-	{ 140,	"Multiregional TransitTelecom (MTT)"},
-	{ 150,	"BodyTrace Netherlands B.V"},
-	{ 5100,	"Voxbone SA"},
-	{ 5110,	"Bandwith.com Inc"},
-	{ 5120,	"MTX Connect Ltd"},
-	{ 5130,	"SIMPE Ltd"},
-	{ 5140,	"Ellipsat Inc"},
-	{ 5150,	"Wins Limited"},
+	{ 0x100, "MediaLincc Ltd"},
+	{ 0x110, "Aicent Inc"},
+	{ 0x120, "Telenor Connexion AB"},
+	{ 0x130, "France Telecom Orange"},
+	{ 0x140, "Multiregional TransitTelecom (MTT)"},
+	{ 0x5100, "Voxbone SA"},
+	{ 0x5110, "Bandwith.com Inc"},
+	{ 0x5120, "MTX Connect Ltd"},
+	{ 0x5130, "SIMPE Ltd"},
 	{ 0,	NULL }
 };
 
-static int proto_e164				= -1;
+static int proto_e164						= -1;
 static int hf_E164_calling_party_number		= -1;
 static int hf_E164_called_party_number		= -1;
-static int hf_E164_number			= -1;
-static int hf_E164_identification_code		= -1;
-static int hf_E164_country_code			= -1;
 
-static int ett_e164_msisdn = -1;
 
-static expert_field ei_E164_country_code_non_decimal = EI_INIT;
-static expert_field ei_E164_identification_code_non_decimal = EI_INIT;
 
 void
-dissect_e164_number(tvbuff_t *tvb, proto_tree *tree, int offset, int length, e164_info_t e164_info)
+dissect_e164_number(tvbuff_t *tvb, proto_tree *tree, int offset, int length,e164_info_t e164_info)
 {
-	proto_item *pi;
-
-	switch (e164_info.e164_number_type) {
-	case CALLING_PARTY_NUMBER:
+	switch (e164_info.e164_number_type){
+	case CALLING_PARTY_NUMBER :
 		proto_tree_add_string(tree, hf_E164_calling_party_number, tvb, offset,
-				      length, e164_info.E164_number_str);
+				length, e164_info.E164_number_str);
 		break;
 
-	case CALLED_PARTY_NUMBER:
+	case CALLED_PARTY_NUMBER :
 		proto_tree_add_string(tree, hf_E164_called_party_number, tvb, offset,
-				      length, e164_info.E164_number_str);
+				length, e164_info.E164_number_str);
 		break;
 
 	default:
 		break;
 	}
 
-	if (e164_info.nature_of_address == E164_NA_INTERNATIONAL_NUMBER) {
-		pi = proto_tree_add_string(tree, hf_E164_number, tvb, offset, length, e164_info.E164_number_str);
-		PROTO_ITEM_SET_HIDDEN(pi);
-	}
 }
-
-/**
- * Convert 16bit integer in BCD encoding to decimal.
- * @param bcd		BCD value to convert.
- * @param[out] dec	Pointer to decimal result.
- * @return TRUE if ok, FALSE if bcd contains a nibble > 9.
- */
-static gboolean
-convert_bcd_to_dec(guint16 bcd, guint16 * dec)
-{
-	gboolean rok = TRUE;
-	guint16 result = 0;
-	guint16 mult = 1;
-	while (bcd) {
-		if ((bcd & 0x0f) > 9)
-			rok = FALSE;
-		result += (bcd & 0x0f) * mult;
-		bcd >>= 4;
-		mult *= 10;
-	}
-	*dec = result;
-	return rok;
-}
-
 void
-dissect_e164_cc(tvbuff_t *tvb, proto_tree *tree, int offset, e164_encoding_t encoding)
-{
+dissect_e164_cc(tvbuff_t *tvb, proto_tree *tree, int offset, gboolean bcd_coded){
+
 	int	cc_offset;
 	guint8	address_digit_pair;
-	guint16	id_code = 0;
+	guint16	id_code;
 	guint8	cc_length;
 	guint8	length;
-	guint16 cc = 0;
-	gboolean bcd_ok = FALSE;
-	proto_item *item = NULL;
+	guint16 cc;
 
 	cc_offset = offset;
 	address_digit_pair = tvb_get_guint8(tvb, cc_offset);
 
-	/* Get the first 3 digits of the MSISDN */
-	switch (encoding) {
-	case E164_ENC_BINARY:
+	if(!bcd_coded){
 		/* Dissect country code after removing non significant zeros */
-		while (address_digit_pair == 0) {
+		while ( address_digit_pair == 0 ) {
 			cc_offset = cc_offset + 1;
 			address_digit_pair = tvb_get_guint8(tvb, cc_offset);
 		}
 		cc = tvb_get_ntohs(tvb, cc_offset);
-		if ((address_digit_pair & 0xf0) != 0) {
+		if (( address_digit_pair & 0xf0 ) != 0 ){
 			cc = cc >> 4;
 		}
-		break;
-	case E164_ENC_BCD:
+	}else{
 		cc = address_digit_pair &0x0f;
 		cc = cc << 4;
 		cc = cc | (address_digit_pair &0xf0)>>4;
 		cc = cc << 4;
-		if (tvb_bytes_exist(tvb, cc_offset+1, 1)) {
+		if (tvb_bytes_exist(tvb, cc_offset+1, 1)){
 			address_digit_pair = tvb_get_guint8(tvb, cc_offset+1);
 			cc = cc | (address_digit_pair &0x0f);
 		}
-		break;
-	case E164_ENC_UTF8:
-		/* XXX - do we need to worry about leading 0s? */
-		cc  = (tvb_get_guint8(tvb, cc_offset)   - '0') << 8;
-		cc |= (tvb_get_guint8(tvb, cc_offset+1) - '0') << 4;
-		cc |= (tvb_get_guint8(tvb, cc_offset+2) - '0');
-		break;
+
 	}
 
-	/* Determine how many of those digits are the Country Code */
-	switch (cc & 0x0f00) {
+	switch ( cc & 0x0f00 ) {
+
 	case 0x0:
 		cc_length = 1;
 		break;
+
 	case 0x0100:
 		cc_length = 1;
 		break;
+
 	case 0x0200:
-		switch (cc & 0x00f0) {
+		switch ( cc & 0x00f0 ) {
 		case 0:
-		case 0x70:
+		case 0x70 :
 			cc_length = 2;
 			break;
-		default:
+		default :
 			cc_length = 3;
 			break;
 		}
 		break;
-	case 0x0300:
-		switch (cc & 0x00f0) {
-		case 0:
-		case 0x10:
-		case 0x20:
-		case 0x30:
-		case 0x40:
-		case 0x60:
-		case 0x90:
+
+	case 0x0300 :
+		switch ( cc & 0x00f0 ) {
+		case 0 :
+		case 0x10 :
+		case 0x20 :
+		case 0x30 :
+		case 0x40 :
+		case 0x60 :
+		case 0x90 :
 			cc_length = 2;
 			break;
-		default:
+		default :
 			cc_length = 3;
 			break;
 		}
 		break;
-	case 0x0400:
-		switch (cc & 0x00f0) {
-		case 0x20:
+	case 0x0400 :
+		switch ( cc & 0x00f0 ) {
+		case 0x20 :
 			cc_length = 3;
 			break;
-		default:
+		default :
 			cc_length = 2;
 			break;
 		}
 		break;
-	case 0x0500:
-		switch (cc & 0x00f0) {
-		case 0:
-		case 0x90:
+
+	case 0x0500 :
+		switch ( cc & 0x00f0 ) {
+		case 0 :
+		case 0x90 :
 			cc_length = 3;
 			break;
-		default:
+		default :
 			cc_length = 2;
 			break;
 		}
 		break;
-	case 0x0600:
-		switch (cc & 0x00f0) {
-		case 0x70:
-		case 0x80:
-		case 0x90:
+
+	case 0x0600 :
+		switch ( cc & 0x00f0 ) {
+		case 0x70 :
+		case 0x80 :
+		case 0x90 :
 			cc_length = 3;
 			break;
-		default:
+		default :
 			cc_length = 2;
 			break;
 		}
 		break;
-	case 0x0700:
+
+	case 0x0700 :
 		cc_length = 1;
 		break;
-	case 0x0800:
-		switch (cc & 0x00f0) {
+
+	case 0x0800 :
+		switch ( cc & 0x00f0 ) {
 		case 0x10:
 		case 0x20:
 		case 0x40:
 		case 0x60:
 			cc_length = 2;
 			break;
-		default:
+		default :
 			cc_length = 3;
 			break;
 		}
 		break;
-	case 0x0900:
-		switch (cc & 0x00f0) {
-		case 0:
-		case 0x10:
-		case 0x20:
-		case 0x30:
-		case 0x40:
-		case 0x50:
-		case 0x80:
+
+	case 0x0900 :
+		switch ( cc & 0x00f0 ) {
+		case 0 :
+		case 0x10 :
+		case 0x20 :
+		case 0x30 :
+		case 0x40 :
+		case 0x50 :
+		case 0x80 :
 			cc_length = 2;
 			break;
-		default:
+		default :
 			cc_length = 3;
 			break;
 		}
 		break;
 
-	default:
+	default :
 		cc_length = 0;
 		break;
-	} /* End switch cc */
+	}/* End switch cc */
 
-	/* (Now that we know how long the CC is,)
-	 * shift off any extra digits we got.
-	 */
-	switch (cc_length) {
-	case 1:
+	switch ( cc_length ) {
+	case 1 :
 		cc = cc >> 8;
 		length = 1;
 		break;
-	case 2:
+	case 2 :
 		cc = cc >> 4;
 		length = 1;
 		break;
 	default:
 		length = 2;
 		break;
-	} /* end switch cc_length */
+	}/* end switch cc_length */
 
-	/* Now process the CC as decimal */
-	bcd_ok = convert_bcd_to_dec(cc, &cc);
+	proto_tree_add_text(tree, tvb, cc_offset, length,"Country Code: %x %s (length %u)", cc,
+			    val_to_str_ext_const(cc,&E164_country_code_value_ext,"Unknown"), cc_length);
 
-	/* Display the CC */
-	if (encoding == E164_ENC_UTF8)
-	    item = proto_tree_add_uint(tree, hf_E164_country_code, tvb, cc_offset, cc_length, cc);
-	else
-	    item = proto_tree_add_uint(tree, hf_E164_country_code, tvb, cc_offset, length, cc);
-	if (!bcd_ok) {
-		expert_add_info(NULL, item, &ei_E164_country_code_non_decimal);
-	}
-
-	/* Handle special Country Codes */
-	switch (cc) {
-	case 881:
-		/* Get the 1-digit ID code */
-		switch (encoding) {
-		case E164_ENC_BINARY:
+	switch ( cc ) {
+	case 0x881 :
+		if (!bcd_coded) {
 			id_code = tvb_get_guint8(tvb, cc_offset + 1) & 0x0f;
-			break;
-		case E164_ENC_BCD:
+		} else {
 			id_code = (tvb_get_guint8(tvb, cc_offset + 1) & 0xf0) >> 4;
-			break;
-		case E164_ENC_UTF8:
-			id_code = tvb_get_guint8(tvb, cc_offset + cc_length) - '0';
-			break;
 		}
-		bcd_ok = (id_code <= 9);
-		item = proto_tree_add_uint_format_value(tree, hf_E164_identification_code, tvb, (cc_offset + 1), 1,
-						id_code, "%d %s", id_code, val_to_str_const(id_code, E164_GMSS_vals, "Unknown"));
-		if (!bcd_ok) {
-			expert_add_info(NULL, item, &ei_E164_identification_code_non_decimal);
-		}
+		proto_tree_add_text(tree,tvb, (cc_offset + 1), 1,"Identification Code: %x %s ",id_code,
+				    val_to_str_const(id_code,E164_GMSS_vals,"Unknown"));
 		break;
-	case 882:
-		/* Get the 2-digit ID code */
-		switch (encoding) {
-		case E164_ENC_BINARY:
+	case 0x882 :
+		if (!bcd_coded) {
 			id_code = tvb_get_ntohs(tvb, cc_offset + 1);
 			id_code = (id_code & 0x0ff0) >> 4;
-			break;
-		case E164_ENC_BCD:
+		} else {
 			id_code  = tvb_get_guint8(tvb, cc_offset + 1) & 0xf0;
 			id_code |= tvb_get_guint8(tvb, cc_offset + 2) & 0x0f;
-			break;
-		case E164_ENC_UTF8:
-			id_code  = (tvb_get_guint8(tvb, cc_offset+cc_length)   - '0') << 4;
-			id_code |= (tvb_get_guint8(tvb, cc_offset+cc_length+1) - '0');
-			break;
 		}
-		bcd_ok = convert_bcd_to_dec(id_code, &id_code);
-		item = proto_tree_add_uint_format_value(tree, hf_E164_identification_code, tvb, (cc_offset + 1), 2,
-						id_code, "%d %s", id_code, val_to_str_ext_const(id_code, &E164_International_Networks_882_vals_ext, "Unknown"));
-		if (!bcd_ok) {
-			expert_add_info(NULL, item, &ei_E164_identification_code_non_decimal);
-		}
+		proto_tree_add_text(tree,tvb, (cc_offset + 1), 2,"Identification Code: %x %s ",id_code,
+				    val_to_str_ext_const(id_code,&E164_International_Networks_882_vals_ext,"Unknown"));
 		break;
-	case 883:
-		/* Get the 3-digit ID code */
-		switch (encoding) {
-		case E164_ENC_BINARY:
+	case 0x883 :
+		if (!bcd_coded) {
 			id_code = tvb_get_ntohs(tvb, cc_offset + 1);
 			id_code = id_code & 0x0fff;
-			break;
-		case E164_ENC_BCD:
+		} else {
 			id_code  = (tvb_get_guint8(tvb, cc_offset + 1) & 0xf0) << 4;
 			id_code |= (tvb_get_guint8(tvb, cc_offset + 2) & 0x0f) << 4;
 			id_code |= (tvb_get_guint8(tvb, cc_offset + 2) & 0xf0) >> 4;
-			break;
-		case E164_ENC_UTF8:
-			id_code  = (tvb_get_guint8(tvb, cc_offset+cc_length)   - '0') << 8;
-			id_code |= (tvb_get_guint8(tvb, cc_offset+cc_length+1) - '0') << 4;
-			id_code |= (tvb_get_guint8(tvb, cc_offset+cc_length+2) - '0');
-			break;
 		}
 		if ((id_code & 0x0ff0) == 0x510) {
-			/* Get the 4th digit of the ID code */
-			switch (encoding) {
-			case E164_ENC_BINARY:
+			if (!bcd_coded) {
 				id_code = (id_code << 4) | ((tvb_get_guint8(tvb, cc_offset + 3) & 0xf0) >> 4);
-				break;
-			case E164_ENC_BCD:
+			} else {
 				id_code = (id_code << 4) | (tvb_get_guint8(tvb, cc_offset + 3) & 0x0f);
-				break;
-			case E164_ENC_UTF8:
-				id_code = (id_code << 4) | (tvb_get_guint8(tvb, cc_offset + cc_length + 3) - '0');
-				break;
 			}
-			bcd_ok = convert_bcd_to_dec(id_code, &id_code);
-			item = proto_tree_add_uint_format_value(tree, hf_E164_identification_code, tvb, (cc_offset + 1), 3,
-					id_code, "%d %s", id_code, val_to_str_const(id_code, E164_International_Networks_883_vals, "Unknown"));
-			if (!bcd_ok) {
-				expert_add_info(NULL, item, &ei_E164_identification_code_non_decimal);
-			}
+			proto_tree_add_text(tree,tvb, (cc_offset + 1), 3,"Identification Code: %x %s ",id_code,
+					    val_to_str_const(id_code,E164_International_Networks_883_vals,"Unknown"));
 		} else {
-			bcd_ok = convert_bcd_to_dec(id_code, &id_code);
-			item = proto_tree_add_uint_format_value(tree, hf_E164_identification_code, tvb, (cc_offset + 1), 2,
-					id_code, "%d %s", id_code, val_to_str_const(id_code, E164_International_Networks_883_vals, "Unknown"));
-			if (!bcd_ok) {
-				expert_add_info(NULL, item, &ei_E164_identification_code_non_decimal);
-			}
+			proto_tree_add_text(tree,tvb, (cc_offset + 1), 2,"Identification Code: %x %s ",id_code,
+					    val_to_str_const(id_code,E164_International_Networks_883_vals,"Unknown"));
 		}
 		break;
 	default:
 		break;
 	}
 
-}
-
-const gchar *
-dissect_e164_msisdn(tvbuff_t *tvb, proto_tree *tree, int offset, int length, e164_encoding_t encoding)
-{
-	proto_item *pi;
-	proto_tree *subtree;
-	const gchar *msisdn_str;
-
-	switch (encoding) {
-	case E164_ENC_UTF8:
-		msisdn_str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_UTF_8);
-		break;
-	case E164_ENC_BCD:
-		msisdn_str = tvb_bcd_dig_to_wmem_packet_str(tvb, offset, length, NULL, FALSE);
-		break;
-	case E164_ENC_BINARY:
-	default:
-		DISSECTOR_ASSERT_NOT_REACHED();
-	}
-
-	pi = proto_tree_add_string(tree, hf_E164_number, tvb, offset, length, msisdn_str);
-
-	subtree = proto_item_add_subtree(pi, ett_e164_msisdn);
-
-	dissect_e164_cc(tvb, subtree, offset, encoding);
-
-	return msisdn_str;
 }
 
 /*
  * Register the protocol with Wireshark.
+ *
+ * This format is required because a script is used to build the C function
+ * that calls all the protocol registration.
  */
 
 void
@@ -790,54 +658,21 @@ proto_register_e164(void)
 		{ &hf_E164_called_party_number,
 		  { "E.164 Called party number digits", "e164.called_party_number.digits",
 		  FT_STRING, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_E164_number,
-		  { "E.164 number (MSISDN)", "e164.msisdn",
-		  FT_STRING, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_E164_identification_code,
-		  { "Identification Code", "e164.identification_code",
-		  FT_UINT32, BASE_DEC, NULL, 0x0,
-			NULL, HFILL }},
-
-		{ &hf_E164_country_code,
-		  { "Country Code", "e164.country_code",
-		  FT_UINT16, BASE_DEC|BASE_EXT_STRING, &E164_country_code_value_ext, 0x0,
-			NULL, HFILL }},
+			NULL, HFILL }}
 	};
 
-	static gint *ett_e164_array[] = {
-	    &ett_e164_msisdn,
-	};
+	/*
+	 * Register the protocol name and description
+	 */
+	proto_e164 = proto_register_protocol(
+			"ITU-T E.164 number",
+			"E.164",
+			"e164");
 
-	static ei_register_info ei[] = {
-	{ &ei_E164_country_code_non_decimal, { "e164.country_code.non_decimal", PI_MALFORMED, PI_WARN, "Country Code contains non-decimal digits", EXPFILL }},
-	{ &ei_E164_identification_code_non_decimal, { "e164.identification_code.non_decimal", PI_MALFORMED, PI_WARN, "Identification Code contains non-decimal digits", EXPFILL }},
-	};
-
-	expert_module_t* expert_e164;
-
-
-	proto_e164 = proto_register_protocol("ITU-T E.164 number", "E.164", "e164");
-
+	/*
+	 * Required function calls to register
+	 * the header fields and subtrees used.
+	 */
 	proto_register_field_array(proto_e164, hf, array_length(hf));
-	proto_register_subtree_array(ett_e164_array, array_length(ett_e164_array));
 
-	expert_e164 = expert_register_protocol(proto_e164);
-	expert_register_field_array(expert_e164, ei, array_length(ei));
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

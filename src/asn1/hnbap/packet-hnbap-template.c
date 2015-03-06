@@ -25,6 +25,9 @@
 
 #include "config.h"
 
+#include <glib.h>
+#include <string.h>
+
 #include <epan/packet.h>
 #include <epan/sctpppids.h>
 #include <epan/asn1.h>
@@ -80,50 +83,50 @@ void proto_reg_handoff_hnbap(void);
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint_new(hnbap_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree, FALSE, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint_new(hnbap_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree, FALSE, NULL)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_ProtocolExtensionFieldExtensionValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint_new(hnbap_extension_dissector_table, ProtocolIE_ID, tvb, pinfo, tree, FALSE, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint_new(hnbap_extension_dissector_table, ProtocolIE_ID, tvb, pinfo, tree, FALSE, NULL)) ? tvb_length(tvb) : 0;
 }
 #if 0
 static int dissect_InitiatingMessageValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
   if (!ProcedureCode) return 0;
-  return (dissector_try_string(hnbap_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_string(hnbap_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree, NULL)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_SuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
   if (!ProcedureCode) return 0;
-  return (dissector_try_string(hnbap_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_string(hnbap_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree, NULL)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
   if (!ProcedureCode) return 0;
-  return (dissector_try_string(hnbap_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_string(hnbap_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree, NULL)) ? tvb_length(tvb) : 0;
 }
 #endif
 
 static int dissect_InitiatingMessageValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint_new(hnbap_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint_new(hnbap_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_SuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint_new(hnbap_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint_new(hnbap_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint_new(hnbap_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint_new(hnbap_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_length(tvb) : 0;
 }
 
-static int
-dissect_hnbap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+static void
+dissect_hnbap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     proto_item  *hnbap_item = NULL;
     proto_tree  *hnbap_tree = NULL;
@@ -135,7 +138,7 @@ dissect_hnbap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     hnbap_item = proto_tree_add_item(tree, proto_hnbap, tvb, 0, -1, ENC_NA);
     hnbap_tree = proto_item_add_subtree(hnbap_item, ett_hnbap);
 
-    return dissect_HNBAP_PDU_PDU(tvb, pinfo, hnbap_tree, data);
+    dissect_HNBAP_PDU_PDU(tvb, pinfo, hnbap_tree);
 }
 
 /*--- proto_register_hnbap -------------------------------------------*/
@@ -163,7 +166,7 @@ module_t *hnbap_module;
   proto_register_subtree_array(ett, array_length(ett));
 
   /* Register dissector */
-  new_register_dissector("hnbap", dissect_hnbap, proto_hnbap);
+  register_dissector("hnbap", dissect_hnbap, proto_hnbap);
 
   /* Register dissector tables */
   hnbap_ies_dissector_table = register_dissector_table("hnbap.ies", "HNBAP-PROTOCOL-IES", FT_UINT32, BASE_DEC);

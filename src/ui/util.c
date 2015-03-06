@@ -26,6 +26,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <errno.h>
 
 #ifdef HAVE_UNISTD_H
@@ -36,9 +37,9 @@
 #include <windows.h>
 #endif
 
-#include "epan/address.h"
-#include "epan/addr_resolv.h"
-#include "epan/strutil.h"
+#include <epan/address.h>
+#include <epan/addr_resolv.h>
+#include <epan/strutil.h>
 
 #include "ui/util.h"
 

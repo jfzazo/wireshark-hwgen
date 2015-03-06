@@ -25,6 +25,6 @@
 #include <wiretap/wtap.h>
 #include "ws_symbol_export.h"
 
-wtap_open_return_val stanag4607_open(wtap *wth, int *err, gchar **err_info);
+int stanag4607_open(wtap *wth, int *err, gchar **err_info);
 
 #endif

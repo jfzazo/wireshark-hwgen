@@ -26,6 +26,7 @@
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/emem.h>
 #include <epan/reassemble.h>
 #include <epan/tvbuff-int.h>
 
@@ -1020,7 +1021,7 @@ fragment_add_work(fragment_head *fd_head, tvbuff_t *tvb, const int offset,
 
 
 	if( !(fd_head->flags & FD_DATALEN_SET) ){
-		/* if we don't know the datalen, there are still missing
+		/* if we dont know the datalen, there are still missing
 		 * packets. Cheaper than the check below.
 		 */
 		return FALSE;
@@ -1725,23 +1726,18 @@ fragment_add_seq_work(fragment_head *fd_head, tvbuff_t *tvb, const int offset,
 
 	/* If we have reached this point, the packet is not defragmented yet.
 	 * Save all payload in a buffer until we can defragment.
+	 * XXX - what if we didn't capture the entire fragment due
+	 * to a too-short snapshot length?
 	 */
 	/* check len, there may be a fragment with 0 len, that is actually the tail */
 	if (fd->len) {
-		if (!tvb_bytes_exist(tvb, offset, fd->len)) {
-			/* abort if we didn't capture the entire fragment due
-			 * to a too-short snapshot length */
-			g_slice_free(fragment_item, fd);
-			return FALSE;
-		}
-
 		fd->tvb_data = tvb_clone_offset_len(tvb, offset, fd->len);
 	}
 	LINK_FRAG(fd_head,fd);
 
 
 	if( !(fd_head->flags & FD_DATALEN_SET) ){
-		/* if we don't know the sequence number of the last fragment,
+		/* if we dont know the sequence number of the last fragment,
 		 * there are definitely still missing packets. Cheaper than
 		 * the check below.
 		 */

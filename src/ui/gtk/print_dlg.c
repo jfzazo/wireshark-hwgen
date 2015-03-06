@@ -27,7 +27,9 @@
 #include <gtk/gtk.h>
 
 #include <epan/prefs.h>
+#include <epan/epan_dissect.h>
 #include <wsutil/filesystem.h>
+#include <epan/print.h>
 
 #include "ui/alert_box.h"
 #include "ui/simple_dialog.h"

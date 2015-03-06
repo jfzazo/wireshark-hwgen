@@ -21,6 +21,7 @@
 
 # include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/to_str.h>
 #include <epan/expert.h>
@@ -76,25 +77,12 @@ static int hf_wfd_subelem_session_dev_info_max_throughput = -1;
 static int hf_wfd_subelem_session_coupled_sink_status_bitmap = -1;
 static int hf_wfd_subelem_session_coupled_sink_reserved = -1;
 static int hf_wfd_subelem_session_coupled_sink_addr = -1;
-static int hf_wfd_subelem_session_extra_info = -1;
-
-static int hf_wfd_subelem_ext_capab = -1;
-static int hf_wfd_subelem_ext_capab_uibc = -1;
-static int hf_wfd_subelem_ext_capab_i2c_read_write = -1;
-static int hf_wfd_subelem_ext_capab_preferred_display_mode = -1;
-static int hf_wfd_subelem_ext_capab_standby_resume_control = -1;
-static int hf_wfd_subelem_ext_capab_tdls_persistent = -1;
-static int hf_wfd_subelem_ext_capab_tdls_persistent_bssid = -1;
-static int hf_wfd_subelem_ext_capab_reserved = -1;
-
-static int hf_wfd_subelem_alt_mac_addr = -1;
 
 static gint ett_wfd_subelem = -1;
 static gint ett_wfd_dev_info_descr = -1;
 
 static expert_field ei_wfd_subelem_len_invalid = EI_INIT;
 static expert_field ei_wfd_subelem_session_descr_invalid = EI_INIT;
-static expert_field ei_wfd_subelem_id = EI_INIT;
 
 enum wifi_display_subelem {
   WFD_SUBELEM_DEVICE_INFO = 0,
@@ -237,8 +225,9 @@ dissect_wfd_subelem_session_info(packet_info *pinfo, proto_tree *tree,
     guint8 dlen = tvb_get_guint8(tvb, offset);
     next = offset + 1 + dlen;
 
-    descr = proto_tree_add_subtree(tree, tvb, offset, 1 + dlen,
-                               ett_wfd_dev_info_descr, &item, "WFD Device Info Descriptor");
+    item = proto_tree_add_text(tree, tvb, offset, 1 + dlen,
+                               "WFD Device Info Descriptor");
+    descr = proto_item_add_subtree(item, ett_wfd_dev_info_descr);
     if (offset + 1 + dlen > end || dlen < 23) {
       expert_add_info(pinfo, item, &ei_wfd_subelem_session_descr_invalid);
       break;
@@ -310,51 +299,12 @@ dissect_wfd_subelem_session_info(packet_info *pinfo, proto_tree *tree,
     offset += 6;
 
     if (offset < next) {
-      proto_tree_add_item(descr, hf_wfd_subelem_session_extra_info, tvb, offset, next - offset, ENC_NA);
+      proto_tree_add_text(descr, tvb, offset, next - offset,
+                          "Extra info in the end of descriptor");
     }
 
     offset = next;
   }
-}
-
-static void
-dissect_wfd_subelem_ext_capab(packet_info *pinfo, proto_tree *tree,
-                                 tvbuff_t *tvb, int offset, int len)
-{
-  if (len<2) {
-    expert_add_info_format(pinfo, tree, &ei_wfd_subelem_len_invalid,
-                           "Too short Wi-Fi Display Extended Capability");
-    return;
-  }
-  proto_tree_add_item(tree, hf_wfd_subelem_ext_capab,
-                      tvb, offset, 2, ENC_BIG_ENDIAN);
-  proto_tree_add_item(tree, hf_wfd_subelem_ext_capab_uibc,
-                      tvb, offset, 2, ENC_BIG_ENDIAN);
-  proto_tree_add_item(tree, hf_wfd_subelem_ext_capab_i2c_read_write,
-                      tvb, offset, 2, ENC_BIG_ENDIAN);
-  proto_tree_add_item(tree, hf_wfd_subelem_ext_capab_preferred_display_mode,
-                      tvb, offset, 2, ENC_BIG_ENDIAN);
-  proto_tree_add_item(tree, hf_wfd_subelem_ext_capab_standby_resume_control,
-                      tvb, offset, 2, ENC_BIG_ENDIAN);
-  proto_tree_add_item(tree, hf_wfd_subelem_ext_capab_tdls_persistent,
-                      tvb, offset, 2, ENC_BIG_ENDIAN);
-  proto_tree_add_item(tree, hf_wfd_subelem_ext_capab_tdls_persistent_bssid,
-                      tvb, offset, 2, ENC_BIG_ENDIAN);
-  proto_tree_add_item(tree, hf_wfd_subelem_ext_capab_reserved,
-                      tvb, offset, 2, ENC_BIG_ENDIAN);
-}
-
-static void
-dissect_wfd_subelem_alt_mac_addr(packet_info *pinfo, proto_tree *tree,
-                                 tvbuff_t *tvb, int offset, int len)
-{
-  if (len<6) {
-    expert_add_info_format(pinfo, tree, &ei_wfd_subelem_len_invalid,
-                           "Too short Wi-Fi Display Alternative MAC Address");
-    return;
-  }
-  proto_tree_add_item(tree, hf_wfd_subelem_alt_mac_addr,
-                      tvb, offset, 6, ENC_NA);
 }
 
 void dissect_wifi_display_ie(packet_info *pinfo, proto_tree *tree,
@@ -374,13 +324,14 @@ void dissect_wifi_display_ie(packet_info *pinfo, proto_tree *tree,
 
     id = tvb_get_guint8(tvb, offset);
     len = tvb_get_ntohs(tvb, offset + 1);
-    wfd_tree = proto_tree_add_subtree(tree, tvb, offset, 3 + len,
-                                  ett_wfd_subelem, &subelem,
+    subelem = proto_tree_add_text(tree, tvb, offset, 3 + len, "%s",
                                   val_to_str(id, wfd_subelem_ids,
                                              "Unknown subelement ID (%u)"));
     if (offset + 3 + len > end) {
       expert_add_info_format(pinfo, subelem, &ei_wfd_subelem_len_invalid, "Packet too short for Wi-Fi Display subelement payload");
     }
+
+    wfd_tree = proto_item_add_subtree(subelem, ett_wfd_subelem);
 
     proto_tree_add_item(wfd_tree, hf_wfd_subelem_id, tvb, offset, 1,
                         ENC_BIG_ENDIAN);
@@ -402,14 +353,9 @@ void dissect_wifi_display_ie(packet_info *pinfo, proto_tree *tree,
     case WFD_SUBELEM_SESSION_INFO:
       dissect_wfd_subelem_session_info(pinfo, wfd_tree, tvb, offset, len);
       break;
-    case WFD_SUBELEM_EXT_CAPAB:
-      dissect_wfd_subelem_ext_capab(pinfo, wfd_tree, tvb, offset, len);
-      break;
-    case WFD_SUBELEM_ALT_MAC_ADDR:
-      dissect_wfd_subelem_alt_mac_addr(pinfo, wfd_tree, tvb, offset, len);
-      break;
     default:
-      expert_add_info(pinfo, subelem, &ei_wfd_subelem_id);
+      proto_tree_add_text(wfd_tree, tvb, offset, len,
+                          "Unknown subelement payload");
       break;
     }
 
@@ -571,45 +517,7 @@ proto_register_wifi_display(void)
     { &hf_wfd_subelem_session_coupled_sink_addr,
       { "Coupled peer sink address",
         "wifi_display.subelem.session.coupled_peer_sink_addr",
-        FT_ETHER, BASE_NONE, NULL, 0, NULL, HFILL }},
-    { &hf_wfd_subelem_session_extra_info,
-      { "Extra info in the end of descriptor",
-        "wifi_display.subelem.session.extra_info",
-        FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
-    { &hf_wfd_subelem_ext_capab,
-      { "WFD Extended Capability Bitmap",
-        "wifi_display.subelem.ext_capab",
-        FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-    { &hf_wfd_subelem_ext_capab_uibc,
-      { "User Input Back Channel(UIBC)",
-        "wifi_display.subelem.ext_capab.uibc",
-        FT_BOOLEAN, 16, TFS (&tfs_supported_not_supported), 0x0001, NULL, HFILL }},
-    { &hf_wfd_subelem_ext_capab_i2c_read_write,
-      { "I2C Read/Write",
-        "wifi_display.subelem.ext_capab.i2c_read_write",
-        FT_BOOLEAN, 16, TFS (&tfs_supported_not_supported), 0x0002, NULL, HFILL }},
-    { &hf_wfd_subelem_ext_capab_preferred_display_mode,
-      { "Preferred Display Mode",
-        "wifi_display.subelem.ext_capab.preferred_display_mode",
-        FT_BOOLEAN, 16, TFS (&tfs_supported_not_supported), 0x0004, NULL, HFILL }},
-    { &hf_wfd_subelem_ext_capab_standby_resume_control,
-      { "Standby and Resume Control",
-        "wifi_display.subelem.ext_capab.standby_resume_control",
-        FT_BOOLEAN, 16, TFS (&tfs_supported_not_supported), 0x008, NULL, HFILL }},
-    { &hf_wfd_subelem_ext_capab_tdls_persistent,
-      { "TDLS Persistent",
-        "wifi_display.subelem.ext_capab.tdls_persistent",
-        FT_BOOLEAN, 16, TFS (&tfs_supported_not_supported), 0x0010, NULL, HFILL }},
-    { &hf_wfd_subelem_ext_capab_tdls_persistent_bssid,
-      { "TDLS Persistent BSSID",
-        "wifi_display.subelem.ext_capab.tdls_persistent_bssid",
-        FT_BOOLEAN, 16, TFS (&tfs_supported_not_supported), 0x0020, NULL, HFILL }},
-    { &hf_wfd_subelem_ext_capab_reserved,
-      { "Reserved", "wifi_display.subelem.ext_capab.reserved",
-        FT_UINT16, BASE_HEX, NULL, 0xffc0, NULL, HFILL }},
-    { &hf_wfd_subelem_alt_mac_addr,
-      { "Alternative MAC Address", "wifi_display.subelem.alt_mac_addr",
-        FT_ETHER, BASE_NONE, NULL, 0, NULL, HFILL }},
+        FT_ETHER, BASE_NONE, NULL, 0, NULL, HFILL }}
   };
   static gint *ett[] = {
     &ett_wfd_subelem,
@@ -619,7 +527,6 @@ proto_register_wifi_display(void)
   static ei_register_info ei[] = {
       { &ei_wfd_subelem_len_invalid, { "wifi_display.subelem.length.invalid", PI_MALFORMED, PI_ERROR, "Subelement length invalid", EXPFILL }},
       { &ei_wfd_subelem_session_descr_invalid, { "wifi_display.subelem.session.descr_invalid", PI_MALFORMED, PI_ERROR, "Invalid WFD Device Info Descriptor", EXPFILL }},
-      { &ei_wfd_subelem_id, { "wifi_display.subelem.id.unknown", PI_PROTOCOL, PI_WARN, "Unknown subelement payload", EXPFILL }},
   };
 
   expert_module_t* expert_wifi_display;

@@ -25,6 +25,7 @@
  */
 
 #include "config.h"
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/dwarf.h>
 #include "packet-tcp.h"
@@ -167,8 +168,7 @@ static gboolean reassemble_mqtt_over_tcp = TRUE;
 
 #define GET_MQTT_PDU_LEN(msg_len, len_offset)    (msg_len + len_offset + MQTT_HDR_SIZE_BEFORE_LEN)
 
-static guint get_mqtt_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                              int offset, void *data _U_)
+static guint get_mqtt_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   guint64 msg_len;
   guint len_offset;
@@ -219,8 +219,9 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
     mqtt_msg_len = (gint) msg_len;
 
     /* Add each MQTT message as a subtree to main Tree */
-    mqtt_msg_tree = proto_tree_add_subtree(mqtt_tree, tvb, offset, mqtt_msg_len, ett_mqtt_msg, NULL,
+    ti_mqtt = proto_tree_add_text(mqtt_tree, tvb, offset, mqtt_msg_len, "%s",
                                   val_to_str_ext(mqtt_msg_type, &mqtt_msgtype_vals_ext, "Unknown (0x%02x)"));
+    mqtt_msg_tree = proto_item_add_subtree(ti_mqtt, ett_mqtt_msg);
 
     ti_mqtt = proto_tree_add_uint_format_value(mqtt_msg_tree, hf_mqtt_hdrflags, tvb, offset, 1, mqtt_fixed_hdr, "0x%02x (%s)",
                                                 mqtt_fixed_hdr, val_to_str_ext(mqtt_msg_type, &mqtt_msgtype_vals_ext, "Unknown (0x%02x)") );
@@ -311,7 +312,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
         {
           mqtt_str_len = tvb_get_ntohs(tvb, offset);
           offset += 2;
-          /*mqtt_msg_len -= 2;*/
+          mqtt_msg_len -= 2;
 
           proto_tree_add_item(mqtt_msg_tree, hf_mqtt_passwd, tvb, offset, mqtt_str_len, ENC_UTF_8|ENC_NA);
           /* offset += mqtt_str_len; */
@@ -586,7 +587,7 @@ void proto_register_mqtt(void)
  */
 void proto_reg_handoff_mqtt(void)
 {
-  dissector_add_for_decode_as("tcp.port", mqtt_handle);
+  dissector_add_handle("tcp.port", mqtt_handle);
 }
 
 /*

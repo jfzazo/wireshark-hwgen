@@ -49,13 +49,14 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include <epan/to_str.h>
 #include <epan/ipproto.h>
-#include "packet-sflow.h"
 
 #define SFLOW_UDP_PORTS "6343"
 
@@ -159,6 +160,24 @@ const true_false_string tfs_low_normal = { "Low", "Normal" };
 const true_false_string tfs_high_normal = { "High", "Normal" };
 const true_false_string tfs_minimize_monetary_normal = { "Minimize Monetary", "Normal" };
 const true_false_string tfs_up_down = { "Up", "Down" };
+
+#define SFLOW_245_HEADER_ETHERNET            1
+#define SFLOW_245_HEADER_TOKENBUS            2
+#define SFLOW_245_HEADER_TOKENRING           3
+#define SFLOW_245_HEADER_FDDI                4
+#define SFLOW_245_HEADER_FRAME_RELAY         5
+#define SFLOW_245_HEADER_X25                 6
+#define SFLOW_245_HEADER_PPP                 7
+#define SFLOW_245_HEADER_SMDS                8
+#define SFLOW_245_HEADER_AAL5                9
+#define SFLOW_245_HEADER_AAL5_IP            10
+#define SFLOW_245_HEADER_IPv4               11
+#define SFLOW_245_HEADER_IPv6               12
+#define SFLOW_245_HEADER_MPLS               13
+#define SFLOW_5_HEADER_POS                  14
+#define SFLOW_5_HEADER_80211_MAC            15
+#define SFLOW_5_HEADER_80211_AMPDU          16
+#define SFLOW_5_HEADER_80211_AMSDU_SUBFRAME 17
 
 static const value_string sflow_245_header_protocol[] = {
     { SFLOW_245_HEADER_ETHERNET,           "Ethernet"},
@@ -321,6 +340,13 @@ struct sflow_address_type {
     int hf_addr_v6;
 };
 
+struct sflow_address_details {
+    int addr_type;              /* ADDR_TYPE_IPV4 | ADDR_TYPE_IPV6 */
+    union {
+        guint8 v4[4];
+        guint8 v6[16];
+    } agent_address;
+};
 
 /* Initialize the protocol and registered fields */
 static int proto_sflow = -1;
@@ -604,7 +630,23 @@ static gint ett_sflow_245_sampled_header = -1;
 
 static expert_field ei_sflow_invalid_address_type = EI_INIT;
 
-static dissector_table_t   header_subdissector_table;
+/* dissectors for other protocols */
+static dissector_handle_t eth_withoutfcs_handle;
+static dissector_handle_t tr_handle;
+static dissector_handle_t fddi_handle;
+static dissector_handle_t fr_handle;
+static dissector_handle_t x25_handle;
+static dissector_handle_t ppp_hdlc_handle;
+static dissector_handle_t smds_handle;
+static dissector_handle_t aal5_handle;
+static dissector_handle_t ipv4_handle;
+static dissector_handle_t ipv6_handle;
+static dissector_handle_t mpls_handle;
+static dissector_handle_t pos_handle;
+static dissector_handle_t ieee80211_mac_handle;
+static dissector_handle_t ieee80211_ampdu_handle;
+static dissector_handle_t ieee80211_amsdu_subframe_handle;
+/* don't dissect */
 static dissector_handle_t data_handle;
 
 void proto_reg_handoff_sflow_245(void);
@@ -623,6 +665,7 @@ dissect_sflow_245_sampled_header(tvbuff_t *tvb, packet_info *pinfo,
     gboolean          save_writable;
     gboolean          save_in_error_pkt;
     address           save_dl_src, save_dl_dst, save_net_src, save_net_dst, save_src, save_dst;
+    void             *pd_save;
 
     version = tvb_get_ntohl(tvb, 0);
     header_proto = tvb_get_ntohl(tvb, offset);
@@ -685,17 +728,71 @@ dissect_sflow_245_sampled_header(tvbuff_t *tvb, packet_info *pinfo,
     save_net_dst = pinfo->net_dst;
     save_src = pinfo->src;
     save_dst = pinfo->dst;
+    pd_save = pinfo->private_data;
 
     TRY
     {
-	    if ((global_dissect_samp_headers == FALSE) ||
-            !dissector_try_uint(header_subdissector_table, header_proto, next_tvb, pinfo, sflow_245_header_tree))
-	    {
-            call_dissector(data_handle, next_tvb, pinfo, sflow_245_header_tree);
-	    }
+        switch (header_proto) {
+            case SFLOW_245_HEADER_ETHERNET:
+                call_dissector(eth_withoutfcs_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_245_HEADER_TOKENRING:
+                call_dissector(tr_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_245_HEADER_FDDI:
+                call_dissector(fddi_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_245_HEADER_FRAME_RELAY:
+                call_dissector(fr_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_245_HEADER_X25:
+                call_dissector(x25_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_245_HEADER_PPP:
+                call_dissector(ppp_hdlc_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_245_HEADER_SMDS:
+                call_dissector(smds_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_245_HEADER_AAL5:
+            case SFLOW_245_HEADER_AAL5_IP:
+                /* I'll be surprised if this works! I have no AAL5 captures
+                 * to test with, and I'm not sure how the encapsulation goes */
+                call_dissector(aal5_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_245_HEADER_IPv4:
+                call_dissector(ipv4_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_245_HEADER_IPv6:
+                call_dissector(ipv6_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_245_HEADER_MPLS:
+                call_dissector(mpls_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_5_HEADER_POS:
+                call_dissector(pos_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_5_HEADER_80211_MAC:
+                call_dissector(ieee80211_mac_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_5_HEADER_80211_AMPDU:
+                call_dissector(ieee80211_ampdu_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            case SFLOW_5_HEADER_80211_AMSDU_SUBFRAME:
+                call_dissector(ieee80211_amsdu_subframe_handle, next_tvb, pinfo, sflow_245_header_tree);
+                break;
+            default:
+                /* some of the protocols, I have no clue where to begin. */
+                break;
+        }
     }
 
     CATCH_BOUNDS_ERRORS {
+        /*  Restore the private_data structure in case one of the
+         *  called dissectors modified it (and, due to the exception,
+         *  was unable to restore it).
+         */
+        pinfo->private_data = pd_save;
     }
     ENDTRY;
 
@@ -718,7 +815,7 @@ static gint
 dissect_sflow_245_address_type(tvbuff_t *tvb, packet_info *pinfo,
                                proto_tree *tree, gint offset,
                                struct sflow_address_type *hf_type,
-                               address *addr) {
+                               struct sflow_address_details *addr_detail) {
     guint32 addr_type;
     int len;
 
@@ -748,13 +845,14 @@ dissect_sflow_245_address_type(tvbuff_t *tvb, packet_info *pinfo,
                                      offset - 4, 4, "Unknown address type (%u)", addr_type);
     }
 
-    if (addr) {
+    if (addr_detail) {
+        addr_detail->addr_type = addr_type;
         switch (len) {
         case 4:
-            TVB_SET_ADDRESS(addr, AT_IPv4, tvb, offset, len);
+            tvb_memcpy(tvb, addr_detail->agent_address.v4, offset, len);
             break;
         case 16:
-            TVB_SET_ADDRESS(addr, AT_IPv6, tvb, offset, len);
+            tvb_memcpy(tvb, addr_detail->agent_address.v6, offset, len);
             break;
         }
     }
@@ -798,7 +896,9 @@ static gint
 dissect_sflow_5_extended_mpls_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gint offset) {
     guint32     in_label_count, out_label_count, label, i, j;
     proto_tree *in_stack;
+    proto_item *ti_in;
     proto_tree *out_stack;
+    proto_item *ti_out;
     struct sflow_address_type addr_type;
 
     addr_type.hf_addr_v4 = hf_sflow_245_nexthop_v4;
@@ -810,7 +910,8 @@ dissect_sflow_5_extended_mpls_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree
     proto_tree_add_item(tree, hf_sflow_245_extended_mpls_in_label_stack_entries, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset += 4;
 
-    in_stack = proto_tree_add_subtree(tree, tvb, offset, -1, ett_sflow_5_mpls_in_label_stack, NULL, "In Label Stack");
+    ti_in = proto_tree_add_text(tree, tvb, offset, -1, "In Label Stack");
+    in_stack = proto_item_add_subtree(ti_in, ett_sflow_5_mpls_in_label_stack);
 
     /* by applying the mask, we avoid possible corrupted data that causes huge number of loops
      * 255 is a sensible limit of label count */
@@ -825,7 +926,8 @@ dissect_sflow_5_extended_mpls_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree
     proto_tree_add_item(tree, hf_sflow_245_extended_mpls_out_label_stack_entries, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset += 4;
 
-    out_stack = proto_tree_add_subtree(tree, tvb, offset, -1, ett_sflow_5_mpls_in_label_stack, NULL, "Out Label Stack");
+    ti_out = proto_tree_add_text(tree, tvb, offset, -1, "Out Label Stack");
+    out_stack = proto_item_add_subtree(ti_out, ett_sflow_5_mpls_in_label_stack);
 
     /* by applying the mask, we avoid possible corrupted data that causes huge number of loops
      * 255 is a sensible limit of label count */
@@ -1011,7 +1113,7 @@ dissect_sflow_5_ipv4(tvbuff_t *tvb, proto_tree *tree, gint offset) {
     offset += 4;
 
     /* 7 bits for type of service, plus 1 reserved bit */
-    proto_tree_add_item(tree, hf_sflow_245_ipv4_precedence_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_sflow_245_ipv4_precedence_type, tvb, offset, 1, ENC_NA);
     proto_tree_add_item(tree, hf_sflow_245_ipv4_delay, tvb, offset, 1, ENC_NA);
     proto_tree_add_item(tree, hf_sflow_245_ipv4_throughput, tvb, offset, 1, ENC_NA);
     proto_tree_add_item(tree, hf_sflow_245_ipv4_reliability, tvb, offset, 1, ENC_NA);
@@ -1267,7 +1369,7 @@ dissect_sflow_5_extended_80211_payload(tvbuff_t *tvb, proto_tree *tree, gint off
     if (OUI == 0x000FAC) {
         proto_tree_add_uint_format_value(tree, hf_sflow_5_extended_80211_oui, tvb, offset, 3, OUI, "Default (0x%X)", OUI);
         offset += 3;
-        proto_tree_add_item(tree, hf_sflow_5_extended_80211_suite_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(tree, hf_sflow_5_extended_80211_suite_type, tvb, offset, 1, ENC_NA);
     } else {
         proto_tree_add_uint_format_value(tree, hf_sflow_5_extended_80211_oui, tvb, offset, 3, OUI, "Other vender (0x%X)", OUI);
         offset += 3;
@@ -1510,8 +1612,9 @@ dissect_sflow_5_flow_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     /* only accept default enterprise 0 (InMon sFlow) */
     if (enterprise == ENTERPRISE_DEFAULT) {
-        flow_data_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_sflow_5_flow_record, &ti,
+        ti = proto_tree_add_text(tree, tvb, offset, -1, "%s",
                 val_to_str_ext_const(format, &sflow_5_flow_record_type_ext, "Unknown sample format"));
+        flow_data_tree = proto_item_add_subtree(ti, ett_sflow_5_flow_record);
 
         proto_tree_add_uint_format_value(flow_data_tree, hf_sflow_enterprise, tvb, offset, 4,
                             enterprise, "standard sFlow (%u)", enterprise);
@@ -1587,11 +1690,10 @@ dissect_sflow_5_flow_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         }
     } else {
         /* unknown enterprise format, what to do?? */
-        flow_data_tree = proto_tree_add_subtree(tree, tvb, offset, -1,
-            ett_sflow_5_flow_record, &ti, "Unknown enterprise format");
-        proto_tree_add_uint_format_value(flow_data_tree, hf_sflow_enterprise, tvb, offset, 4,
+        ti = proto_tree_add_text(tree, tvb, offset, -1, "Unknown enterprise format");
+        flow_data_tree = proto_item_add_subtree(ti, ett_sflow_5_flow_record);
+        proto_tree_add_uint_format_value(flow_data_tree, hf_sflow_enterprise, tvb, offset, -1,
                                     enterprise, "Non-standard sFlow (%u)", enterprise);
-        offset = tvb_captured_length(tvb);
     }
     proto_item_set_end(ti, tvb, offset);
 
@@ -1872,8 +1974,9 @@ dissect_sflow_5_counters_record(tvbuff_t *tvb, proto_tree *tree, gint offset) {
     format = enterprise_format & 0x00000fff;
 
     if (enterprise == ENTERPRISE_DEFAULT) { /* only accept default enterprise 0 (InMon sFlow) */
-        counter_data_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_sflow_5_counters_record, &ti,
+        ti = proto_tree_add_text(tree, tvb, offset, -1, "%s",
                 val_to_str_const(format, sflow_5_counters_record_type, "Unknown sample format"));
+        counter_data_tree = proto_item_add_subtree(ti, ett_sflow_5_counters_record);
 
         proto_tree_add_uint_format_value(counter_data_tree, hf_sflow_enterprise, tvb, offset, 4,
                                 enterprise, "standard sFlow (%u)", enterprise);
@@ -1913,11 +2016,10 @@ dissect_sflow_5_counters_record(tvbuff_t *tvb, proto_tree *tree, gint offset) {
                 break;
         }
     } else { /* unknown enterprise format, what to do?? */
-        counter_data_tree = proto_tree_add_subtree(tree, tvb, offset, -1,
-            ett_sflow_5_counters_record, &ti, "Unknown enterprise format");
-        proto_tree_add_uint_format_value(counter_data_tree, hf_sflow_enterprise, tvb, offset, 4,
+        ti = proto_tree_add_text(tree, tvb, offset, -1, "Unknown enterprise format");
+        counter_data_tree = proto_item_add_subtree(ti, ett_sflow_5_counters_record);
+        proto_tree_add_uint_format_value(counter_data_tree, hf_sflow_enterprise, tvb, offset, -1,
                         enterprise, "Non-standard sFlow (%u)", enterprise);
-        offset = tvb_captured_length(tvb);
     }
     proto_item_set_end(ti, tvb, offset);
 
@@ -2172,8 +2274,9 @@ dissect_sflow_245_samples(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
         format = sample_type & 0x00000fff;
 
         if (enterprise == ENTERPRISE_DEFAULT) { /* only accept default enterprise 0 (InMon sFlow) */
-            sflow_245_sample_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_sflow_245_sample, &ti,
+            ti = proto_tree_add_text(tree, tvb, offset, -1, "%s",
                     val_to_str_const(format, sflow_245_sampletype, "Unknown sample format"));
+            sflow_245_sample_tree = proto_item_add_subtree(ti, ett_sflow_245_sample);
 
             proto_tree_add_uint_format_value(sflow_245_sample_tree, hf_sflow_enterprise, tvb, offset, 4, enterprise, "standard sFlow (%u)", enterprise);
             proto_tree_add_item(sflow_245_sample_tree, hf_sflow_245_sampletype12, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -2204,16 +2307,16 @@ dissect_sflow_245_samples(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
             /* current offset points to sample length field, which is 4 bytes from the beginning of the packet*/
             offset += length;
         } else { /* unknown enterprise format, what to do?? */
-            sflow_245_sample_tree = proto_tree_add_subtree(tree, tvb, offset, -1,
-                        ett_sflow_245_sample, &ti, "Unknown enterprise format");
-            proto_tree_add_uint_format_value(sflow_245_sample_tree, hf_sflow_enterprise, tvb, offset, 4,
+            ti = proto_tree_add_text(tree, tvb, offset, -1, "Unknown enterprise format");
+            sflow_245_sample_tree = proto_item_add_subtree(ti, ett_sflow_245_sample);
+            proto_tree_add_uint_format_value(sflow_245_sample_tree, hf_sflow_enterprise, tvb, offset, -1,
                             enterprise, "Non-standard sFlow (%u)", enterprise);
-            offset = tvb_captured_length(tvb);
         }
 
     } else { /* version 2 or 4 */
-        sflow_245_sample_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_sflow_245_sample, &ti,
+        ti = proto_tree_add_text(tree, tvb, offset, -1, "%s",
                 val_to_str_const(sample_type, sflow_245_sampletype, "Unknown sample type"));
+        sflow_245_sample_tree = proto_item_add_subtree(ti, ett_sflow_245_sample);
 
         proto_tree_add_item(sflow_245_sample_tree, hf_sflow_245_sampletype, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset += 4;
@@ -2242,8 +2345,7 @@ dissect_sflow_245(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
     proto_item                   *ti;
     proto_tree                   *sflow_245_tree;
     guint32                       version, sub_agent_id, seqnum;
-    address                       addr_details;
-    int                           sflow_addr_type;
+    struct sflow_address_details  addr_details;
     struct sflow_address_type     addr_type;
 
     guint32        numsamples;
@@ -2266,16 +2368,11 @@ dissect_sflow_245(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
        /* Unknown version; assume it's not an sFlow packet. */
        return 0;
     }
-    sflow_addr_type = tvb_get_ntohl(tvb, offset + 4);
-    switch (sflow_addr_type) {
+    addr_details.addr_type = tvb_get_ntohl(tvb, offset + 4);
+    switch (addr_details.addr_type) {
         case ADDR_TYPE_UNKNOWN:
-            addr_details.type = AT_NONE;
-            break;
         case ADDR_TYPE_IPV4:
-            addr_details.type = AT_IPv4;
-            break;
         case ADDR_TYPE_IPV6:
-            addr_details.type = AT_IPv6;
             break;
 
         default:
@@ -2300,12 +2397,15 @@ dissect_sflow_245(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
 
     offset = dissect_sflow_245_address_type(tvb, pinfo, sflow_245_tree, offset,
                                             &addr_type, &addr_details);
-    switch (sflow_addr_type) {
+    switch (addr_details.addr_type) {
         case ADDR_TYPE_UNKNOWN:
             break;
         case ADDR_TYPE_IPV4:
+            col_append_fstr(pinfo->cinfo, COL_INFO, ", agent %s", ip_to_str(addr_details.agent_address.v4));
+            break;
         case ADDR_TYPE_IPV6:
-            col_append_fstr(pinfo->cinfo, COL_INFO, ", agent %s", address_to_str(wmem_packet_scope(), &addr_details));
+            col_append_fstr(pinfo->cinfo, COL_INFO, ", agent %s",
+                    ip6_to_str((struct e_in6_addr *) addr_details.agent_address.v6));
             break;
     }
 
@@ -3177,7 +3277,7 @@ proto_register_sflow(void) {
           NULL, HFILL }
       },
       { &hf_sflow_5_extended_80211_rx_packet_duration,
-        { "Packet Duration (ms)", "sflow_5.extended_80211.rx.packet_duration",
+        { "Packet Duration (ms)", "sflow_5.rx.extended_80211.packet_duration",
           FT_UINT32, BASE_DEC, NULL, 0x0,
           NULL, HFILL }
       },
@@ -3457,8 +3557,6 @@ proto_register_sflow(void) {
     expert_sflow = expert_register_protocol(proto_sflow);
     expert_register_field_array(expert_sflow, ei, array_length(ei));
 
-    header_subdissector_table  = register_dissector_table("sflow_245.header_protocol", "SFLOW header protocol", FT_UINT32, BASE_DEC);
-
     /* Register our configuration options for sFlow */
     sflow_245_module = prefs_register_protocol(proto_sflow, proto_reg_handoff_sflow_245);
 
@@ -3517,17 +3615,91 @@ proto_reg_handoff_sflow_245(void) {
 
     sflow_ports = range_copy(global_sflow_ports);
     dissector_add_uint_range("udp.port", sflow_ports, sflow_handle);
+
+
+    /*dissector_handle_t sflow_245_handle;*/
+
+    /*
+     * XXX - should this be done with a dissector table?
+     */
+
+    if (global_dissect_samp_headers) {
+        eth_withoutfcs_handle = find_dissector("eth_withoutfcs");
+        tr_handle = find_dissector("tr");
+        fddi_handle = find_dissector("fddi");
+        fr_handle = find_dissector("fr");
+        x25_handle = find_dissector("x.25");
+        ppp_hdlc_handle = find_dissector("ppp_hdlc");
+#if 0
+        smds_handle = find_dissector("smds");
+#else
+        /* We don't have an SMDS dissector yet
+         *
+         *Switched multimegabit data service (SMDS) was a connectionless service
+         *used to connect LANs, MANs and WANs to exchange data. SMDS was based on
+         *the IEEE 802.6 DQDB standard. SMDS fragmented its datagrams into smaller
+         *"cells" for transport, and can be viewed as a technological precursor of ATM.
+         */
+        smds_handle = data_handle;
+#endif
+#if 0
+        aal5_handle = find_dissector("aal5");
+#else
+        /*
+         * No AAL5 (ATM Adaptation Layer 5) dissector available.
+         * What does the packet look like?  An AAL5 PDU?  Where
+         * do the VPI/VCI pair appear, if anywhere?
+         */
+        aal5_handle = data_handle;
+#endif
+        ipv4_handle = find_dissector("ip");
+        ipv6_handle = find_dissector("ipv6");
+        mpls_handle = find_dissector("mpls");
+#if 0
+        pos_handle = find_dissector("pos");
+#else
+        /* wireshark does not have POS dissector yet */
+        pos_handle = data_handle;
+#endif
+        ieee80211_mac_handle = find_dissector("wlan_withoutfcs");
+#if 0
+        ieee80211_ampdu_handle = find_dissector("ampdu");
+        ieee80211_amsdu_subframe_handle = find_dissector("wlan_aggregate");
+#else
+        /* No handles for these */
+        ieee80211_ampdu_handle = data_handle;
+        ieee80211_amsdu_subframe_handle = data_handle;
+#endif
+    } else {
+        eth_withoutfcs_handle = data_handle;
+        tr_handle = data_handle;
+        fddi_handle = data_handle;
+        fr_handle = data_handle;
+        x25_handle = data_handle;
+        ppp_hdlc_handle = data_handle;
+        smds_handle = data_handle;
+        aal5_handle = data_handle;
+        ipv4_handle = data_handle;
+        ipv6_handle = data_handle;
+        mpls_handle = data_handle;
+        pos_handle = data_handle;
+        ieee80211_mac_handle = data_handle;
+        ieee80211_ampdu_handle = data_handle;
+        ieee80211_amsdu_subframe_handle = data_handle;
+    }
+
 }
 
+
 /*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
+ * Editor modelines
  *
- * Local variables:
+ * Local Variables:
  * c-basic-offset: 4
  * tab-width: 8
  * indent-tabs-mode: nil
  * End:
  *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
+ * ex: set shiftwidth=4 tabstop=8 noexpandtab
  * :indentSize=4:tabSize=8:noTabs=true:
  */

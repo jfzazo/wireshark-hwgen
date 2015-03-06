@@ -36,13 +36,15 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 
 #include "packet-igmp.h"
+#include "packet-mrdisc.h"
 
 void proto_register_mrdisc(void);
-void proto_reg_handoff_mrdisc(void);
 
 static int proto_mrdisc = -1;
 static int hf_checksum = -1;
@@ -59,8 +61,6 @@ static int hf_option_bytes = -1;
 
 static int ett_mrdisc = -1;
 static int ett_options = -1;
-
-#define MC_ALL_ROUTERS		0xe0000002
 
 #define MRDISC_MRA	0x24
 #define MRDISC_MRS	0x25
@@ -182,24 +182,27 @@ dissect_mrdisc_mrst(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 
 
 /* This function is only called from the IGMP dissector */
-static int
-dissect_mrdisc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* data _U_)
+int
+dissect_mrdisc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, int offset)
 {
 	proto_tree *tree;
 	proto_item *item;
 	guint8 type;
-	int offset = 0;
-	guint32 dst = g_htonl(MC_ALL_ROUTERS);
 
-	/* Shouldn't be destined for us */
-	if (memcmp(pinfo->dst.data, &dst, 4))
-	return 0;
+	if (!proto_is_protocol_enabled(find_protocol_by_id(proto_mrdisc))) {
+		/* we are not enabled, skip entire packet to be nice
+		   to the igmp layer. (so clicking on IGMP will display the data)
+		 */
+		return offset+tvb_length_remaining(tvb, offset);
+	}
+
+	item = proto_tree_add_item(parent_tree, proto_mrdisc, tvb, offset, 0, ENC_NA);
+	tree = proto_item_add_subtree(item, ett_mrdisc);
+
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "MRDISC");
 	col_clear(pinfo->cinfo, COL_INFO);
 
-	item = proto_tree_add_item(parent_tree, proto_mrdisc, tvb, offset, 0, ENC_NA);
-	tree = proto_item_add_subtree(item, ett_mrdisc);
 
 	type = tvb_get_guint8(tvb, offset);
 	col_add_str(pinfo->cinfo, COL_INFO,
@@ -242,11 +245,11 @@ proto_register_mrdisc(void)
 
 		{ &hf_advint,
 			{ "Advertising Interval", "mrdisc.adv_int", FT_UINT8, BASE_DEC,
-			  NULL, 0, "MRDISC Advertising Interval in seconds", HFILL }},
+		  	  NULL, 0, "MRDISC Advertising Interval in seconds", HFILL }},
 
 		{ &hf_numopts,
 			{ "Number Of Options", "mrdisc.num_opts", FT_UINT16, BASE_DEC,
-			  NULL, 0, "MRDISC Number Of Options", HFILL }},
+		  	  NULL, 0, "MRDISC Number Of Options", HFILL }},
 
 		{ &hf_options,
 			{ "Options", "mrdisc.options", FT_NONE, BASE_NONE,
@@ -262,15 +265,15 @@ proto_register_mrdisc(void)
 
 		{ &hf_qi,
 			{ "Query Interval", "mrdisc.query_int", FT_UINT16, BASE_DEC,
-			  NULL, 0, "MRDISC Query Interval", HFILL }},
+		  	  NULL, 0, "MRDISC Query Interval", HFILL }},
 
 		{ &hf_rv,
 			{ "Robustness Variable", "mrdisc.rob_var", FT_UINT16, BASE_DEC,
-			  NULL, 0, "MRDISC Robustness Variable", HFILL }},
+		  	  NULL, 0, "MRDISC Robustness Variable", HFILL }},
 
 		{ &hf_option_bytes,
 			{ "Data", "mrdisc.option_data", FT_BYTES, BASE_NONE,
-			  NULL, 0, "MRDISC Unknown Option Data", HFILL }},
+		  	  NULL, 0, "MRDISC Unknown Option Data", HFILL }},
 
 	};
 	static gint *ett[] = {
@@ -278,31 +281,8 @@ proto_register_mrdisc(void)
 		&ett_options,
 	};
 
-	proto_mrdisc = proto_register_protocol("Multicast Router DISCovery protocol", "MRDISC", "mrdisc");
+	proto_mrdisc = proto_register_protocol("Multicast Router DISCovery protocol",
+	    "MRDISC", "mrdisc");
 	proto_register_field_array(proto_mrdisc, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
 }
-
-void
-proto_reg_handoff_mrdisc(void)
-{
-	dissector_handle_t mrdisc_handle;
-
-	mrdisc_handle = new_create_dissector_handle(dissect_mrdisc, proto_mrdisc);
-	dissector_add_uint("igmp.type", IGMP_TYPE_0x24, mrdisc_handle);
-	dissector_add_uint("igmp.type", IGMP_TYPE_0x25, mrdisc_handle);
-	dissector_add_uint("igmp.type", IGMP_TYPE_0x26, mrdisc_handle);
-}
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

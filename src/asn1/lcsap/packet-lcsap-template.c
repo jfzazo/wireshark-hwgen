@@ -26,9 +26,14 @@
 
 #include "config.h"
 
+#include <glib.h>
+#include <epan/packet.h>
+
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
 #include <math.h>
 
-#include <epan/packet.h>
 #include <epan/strutil.h>
 #include <epan/asn1.h>
 #include <epan/prefs.h>
@@ -57,6 +62,10 @@ static dissector_handle_t lppa_handle;
 
 #define SCTP_PORT_LCSAP 9082
 #include "packet-lcsap-val.h"
+/* Strcture to hold ProcedureCode */
+struct pro_code {
+        guint8 code;
+} _pro_code;
 
 /* Initialize the protocol and registered fields */
 static int proto_lcsap  =   -1;
@@ -188,28 +197,28 @@ static const value_string lcsap_gnss_pos_usage_vals[] = {
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(lcsap_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(lcsap_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 
 static int dissect_ProtocolExtensionFieldExtensionValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(lcsap_extension_dissector_table, ProtocolExtensionID, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(lcsap_extension_dissector_table, ProtocolExtensionID, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_InitiatingMessageValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(lcsap_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(lcsap_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_SuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(lcsap_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(lcsap_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(lcsap_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(lcsap_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 
@@ -241,7 +250,7 @@ proto_reg_handoff_lcsap(void)
 		lcsap_handle = find_dissector("lcsap");
 		lpp_handle = find_dissector("lpp");
 		lppa_handle = find_dissector("lppa");
-		dissector_add_for_decode_as("sctp.port", lcsap_handle);   /* for "decode-as"  */
+		dissector_add_handle("sctp.port", lcsap_handle);   /* for "decode-as"  */
 		dissector_add_uint("sctp.ppi", LCS_AP_PAYLOAD_PROTOCOL_ID,   lcsap_handle);
 		Initialized=TRUE;
 #include "packet-lcsap-dis-tab.c"

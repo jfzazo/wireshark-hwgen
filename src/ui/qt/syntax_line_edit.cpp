@@ -59,15 +59,11 @@ void SyntaxLineEdit::setSyntaxState(SyntaxState state) {
             .arg(Invalid)
             .arg(Deprecated)
             .arg("palette(text)")   // Foreground
-            .arg(ColorUtils::fromColorT(&prefs.gui_text_valid).name())        // Valid
-            .arg(ColorUtils::fromColorT(&prefs.gui_text_invalid).name())      // Invalid
-            .arg(ColorUtils::fromColorT(&prefs.gui_text_deprecated).name())   // VDeprecated
+            .arg(ColorUtils::fromColorT(&prefs.gui_text_valid).name()) // Invalid
+            .arg(ColorUtils::fromColorT(&prefs.gui_text_invalid).name())      // Deprecated
+            .arg(ColorUtils::fromColorT(&prefs.gui_text_deprecated).name())   // Valid
             ;
     setStyleSheet(style_sheet_);
-}
-
-QString SyntaxLineEdit::syntaxErrorMessage() {
-    return syntax_error_message_;
 }
 
 QString SyntaxLineEdit::styleSheet() const {
@@ -93,23 +89,21 @@ void SyntaxLineEdit::checkDisplayFilter(QString filter)
 
     deprecated_token_.clear();
     dfilter_t *dfp = NULL;
-    gchar *err_msg;
-    if (dfilter_compile(filter.toUtf8().constData(), &dfp, &err_msg)) {
+    bool valid = dfilter_compile(filter.toUtf8().constData(), &dfp);
+
+    if (valid) {
+        setSyntaxState(SyntaxLineEdit::Valid);
+    } else {
         GPtrArray *depr = NULL;
         if (dfp) {
             depr = dfilter_deprecated_tokens(dfp);
         }
         if (depr) {
-            // You keep using that word. I do not think it means what you think it means.
             setSyntaxState(SyntaxLineEdit::Deprecated);
             deprecated_token_ = (const char *) g_ptr_array_index(depr, 0);
         } else {
-            setSyntaxState(SyntaxLineEdit::Valid);
+            setSyntaxState(SyntaxLineEdit::Invalid);
         }
-    } else {
-        setSyntaxState(SyntaxLineEdit::Invalid);
-        syntax_error_message_ = QString::fromUtf8(err_msg);
-        g_free(err_msg);
     }
     dfilter_free(dfp);
 }
@@ -126,21 +120,5 @@ void SyntaxLineEdit::checkFieldName(QString field)
         setSyntaxState(SyntaxLineEdit::Invalid);
     } else {
         checkDisplayFilter(field);
-    }
-}
-
-void SyntaxLineEdit::checkInteger(QString number)
-{
-    if (number.isEmpty()) {
-        setSyntaxState(SyntaxLineEdit::Empty);
-        return;
-    }
-
-    bool ok;
-    text().toInt(&ok);
-    if (ok) {
-        setSyntaxState(SyntaxLineEdit::Valid);
-    } else {
-        setSyntaxState(SyntaxLineEdit::Invalid);
     }
 }

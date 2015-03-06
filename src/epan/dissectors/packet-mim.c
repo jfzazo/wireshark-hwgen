@@ -27,6 +27,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/etypes.h>
 #include <epan/addr_resolv.h>
@@ -234,14 +235,11 @@ dissect_fp( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_ 
 
     if (PTREE_DATA(tree)->visible) {
       if (dest_ig) {
-        address      ether_addr;
-
-        SET_ADDRESS(&ether_addr, AT_ETHER, 6, dst_addr);
 
         ti = proto_tree_add_protocol_format(tree, proto_fp, tvb, 0, FP_HEADER_SIZE,
                                             "Cisco FabricPath, Src: %03x.%02x.%04x, Dst: %s (%s)",
                                             sswid, ssswid, slid,
-                                            get_ether_name(dst_addr), address_to_str(wmem_packet_scope(), &ether_addr));
+                                            get_ether_name(dst_addr), ether_to_str(dst_addr));
       } else {
         ti = proto_tree_add_protocol_format(tree, proto_fp, tvb, 0, FP_HEADER_SIZE,
                                             "Cisco FabricPath, Src: %03x.%02x.%04x, Dst: %03x.%02x.%04x",
@@ -398,16 +396,3 @@ proto_reg_handoff_fabricpath(void)
 
   proto_set_decoding(proto_fp, mim_enable_dissector);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

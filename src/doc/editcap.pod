@@ -30,12 +30,8 @@ S< B<-d> > |
 S< B<-D> E<lt>dup windowE<gt> > |
 S< B<-w> E<lt>dup time windowE<gt> >
 S<[ B<-v> ]>
-S<[ B<-I> E<lt>bytes to ignoreE<gt> ]>
 I<infile>
 I<outfile>
-
-B<editcap>
-S<[ B<-V> ]>
 
 =head1 DESCRIPTION
 
@@ -166,13 +162,6 @@ be created with a suffix -nnnnn, starting with 00000. If packets for the specifi
 time interval are written to the output file, the next output file is
 opened. The default is to use a single output file.
 
-=item -I  E<lt>bytes to ignoreE<gt>
-
-Ignore the specified bytes number at the beginning of the frame during MD5 hash calculation
-Useful to remove duplicated packets taken on several routers(differents mac addresses for example)
-e.g. -I 26 in case of Ether/IP/ will ignore ether(14) and IP header(20 - 4(src ip) - 4(dst ip)).
-The default value is 0.
-
 =item -L
 
 Adjust the original frame length accordingly when chopping and/or snapping
@@ -273,10 +262,6 @@ Causes B<editcap> to print verbose messages while it's working.
 Use of B<-v> with the de-duplication switches of B<-d>, B<-D> or B<-w>
 will cause all MD5 hashes to be printed whether the packet is skipped
 or not.
-
-=item -V
-
-Print the version and exit.
 
 =item -w  E<lt>dup time windowE<gt>
 

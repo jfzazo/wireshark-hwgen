@@ -898,6 +898,7 @@ char *WimaxasncpDicttext;
 #include <errno.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <epan/emem.h>
 #include <epan/value_string.h>
 #include <epan/packet.h>	/* array_length */
 #include <wsutil/file_util.h>
@@ -956,7 +957,7 @@ static GString *dict_error = NULL;
 
 
 
-#line 960 "wimaxasncp_dict.c"
+#line 961 "wimaxasncp_dict.c"
 
 #define INITIAL 0
 #define LOADING 1
@@ -1177,9 +1178,9 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 186 "wimaxasncp_dict.l"
+#line 187 "wimaxasncp_dict.l"
 
-#line 1183 "wimaxasncp_dict.c"
+#line 1184 "wimaxasncp_dict.c"
 
 	if ( !(yy_init) )
 		{
@@ -1261,47 +1262,47 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 187 "wimaxasncp_dict.l"
+#line 188 "wimaxasncp_dict.l"
 ;
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 188 "wimaxasncp_dict.l"
+#line 189 "wimaxasncp_dict.l"
 ;
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 190 "wimaxasncp_dict.l"
+#line 191 "wimaxasncp_dict.l"
 BEGIN LOADING_COMMENT;
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 191 "wimaxasncp_dict.l"
+#line 192 "wimaxasncp_dict.l"
 ;
 	YY_BREAK
 case 5:
 /* rule 5 can match eol */
 YY_RULE_SETUP
-#line 192 "wimaxasncp_dict.l"
+#line 193 "wimaxasncp_dict.l"
 BEGIN LOADING;
 	YY_BREAK
 case 6:
 /* rule 6 can match eol */
 YY_RULE_SETUP
-#line 194 "wimaxasncp_dict.l"
+#line 195 "wimaxasncp_dict.l"
 BEGIN LOADING_XMLPI;
 	YY_BREAK
 case 7:
 /* rule 7 can match eol */
 YY_RULE_SETUP
-#line 195 "wimaxasncp_dict.l"
+#line 196 "wimaxasncp_dict.l"
 ;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 196 "wimaxasncp_dict.l"
+#line 197 "wimaxasncp_dict.l"
 {
 	xmlpi = g_new(wimaxasncp_dict_xmlpi_t,1);
 	xmlpi->name = g_strdup(WimaxasncpDicttext);
@@ -1318,47 +1319,47 @@ YY_RULE_SETUP
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 209 "wimaxasncp_dict.l"
+#line 210 "wimaxasncp_dict.l"
 BEGIN XMLPI_GETKEY;
 	YY_BREAK
 case 10:
 /* rule 10 can match eol */
 YY_RULE_SETUP
-#line 210 "wimaxasncp_dict.l"
+#line 211 "wimaxasncp_dict.l"
 { xmlpi->key = g_strdup(WimaxasncpDicttext); BEGIN XMLPI_ATTRS; }
 	YY_BREAK
 case 11:
 /* rule 11 can match eol */
 YY_RULE_SETUP
-#line 212 "wimaxasncp_dict.l"
+#line 213 "wimaxasncp_dict.l"
 BEGIN XMLPI_GETVAL;
 	YY_BREAK
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 213 "wimaxasncp_dict.l"
+#line 214 "wimaxasncp_dict.l"
 { xmlpi->value = g_strdup(WimaxasncpDicttext); BEGIN XMLPI_ATTRS; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 215 "wimaxasncp_dict.l"
+#line 216 "wimaxasncp_dict.l"
 
 	YY_BREAK
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 216 "wimaxasncp_dict.l"
+#line 217 "wimaxasncp_dict.l"
 BEGIN LOADING;
 	YY_BREAK
 case 15:
 /* rule 15 can match eol */
 YY_RULE_SETUP
-#line 219 "wimaxasncp_dict.l"
+#line 220 "wimaxasncp_dict.l"
 BEGIN ENTITY;
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 220 "wimaxasncp_dict.l"
+#line 221 "wimaxasncp_dict.l"
 {
 	entity_t *e = g_new(entity_t,1);
 	D(("ENTITY: %s\n",WimaxasncpDicttext));
@@ -1371,13 +1372,13 @@ YY_RULE_SETUP
 case 17:
 /* rule 17 can match eol */
 YY_RULE_SETUP
-#line 228 "wimaxasncp_dict.l"
+#line 229 "wimaxasncp_dict.l"
 BEGIN GET_FILE;
 	YY_BREAK
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 229 "wimaxasncp_dict.l"
+#line 230 "wimaxasncp_dict.l"
 {
 	D(("GET_FILE: %s\n",WimaxasncpDicttext));
 	ents.next->file = g_strdup(WimaxasncpDicttext);
@@ -1387,59 +1388,59 @@ YY_RULE_SETUP
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 234 "wimaxasncp_dict.l"
+#line 235 "wimaxasncp_dict.l"
 BEGIN LOADING;
 	YY_BREAK
 case 20:
 /* rule 20 can match eol */
 YY_RULE_SETUP
-#line 236 "wimaxasncp_dict.l"
+#line 237 "wimaxasncp_dict.l"
 APPEND("<",1);
 	YY_BREAK
 case 21:
 /* rule 21 can match eol */
 YY_RULE_SETUP
-#line 238 "wimaxasncp_dict.l"
+#line 239 "wimaxasncp_dict.l"
 APPEND(">",1);
 	YY_BREAK
 case 22:
 /* rule 22 can match eol */
 YY_RULE_SETUP
-#line 240 "wimaxasncp_dict.l"
+#line 241 "wimaxasncp_dict.l"
 APPEND("/>",2);
 	YY_BREAK
 case 23:
 /* rule 23 can match eol */
 YY_RULE_SETUP
-#line 242 "wimaxasncp_dict.l"
+#line 243 "wimaxasncp_dict.l"
 APPEND("</",2);
 	YY_BREAK
 case 24:
 /* rule 24 can match eol */
 YY_RULE_SETUP
-#line 244 "wimaxasncp_dict.l"
+#line 245 "wimaxasncp_dict.l"
 APPEND(" ",1);
 	YY_BREAK
 case 25:
 /* rule 25 can match eol */
 YY_RULE_SETUP
-#line 246 "wimaxasncp_dict.l"
+#line 247 "wimaxasncp_dict.l"
 APPEND(WimaxasncpDicttext,WimaxasncpDictleng);
 	YY_BREAK
 case 26:
 /* rule 26 can match eol */
 YY_RULE_SETUP
-#line 248 "wimaxasncp_dict.l"
+#line 249 "wimaxasncp_dict.l"
 APPEND("=",1);
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 250 "wimaxasncp_dict.l"
+#line 251 "wimaxasncp_dict.l"
 APPEND(WimaxasncpDicttext,WimaxasncpDictleng);
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 252 "wimaxasncp_dict.l"
+#line 253 "wimaxasncp_dict.l"
 {
 	gchar *p = ++WimaxasncpDicttext, *temp_str;
 	entity_t* e;
@@ -1509,7 +1510,7 @@ case YY_STATE_EOF(XMLPI_ATTRS):
 case YY_STATE_EOF(XMLPI_GETKEY):
 case YY_STATE_EOF(XMLPI_GETVAL):
 case YY_STATE_EOF(XMLPI_ENDATTR):
-#line 294 "wimaxasncp_dict.l"
+#line 295 "wimaxasncp_dict.l"
 {
 	if (!WimaxasncpDictin) yyterminate();
 
@@ -1530,7 +1531,7 @@ case YY_STATE_EOF(XMLPI_ENDATTR):
 case 29:
 /* rule 29 can match eol */
 YY_RULE_SETUP
-#line 312 "wimaxasncp_dict.l"
+#line 313 "wimaxasncp_dict.l"
 {
 	*attr_str = g_strdup(WimaxasncpDicttext);
 	D(("%s\n",WimaxasncpDicttext));
@@ -1540,7 +1541,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 319 "wimaxasncp_dict.l"
+#line 320 "wimaxasncp_dict.l"
 {
 	*attr_uint = (guint)strtoul(WimaxasncpDicttext,NULL,0);
 	D(("%s\n",WimaxasncpDicttext););
@@ -1550,7 +1551,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 326 "wimaxasncp_dict.l"
+#line 327 "wimaxasncp_dict.l"
 {
 	*attr_uint16 = (gint16) strtol(WimaxasncpDicttext,NULL,0);
 	D(("%s\n",WimaxasncpDicttext););
@@ -1560,12 +1561,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 333 "wimaxasncp_dict.l"
+#line 334 "wimaxasncp_dict.l"
 { BEGIN BIT32; }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 335 "wimaxasncp_dict.l"
+#line 336 "wimaxasncp_dict.l"
 {
 	*attr_uint = wimaxasncp_bits(32, WimaxasncpDicttext);
 	D(("WIMAXASNCP_BIT32(%s)\n",WimaxasncpDicttext););
@@ -1574,12 +1575,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 341 "wimaxasncp_dict.l"
+#line 342 "wimaxasncp_dict.l"
 { BEGIN BIT16; }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 343 "wimaxasncp_dict.l"
+#line 344 "wimaxasncp_dict.l"
 {
 	*attr_uint = wimaxasncp_bits(16, WimaxasncpDicttext);
 	D(("WIMAXASNCP_BIT16(%s)\n",WimaxasncpDicttext););
@@ -1588,12 +1589,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 349 "wimaxasncp_dict.l"
+#line 350 "wimaxasncp_dict.l"
 { BEGIN BIT8; }
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 351 "wimaxasncp_dict.l"
+#line 352 "wimaxasncp_dict.l"
 {
 	*attr_uint = wimaxasncp_bits(8, WimaxasncpDicttext);
 	D(("WIMAXASNCP_BIT8(%s)\n",WimaxasncpDicttext););
@@ -1602,13 +1603,13 @@ YY_RULE_SETUP
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 357 "wimaxasncp_dict.l"
+#line 358 "wimaxasncp_dict.l"
 { BEGIN END_ATTR; }
 	YY_BREAK
 case 39:
 /* rule 39 can match eol */
 YY_RULE_SETUP
-#line 359 "wimaxasncp_dict.l"
+#line 360 "wimaxasncp_dict.l"
 {
 	*attr_uint = wimaxasncp_decode_type(WimaxasncpDicttext);
 	D(("%s\n",WimaxasncpDicttext));
@@ -1618,12 +1619,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 366 "wimaxasncp_dict.l"
+#line 367 "wimaxasncp_dict.l"
 {	yy_pop_state(); }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 368 "wimaxasncp_dict.l"
+#line 369 "wimaxasncp_dict.l"
 {
 	/* XXX: should go?*/
 	D(("{%s}",WimaxasncpDicttext));
@@ -1632,7 +1633,7 @@ YY_RULE_SETUP
 case 42:
 /* rule 42 can match eol */
 YY_RULE_SETUP
-#line 373 "wimaxasncp_dict.l"
+#line 374 "wimaxasncp_dict.l"
 {
 	D(("=>%s<=\n",WimaxasncpDicttext));
 	yy_pop_state();
@@ -1640,7 +1641,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 378 "wimaxasncp_dict.l"
+#line 379 "wimaxasncp_dict.l"
 {
 	D(("dictionary_start\n"));
 
@@ -1649,7 +1650,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 384 "wimaxasncp_dict.l"
+#line 385 "wimaxasncp_dict.l"
 {
 	D(("tlv_start\n"));
 
@@ -1683,42 +1684,42 @@ YY_RULE_SETUP
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 415 "wimaxasncp_dict.l"
+#line 416 "wimaxasncp_dict.l"
 { ATTR_STR(tlv->name); }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 416 "wimaxasncp_dict.l"
+#line 417 "wimaxasncp_dict.l"
 { ATTR_STR(tlv->description); }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 417 "wimaxasncp_dict.l"
+#line 418 "wimaxasncp_dict.l"
 { ATTR_UINT16(tlv->type); }
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 418 "wimaxasncp_dict.l"
+#line 419 "wimaxasncp_dict.l"
 { ATTR_DECODER(tlv->decoder); }
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 419 "wimaxasncp_dict.l"
+#line 420 "wimaxasncp_dict.l"
 { ATTR_UINT(tlv->since); }
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 420 "wimaxasncp_dict.l"
+#line 421 "wimaxasncp_dict.l"
 { BEGIN IN_TLV;	 }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 421 "wimaxasncp_dict.l"
+#line 422 "wimaxasncp_dict.l"
 { BEGIN IN_DICT; }
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
-#line 424 "wimaxasncp_dict.l"
+#line 425 "wimaxasncp_dict.l"
 {
 	D(("enum_start\n"));
 
@@ -1735,52 +1736,52 @@ YY_RULE_SETUP
 	YY_BREAK
 case 53:
 YY_RULE_SETUP
-#line 439 "wimaxasncp_dict.l"
+#line 440 "wimaxasncp_dict.l"
 { ATTR_STR(enumitem->name); }
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-#line 440 "wimaxasncp_dict.l"
+#line 441 "wimaxasncp_dict.l"
 { ATTR_UINT(enumitem->code); }
 	YY_BREAK
 case 55:
 YY_RULE_SETUP
-#line 442 "wimaxasncp_dict.l"
+#line 443 "wimaxasncp_dict.l"
 { BEGIN IN_TLV; }
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 443 "wimaxasncp_dict.l"
+#line 444 "wimaxasncp_dict.l"
 { BEGIN IN_TLV; }
 	YY_BREAK
 case 57:
 YY_RULE_SETUP
-#line 445 "wimaxasncp_dict.l"
+#line 446 "wimaxasncp_dict.l"
 { D(("tlv_end")); BEGIN IN_DICT; }
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
-#line 447 "wimaxasncp_dict.l"
+#line 448 "wimaxasncp_dict.l"
 {
 	yyterminate();
 }
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
-#line 451 "wimaxasncp_dict.l"
+#line 452 "wimaxasncp_dict.l"
 WIMAXASNCP_IGNORE();
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
-#line 453 "wimaxasncp_dict.l"
+#line 454 "wimaxasncp_dict.l"
 ;
 	YY_BREAK
 case 61:
 YY_RULE_SETUP
-#line 460 "wimaxasncp_dict.l"
+#line 461 "wimaxasncp_dict.l"
 ECHO;
 	YY_BREAK
-#line 1784 "wimaxasncp_dict.c"
+#line 1785 "wimaxasncp_dict.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2781,7 +2782,7 @@ void WimaxasncpDictfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 460 "wimaxasncp_dict.l"
+#line 461 "wimaxasncp_dict.l"
 
 
 
@@ -2998,7 +2999,8 @@ wimaxasncp_dict_t *wimaxasncp_dict_scan(
 
 	if (dict_error->len > 0)
 	{
-		*error = g_string_free(dict_error, FALSE);
+		*error = dict_error->str;
+		g_string_free(dict_error, FALSE);
 	}
 	else
 	{

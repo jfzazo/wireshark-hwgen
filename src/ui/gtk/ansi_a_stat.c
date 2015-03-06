@@ -36,19 +36,23 @@
 #include <string.h>
 
 #include "epan/packet_info.h"
+#include "epan/epan.h"
 #include "epan/value_string.h"
+#include <epan/stat_cmd_args.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-bssap.h>
 #include <epan/dissectors/packet-ansi_a.h>
 
-#include <epan/stat_groups.h>
+#include "../stat_menu.h"
 
 #include "ui/simple_dialog.h"
 
 #include "ui/gtk/gui_stat_menu.h"
 #include "ui/gtk/dlg_utils.h"
+#include "ui/gtk/filter_dlg.h"
 #include "ui/gtk/gui_utils.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkansi_a_stat(void);
 

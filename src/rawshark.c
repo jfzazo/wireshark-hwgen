@@ -32,7 +32,7 @@
  * - Prints a status line, followed by fields from a specified list.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -44,15 +44,13 @@
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_GETOPT_H
-#include <getopt.h>
-#endif
-
 #include <errno.h>
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
+
+#include <signal.h>
 
 #ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
@@ -65,8 +63,6 @@
 #include <glib.h>
 #include <epan/epan-int.h>
 #include <epan/epan.h>
-
-#include <wsutil/cmdarg_err.h>
 #include <wsutil/crash_info.h>
 #include <wsutil/privileges.h>
 #include <wsutil/file_util.h>
@@ -84,15 +80,16 @@
 #include <epan/column.h>
 #include <epan/print.h>
 #include <epan/addr_resolv.h>
-#ifdef HAVE_LIBPCAP
-#include "ui/capture_ui_utils.h"
-#endif
 #include "ui/util.h"
+#include "clopts_common.h"
+#include "cmdarg_err.h"
+#include "version_info.h"
 #include "register.h"
 #include "conditions.h"
 #include "capture_stop_conditions.h"
+#include "capture_ui_utils.h"
 #include <epan/epan_dissect.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/timestamp.h>
 #include <wsutil/unicode-utils.h>
 #include "epan/column-utils.h"
@@ -103,18 +100,18 @@
 #include <wiretap/libpcap.h>
 #include <wiretap/pcap-encap.h>
 
-#include <wsutil/clopts_common.h>
-#include <wsutil/ws_version_info.h>
-
-#include "caputils/capture-pcap-util.h"
-
 #ifdef HAVE_LIBPCAP
 #include <setjmp.h>
+#include "capture-pcap-util.h"
 #ifdef _WIN32
-#include "caputils/capture-wpcap.h"
+#include "capture-wpcap.h"
 #endif /* _WIN32 */
 #endif /* HAVE_LIBPCAP */
 #include "log.h"
+
+#ifdef _WIN32
+#include <wsutil/unicode-utils.h>
+#endif /* _WIN32 */
 
 #if 0
 /*
@@ -147,7 +144,7 @@ static print_format_e print_format = PR_FMT_TEXT;
 static gboolean want_pcap_pkthdr;
 
 cf_status_t raw_cf_open(capture_file *cf, const char *fname);
-static gboolean load_cap_file(capture_file *cf);
+static int load_cap_file(capture_file *cf);
 static gboolean process_packet(capture_file *cf, epan_dissect_t *edt, gint64 offset,
                                struct wtap_pkthdr *whdr, const guchar *pd);
 static void show_print_file_io_error(int err);
@@ -157,8 +154,6 @@ static void open_failure_message(const char *filename, int err,
 static void failure_message(const char *msg_format, va_list ap);
 static void read_failure_message(const char *filename, int err);
 static void write_failure_message(const char *filename, int err);
-static void rawshark_cmdarg_err(const char *fmt, va_list ap);
-static void rawshark_cmdarg_err_cont(const char *fmt, va_list ap);
 static void protocolinfo_init(char *field);
 static gboolean parse_field_string_format(char *format);
 
@@ -185,8 +180,22 @@ int encap;
 GPtrArray *string_fmts;
 
 static void
-print_usage(FILE *output)
+print_usage(gboolean print_ver)
 {
+    FILE *output;
+
+    if (print_ver) {
+        output = stdout;
+        fprintf(output,
+                "Rawshark " VERSION "%s\n"
+                "Dump and analyze network traffic.\n"
+                "See http://www.wireshark.org for more information.\n"
+                "\n"
+                "%s",
+                wireshark_gitversion, get_copyright_info());
+    } else {
+        output = stderr;
+    }
     fprintf(output, "\n");
     fprintf(output, "Usage: rawshark [options] ...\n");
     fprintf(output, "\n");
@@ -413,6 +422,20 @@ set_link_type(const char *lt_arg) {
     return FALSE;
 }
 
+static void
+show_version(GString *comp_info_str, GString *runtime_info_str)
+{
+    printf("Rawshark " VERSION "%s\n"
+           "\n"
+           "%s"
+           "\n"
+           "%s"
+           "\n"
+           "%s",
+           wireshark_gitversion, get_copyright_info(), comp_info_str->str,
+           runtime_info_str->str);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -432,6 +455,7 @@ main(int argc, char *argv[])
     int                  pf_open_errno, pf_read_errno;
     int                  gdp_open_errno, gdp_read_errno;
     int                  dp_open_errno, dp_read_errno;
+    int                  err;
     gchar               *pipe_name = NULL;
     gchar               *rfilters[64];
     e_prefs             *prefs_p;
@@ -440,34 +464,26 @@ main(int argc, char *argv[])
     GPtrArray           *disp_fields = g_ptr_array_new();
     guint                fc;
     gboolean             skip_pcap_header = FALSE;
-    static const struct option long_options[] = {
-      {(char *)"help", no_argument, NULL, 'h'},
-      {(char *)"version", no_argument, NULL, 'v'},
-      {0, 0, 0, 0 }
-    };
 
 #define OPTSTRING_INIT "d:F:hlnN:o:pr:R:sS:t:v"
 
     static const char    optstring[] = OPTSTRING_INIT;
 
-    /* Set the C-language locale to the native environment. */
-    setlocale(LC_ALL, "");
+    /* Assemble the compile-time version information string */
+    comp_info_str = g_string_new("Compiled ");
+    get_compiled_version_info(comp_info_str, NULL, epan_get_compiled_version_info);
 
-    cmdarg_err_init(rawshark_cmdarg_err, rawshark_cmdarg_err_cont);
-
-    /* Get the compile-time version information string */
-    comp_info_str = get_compiled_version_info(NULL, epan_get_compiled_version_info);
-
-    /* Get the run-time version information string */
-    runtime_info_str = get_runtime_version_info(NULL);
+    /* Assemble the run-time version information string */
+    runtime_info_str = g_string_new("Running ");
+    get_runtime_version_info(runtime_info_str, NULL);
 
     /* Add it to the information to be reported on a crash. */
-    ws_add_crash_info("Rawshark (Wireshark) %s\n"
+    ws_add_crash_info("Rawshark " VERSION "%s\n"
            "\n"
            "%s"
            "\n"
            "%s",
-        get_ws_vcs_version_info(), comp_info_str->str, runtime_info_str->str);
+        wireshark_gitversion, comp_info_str->str, runtime_info_str->str);
 
 #ifdef _WIN32
     arg_list_utf_16to8(argc, argv);
@@ -532,6 +548,9 @@ main(int argc, char *argv[])
        dissectors, and we must do it before we read the preferences, in
        case any dissectors register preferences. */
     epan_init(register_all_protocols, register_all_protocol_handoffs, NULL, NULL);
+
+    /* Set the C-language locale to the native environment. */
+    setlocale(LC_ALL, "");
 
     prefs_p = read_prefs(&gpf_open_errno, &gpf_read_errno, &gpf_path,
                          &pf_open_errno, &pf_read_errno, &pf_path);
@@ -601,7 +620,7 @@ main(int argc, char *argv[])
 
     /* Now get our args */
     /* XXX - We should probably have an option to dump libpcap link types */
-    while ((opt = getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
+    while ((opt = getopt(argc, argv, optstring)) != -1) {
         switch (opt) {
             case 'd':        /* Payload type */
                 if (!set_link_type(optarg)) {
@@ -613,11 +632,7 @@ main(int argc, char *argv[])
                 g_ptr_array_add(disp_fields, g_strdup(optarg));
                 break;
             case 'h':        /* Print help and exit */
-                printf("Rawshark (Wireshark) %s\n"
-                       "Dump and analyze network traffic.\n"
-                       "See http://www.wireshark.org for more information.\n",
-                       get_ws_vcs_version_info());
-                print_usage(stdout);
+                print_usage(TRUE);
                 exit(0);
                 break;
             case 'l':        /* "Line-buffer" standard output */
@@ -730,7 +745,7 @@ main(int argc, char *argv[])
                 break;
             case 'v':        /* Show version and exit */
             {
-                show_version("Rawshark (Wireshark)", comp_info_str, runtime_info_str);
+                show_version(comp_info_str, runtime_info_str);
                 g_string_free(comp_info_str, TRUE);
                 g_string_free(runtime_info_str, TRUE);
                 exit(0);
@@ -738,7 +753,7 @@ main(int argc, char *argv[])
             }
             default:
             case '?':        /* Bad flag - print usage message */
-                print_usage(stderr);
+                print_usage(TRUE);
             exit(1);
             break;
         }
@@ -781,7 +796,7 @@ main(int argc, char *argv[])
     }
 
     if (arg_error) {
-        print_usage(stderr);
+        print_usage(FALSE);
         exit(1);
     }
 
@@ -806,11 +821,8 @@ main(int argc, char *argv[])
 
     if (n_rfilters != 0) {
         for (i = 0; i < n_rfilters; i++) {
-            gchar *err_msg;
-
-            if (!dfilter_compile(rfilters[i], &rfcodes[n_rfcodes], &err_msg)) {
-                cmdarg_err("%s", err_msg);
-                g_free(err_msg);
+            if (!dfilter_compile(rfilters[i], &rfcodes[n_rfcodes])) {
+                cmdarg_err("%s", dfilter_error_msg);
                 epan_free(cfile.epan);
                 epan_cleanup();
                 exit(2);
@@ -851,8 +863,39 @@ main(int argc, char *argv[])
             }
         }
 
+        /* Set timestamp precision; there should arguably be a command-line
+           option to let the user set this. */
+#if 0
+        switch(wtap_file_tsprecision(cfile.wth)) {
+            case(WTAP_FILE_TSPREC_SEC):
+                timestamp_set_precision(TS_PREC_AUTO_SEC);
+                break;
+            case(WTAP_FILE_TSPREC_DSEC):
+                timestamp_set_precision(TS_PREC_AUTO_DSEC);
+                break;
+            case(WTAP_FILE_TSPREC_CSEC):
+                timestamp_set_precision(TS_PREC_AUTO_CSEC);
+                break;
+            case(WTAP_FILE_TSPREC_MSEC):
+                timestamp_set_precision(TS_PREC_AUTO_MSEC);
+                break;
+            case(WTAP_FILE_TSPREC_USEC):
+                timestamp_set_precision(TS_PREC_AUTO_USEC);
+                break;
+            case(WTAP_FILE_TSPREC_NSEC):
+                timestamp_set_precision(TS_PREC_AUTO_NSEC);
+                break;
+            default:
+                g_assert_not_reached();
+        }
+#else
+        timestamp_set_precision(TS_PREC_AUTO_USEC);
+#endif
+
         /* Process the packets in the file */
-        if (!load_cap_file(&cfile)) {
+        err = load_cap_file(&cfile);
+
+        if (err != 0) {
             epan_free(cfile.epan);
             epan_cleanup();
             exit(2);
@@ -881,12 +924,13 @@ main(int argc, char *argv[])
  * @return TRUE on success, FALSE on failure.
  */
 static gboolean
-raw_pipe_read(struct wtap_pkthdr *phdr, guchar * pd, int *err, gchar **err_info, gint64 *data_offset) {
+raw_pipe_read(struct wtap_pkthdr *phdr, guchar * pd, int *err, const gchar **err_info, gint64 *data_offset) {
     struct pcap_pkthdr mem_hdr;
     struct pcaprec_hdr disk_hdr;
     ssize_t bytes_read = 0;
     size_t bytes_needed = sizeof(disk_hdr);
     guchar *ptr = (guchar*) &disk_hdr;
+    static gchar err_str[100];
 
     if (want_pcap_pkthdr) {
         bytes_needed = sizeof(mem_hdr);
@@ -898,11 +942,10 @@ raw_pipe_read(struct wtap_pkthdr *phdr, guchar * pd, int *err, gchar **err_info,
         bytes_read = read(fd, ptr, (int)bytes_needed);
         if (bytes_read == 0) {
             *err = 0;
-            *err_info = NULL;
             return FALSE;
         } else if (bytes_read < 0) {
-            *err = errno;
-            *err_info = NULL;
+            *err = WTAP_ERR_CANT_READ;
+            *err_info = "Error reading header from pipe";
             return FALSE;
         }
         bytes_needed -= bytes_read;
@@ -934,8 +977,9 @@ raw_pipe_read(struct wtap_pkthdr *phdr, guchar * pd, int *err, gchar **err_info,
 #endif
     if (bytes_needed > WTAP_MAX_PACKET_SIZE) {
         *err = WTAP_ERR_BAD_FILE;
-        *err_info = g_strdup_printf("Bad packet length: %lu\n",
+        g_snprintf(err_str, 100, "Bad packet length: %lu\n",
                    (unsigned long) bytes_needed);
+        *err_info = err_str;
         return FALSE;
     }
 
@@ -944,11 +988,11 @@ raw_pipe_read(struct wtap_pkthdr *phdr, guchar * pd, int *err, gchar **err_info,
         bytes_read = read(fd, ptr, (int)bytes_needed);
         if (bytes_read == 0) {
             *err = WTAP_ERR_SHORT_READ;
-            *err_info = NULL;
+            *err_info = "Got zero bytes reading data from pipe";
             return FALSE;
         } else if (bytes_read < 0) {
-            *err = errno;
-            *err_info = NULL;
+            *err = WTAP_ERR_CANT_READ;
+            *err_info = "Error reading data from pipe";
             return FALSE;
         }
         bytes_needed -= bytes_read;
@@ -958,18 +1002,18 @@ raw_pipe_read(struct wtap_pkthdr *phdr, guchar * pd, int *err, gchar **err_info,
     return TRUE;
 }
 
-static gboolean
+static int
 load_cap_file(capture_file *cf)
 {
     int          err;
-    gchar       *err_info;
+    const gchar  *err_info;
     gint64       data_offset = 0;
 
     guchar pd[WTAP_MAX_PACKET_SIZE];
     struct wtap_pkthdr phdr;
     epan_dissect_t edt;
 
-    wtap_phdr_init(&phdr);
+    memset(&phdr, 0, sizeof(phdr));
 
     epan_dissect_init(&edt, cf->epan, TRUE, FALSE);
 
@@ -979,17 +1023,18 @@ load_cap_file(capture_file *cf)
 
     epan_dissect_cleanup(&edt);
 
-    wtap_phdr_cleanup(&phdr);
-
     if (err != 0) {
         /* Print a message noting that the read failed somewhere along the line. */
         switch (err) {
 
-            case WTAP_ERR_UNSUPPORTED:
-                cmdarg_err("The file \"%s\" contains record data that Rawshark doesn't support.\n(%s)",
-                           cf->filename,
-                           err_info != NULL ? err_info : "no information supplied");
-                g_free(err_info);
+            case WTAP_ERR_UNSUPPORTED_ENCAP:
+                cmdarg_err("The file \"%s\" has a packet with a network type that Rawshark doesn't support.\n(%s)",
+                           cf->filename, err_info);
+                break;
+
+            case WTAP_ERR_CANT_READ:
+                cmdarg_err("An attempt to read from the file \"%s\" failed for some unknown reason.",
+                           cf->filename);
                 break;
 
             case WTAP_ERR_SHORT_READ:
@@ -999,16 +1044,12 @@ load_cap_file(capture_file *cf)
 
             case WTAP_ERR_BAD_FILE:
                 cmdarg_err("The file \"%s\" appears to be damaged or corrupt.\n(%s)",
-                           cf->filename,
-                           err_info != NULL ? err_info : "no information supplied");
-                g_free(err_info);
+                           cf->filename, err_info);
                 break;
 
             case WTAP_ERR_DECOMPRESS:
                 cmdarg_err("The compressed file \"%s\" appears to be damaged or corrupt.\n(%s)",
-                           cf->filename,
-                           err_info != NULL ? err_info : "no information supplied");
-                g_free(err_info);
+                           cf->filename, err_info);
                 break;
 
             default:
@@ -1016,10 +1057,9 @@ load_cap_file(capture_file *cf)
                            cf->filename, wtap_strerror(err));
                 break;
         }
-        return FALSE;
     }
 
-    return TRUE;
+    return err;
 }
 
 static gboolean
@@ -1293,14 +1333,14 @@ static gboolean print_field_value(field_info *finfo, int cmd_line_index)
          * this field has an associated value,
          * e.g: ip.hdr_len
          */
-        fs_len = fvalue_string_repr_len(&finfo->value, FTREPR_DFILTER, finfo->hfinfo->display);
+        fs_len = fvalue_string_repr_len(&finfo->value, FTREPR_DFILTER);
         while (fs_buf_len < fs_len) {
             fs_buf_len *= 2;
             fs_buf = (char *)g_realloc(fs_buf, fs_buf_len + 1);
             fs_ptr = fs_buf;
         }
         fvalue_to_string_repr(&finfo->value,
-                              FTREPR_DFILTER, finfo->hfinfo->display,
+                              FTREPR_DFILTER,
                               fs_buf);
 
         /* String types are quoted. Remove them. */
@@ -1340,7 +1380,7 @@ static gboolean print_field_value(field_info *finfo, int cmd_line_index)
                                 if (hfinfo->display & BASE_RANGE_STRING) {
                                     g_string_append(label_s, rval_to_str_const(svalue, RVALS(hfinfo->strings), "Unknown"));
                                 } else if (hfinfo->display & BASE_EXT_STRING) {
-                                    g_string_append(label_s, val_to_str_ext_const(svalue, (value_string_ext *) hfinfo->strings, "Unknown"));
+                                    g_string_append(label_s, val_to_str_ext_const(svalue, (const value_string_ext *) hfinfo->strings, "Unknown"));
                                 } else {
                                     g_string_append(label_s, val_to_str_const(svalue, cVALS(hfinfo->strings), "Unknown"));
                                 }
@@ -1360,7 +1400,7 @@ static gboolean print_field_value(field_info *finfo, int cmd_line_index)
                                 if (!hfinfo->bitmask && hfinfo->display & BASE_RANGE_STRING) {
                                     g_string_append(label_s, rval_to_str_const(uvalue, RVALS(hfinfo->strings), "Unknown"));
                                 } else if (hfinfo->display & BASE_EXT_STRING) {
-                                    g_string_append(label_s, val_to_str_ext_const(uvalue, (value_string_ext *) hfinfo->strings, "Unknown"));
+                                    g_string_append(label_s, val_to_str_ext_const(uvalue, (const value_string_ext *) hfinfo->strings, "Unknown"));
                                 } else {
                                     g_string_append(label_s, val_to_str_const(uvalue, cVALS(hfinfo->strings), "Unknown"));
                                 }
@@ -1688,23 +1728,32 @@ write_failure_message(const char *filename, int err)
 /*
  * Report an error in command-line arguments.
  */
-static void
-rawshark_cmdarg_err(const char *fmt, va_list ap)
+void
+cmdarg_err(const char *fmt, ...)
 {
+    va_list ap;
+
+    va_start(ap, fmt);
     fprintf(stderr, "rawshark: ");
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
+    va_end(ap);
 }
 
 /*
  * Report additional information for an error in command-line arguments.
  */
-static void
-rawshark_cmdarg_err_cont(const char *fmt, va_list ap)
+void
+cmdarg_err_cont(const char *fmt, ...)
 {
+    va_list ap;
+
+    va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
+    va_end(ap);
 }
+
 
 /*
  * Editor modelines

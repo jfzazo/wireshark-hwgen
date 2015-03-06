@@ -139,7 +139,7 @@ dissect_text_interface_identifier_parameter(tvbuff_t *parameter_tvb, proto_tree 
 
   proto_tree_add_item(parameter_tree, hf_text_interface_id, parameter_tvb, TEXT_INTERFACE_ID_OFFSET, interface_id_length, ENC_ASCII|ENC_NA);
   proto_item_append_text(parameter_item, " (%.*s)", interface_id_length,
-                         tvb_format_text(parameter_tvb, TEXT_INTERFACE_ID_OFFSET, interface_id_length));
+                         tvb_get_string(wmem_packet_scope(), parameter_tvb, TEXT_INTERFACE_ID_OFFSET, interface_id_length));
 }
 
 #define INFO_STRING_OFFSET PARAMETER_VALUE_OFFSET
@@ -152,7 +152,7 @@ dissect_info_string_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tre
   info_string_length = tvb_get_ntohs(parameter_tvb, PARAMETER_LENGTH_OFFSET) - PARAMETER_HEADER_LENGTH;
   proto_tree_add_item(parameter_tree, hf_info_string, parameter_tvb, INFO_STRING_OFFSET, info_string_length, ENC_ASCII|ENC_NA);
   proto_item_append_text(parameter_item, " (%.*s)", info_string_length,
-                         tvb_format_text(parameter_tvb, INFO_STRING_OFFSET, info_string_length));
+                         tvb_get_string(wmem_packet_scope(), parameter_tvb, INFO_STRING_OFFSET, info_string_length));
 }
 
 #define DLCI_SAPI_LENGTH  1
@@ -421,7 +421,7 @@ dissect_protocol_data_parameter(tvbuff_t *parameter_tvb, proto_item *parameter_i
   tvbuff_t *protocol_data_tvb;
 
   protocol_data_length = tvb_get_ntohs(parameter_tvb, PARAMETER_LENGTH_OFFSET) - PARAMETER_HEADER_LENGTH;
-  protocol_data_tvb    = tvb_new_subset_length(parameter_tvb, PROTOCOL_DATA_OFFSET, protocol_data_length);
+  protocol_data_tvb    = tvb_new_subset(parameter_tvb, PROTOCOL_DATA_OFFSET, protocol_data_length, protocol_data_length);
   proto_item_append_text(parameter_item, " (%u byte%s)", protocol_data_length, plurality(protocol_data_length, "", "s"));
 
   if(sapi_val_assigned == FALSE)
@@ -453,7 +453,7 @@ dissect_protocol_data_parameter(tvbuff_t *parameter_tvb, proto_item *parameter_i
 #define RELEASE_MGMT_REASON   0
 #define RELEASE_PHYS_REASON   1
 #define RELEASE_DM_REASON     2
-#define RELEASE_OTHER_REASON  3
+#define RELEASE_OTHER_REASON  4
 
 static const value_string release_reason_values[] = {
   { RELEASE_MGMT_REASON,  "Management layer generated release" },
@@ -574,11 +574,12 @@ dissect_parameter(tvbuff_t *parameter_tvb, packet_info *pinfo, proto_tree *tree,
   /* extract tag and length from the parameter */
   tag            = tvb_get_ntohs(parameter_tvb, PARAMETER_TAG_OFFSET);
   length         = tvb_get_ntohs(parameter_tvb, PARAMETER_LENGTH_OFFSET);
-  padding_length = tvb_reported_length(parameter_tvb) - length;
+  padding_length = tvb_length(parameter_tvb) - length;
 
   /* create proto_tree stuff */
-  parameter_tree   = proto_tree_add_subtree_format(iua_tree, parameter_tvb, PARAMETER_HEADER_OFFSET, -1, ett_iua_parameter, &parameter_item,
+  parameter_item   = proto_tree_add_text(iua_tree, parameter_tvb, PARAMETER_HEADER_OFFSET, tvb_length(parameter_tvb),
                                          "%s parameter", val_to_str_const(tag, support_IG?parameter_tag_ig_values:parameter_tag_values, "Unknown"));
+  parameter_tree   = proto_item_add_subtree(parameter_item, ett_iua_parameter);
 
   /* add tag and length to the iua tree */
   proto_tree_add_item(parameter_tree, support_IG?hf_parameter_tag_ig:hf_parameter_tag, parameter_tvb, PARAMETER_TAG_OFFSET, PARAMETER_TAG_LENGTH, ENC_BIG_ENDIAN);
@@ -652,13 +653,13 @@ dissect_parameters(tvbuff_t *parameters_tvb, packet_info *pinfo, proto_tree *tre
   tvbuff_t *parameter_tvb;
 
   offset = 0;
-  while((remaining_length = tvb_reported_length_remaining(parameters_tvb, offset))) {
+  while((remaining_length = tvb_length_remaining(parameters_tvb, offset))) {
     length       = tvb_get_ntohs(parameters_tvb, offset + PARAMETER_LENGTH_OFFSET);
     total_length = ADD_PADDING(length);
     if (remaining_length >= length)
       total_length = MIN(total_length, remaining_length);
     /* create a tvb for the parameter including the padding bytes */
-    parameter_tvb  = tvb_new_subset_length(parameters_tvb, offset, total_length);
+    parameter_tvb  = tvb_new_subset(parameters_tvb, offset, total_length, total_length);
     dissect_parameter(parameter_tvb, pinfo, tree, iua_tree);
     /* get rid of the handled parameter */
     offset += total_length;
@@ -888,7 +889,7 @@ dissect_iua_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *tree,
 
   sapi_val_assigned = FALSE;
 
-  common_header_tvb = tvb_new_subset_length(message_tvb, COMMON_HEADER_OFFSET, COMMON_HEADER_LENGTH);
+  common_header_tvb = tvb_new_subset(message_tvb, COMMON_HEADER_OFFSET, COMMON_HEADER_LENGTH, COMMON_HEADER_LENGTH);
   parameters_tvb    = tvb_new_subset_remaining(message_tvb, PARAMETERS_OFFSET);
   dissect_common_header(common_header_tvb, pinfo, iua_tree);
   dissect_parameters(parameters_tvb, pinfo, tree, iua_tree);
@@ -904,10 +905,15 @@ dissect_iua(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *tree)
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, support_IG?"IUA (RFC 3057 + IG)":"IUA (RFC 3057)");
 
-  /* create the m3ua protocol tree */
-  iua_item = proto_tree_add_item(tree, proto_iua, message_tvb, 0, -1, ENC_NA);
-  iua_tree = proto_item_add_subtree(iua_item, ett_iua);
-
+  /* In the interest of speed, if "tree" is NULL, don't do any work not
+     necessary to generate protocol tree items. */
+  if (tree) {
+    /* create the m3ua protocol tree */
+    iua_item = proto_tree_add_item(tree, proto_iua, message_tvb, 0, -1, ENC_NA);
+    iua_tree = proto_item_add_subtree(iua_item, ett_iua);
+  } else {
+    iua_tree = NULL;
+  };
   /* dissect the message */
   dissect_iua_message(message_tvb, pinfo, tree, iua_tree);
 }
@@ -995,16 +1001,3 @@ proto_reg_handoff_iua(void)
   data_handle = find_dissector("data");
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

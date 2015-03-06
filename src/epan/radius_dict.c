@@ -990,6 +990,8 @@ char *Radiustext;
 	*
 	* RADIUS dictionary parser
 	*
+	* $Id$
+	*
 	* Wireshark - Network traffic analyzer
 	* By Gerald Combs <gerald@wireshark.org>
 	* Copyright 1998 Gerald Combs
@@ -1067,7 +1069,7 @@ char *Radiustext;
  *       name types in the FreeRadius dictionaries.
  */
 
-#line 1071 "radius_dict.c"
+#line 1073 "radius_dict.c"
 
 #define INITIAL 0
 #define WS_OUT 1
@@ -1274,9 +1276,9 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 114 "radius_dict.l"
+#line 116 "radius_dict.l"
 
-#line 1280 "radius_dict.c"
+#line 1282 "radius_dict.c"
 
 	if ( !(yy_init) )
 		{
@@ -1357,62 +1359,62 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 115 "radius_dict.l"
+#line 117 "radius_dict.l"
 ;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 116 "radius_dict.l"
+#line 118 "radius_dict.l"
 ;
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 118 "radius_dict.l"
+#line 120 "radius_dict.l"
 ;
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 120 "radius_dict.l"
+#line 122 "radius_dict.l"
 { BEGIN VENDOR; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 121 "radius_dict.l"
+#line 123 "radius_dict.l"
 { BEGIN ATTR; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 122 "radius_dict.l"
+#line 124 "radius_dict.l"
 { BEGIN VALUE; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 123 "radius_dict.l"
+#line 125 "radius_dict.l"
 { BEGIN INCLUDE; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 124 "radius_dict.l"
+#line 126 "radius_dict.l"
 { BEGIN BEGIN_VENDOR; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 125 "radius_dict.l"
+#line 127 "radius_dict.l"
 { BEGIN END_VENDOR; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 126 "radius_dict.l"
+#line 128 "radius_dict.l"
 { BEGIN BEGIN_TLV; }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 127 "radius_dict.l"
+#line 129 "radius_dict.l"
 { BEGIN END_TLV; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 129 "radius_dict.l"
+#line 131 "radius_dict.l"
 {
     if (current_vendor) {
         g_free(current_vendor);
@@ -1423,7 +1425,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 136 "radius_dict.l"
+#line 138 "radius_dict.l"
 {
     if (current_vendor) {
         g_free(current_vendor);
@@ -1434,7 +1436,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 144 "radius_dict.l"
+#line 146 "radius_dict.l"
 {
     if (current_attr) {
         g_free(current_attr);
@@ -1445,7 +1447,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 151 "radius_dict.l"
+#line 153 "radius_dict.l"
 {
     if (current_attr) {
         g_free(current_attr);
@@ -1456,7 +1458,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 159 "radius_dict.l"
+#line 161 "radius_dict.l"
 {
     vendor_name = g_strdup(Radiustext);
     vendor_type_octets = 1;
@@ -1467,7 +1469,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 166 "radius_dict.l"
+#line 168 "radius_dict.l"
 {
     vendor_id = (guint32) strtoul(Radiustext,NULL,10);
     BEGIN VENDOR_W_ID;
@@ -1475,7 +1477,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 170 "radius_dict.l"
+#line 172 "radius_dict.l"
 {
     vendor_id = (guint32) strtoul(Radiustext,NULL,16);
     BEGIN VENDOR_W_ID;
@@ -1483,14 +1485,14 @@ YY_RULE_SETUP
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 174 "radius_dict.l"
+#line 176 "radius_dict.l"
 {
     BEGIN VENDOR_W_FORMAT;
 }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 177 "radius_dict.l"
+#line 179 "radius_dict.l"
 {
     vendor_type_octets = (guint) strtoul(Radiustext,NULL,10);
     BEGIN VENDOR_W_TYPE_OCTETS;
@@ -1498,7 +1500,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 181 "radius_dict.l"
+#line 183 "radius_dict.l"
 {
     vendor_length_octets = (guint) strtoul(Radiustext+1,NULL,10);
     BEGIN VENDOR_W_LENGTH_OCTETS;
@@ -1506,7 +1508,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 185 "radius_dict.l"
+#line 187 "radius_dict.l"
 {
     vendor_has_flags = TRUE;
     BEGIN VENDOR_W_CONTINUATION;
@@ -1514,20 +1516,20 @@ YY_RULE_SETUP
 	YY_BREAK
 case 23:
 /* rule 23 can match eol */
-#line 190 "radius_dict.l"
+#line 192 "radius_dict.l"
 case 24:
 /* rule 24 can match eol */
-#line 191 "radius_dict.l"
+#line 193 "radius_dict.l"
 case 25:
 /* rule 25 can match eol */
-#line 192 "radius_dict.l"
+#line 194 "radius_dict.l"
 case 26:
 /* rule 26 can match eol */
-#line 193 "radius_dict.l"
+#line 195 "radius_dict.l"
 case 27:
 /* rule 27 can match eol */
 YY_RULE_SETUP
-#line 193 "radius_dict.l"
+#line 195 "radius_dict.l"
 {
     add_vendor(vendor_name, vendor_id, vendor_type_octets, vendor_length_octets, vendor_has_flags);
     g_free(vendor_name);
@@ -1536,122 +1538,122 @@ YY_RULE_SETUP
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 199 "radius_dict.l"
+#line 201 "radius_dict.l"
 { attr_name = g_strdup(Radiustext); encrypted = 0; has_tag = FALSE; BEGIN ATTR_W_NAME; }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 200 "radius_dict.l"
+#line 202 "radius_dict.l"
 { attr_id = g_strdup(Radiustext);  BEGIN ATTR_W_ID;}
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 201 "radius_dict.l"
+#line 203 "radius_dict.l"
 { attr_id = g_strdup_printf("%u",(int)strtoul(Radiustext,NULL,16)); BEGIN ATTR_W_ID;}
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 202 "radius_dict.l"
+#line 204 "radius_dict.l"
 { attr_type = radius_integer;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 203 "radius_dict.l"
+#line 205 "radius_dict.l"
 { attr_type = radius_string;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 204 "radius_dict.l"
+#line 206 "radius_dict.l"
 { attr_type = radius_octets;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 205 "radius_dict.l"
+#line 207 "radius_dict.l"
 { attr_type = radius_ipaddr;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 206 "radius_dict.l"
+#line 208 "radius_dict.l"
 { attr_type = radius_ipv6addr;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 207 "radius_dict.l"
+#line 209 "radius_dict.l"
 { attr_type = radius_ipv6prefix;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 208 "radius_dict.l"
+#line 210 "radius_dict.l"
 { attr_type = radius_ipxnet;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 209 "radius_dict.l"
+#line 211 "radius_dict.l"
 { attr_type = radius_date;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 210 "radius_dict.l"
+#line 212 "radius_dict.l"
 { attr_type = radius_abinary;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 211 "radius_dict.l"
+#line 213 "radius_dict.l"
 { attr_type = radius_ether;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 212 "radius_dict.l"
+#line 214 "radius_dict.l"
 { attr_type = radius_ifid;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 213 "radius_dict.l"
+#line 215 "radius_dict.l"
 { attr_type = radius_integer;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 214 "radius_dict.l"
+#line 216 "radius_dict.l"
 { attr_type = radius_integer;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 215 "radius_dict.l"
+#line 217 "radius_dict.l"
 { attr_type = radius_signed;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 216 "radius_dict.l"
+#line 218 "radius_dict.l"
 { attr_type = radius_combo_ip;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 217 "radius_dict.l"
+#line 219 "radius_dict.l"
 { attr_type = radius_tlv;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 218 "radius_dict.l"
+#line 220 "radius_dict.l"
 { attr_type = radius_octets;  BEGIN ATTR_W_TYPE; }
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 219 "radius_dict.l"
+#line 221 "radius_dict.l"
 { has_tag = TRUE; }
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 220 "radius_dict.l"
+#line 222 "radius_dict.l"
 { encrypted = (guint) strtoul(Radiustext+8,NULL,10); }
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 221 "radius_dict.l"
+#line 223 "radius_dict.l"
 ;
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 222 "radius_dict.l"
+#line 224 "radius_dict.l"
 {
     attr_vendor = g_strdup(Radiustext);
     add_attribute(attr_name,attr_id,attr_type,attr_vendor,encrypted,has_tag,current_attr);
@@ -1667,7 +1669,7 @@ YY_RULE_SETUP
 case 52:
 /* rule 52 can match eol */
 YY_RULE_SETUP
-#line 233 "radius_dict.l"
+#line 235 "radius_dict.l"
 {
     add_attribute(attr_name,attr_id,attr_type,current_vendor,encrypted,has_tag,current_attr);
     g_free(attr_id);
@@ -1681,7 +1683,7 @@ YY_RULE_SETUP
 case 53:
 /* rule 53 can match eol */
 YY_RULE_SETUP
-#line 242 "radius_dict.l"
+#line 244 "radius_dict.l"
 {
     add_attribute(attr_name,attr_id,attr_type,attr_vendor,encrypted,has_tag,current_attr);
     g_free(attr_id);
@@ -1693,28 +1695,28 @@ YY_RULE_SETUP
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-#line 251 "radius_dict.l"
+#line 253 "radius_dict.l"
 { attr_name = g_strdup(Radiustext); BEGIN VALUE_W_ATTR; }
 	YY_BREAK
 case 55:
 /* rule 55 can match eol */
 YY_RULE_SETUP
-#line 252 "radius_dict.l"
+#line 254 "radius_dict.l"
 { value_repr = g_strdup(Radiustext); BEGIN VALUE_W_NAME; }
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 253 "radius_dict.l"
+#line 255 "radius_dict.l"
 { add_value(attr_name,value_repr, (guint32) strtoul(Radiustext,NULL,10));  g_free(attr_name); g_free(value_repr); BEGIN WS_OUT;}
 	YY_BREAK
 case 57:
 YY_RULE_SETUP
-#line 254 "radius_dict.l"
+#line 256 "radius_dict.l"
 { add_value(attr_name,value_repr, (guint32) strtoul(Radiustext,NULL,16));  g_free(attr_name); g_free(value_repr); BEGIN WS_OUT;}
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
-#line 256 "radius_dict.l"
+#line 258 "radius_dict.l"
 {
 	if ( include_stack_ptr >= MAX_INCLUDE_DEPTH ) {
 		g_string_append_printf(error, "$INCLUDE files nested to deeply\n");
@@ -1774,7 +1776,7 @@ case YY_STATE_EOF(VENDOR_W_LENGTH_OCTETS):
 case YY_STATE_EOF(VENDOR_W_CONTINUATION):
 case YY_STATE_EOF(BEGIN_TLV):
 case YY_STATE_EOF(END_TLV):
-#line 292 "radius_dict.l"
+#line 294 "radius_dict.l"
 {
 
 	fclose(Radiusin);
@@ -1796,15 +1798,15 @@ case YY_STATE_EOF(END_TLV):
 case 59:
 /* rule 59 can match eol */
 YY_RULE_SETUP
-#line 310 "radius_dict.l"
+#line 312 "radius_dict.l"
 { linenums[include_stack_ptr]++; BEGIN WS_OUT; }
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
-#line 313 "radius_dict.l"
+#line 315 "radius_dict.l"
 ECHO;
 	YY_BREAK
-#line 1808 "radius_dict.c"
+#line 1810 "radius_dict.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2760,7 +2762,7 @@ void Radiusfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 313 "radius_dict.l"
+#line 315 "radius_dict.l"
 
 
 
@@ -2770,62 +2772,34 @@ static void add_vendor(const gchar* name, guint32 id, guint type_octets, guint l
 	v = (radius_vendor_info_t *)g_hash_table_lookup(dict->vendors_by_id, GUINT_TO_POINTER(id));
 
 	if (!v) {
-		/*
-		 * New vendor.
-		 * Allocate a new entry and insert it into the by-ID and
-		 * by-name hash tables.
-		 */
 		v = g_new(radius_vendor_info_t,1);
 		v->attrs_by_id = g_hash_table_new(g_direct_hash,g_direct_equal);
 		v->code = id;
 		v->ett = -1;
-		v->name = g_strdup(name);
-		v->type_octets = type_octets;
-		v->length_octets = length_octets;
-		v->has_flags = has_flags;
-
-		g_hash_table_insert(dict->vendors_by_id,GUINT_TO_POINTER(v->code),v);
-		g_hash_table_insert(dict->vendors_by_name, (gpointer) v->name, v);
-	} else {
-		/*
-		 * This vendor is already in the table.
-		 *
-		 * Assume that the dictionary knows the 'ground truth' about
-		 * the type/length/has_flags information and thus allow the
-		 * dictionary to overwrite these values even for vendors that
-		 * have already been loaded.
-		 *
-		 * XXX - this could be due to the vendor being in multiple
-		 * dictionary files, rather than having been specially
-		 * entered by the RADIUS dissector, as a side effect of
-		 * specially entering an attribute; should we report vendors
-		 * that appear in different dictionaries with different
-		 * properties?
-		 */
-		v->type_octets = type_octets;
-		v->length_octets = length_octets;
-		v->has_flags = has_flags;
-
-		/*
-		 * Did the name change?
-		 */
-		if (g_strcmp0(v->name, name) != 0) {
-			/*
-			 * Yes.  Remove the entry from the by-name hash table
-			 * and re-insert it with the new name.
-			 */
-			g_hash_table_remove(dict->vendors_by_name, (gpointer) v->name);
-			g_free((gpointer) v->name);
-			v->name = g_strdup(name);
-			g_hash_table_insert(dict->vendors_by_name, (gpointer) v->name, v);
-		}
+		v->name = NULL;
 	}
+        /* Assume that the dictionary knows the 'ground truth' about the
+         * type/length/has_flags information and thus allow the dictionary to
+         * overwrite these values even for vendors that have already been loaded.
+         */
+	v->type_octets = type_octets;
+	v->length_octets = length_octets;
+	v->has_flags = has_flags;
+
+	if (v->name)
+		g_free((gpointer) v->name);
+	v->name = g_strdup(name);
+
+	g_hash_table_insert(dict->vendors_by_id,GUINT_TO_POINTER(v->code),v);
+	g_hash_table_insert(dict->vendors_by_name, (gpointer) v->name, v);
 }
 
 static void add_attribute(const gchar* name, const  gchar* codestr, radius_attr_dissector_t type, const  gchar* vendor, guint encrypted_flag, gboolean tagged, const gchar* attr) {
 	radius_attr_info_t* a;
 	GHashTable* by_id;
 	guint32 code;
+	const gchar *tmpName = NULL;
+
 
 	if (attr){
 		add_tlv(name, codestr, type, attr);
@@ -2853,59 +2827,36 @@ static void add_attribute(const gchar* name, const  gchar* codestr, radius_attr_
 	a=(radius_attr_info_t*)g_hash_table_lookup(by_id, GUINT_TO_POINTER(code));
 
 	if (!a) {
-		/*
-		 * New attribute.
-		 * Allocate a new entry and insert it into the by-ID and
-		 * by-name hash tables.
-		 */
 		a = g_new(radius_attr_info_t,1);
-		a->code = code;
-		a->name = g_strdup(name);
+		a->name = NULL;
 		a->dissector = NULL;
-		a->encrypt = encrypted_flag;
-		a->tagged =  tagged;
-		a->type = type;
-		a->vs = NULL;
-		a->hf = -1;
-		a->hf_alt = -1;
-		a->hf_tag = -1;
-		a->hf_len = -1;
-		a->ett = -1;
-		a->tlvs_by_id = NULL;
-		g_hash_table_insert(by_id, GUINT_TO_POINTER(code),a);
-		g_hash_table_insert(dict->attrs_by_name,(gpointer) (a->name),a);
-	} else {
-		/*
-		 * This attribute is already in the table.
-		 *
-		 * Overwrite the encrypted flag, tagged property, and type;
-		 * the other properties don't get set until after we've
-		 * finished reading the dictionaries.
-		 *
-		 * XXX - this could be due to the attribute being in
-		 * multiple dictionary files, rather than having been
-		 * specially entered by the RADIUS dissector to give it
-		 * a special dissection routine; should we report attributes
-		 * that appear in different dictionaries with different
-		 * properties?
-		 */
-		a->encrypt = encrypted_flag;
-		a->tagged =  tagged;
-		a->type = type;
+	}
 
-		/*
-		 * Did the name change?
-		 */
-		if (g_strcmp0(a->name, name) != 0) {
-			/*
-			 * Yes.  Remove the entry from the by-name hash table
-			 * and re-insert it with the new name.
-			 */
-			g_hash_table_remove(dict->attrs_by_name, (gpointer) (a->name));
-			g_free((gpointer) a->name);
-			a->name = g_strdup(name);
-			g_hash_table_insert(dict->attrs_by_name, (gpointer) (a->name),a);
-		}
+	a->code = code;
+	a->encrypt = encrypted_flag;
+	a->tagged =  tagged;
+	a->type = type;
+	a->vs = NULL;
+	a->hf = -1;
+	a->hf_alt = -1;
+	a->hf_tag = -1;
+	a->hf_len = -1;
+	a->ett = -1;
+	a->tlvs_by_id = NULL;
+
+	if (a->name) {
+		tmpName = a->name;
+	}
+	a->name = g_strdup(name);
+
+	g_hash_table_insert(by_id, GUINT_TO_POINTER(code),a);
+	g_hash_table_insert(dict->attrs_by_name,(gpointer) (a->name),a);
+
+	/* Don't free the old name until after the hash_table ops, since it
+	   seems to end up being used in there somewhere, causing valgrind
+	   errors. https://bugs.wireshark.org/bugzilla/show_bug.cgi?id=7803 */
+	if (tmpName) {
+		g_free((gpointer) tmpName);
 	}
 }
 
@@ -2938,39 +2889,30 @@ static void add_tlv(const gchar* name, const  gchar* codestr, radius_attr_dissec
 	s = (radius_attr_info_t*)g_hash_table_lookup(a->tlvs_by_id, GUINT_TO_POINTER(code));
 
 	if (!s) {
-		/*
-		 * This TLV doesn't yet exist in this attribute's TLVs-by-ID
-		 * hash table.  Add it.
-		 */
 		s = g_new(radius_attr_info_t,1);
-		s->name = g_strdup(name);
+		s->name = NULL;
 		s->dissector = NULL;
-		s->code = code;
-		s->type = type;
-		s->encrypt = FALSE;
-		s->tagged = FALSE;
-		s->dissector = NULL;
-		s->vs = NULL;
-		s->hf = -1;
-		s->hf_alt = -1;
-		s->hf_tag = -1;
-		s->hf_len = -1;
-		s->ett = -1;
-		s->tlvs_by_id = NULL;
-
-		g_hash_table_insert(a->tlvs_by_id,GUINT_TO_POINTER(s->code),s);
-		g_hash_table_insert(dict->tlvs_by_name,(gpointer) (s->name),s);
 	}
 
-	/*
-	 * If it *does* exist, leave it alone; there shouldn't be duplicate
-	 * entries by name in the dictionaries (even if there might be
-	 * multiple entries for a given attribute in the dictionaries, each
-	 * one adding some TLV values), and we don't directly add entries
-	 * for TLVs in the RADIUS dissector.
-	 *
-	 * XXX - report the duplicate entries? 
-	 */
+	s->code = code;
+	s->type = type;
+	s->encrypt = FALSE;
+	s->tagged = FALSE;
+	s->dissector = NULL;
+	s->vs = NULL;
+	s->hf = -1;
+	s->hf_alt = -1;
+	s->hf_tag = -1;
+	s->hf_len = -1;
+	s->ett = -1;
+	s->tlvs_by_id = NULL;
+
+	if (s->name)
+		g_free((gpointer) s->name);
+	s->name = g_strdup(name);
+
+	g_hash_table_insert(a->tlvs_by_id,GUINT_TO_POINTER(s->code),s);
+	g_hash_table_insert(dict->tlvs_by_name,(gpointer) (s->name),s);
 }
 
 void add_value(const gchar* attrib_name, const gchar* repr, guint32 value) {
@@ -3061,7 +3003,8 @@ gboolean radius_load_dictionary (radius_dictionary_t* d, gchar* dir, const gchar
 	if (!Radiusin) {
 		g_string_append_printf(error, "Could not open file: '%s', error: %s\n", fullpaths[include_stack_ptr], g_strerror(errno) );
 		g_free(fullpaths[include_stack_ptr]);
-		*err_str = g_string_free(error,FALSE);
+		*err_str = error->str;
+		g_string_free(error,FALSE);
 		return FALSE;
 	}
 
@@ -3083,7 +3026,8 @@ gboolean radius_load_dictionary (radius_dictionary_t* d, gchar* dir, const gchar
 	g_hash_table_foreach_remove(value_strings,destroy_value_strings,NULL);
 
 	if (error->len > 0) {
-		*err_str = g_string_free(error,FALSE);
+		*err_str = error->str;
+		g_string_free(error,FALSE);
 		return FALSE;
 	} else {
 		*err_str = NULL;

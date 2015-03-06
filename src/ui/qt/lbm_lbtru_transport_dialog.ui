@@ -824,7 +824,7 @@
     <string>NCF frames/count/bytes</string>
    </property>
    <property name="toolTip">
-    <string>Show the NCF frames/count/bytes column</string>
+    <string>Sow the NCF frames/count/bytes column</string>
    </property>
   </action>
   <action name="action_SourceSMFrames">
@@ -1123,9 +1123,10 @@
   <customwidget>
    <class>DisplayFilterEdit</class>
    <extends>QLineEdit</extends>
-   <header>display_filter_edit.h</header>
+   <header location="global">display_filter_edit.h</header>
   </customwidget>
  </customwidgets>
+ <resources/>
  <connections>
   <connection>
    <sender>buttonBox</sender>

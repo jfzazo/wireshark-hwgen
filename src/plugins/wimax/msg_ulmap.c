@@ -28,12 +28,11 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include "crc.h"
 #include "wimax_mac.h"
 #include "wimax_bits.h"
-#include "wimax_utils.h"
 
 extern	gboolean include_cor2_changes;
 
@@ -42,22 +41,19 @@ void proto_reg_handoff_mac_mgmt_msg_ulmap(void);
 
 #define MAC_MGMT_MSG_ULMAP 3
 
-#define XBIT_HF(bits, hf) \
-	proto_tree_add_bits_item(tree, hf, tvb, bit, bits, ENC_BIG_ENDIAN); bit += bits;
+#define XBIT(var, bits, desc) \
+    do { \
+    var = TVB_BIT_BITS(bit, tvb, bits); \
+    proto_tree_add_text(tree, tvb, BITHI(bit, bits), desc ": %d", var); \
+    bit += bits; \
+    } while(0)
 
-#define XBIT_HF_VALUE(var, bits, hf) \
-	do { \
-	var = TVB_BIT_BITS(bit, tvb, bits); \
-	proto_tree_add_bits_item(tree, hf, tvb, bit, bits, ENC_BIG_ENDIAN); \
-	bit += bits; \
-	} while(0)
-
-#define VNIB(var, nibs, hf) \
-	do { \
-	var = TVB_NIB_NIBS(nib, tvb, nibs); \
-	proto_tree_add_uint(tree, hf, tvb, NIBHI(nib, nibs), var); \
-	nib += nibs; \
-	} while(0)
+#define XNIB(var, nibs, desc) \
+    do { \
+    var = TVB_NIB_NIBS(nib, tvb, nibs); \
+    proto_tree_add_text(tree, tvb, NIBHI(nib, nibs), desc ": %d", var); \
+    nib += nibs; \
+    } while(0)
 
 /* from msg_ucd.c */
 extern guint cqich_id_size;		/* Set for CQICH_Alloc_IE */
@@ -67,6 +63,7 @@ extern gint harq;
 extern gint ir_type;
 extern gint N_layer;
 extern gint RCID_Type;
+extern gint RCID_IE(proto_tree *diuc_tree, gint offset, gint length, tvbuff_t *tvb, gint RCID_Type);
 
 static gint proto_mac_mgmt_msg_ulmap_decoder = -1;
 
@@ -211,11 +208,6 @@ static gint hf_ulmap_reserved = -1;
 static gint hf_ulmap_ucd_count = -1;
 static gint hf_ulmap_alloc_start_time = -1;
 static gint hf_ulmap_ofdma_sym = -1;
-static gint hf_ulmap_ie_diuc_ext = -1;
-static gint hf_ulmap_ie_diuc_ext2 = -1;
-static gint hf_ulmap_ie_length = -1;
-static gint hf_ulmap_ie_reserved_extended2_duic = -1;
-static gint hf_ulmap_ie_reserved_extended_duic = -1;
 /* static gint hf_ulmap_fch_expected = -1; */
 
 /* static gint hf_ulmap_ie = -1; */
@@ -230,7 +222,6 @@ static gint hf_ulmap_uiuc12_method = -1;
 static gint hf_ulmap_uiuc12_dri    = -1;
 static gint hf_ulmap_uiuc10_dur    = -1;
 static gint hf_ulmap_uiuc10_rep    = -1;
-static gint hf_ulmap_uiuc10_slot_offset = -1;
 
 static gint hf_ulmap_uiuc14_dur  = -1;
 static gint hf_ulmap_uiuc14_uiuc = -1;
@@ -261,293 +252,6 @@ static gint hf_ulmap_uiuc13_numsub = -1;
 static gint hf_ulmap_uiuc13_papr   = -1;
 static gint hf_ulmap_uiuc13_zone   = -1;
 static gint hf_ulmap_uiuc13_rsv    = -1;
-/* static gint hf_ulmap_crc16         = -1; */
-static gint hf_ulmap_padding       = -1;
-
-/* Generated via "one time" script to help create filterable fields */
-static int hf_ulmap_dedicated_ul_control_length = -1;
-static int hf_ulmap_dedicated_ul_control_control_header = -1;
-static int hf_ulmap_dedicated_ul_control_num_sdma_layers = -1;
-static int hf_ulmap_dedicated_ul_control_pilot_pattern = -1;
-static int hf_ulmap_dedicated_mimo_ul_control_matrix = -1;
-static int hf_ulmap_dedicated_mimo_ul_control_n_layer = -1;
-static int hf_ulmap_harq_chase_dedicated_ul_control_indicator = -1;
-static int hf_ulmap_harq_chase_uiuc = -1;
-static int hf_ulmap_harq_chase_repetition_coding_indication = -1;
-static int hf_ulmap_harq_chase_duration = -1;
-static int hf_ulmap_harq_chase_acid = -1;
-static int hf_ulmap_harq_chase_ai_sn = -1;
-static int hf_ulmap_harq_chase_ack_disable = -1;
-static int hf_ulmap_reserved_uint = -1;
-static int hf_ulmap_harq_ir_ctc_dedicated_ul_control_indicator = -1;
-static int hf_ulmap_harq_ir_ctc_nep = -1;
-static int hf_ulmap_harq_ir_ctc_nsch = -1;
-static int hf_ulmap_harq_ir_ctc_spid = -1;
-static int hf_ulmap_harq_ir_ctc_acin = -1;
-static int hf_ulmap_harq_ir_ctc_ai_sn = -1;
-static int hf_ulmap_harq_ir_ctc_ack_disable = -1;
-static int hf_ulmap_harq_ir_cc_dedicated_ul_control_indicator = -1;
-static int hf_ulmap_harq_ir_cc_uiuc = -1;
-static int hf_ulmap_harq_ir_cc_repetition_coding_indication = -1;
-static int hf_ulmap_harq_ir_cc_duration = -1;
-static int hf_ulmap_harq_ir_cc_spid = -1;
-static int hf_ulmap_harq_ir_cc_acid = -1;
-static int hf_ulmap_harq_ir_cc_ai_sn = -1;
-static int hf_ulmap_harq_ir_cc_ack_disable = -1;
-static int hf_ulmap_mimo_ul_chase_harq_mu_indicator = -1;
-static int hf_ulmap_mimo_ul_chase_harq_dedicated_mimo_ulcontrol_indicator = -1;
-static int hf_ulmap_mimo_ul_chase_harq_ack_disable = -1;
-static int hf_ulmap_mimo_ul_chase_harq_matrix = -1;
-static int hf_ulmap_mimo_ul_chase_harq_duration = -1;
-static int hf_ulmap_mimo_ul_chase_harq_uiuc = -1;
-static int hf_ulmap_mimo_ul_chase_harq_repetition_coding_indication = -1;
-static int hf_ulmap_mimo_ul_chase_harq_acid = -1;
-static int hf_ulmap_mimo_ul_chase_harq_ai_sn = -1;
-static int hf_ulmap_mimo_ul_ir_harq_mu_indicator = -1;
-static int hf_ulmap_mimo_ul_ir_harq_dedicated_mimo_ul_control_indicator = -1;
-static int hf_ulmap_mimo_ul_ir_harq_ack_disable = -1;
-static int hf_ulmap_mimo_ul_ir_harq_matrix = -1;
-static int hf_ulmap_mimo_ul_ir_harq_nsch = -1;
-static int hf_ulmap_mimo_ul_ir_harq_nep = -1;
-static int hf_ulmap_mimo_ul_ir_harq_spid = -1;
-static int hf_ulmap_mimo_ul_ir_harq_acid = -1;
-static int hf_ulmap_mimo_ul_ir_harq_ai_sn = -1;
-static int hf_ulmap_mimo_ul_ir_harq_cc_mu_indicator = -1;
-static int hf_ulmap_mimo_ul_ir_harq_cc_dedicated_mimo_ul_control_indicator = -1;
-static int hf_ulmap_mimo_ul_ir_harq_cc_ack_disable = -1;
-static int hf_ulmap_mimo_ul_ir_harq_cc_matrix = -1;
-static int hf_ulmap_mimo_ul_ir_harq_cc_duration = -1;
-static int hf_ulmap_mimo_ul_ir_harq_cc_uiuc = -1;
-static int hf_ulmap_mimo_ul_ir_harq_cc_repetition_coding_indication = -1;
-static int hf_ulmap_mimo_ul_ir_harq_cc_acid = -1;
-static int hf_ulmap_mimo_ul_ir_harq_cc_ai_sn = -1;
-static int hf_ulmap_mimo_ul_ir_harq_cc_spid = -1;
-static int hf_ulmap_mimo_ul_stc_harq_tx_count = -1;
-static int hf_ulmap_mimo_ul_stc_harq_duration = -1;
-static int hf_ulmap_mimo_ul_stc_harq_sub_burst_offset_indication = -1;
-static int hf_ulmap_mimo_ul_stc_harq_sub_burst_offset = -1;
-static int hf_ulmap_mimo_ul_stc_harq_ack_disable = -1;
-static int hf_ulmap_mimo_ul_stc_harq_uiuc = -1;
-static int hf_ulmap_mimo_ul_stc_harq_repetition_coding_indication = -1;
-static int hf_ulmap_mimo_ul_stc_harq_acid = -1;
-static int hf_ulmap_power_control = -1;
-static int hf_ulmap_power_measurement_frame = -1;
-static int hf_ulmap_mini_subcha_alloc_extended_2_uiuc = -1;
-static int hf_ulmap_mini_subcha_alloc_length = -1;
-static int hf_ulmap_mini_subcha_alloc_ctype = -1;
-static int hf_ulmap_mini_subcha_alloc_duration = -1;
-static int hf_ulmap_mini_subcha_alloc_cid = -1;
-static int hf_ulmap_mini_subcha_alloc_uiuc = -1;
-static int hf_ulmap_mini_subcha_alloc_repetition = -1;
-static int hf_ulmap_mini_subcha_alloc_padding = -1;
-static int hf_ulmap_aas_ul_extended_uiuc = -1;
-static int hf_ulmap_aas_ul_length = -1;
-static int hf_ulmap_aas_ul_permutation = -1;
-static int hf_ulmap_aas_ul_ul_permbase = -1;
-static int hf_ulmap_aas_ul_ofdma_symbol_offset = -1;
-static int hf_ulmap_aas_ul_aas_zone_length = -1;
-static int hf_ulmap_aas_ul_uplink_preamble_config = -1;
-static int hf_ulmap_aas_ul_preamble_type = -1;
-static int hf_ulmap_cqich_alloc_extended_uiuc = -1;
-static int hf_ulmap_cqich_alloc_length = -1;
-static int hf_ulmap_cqich_alloc_cqich_id = -1;
-static int hf_ulmap_cqich_alloc_allocation_offset = -1;
-static int hf_ulmap_cqich_alloc_period = -1;
-static int hf_ulmap_cqich_alloc_frame_offset = -1;
-static int hf_ulmap_cqich_alloc_duration = -1;
-static int hf_ulmap_cqich_alloc_report_configuration_included = -1;
-static int hf_ulmap_cqich_alloc_feedback_type = -1;
-static int hf_ulmap_cqich_alloc_report_type = -1;
-static int hf_ulmap_cqich_alloc_cinr_preamble_report_type = -1;
-static int hf_ulmap_cqich_alloc_zone_permutation = -1;
-static int hf_ulmap_cqich_alloc_zone_type = -1;
-static int hf_ulmap_cqich_alloc_zone_prbs_id = -1;
-static int hf_ulmap_cqich_alloc_major_group_indication = -1;
-static int hf_ulmap_cqich_alloc_pusc_major_group_bitmap = -1;
-static int hf_ulmap_cqich_alloc_cinr_zone_measurement_type = -1;
-static int hf_ulmap_cqich_alloc_averaging_parameter_included = -1;
-static int hf_ulmap_cqich_alloc_averaging_parameter = -1;
-static int hf_ulmap_cqich_alloc_mimo_permutation_feedback_cycle = -1;
-static int hf_ulmap_zone_extended_uiuc = -1;
-static int hf_ulmap_zone_length = -1;
-static int hf_ulmap_zone_ofdma_symbol_offset = -1;
-static int hf_ulmap_zone_permutation = -1;
-static int hf_ulmap_zone_ul_permbase = -1;
-static int hf_ulmap_zone_amc_type = -1;
-static int hf_ulmap_zone_use_all_sc_indicator = -1;
-static int hf_ulmap_zone_disable_subchannel_rotation = -1;
-static int hf_ulmap_phymod_ul_extended_uiuc = -1;
-static int hf_ulmap_phymod_ul_length = -1;
-static int hf_ulmap_phymod_ul_preamble_modifier_type = -1;
-static int hf_ulmap_phymod_ul_preamble_frequency_shift_index = -1;
-static int hf_ulmap_phymod_ul_preamble_time_shift_index = -1;
-static int hf_ulmap_phymod_ul_pilot_pattern_modifier = -1;
-static int hf_ulmap_phymod_ul_pilot_pattern_index = -1;
-static int hf_ulmap_fast_tracking_extended_uiuc = -1;
-static int hf_ulmap_fast_tracking_length = -1;
-static int hf_ulmap_fast_tracking_map_index = -1;
-static int hf_ulmap_fast_tracking_power_correction = -1;
-static int hf_ulmap_fast_tracking_frequency_correction = -1;
-static int hf_ulmap_fast_tracking_time_correction = -1;
-static int hf_ulmap_pusc_burst_allocation_extended_uiuc = -1;
-static int hf_ulmap_pusc_burst_allocation_length = -1;
-static int hf_ulmap_pusc_burst_allocation_uiuc = -1;
-static int hf_ulmap_pusc_burst_allocation_segment = -1;
-static int hf_ulmap_pusc_burst_allocation_ul_permbase = -1;
-static int hf_ulmap_pusc_burst_allocation_ofdma_symbol_offset = -1;
-static int hf_ulmap_pusc_burst_allocation_subchannel_offset = -1;
-static int hf_ulmap_pusc_burst_allocation_duration = -1;
-static int hf_ulmap_pusc_burst_allocation_repetition_coding_indication = -1;
-static int hf_ulmap_fast_ranging_extended_uiuc = -1;
-static int hf_ulmap_fast_ranging_length = -1;
-static int hf_ulmap_fast_ranging_ho_id_indicator = -1;
-static int hf_ulmap_fast_ranging_ho_id = -1;
-static int hf_ulmap_fast_ranging_mac_address = -1;
-static int hf_ulmap_fast_ranging_uiuc = -1;
-static int hf_ulmap_fast_ranging_duration = -1;
-static int hf_ulmap_fast_ranging_repetition_coding_indication = -1;
-static int hf_ulmap_allocation_start_extended_uiuc = -1;
-static int hf_ulmap_allocation_start_length = -1;
-static int hf_ulmap_allocation_start_ofdma_symbol_offset = -1;
-static int hf_ulmap_allocation_start_subchannel_offset = -1;
-static int hf_ulmap_cqich_enhanced_alloc_extended_2_uiuc = -1;
-static int hf_ulmap_cqich_enhanced_alloc_length = -1;
-static int hf_ulmap_cqich_enhanced_alloc_cqich_id = -1;
-static int hf_ulmap_cqich_enhanced_alloc_period = -1;
-static int hf_ulmap_cqich_enhanced_alloc_frame_offset = -1;
-static int hf_ulmap_cqich_enhanced_alloc_duration = -1;
-static int hf_ulmap_cqich_enhanced_alloc_cqich_num = -1;
-static int hf_ulmap_cqich_enhanced_alloc_feedback_type = -1;
-static int hf_ulmap_cqich_enhanced_alloc_allocation_index = -1;
-static int hf_ulmap_cqich_enhanced_alloc_cqich_type = -1;
-static int hf_ulmap_cqich_enhanced_alloc_sttd_indication = -1;
-static int hf_ulmap_cqich_enhanced_alloc_band_amc_precoding_mode = -1;
-static int hf_ulmap_cqich_enhanced_alloc_nr_precoders_feedback = -1;
-static int hf_ulmap_anchor_bs_switch_extended_2_uiuc = -1;
-static int hf_ulmap_anchor_bs_switch_length = -1;
-static int hf_ulmap_anchor_bs_switch_n_anchor_bs_switch = -1;
-static int hf_ulmap_anchor_bs_switch_reduced_cid = -1;
-static int hf_ulmap_anchor_bs_switch_action_code = -1;
-static int hf_ulmap_anchor_bs_switch_action_time = -1;
-static int hf_ulmap_anchor_bs_switch_temp_bs_id = -1;
-static int hf_ulmap_anchor_bs_switch_ak_change_indicator = -1;
-static int hf_ulmap_anchor_bs_switch_cqich_allocation_indicator = -1;
-static int hf_ulmap_anchor_bs_switch_cqich_id = -1;
-static int hf_ulmap_anchor_bs_switch_feedback_channel_offset = -1;
-static int hf_ulmap_anchor_bs_switch_period = -1;
-static int hf_ulmap_anchor_bs_switch_frame_offset = -1;
-static int hf_ulmap_anchor_bs_switch_duration = -1;
-static int hf_ulmap_anchor_bs_switch_mimo_permutation_feedback_code = -1;
-static int hf_ulmap_sounding_command_extended_2_uiuc = -1;
-static int hf_ulmap_sounding_command_length = -1;
-static int hf_ulmap_sounding_command_type = -1;
-static int hf_ulmap_sounding_command_send_sounding_report_flag = -1;
-static int hf_ulmap_sounding_command_relevance_flag = -1;
-static int hf_ulmap_sounding_command_relevance = -1;
-static int hf_ulmap_sounding_command_include_additional_feedback = -1;
-static int hf_ulmap_sounding_command_num_sounding_symbols = -1;
-static int hf_ulmap_sounding_command_separability_type = -1;
-static int hf_ulmap_sounding_command_max_cyclic_shift_index_p = -1;
-static int hf_ulmap_sounding_command_decimation_value = -1;
-static int hf_ulmap_sounding_command_decimation_offset_randomization = -1;
-static int hf_ulmap_sounding_command_symbol_index = -1;
-static int hf_ulmap_sounding_command_number_of_cids = -1;
-static int hf_ulmap_sounding_command_shorted_basic_cid = -1;
-static int hf_ulmap_sounding_command_power_assignment_method = -1;
-static int hf_ulmap_sounding_command_power_boost = -1;
-static int hf_ulmap_sounding_command_multi_antenna_flag = -1;
-static int hf_ulmap_sounding_command_allocation_mode = -1;
-static int hf_ulmap_sounding_command_band_bit_map = -1;
-static int hf_ulmap_sounding_command_starting_frequency_band = -1;
-static int hf_ulmap_sounding_command_number_of_frequency_bands = -1;
-static int hf_ulmap_sounding_command_cyclic_time_shift_index = -1;
-static int hf_ulmap_sounding_command_decimation_offset = -1;
-static int hf_ulmap_sounding_command_use_same_symbol_for_additional_feedback = -1;
-static int hf_ulmap_sounding_command_periodicity = -1;
-static int hf_ulmap_sounding_command_permutation = -1;
-static int hf_ulmap_sounding_command_dl_permbase = -1;
-static int hf_ulmap_sounding_command_shortened_basic_cid = -1;
-static int hf_ulmap_sounding_command_subchannel_offset = -1;
-static int hf_ulmap_sounding_command_number_of_subchannels = -1;
-static int hf_ulmap_harq_ulmap_extended_2_uiuc = -1;
-static int hf_ulmap_harq_ulmap_length = -1;
-static int hf_ulmap_harq_ulmap_rcid_type = -1;
-static int hf_ulmap_harq_ulmap_mode = -1;
-static int hf_ulmap_harq_ulmap_allocation_start_indication = -1;
-static int hf_ulmap_harq_ulmap_ofdma_symbol_offset = -1;
-static int hf_ulmap_harq_ulmap_subchannel_offset = -1;
-static int hf_ulmap_harq_ulmap_n_sub_burst = -1;
-static int hf_ulmap_harq_ackch_region_alloc_extended_2_uiuc = -1;
-static int hf_ulmap_harq_ackch_region_alloc_length = -1;
-static int hf_ulmap_harq_ackch_region_alloc_ofdma_symbol_offset = -1;
-static int hf_ulmap_harq_ackch_region_alloc_subchannel_offset = -1;
-static int hf_ulmap_harq_ackch_region_alloc_num_ofdma_symbols = -1;
-static int hf_ulmap_harq_ackch_region_alloc_num_subchannels = -1;
-static int hf_ulmap_aas_sdma_extended_2_uiuc = -1;
-static int hf_ulmap_aas_sdma_length = -1;
-static int hf_ulmap_aas_sdma_rcid_type = -1;
-static int hf_ulmap_aas_sdma_num_burst_region = -1;
-static int hf_ulmap_aas_sdma_slot_offset = -1;
-static int hf_ulmap_aas_sdma_slot_duration = -1;
-static int hf_ulmap_aas_sdma_number_of_users = -1;
-static int hf_ulmap_aas_sdma_encoding_mode = -1;
-static int hf_ulmap_aas_sdma_power_adjust = -1;
-static int hf_ulmap_aas_sdma_pilot_pattern_modifier = -1;
-static int hf_ulmap_aas_sdma_preamble_modifier_index = -1;
-static int hf_ulmap_aas_sdma_pilot_pattern = -1;
-static int hf_ulmap_aas_sdma_diuc = -1;
-static int hf_ulmap_aas_sdma_repetition_coding_indication = -1;
-static int hf_ulmap_aas_sdma_acid = -1;
-static int hf_ulmap_aas_sdma_ai_sn = -1;
-static int hf_ulmap_aas_sdma_nep = -1;
-static int hf_ulmap_aas_sdma_nsch = -1;
-static int hf_ulmap_aas_sdma_spid = -1;
-static int hf_ulmap_aas_sdma_power_adjustment = -1;
-static int hf_ulmap_feedback_polling_extended_2_uiuc = -1;
-static int hf_ulmap_feedback_polling_length = -1;
-static int hf_ulmap_feedback_polling_num_allocation = -1;
-static int hf_ulmap_feedback_polling_dedicated_ul_allocation_included = -1;
-static int hf_ulmap_feedback_polling_basic_cid = -1;
-static int hf_ulmap_feedback_polling_allocation_duration = -1;
-static int hf_ulmap_feedback_polling_type = -1;
-static int hf_ulmap_feedback_polling_frame_offset = -1;
-static int hf_ulmap_feedback_polling_period = -1;
-static int hf_ulmap_feedback_polling_uiuc = -1;
-static int hf_ulmap_feedback_polling_ofdma_symbol_offset = -1;
-static int hf_ulmap_feedback_polling_subchannel_offset = -1;
-static int hf_ulmap_feedback_polling_duration = -1;
-static int hf_ulmap_feedback_polling_repetition_coding_indication = -1;
-static int hf_ulmap_reduced_aas_aas_zone_configuration_included = -1;
-static int hf_ulmap_reduced_aas_aas_zone_position_included = -1;
-static int hf_ulmap_reduced_aas_ul_map_information_included = -1;
-static int hf_ulmap_reduced_aas_phy_modification_included = -1;
-static int hf_ulmap_reduced_aas_power_control_included = -1;
-static int hf_ulmap_reduced_aas_include_feedback_header = -1;
-static int hf_ulmap_reduced_aas_encoding_mode = -1;
-static int hf_ulmap_reduced_aas_permutation = -1;
-static int hf_ulmap_reduced_aas_ul_permbase = -1;
-static int hf_ulmap_reduced_aas_preamble_indication = -1;
-static int hf_ulmap_reduced_aas_padding = -1;
-static int hf_ulmap_reduced_aas_zone_symbol_offset = -1;
-static int hf_ulmap_reduced_aas_zone_length = -1;
-static int hf_ulmap_reduced_aas_ucd_count = -1;
-static int hf_ulmap_reduced_aas_private_map_alloc_start_time = -1;
-static int hf_ulmap_reduced_aas_pilot_pattern_index = -1;
-static int hf_ulmap_reduced_aas_preamble_select = -1;
-static int hf_ulmap_reduced_aas_preamble_shift_index = -1;
-static int hf_ulmap_reduced_aas_pilot_pattern_modifier = -1;
-static int hf_ulmap_reduced_aas_power_control = -1;
-static int hf_ulmap_reduced_aas_ul_frame_offset = -1;
-static int hf_ulmap_reduced_aas_slot_offset = -1;
-static int hf_ulmap_reduced_aas_slot_duration = -1;
-static int hf_ulmap_reduced_aas_uiuc_nep = -1;
-static int hf_ulmap_reduced_aas_acid = -1;
-static int hf_ulmap_reduced_aas_ai_sn = -1;
-static int hf_ulmap_reduced_aas_nsch = -1;
-static int hf_ulmap_reduced_aas_spid = -1;
-static int hf_ulmap_reduced_aas_repetition_coding_indication = -1;
-
-static expert_field ei_ulmap_not_implemented = EI_INIT;
 
 /*  This gets called each time a capture file is loaded. */
 void init_wimax_globals(void)
@@ -570,18 +274,21 @@ static gint Dedicated_UL_Control_IE(proto_tree *uiuc_tree, gint offset, gint len
     /* 8.4.5.4.24.1 Dedicated_UL_Control_IE -- table 302r */
     /* UL-MAP HARQ Sub-Burst IE * offset/length are in bits */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     gint sdma;
 
     bit = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302r, NULL, "Dedicated_UL_Control_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "Dedicated_UL_Control_IE");
+    tree = proto_item_add_subtree(ti, ett_302r);
 
-    XBIT_HF(4, hf_ulmap_dedicated_ul_control_length);
-    XBIT_HF_VALUE(sdma, 4, hf_ulmap_dedicated_ul_control_control_header);
+    XBIT(data, 4, "Length");
+    XBIT(sdma, 4, "Control Header");
     if ((sdma & 1) == 1) {
-        XBIT_HF(2, hf_ulmap_dedicated_ul_control_num_sdma_layers);
-        XBIT_HF(2, hf_ulmap_dedicated_ul_control_pilot_pattern);
+        XBIT(data, 2, "Num SDMA layers");
+        XBIT(data, 2, "Pilot Pattern");
     }
     return (bit - offset); /* length in bits */
 }
@@ -591,14 +298,17 @@ static gint Dedicated_MIMO_UL_Control_IE(proto_tree *uiuc_tree, gint offset, gin
     /* 8.4.5.4.24.2 Dedicated_MIMO_UL_Control_IE -- table 302s */
     /* UL-MAP HARQ Sub-Burst IE * offset/length are in bits */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     bit = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302s, NULL, "Dedicated_MIMO_UL_Control_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "Dedicated_MIMO_UL_Control_IE");
+    tree = proto_item_add_subtree(ti, ett_302s);
 
-    XBIT_HF(2, hf_ulmap_dedicated_mimo_ul_control_matrix);
-    XBIT_HF_VALUE(N_layer, 2, hf_ulmap_dedicated_mimo_ul_control_n_layer);
+    XBIT(data, 2, "Matrix");
+    XBIT(N_layer, 2, "N_layer");
 
     return (bit - offset); /* length in bits */
 }
@@ -610,34 +320,37 @@ static gint UL_HARQ_Chase_Sub_Burst_IE(proto_tree *uiuc_tree, gint offset, gint 
     /* 8.4.5.4.24 UL_HARQ_Chase_sub_burst_IE -- table 302k */
     /* UL-MAP HARQ Sub-Burst IE * offset/length are in bits */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     /*proto_item *generic_item = NULL;*/
     gint duci;
     /*guint16 calculated_crc;*/
 
     bit = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, BITHI(offset,length), ett_302k, NULL, "UL_HARQ_Chase_Sub_Burst_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, BITHI(offset,length), "UL_HARQ_Chase_Sub_Burst_IE");
+    tree = proto_item_add_subtree(ti, ett_302k);
 
     bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
-    XBIT_HF_VALUE(duci, 1, hf_ulmap_harq_chase_dedicated_ul_control_indicator);
+    XBIT(duci, 1, "Dedicated UL Control Indicator");
     if (duci == 1) {
         bit += Dedicated_UL_Control_IE(tree, bit, length, tvb);
     }
-    XBIT_HF(4, hf_ulmap_harq_chase_uiuc);
-    XBIT_HF(2, hf_ulmap_harq_chase_repetition_coding_indication);
-    XBIT_HF(10, hf_ulmap_harq_chase_duration);
-    XBIT_HF(4, hf_ulmap_harq_chase_acid);
-    XBIT_HF(1, hf_ulmap_harq_chase_ai_sn);
-    XBIT_HF(1, hf_ulmap_harq_chase_ack_disable);
-    XBIT_HF(1, hf_ulmap_reserved_uint);
+    XBIT(data, 4, "UIUC");
+    XBIT(data, 2, "Repetition Coding Indication");
+    XBIT(data,10, "Duration");
+    XBIT(data, 4, "ACID");
+    XBIT(data, 1, "AI_SN");
+    XBIT(data, 1, "ACK_disable");
+    XBIT(data, 1, "Reserved");
 
 #if 0
     if (include_cor2_changes)
     {
 	/* CRC-16 is always appended */
 	data = TVB_BIT_BITS(bit, tvb, 16);
-	generic_item = proto_tree_add_uint(tree, hf_ulmap_crc16, tvb, BITHI(bit,16), data);
+	generic_item = proto_tree_add_text(tree, tvb, BITHI(bit,16), "CRC-16: 0x%04x",data);
 	/* calculate the CRC */
 	calculated_crc = wimax_mac_calc_crc16((guint8 *)tvb_get_ptr(tvb, 0, BIT_TO_BYTE(bit)), BIT_TO_BYTE(bit));
 	if (data != calculated_crc)
@@ -656,34 +369,37 @@ static gint UL_HARQ_IR_CTC_Sub_Burst_IE(proto_tree *uiuc_tree, gint offset, gint
     /* 8.4.5.4.24 UL_HARQ_IR_CTC_sub_burst_IE -- table 302l */
     /* UL-MAP HARQ Sub-Burst IE * offset/length are in bits */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     /*proto_item *generic_item = NULL;*/
     gint duci;
     /*guint16 calculated_crc;*/
 
     bit = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302l, NULL, "UL_HARQ_IR_CTC_Sub_Burst_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "UL_HARQ_IR_CTC_Sub_Burst_IE");
+    tree = proto_item_add_subtree(ti, ett_302l);
 
     bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
-    XBIT_HF_VALUE(duci, 1, hf_ulmap_harq_ir_ctc_dedicated_ul_control_indicator);
+    XBIT(duci, 1, "Dedicated UL Control Indicator");
     if (duci == 1) {
         bit += Dedicated_UL_Control_IE(tree, bit, length, tvb);
     }
-    XBIT_HF(4, hf_ulmap_harq_ir_ctc_nep);
-    XBIT_HF(4, hf_ulmap_harq_ir_ctc_nsch);
-    XBIT_HF(2, hf_ulmap_harq_ir_ctc_spid);
-    XBIT_HF(4, hf_ulmap_harq_ir_ctc_acin);
-    XBIT_HF(1, hf_ulmap_harq_ir_ctc_ai_sn);
-    XBIT_HF(1, hf_ulmap_harq_ir_ctc_ack_disable);
-    XBIT_HF(3, hf_ulmap_reserved_uint);
+    XBIT(data, 4, "N(EP)");
+    XBIT(data, 4, "N(SCH)");
+    XBIT(data, 2, "SPID");
+    XBIT(data, 4, "ACIN");
+    XBIT(data, 1, "AI_SN");
+    XBIT(data, 1, "ACK_disable");
+    XBIT(data, 3, "Reserved");
 
 #if 0
     if (include_cor2_changes)
     {
 	/* CRC-16 is always appended */
 	data = TVB_BIT_BITS(bit, tvb, 16);
-	generic_item = proto_tree_add_uint(tree, hf_ulmap_crc16, tvb, BITHI(bit,16), data);
+	generic_item = proto_tree_add_text(tree, tvb, BITHI(bit,16), "CRC-16: 0x%04x",data);
 	/* calculate the CRC */
 	calculated_crc = wimax_mac_calc_crc16((guint8 *)tvb_get_ptr(tvb, 0, BIT_TO_BYTE(bit)), BIT_TO_BYTE(bit));
 	if (data != calculated_crc)
@@ -702,35 +418,38 @@ static gint UL_HARQ_IR_CC_Sub_Burst_IE(proto_tree *uiuc_tree, gint offset, gint 
     /* 8.4.5.4.24 UL_HARQ_IR_CC_sub_burst_IE -- table 302m */
     /* UL-MAP HARQ Sub-Burst IE * offset/length are in bits */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     /*proto_item *generic_item = NULL;*/
     gint duci;
     /*guint16 calculated_crc;*/
 
     bit = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302m, NULL, "UL_HARQ_IR_CC_Sub_Burst_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "UL_HARQ_IR_CC_Sub_Burst_IE");
+    tree = proto_item_add_subtree(ti, ett_302m);
 
     bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
-    XBIT_HF_VALUE(duci, 1, hf_ulmap_harq_ir_cc_dedicated_ul_control_indicator);
+    XBIT(duci, 1, "Dedicated UL Control Indicator");
     if (duci == 1) {
         bit += Dedicated_UL_Control_IE(tree, bit, length, tvb);
     }
-    XBIT_HF(4, hf_ulmap_harq_ir_cc_uiuc);
-    XBIT_HF(2, hf_ulmap_harq_ir_cc_repetition_coding_indication);
-    XBIT_HF(10, hf_ulmap_harq_ir_cc_duration);
-    XBIT_HF(2, hf_ulmap_harq_ir_cc_spid);
-    XBIT_HF(4, hf_ulmap_harq_ir_cc_acid);
-    XBIT_HF(1, hf_ulmap_harq_ir_cc_ai_sn);
-    XBIT_HF(1, hf_ulmap_harq_ir_cc_ack_disable);
-    XBIT_HF(3, hf_ulmap_reserved_uint);
+    XBIT(data, 4, "UIUC");
+    XBIT(data, 2, "Repetition Coding Indication");
+    XBIT(data,10, "Duration");
+    XBIT(data, 2, "SPID");
+    XBIT(data, 4, "ACID");
+    XBIT(data, 1, "AI_SN");
+    XBIT(data, 1, "ACK_disable");
+    XBIT(data, 3, "Reserved");
 
 #if 0
     if (include_cor2_changes)
     {
 	/* CRC-16 is always appended */
 	data = TVB_BIT_BITS(bit, tvb, 16);
-	generic_item = proto_tree_add_uint(tree, hf_ulmap_crc16, tvb, BITHI(bit,16), data);
+	generic_item = proto_tree_add_text(tree, tvb, BITHI(bit,16), "CRC-16: 0x%04x",data);
 	/* calculate the CRC */
 	calculated_crc = wimax_mac_calc_crc16((guint8 *)tvb_get_ptr(tvb, 0, BIT_TO_BYTE(bit)), BIT_TO_BYTE(bit));
 	if (data != calculated_crc)
@@ -749,36 +468,39 @@ static gint MIMO_UL_Chase_HARQ_Sub_Burst_IE(proto_tree *uiuc_tree, gint offset, 
     /* 8.4.5.4.24 MIMO_UL_Chase_HARQ_Sub_Burst_IE -- table 302n */
     /* UL-MAP HARQ Sub-Burst IE * offset/length are in bits */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     /*proto_item *generic_item = NULL;*/
     gint muin,dmci,ackd,i;
     /*guint16 calculated_crc;*/
 
     bit = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302n, NULL, "MIMO_UL_Chase_HARQ_Sub_Burst_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "MIMO_UL_Chase_HARQ_Sub_Burst_IE");
+    tree = proto_item_add_subtree(ti, ett_302n);
 
-    XBIT_HF_VALUE(muin, 1, hf_ulmap_mimo_ul_chase_harq_mu_indicator);
-    XBIT_HF_VALUE(dmci, 1, hf_ulmap_mimo_ul_chase_harq_dedicated_mimo_ulcontrol_indicator);
-    XBIT_HF_VALUE(ackd, 1, hf_ulmap_mimo_ul_chase_harq_ack_disable);
+    XBIT(muin, 1, "MU indicator");
+    XBIT(dmci, 1, "Dedicated MIMO ULControl Indicator");
+    XBIT(ackd, 1, "ACK Disable");
     if (muin == 0) {
         bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
         if (dmci) {
             bit += Dedicated_MIMO_UL_Control_IE(tree, bit, length, tvb);
         }
     } else {
-        XBIT_HF(1, hf_ulmap_mimo_ul_chase_harq_matrix);
+        XBIT(data, 1, "Matrix");
     }
-    XBIT_HF(10, hf_ulmap_mimo_ul_chase_harq_duration);
+    XBIT(data, 10, "Duration");
     for (i = 0; i < N_layer; i++) {
         if (muin == 1) {
             bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
         }
-        XBIT_HF(4, hf_ulmap_mimo_ul_chase_harq_uiuc);
-        XBIT_HF(2, hf_ulmap_mimo_ul_chase_harq_repetition_coding_indication);
+        XBIT(data, 4, "UIUC");
+        XBIT(data, 2, "Repetition Coding Indication");
         if (ackd == 0) {
-            XBIT_HF(4, hf_ulmap_mimo_ul_chase_harq_acid);
-            XBIT_HF(1, hf_ulmap_mimo_ul_chase_harq_ai_sn);
+            XBIT(data, 4, "ACID");
+            XBIT(data, 1, "AI_SN");
         }
     }
 
@@ -787,7 +509,7 @@ static gint MIMO_UL_Chase_HARQ_Sub_Burst_IE(proto_tree *uiuc_tree, gint offset, 
     {
 	/* CRC-16 is always appended */
 	data = TVB_BIT_BITS(bit, tvb, 16);
-	generic_item = proto_tree_add_uint(tree, hf_ulmap_crc16, tvb, BITHI(bit,16), data);
+	generic_item = proto_tree_add_text(tree, tvb, BITHI(bit,16), "CRC-16: 0x%04x",data);
 	/* calculate the CRC */
 	calculated_crc = wimax_mac_calc_crc16((guint8 *)tvb_get_ptr(tvb, 0, BIT_TO_BYTE(bit)), BIT_TO_BYTE(bit));
 	if (data != calculated_crc)
@@ -806,36 +528,39 @@ static gint MIMO_UL_IR_HARQ__Sub_Burst_IE(proto_tree *uiuc_tree, gint offset, gi
     /* 8.4.5.4.24 MIMO_UL_IR_HARQ__Sub_Burst_IE -- table 302o */
     /* UL-MAP HARQ Sub-Burst IE * offset/length are in bits */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     /*proto_item *generic_item = NULL;*/
     gint muin,dmci,ackd,i;
     /*guint16 calculated_crc;*/
 
     bit = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302o, NULL, "MIMO_UL_IR_HARQ__Sub_Burst_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "MIMO_UL_IR_HARQ__Sub_Burst_IE");
+    tree = proto_item_add_subtree(ti, ett_302o);
 
-    XBIT_HF_VALUE(muin, 1, hf_ulmap_mimo_ul_ir_harq_mu_indicator);
-    XBIT_HF_VALUE(dmci, 1, hf_ulmap_mimo_ul_ir_harq_dedicated_mimo_ul_control_indicator);
-    XBIT_HF_VALUE(ackd, 1, hf_ulmap_mimo_ul_ir_harq_ack_disable);
+    XBIT(muin, 1, "MU indicator");
+    XBIT(dmci, 1, "Dedicated MIMO UL Control Indicator");
+    XBIT(ackd, 1, "ACK Disable");
     if (muin == 0) {
         bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
         if (dmci) {
             bit += Dedicated_MIMO_UL_Control_IE(tree, bit, length, tvb);
         }
     } else {
-        XBIT_HF(1, hf_ulmap_mimo_ul_ir_harq_matrix);
+        XBIT(data, 1, "Matrix");
     }
-    XBIT_HF(4, hf_ulmap_mimo_ul_ir_harq_nsch);
+    XBIT(data, 4, "N(SCH)");
     for (i = 0; i < N_layer; i++) {
         if (muin == 1) {
             bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
         }
-        XBIT_HF(4, hf_ulmap_mimo_ul_ir_harq_nep);
+        XBIT(data, 4, "N(EP)");
         if (ackd == 0) {
-            XBIT_HF(2, hf_ulmap_mimo_ul_ir_harq_spid);
-            XBIT_HF(4, hf_ulmap_mimo_ul_ir_harq_acid);
-            XBIT_HF(1, hf_ulmap_mimo_ul_ir_harq_ai_sn);
+            XBIT(data, 2, "SPID");
+            XBIT(data, 4, "ACID");
+            XBIT(data, 1, "AI_SN");
         }
     }
 
@@ -844,7 +569,7 @@ static gint MIMO_UL_IR_HARQ__Sub_Burst_IE(proto_tree *uiuc_tree, gint offset, gi
     {
 	/* CRC-16 is always appended */
 	data = TVB_BIT_BITS(bit, tvb, 16);
-	generic_item = proto_tree_add_uint(tree, hf_ulmap_crc16, tvb, BITHI(bit,16), data);
+	generic_item = proto_tree_add_text(tree, tvb, BITHI(bit,16), "CRC-16: 0x%04x",data);
 	/* calculate the CRC */
 	calculated_crc = wimax_mac_calc_crc16((guint8 *)tvb_get_ptr(tvb, 0, BIT_TO_BYTE(bit)), BIT_TO_BYTE(bit));
 	if (data != calculated_crc)
@@ -863,37 +588,40 @@ static gint MIMO_UL_IR_HARQ_for_CC_Sub_Burst_UIE(proto_tree *uiuc_tree, gint off
     /* 8.4.5.4.24 MIMO_UL_IR_HARQ_for_CC_Sub_Burst_UIE -- table 302p */
     /* UL-MAP HARQ Sub-Burst IE * offset/length are in bits */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     /*proto_item *generic_item = NULL;*/
     gint muin,dmci,ackd,i;
     /*guint16 calculated_crc;*/
 
     bit = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302p, NULL, "MIMO_UL_IR_HARQ_for_CC_Sub_Burst_UIE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "MIMO_UL_IR_HARQ_for_CC_Sub_Burst_UIE");
+    tree = proto_item_add_subtree(ti, ett_302p);
 
-    XBIT_HF_VALUE(muin, 1, hf_ulmap_mimo_ul_ir_harq_cc_mu_indicator);
-    XBIT_HF_VALUE(dmci, 1, hf_ulmap_mimo_ul_ir_harq_cc_dedicated_mimo_ul_control_indicator);
-    XBIT_HF_VALUE(ackd, 1, hf_ulmap_mimo_ul_ir_harq_cc_ack_disable);
+    XBIT(muin, 1, "MU indicator");
+    XBIT(dmci, 1, "Dedicated MIMO UL Control Indicator");
+    XBIT(ackd, 1, "ACK Disable");
     if (muin == 0) {
         bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
         if (dmci) {
             bit += Dedicated_MIMO_UL_Control_IE(tree, bit, length, tvb);
         }
     } else {
-        XBIT_HF(1, hf_ulmap_mimo_ul_ir_harq_cc_matrix);
+        XBIT(data, 1, "Matrix");
     }
-    XBIT_HF(10, hf_ulmap_mimo_ul_ir_harq_cc_duration);
+    XBIT(data, 10, "Duration");
     for (i = 0; i < N_layer; i++) {
         if (muin == 1) {
             bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
         }
-        XBIT_HF(4, hf_ulmap_mimo_ul_ir_harq_cc_uiuc);
-        XBIT_HF(2, hf_ulmap_mimo_ul_ir_harq_cc_repetition_coding_indication);
+        XBIT(data, 4, "UIUC");
+        XBIT(data, 2, "Repetition Coding Indication");
         if (ackd == 0) {
-            XBIT_HF(4, hf_ulmap_mimo_ul_ir_harq_cc_acid);
-            XBIT_HF(1, hf_ulmap_mimo_ul_ir_harq_cc_ai_sn);
-            XBIT_HF(2, hf_ulmap_mimo_ul_ir_harq_cc_spid);
+            XBIT(data, 4, "ACID");
+            XBIT(data, 1, "AI_SN");
+            XBIT(data, 2, "SPID");
         }
     }
 
@@ -902,7 +630,7 @@ static gint MIMO_UL_IR_HARQ_for_CC_Sub_Burst_UIE(proto_tree *uiuc_tree, gint off
     {
 	/* CRC-16 is always appended */
 	data = TVB_BIT_BITS(bit, tvb, 16);
-	generic_item = proto_tree_add_uint(tree, hf_ulmap_crc16, tvb, BITHI(bit,16), data);
+	generic_item = proto_tree_add_text(tree, tvb, BITHI(bit,16), "CRC-16: 0x%04x",data);
 	/* calculate the CRC */
 	calculated_crc = wimax_mac_calc_crc16((guint8 *)tvb_get_ptr(tvb, 0, BIT_TO_BYTE(bit)), BIT_TO_BYTE(bit));
 	if (data != calculated_crc)
@@ -921,30 +649,33 @@ static gint MIMO_UL_STC_HARQ_Sub_Burst_IE(proto_tree *uiuc_tree, gint offset, gi
     /* 8.4.5.4.24 MIMO_UL_STC_HARQ_Sub_Burst_IE -- table 302q */
     /* UL-MAP HARQ Sub-Burst IE * offset/length are in bits */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     /*proto_item *generic_item = NULL;*/
     gint ackd,txct,sboi;
     /*guint16 calculated_crc;*/
 
     bit = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302q, NULL, "MIMO_UL_STC_HARQ_Sub_Burst_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "MIMO_UL_STC_HARQ_Sub_Burst_IE");
+    tree = proto_item_add_subtree(ti, ett_302q);
 
-    XBIT_HF_VALUE(txct, 2, hf_ulmap_mimo_ul_stc_harq_tx_count);
-    XBIT_HF(10, hf_ulmap_mimo_ul_stc_harq_duration);
-    XBIT_HF_VALUE(sboi, 1, hf_ulmap_mimo_ul_stc_harq_sub_burst_offset_indication);
-    /*XBIT_HF_VALUE(muin, 1, hf_ulmap_reserved_uint);*/
+    XBIT(txct, 2, "Tx count");
+    XBIT(data, 10, "Duration");
+    XBIT(sboi, 1, "Sub-burst offset indication");
+    /*XBIT(muin, 1, "Reserved");*/
     if (sboi == 1) {
-        XBIT_HF(8, hf_ulmap_mimo_ul_stc_harq_sub_burst_offset);
+        XBIT(data, 8, "Sub-burst offset");
     }
     bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
-    XBIT_HF_VALUE(ackd, 1, hf_ulmap_mimo_ul_stc_harq_ack_disable);
+    XBIT(ackd, 1, "ACK Disable");
     if (txct == 0) {
-        XBIT_HF(4, hf_ulmap_mimo_ul_stc_harq_uiuc);
-        XBIT_HF(2, hf_ulmap_mimo_ul_stc_harq_repetition_coding_indication);
+        XBIT(data, 4, "UIUC");
+        XBIT(data, 2, "Repetition Coding Indication");
     }
     if (ackd == 0) {
-        XBIT_HF(4, hf_ulmap_mimo_ul_stc_harq_acid);
+        XBIT(data, 4, "ACID");
     }
 
 #if 0
@@ -952,7 +683,7 @@ static gint MIMO_UL_STC_HARQ_Sub_Burst_IE(proto_tree *uiuc_tree, gint offset, gi
     {
 	/* CRC-16 is always appended */
 	data = TVB_BIT_BITS(bit, tvb, 16);
-	generic_item = proto_tree_add_uint(tree, hf_ulmap_crc16, tvb, BITHI(bit,16), data);
+	generic_item = proto_tree_add_text(tree, tvb, BITHI(bit,16), "CRC-16: 0x%04x",data);
 	/* calculate the CRC */
 	calculated_crc = wimax_mac_calc_crc16((guint8 *)tvb_get_ptr(tvb, 0, BIT_TO_BYTE(bit)), BIT_TO_BYTE(bit));
 	if (data != calculated_crc)
@@ -978,17 +709,19 @@ static gint Power_Control_IE(proto_tree *uiuc_tree, gint offset, gint length, tv
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint nib;
     gint data;
-    proto_item *tree;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     nib = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_292, NULL, "Power_Control_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "Power_Control_IE");
+    tree = proto_item_add_subtree(ti, ett_292);
 
-    VNIB(data, 1, hf_ulmap_ie_diuc_ext);
-    VNIB(data, 1, hf_ulmap_ie_length);
+    XNIB(data, 1, "Extended UIUC");
+    XNIB(data, 1, "Length");
 
-    VNIB(data, 2, hf_ulmap_power_control);
-    VNIB(data, 2, hf_ulmap_power_measurement_frame);
+    XNIB(data, 2, "Power Control");
+    XNIB(data, 2, "Power measurement frame");
     return nib;
 }
 
@@ -999,35 +732,36 @@ static gint Mini_Subchannel_allocation_IE(proto_tree *uiuc_tree, gint offset, gi
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
     gint data;
-    guint idx;
-    proto_item *tree;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     gint j, M;
     const gint m_table[4] = { 2, 2, 3, 6 };
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_295, NULL, "Mini_subchannel_allocation_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "Mini_subchannel_allocation_IE");
+    tree = proto_item_add_subtree(ti, ett_295);
 
-    XBIT_HF(4, hf_ulmap_mini_subcha_alloc_extended_2_uiuc);
-    XBIT_HF(8, hf_ulmap_mini_subcha_alloc_length);
+    XBIT(data, 4, "Extended-2 UIUC");
+    XBIT(data, 8, "Length");
 
-    XBIT_HF_VALUE(idx, 2, hf_ulmap_mini_subcha_alloc_ctype);
-    M = m_table[idx];
-    XBIT_HF(6, hf_ulmap_mini_subcha_alloc_duration);
+    XBIT(data, 2, "Ctype");
+    M = m_table[data];
+    XBIT(data, 6, "Duration");
 
     for (j = 0; j < M; j++) {
         data = TVB_BIT_BITS(bit, tvb, 16);
-        proto_tree_add_uint_format(tree, hf_ulmap_mini_subcha_alloc_cid, tvb, BITHI(bit, 16), data, "CID(%d): %d", j, data);
+        proto_tree_add_text(tree, tvb, BITHI(bit, 16), "CID(%d): %d", j, data);
         bit += 16;
         data = TVB_BIT_BITS(bit, tvb, 4);
-        proto_tree_add_uint_format(tree, hf_ulmap_mini_subcha_alloc_uiuc, tvb, BITHI(bit, 4), data, "UIUC(%d): %d", j, data);
+        proto_tree_add_text(tree, tvb, BITHI(bit, 4), "UIUC(%d): %d", j, data);
         bit += 4;
         data = TVB_BIT_BITS(bit, tvb, 2);
-        proto_tree_add_uint_format(tree, hf_ulmap_mini_subcha_alloc_repetition, tvb, BITHI(bit, 2), data, "Repetition(%d): %d", j, data);
+        proto_tree_add_text(tree, tvb, BITHI(bit, 2), "Repetition(%d): %d", j, data);
         bit += 2;
     }
     if (M == 3) {
-        XBIT_HF(4, hf_ulmap_mini_subcha_alloc_padding);
+        XBIT(data, 4, "Padding");
     }
     return BIT_TO_NIB(bit);
 }
@@ -1038,22 +772,25 @@ static gint AAS_UL_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbuff_t 
     /* 8.4.5.4.6 [2] AAS_UL_IE*/
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_293, NULL, "AAS_UL_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "AAS_UL_IE");
+    tree = proto_item_add_subtree(ti, ett_293);
 
-    XBIT_HF(4, hf_ulmap_aas_ul_extended_uiuc);
-    XBIT_HF(4, hf_ulmap_aas_ul_length);
+    XBIT(data, 4, "Extended UIUC");
+    XBIT(data, 4, "Length");
 
-    XBIT_HF(2, hf_ulmap_aas_ul_permutation);
-    XBIT_HF(7, hf_ulmap_aas_ul_ul_permbase);
-    XBIT_HF(8, hf_ulmap_aas_ul_ofdma_symbol_offset);
-    XBIT_HF(8, hf_ulmap_aas_ul_aas_zone_length);
-    XBIT_HF(2, hf_ulmap_aas_ul_uplink_preamble_config);
-    XBIT_HF(1, hf_ulmap_aas_ul_preamble_type);
-    XBIT_HF(4, hf_ulmap_reserved_uint);
+    XBIT(data, 2, "Permutation");
+    XBIT(data, 7, "UL_PermBase");
+    XBIT(data, 8, "OFDMA symbol offset");
+    XBIT(data, 8, "AAS zone length");
+    XBIT(data, 2, "Uplink preamble config");
+    XBIT(data, 1, "Preamble type");
+    XBIT(data, 4, "Reserved");
     return BIT_TO_NIB(bit);
 }
 
@@ -1065,63 +802,65 @@ static gint CQICH_Alloc_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbu
     gint bit;
     gint data;
     gint target;
-    proto_item *tree;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     gint rci, rtype, ftype, zperm, mgi, api, pad;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_300, NULL, "CQICH_Alloc_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "CQICH_Alloc_IE");
+    tree = proto_item_add_subtree(ti, ett_300);
 
-    XBIT_HF(4, hf_ulmap_cqich_alloc_extended_uiuc);
-    XBIT_HF_VALUE(data, 4, hf_ulmap_cqich_alloc_length);
+    XBIT(data, 4, "Extended UIUC");
+    XBIT(data, 4, "Length");
     target = bit + BYTE_TO_BIT(data);
 
     if (cqich_id_size == 0) {
-        proto_tree_add_uint_format_value(tree, hf_ulmap_cqich_alloc_cqich_id, tvb, BITHI(bit, 1), cqich_id_size, "n/a (size == 0 bits)");
+        proto_tree_add_text(tree, tvb, BITHI(bit, 1), "CQICH_ID: n/a (size == 0 bits)");
     } else {
         /* variable from 0-9 bits */
         data = TVB_BIT_BITS16(bit, tvb, cqich_id_size);
-        proto_tree_add_uint_format_value(tree, hf_ulmap_cqich_alloc_cqich_id, tvb, BITHI(bit, cqich_id_size), data, "%d (%d bits)", data, cqich_id_size);
+        proto_tree_add_text(tree, tvb, BITHI(bit, cqich_id_size), "CQICH_ID: %d (%d bits)", data, cqich_id_size);
         bit += cqich_id_size;
     }
 
-    XBIT_HF(6, hf_ulmap_cqich_alloc_allocation_offset);
-    XBIT_HF(2, hf_ulmap_cqich_alloc_period);
-    XBIT_HF(3, hf_ulmap_cqich_alloc_frame_offset);
-    XBIT_HF(3, hf_ulmap_cqich_alloc_duration);
-    XBIT_HF_VALUE(rci, 1, hf_ulmap_cqich_alloc_report_configuration_included);
+    XBIT(data, 6, "Allocation offset");
+    XBIT(data, 2, "Period (p)");
+    XBIT(data, 3, "Frame offset");
+    XBIT(data, 3, "Duration (d)");
+    XBIT(rci,  1, "Report configuration included");
     if (rci)
     {
-        XBIT_HF_VALUE(ftype, 2, hf_ulmap_cqich_alloc_feedback_type);
-        XBIT_HF_VALUE(rtype, 1, hf_ulmap_cqich_alloc_report_type);
+        XBIT(ftype, 2, "Feedback Type");
+        XBIT(rtype, 1, "Report type");
         if (rtype == 0) {
-            XBIT_HF(1, hf_ulmap_cqich_alloc_cinr_preamble_report_type);
+            XBIT(data, 1, "CINR preamble report type");
         }
         else {
-            XBIT_HF_VALUE(zperm, 3, hf_ulmap_cqich_alloc_zone_permutation);
-            XBIT_HF(2, hf_ulmap_cqich_alloc_zone_type);
-            XBIT_HF(2, hf_ulmap_cqich_alloc_zone_prbs_id);
+            XBIT(zperm, 3, "Zone permutation");
+            XBIT(data, 2, "Zone type");
+            XBIT(data, 2, "Zone PRBS_ID");
             if (zperm == 0 || zperm == 1) {
-                XBIT_HF_VALUE(mgi, 1, hf_ulmap_cqich_alloc_major_group_indication);
+                XBIT(mgi, 1, "Major group indication");
                 if (mgi == 1) {
                     /* PUSC major group bitmap*/
-                    XBIT_HF(6, hf_ulmap_cqich_alloc_pusc_major_group_bitmap);
+                    XBIT(data, 6, "PUSC Major group bitmap");
                 }
             }
-            XBIT_HF(1, hf_ulmap_cqich_alloc_cinr_zone_measurement_type);
+            XBIT(data, 1, "CINR zone measurement type");
         }
         if (ftype == 0) {
-            XBIT_HF_VALUE(api, 1, hf_ulmap_cqich_alloc_averaging_parameter_included);
+            XBIT(api, 1, "Averaging parameter included");
             if (api == 1) {
-                XBIT_HF(4, hf_ulmap_cqich_alloc_averaging_parameter);
+                XBIT(data, 4, "Averaging parameter");
             }
         }
     }
-    XBIT_HF(2, hf_ulmap_cqich_alloc_mimo_permutation_feedback_cycle);
+    XBIT(data, 2, "MIMO_permutation_feedback_cycle");
 
     pad = target - bit;
     if (pad) {
-        proto_tree_add_bytes_format_value(tree, hf_ulmap_padding, tvb, BITHI(bit, pad), NULL, "%d bits", pad);
+        proto_tree_add_text(tree, tvb, BITHI(bit, pad), "Padding: %d bits", pad);
         bit += pad;
     }
     return BIT_TO_NIB(bit);	/* Return position in nibbles. */
@@ -1133,22 +872,25 @@ static gint UL_Zone_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbuff_t
     /* 8.4.5.4.7 [2] UL_Zone_IE */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_294, NULL, "UL_Zone_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "UL_Zone_IE");
+    tree = proto_item_add_subtree(ti, ett_294);
 
-    XBIT_HF(4, hf_ulmap_zone_extended_uiuc);
-    XBIT_HF(4, hf_ulmap_zone_length);
+    XBIT(data, 4, "Extended UIUC");
+    XBIT(data, 4, "Length");
 
-    XBIT_HF(7, hf_ulmap_zone_ofdma_symbol_offset);
-    XBIT_HF(2, hf_ulmap_zone_permutation);
-    XBIT_HF(7, hf_ulmap_zone_ul_permbase);
-    XBIT_HF(2, hf_ulmap_zone_amc_type);
-    XBIT_HF(1, hf_ulmap_zone_use_all_sc_indicator);
-    XBIT_HF(1, hf_ulmap_zone_disable_subchannel_rotation);
-    XBIT_HF(4, hf_ulmap_reserved_uint);
+    XBIT(data, 7, "OFDMA symbol offset");
+    XBIT(data, 2, "Permutation");
+    XBIT(data, 7, "UL_PermBase");
+    XBIT(data, 2, "AMC type");
+    XBIT(data, 1, "Use All SC indicator");
+    XBIT(data, 1, "Disable subchannel rotation");
+    XBIT(data, 4, "Reserved");
     return BIT_TO_NIB(bit);
 }
 
@@ -1158,43 +900,48 @@ static gint PHYMOD_UL_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbuff
     /* 8.4.5.4.14 [2] PHYMOD_UL_IE */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     gint pmt;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302, NULL, "PHYMOD_UL_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "PHYMOD_UL_IE");
+    tree = proto_item_add_subtree(ti, ett_302);
 
-    XBIT_HF(4, hf_ulmap_phymod_ul_extended_uiuc);
-    XBIT_HF(4, hf_ulmap_phymod_ul_length);
+    XBIT(data, 4, "Extended UIUC");
+    XBIT(data, 4, "Length");
 
-    XBIT_HF_VALUE(pmt, 1, hf_ulmap_phymod_ul_preamble_modifier_type);
+    XBIT(pmt, 1, "Preamble Modifier Type");
     if (pmt == 0) {
-        XBIT_HF(4, hf_ulmap_phymod_ul_preamble_frequency_shift_index);
+        XBIT(data, 4, "Preamble frequency shift index");
     } else {
-        XBIT_HF(4, hf_ulmap_phymod_ul_preamble_time_shift_index);
+        XBIT(data, 4, "Preamble Time Shift index");
     }
-    XBIT_HF(1, hf_ulmap_phymod_ul_pilot_pattern_modifier);
-    XBIT_HF(2, hf_ulmap_phymod_ul_pilot_pattern_index);
+    XBIT(data, 1, "Pilot Pattern Modifier");
+    XBIT(data, 2, "Pilot Pattern Index");
     return BIT_TO_NIB(bit);
 }
 
-static gint MIMO_UL_IE(proto_tree *uiuc_tree, packet_info* pinfo, gint offset, gint length, tvbuff_t *tvb)
+static gint MIMO_UL_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbuff_t *tvb)
 {
     /* UL-MAP Extended IE = 6 */
     /* 8.4.5.4.11 MIMO_UL_Basic_IE (not implemented) */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint nib;
     gint data;
-    proto_item *tree;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     nib = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_299, NULL, "MIMO_UL_Basic_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "MIMO_UL_Basic_IE");
+    tree = proto_item_add_subtree(ti, ett_299);
 
-    VNIB(data, 1, hf_ulmap_ie_diuc_ext);
-    VNIB(data, 1, hf_ulmap_ie_length);
-    proto_tree_add_expert(tree, pinfo, &ei_ulmap_not_implemented, tvb, NIBHI(nib,length-2));
+    XNIB(data, 1, "Extended UIUC");
+    XNIB(data, 1, "Length");
+    proto_tree_add_text(tree, tvb, NIBHI(nib,length-2), "(not implemented)");
     return nib;
 }
 
@@ -1204,23 +951,26 @@ static gint ULMAP_Fast_Tracking_IE(proto_tree *uiuc_tree, gint offset, gint leng
     /* 8.4.5.4.22 [2] ULMAP_Fast_Tracking_IE */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302h, NULL, "Fast_Tracking_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "Fast_Tracking_IE");
+    tree = proto_item_add_subtree(ti, ett_302h);
 
     length = NIB_TO_BIT(length);
 
-    XBIT_HF(4, hf_ulmap_fast_tracking_extended_uiuc);
-    XBIT_HF(4, hf_ulmap_fast_tracking_length);
+    XBIT(data, 4, "Extended UIUC");
+    XBIT(data, 4, "Length");
 
-    XBIT_HF(2, hf_ulmap_fast_tracking_map_index);
-    XBIT_HF(6, hf_ulmap_reserved_uint);
+    XBIT(data, 2, "Map Index");
+    XBIT(data, 6, "Reserved");
     while (bit < (length-7)) {
-        XBIT_HF(3, hf_ulmap_fast_tracking_power_correction);
-        XBIT_HF(3, hf_ulmap_fast_tracking_frequency_correction);
-        XBIT_HF(2, hf_ulmap_fast_tracking_time_correction);
+        XBIT(data, 3, "Power correction");
+        XBIT(data, 3, "Frequency correction");
+        XBIT(data, 2, "Time correction");
     }
     return BIT_TO_NIB(bit);
 }
@@ -1231,23 +981,26 @@ static gint UL_PUSC_Burst_Allocation_in_other_segment_IE(proto_tree *uiuc_tree, 
     /* 8.4.5.4.17 [2] UL_PUSC_Burst_Allocation_in_other_segment_IE */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302c, NULL, "UL_PUSC_Burst_Allocation_in_Other_Segment_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "UL_PUSC_Burst_Allocation_in_Other_Segment_IE");
+    tree = proto_item_add_subtree(ti, ett_302c);
 
-    XBIT_HF(4, hf_ulmap_pusc_burst_allocation_extended_uiuc);
-    XBIT_HF(4, hf_ulmap_pusc_burst_allocation_length);
+    XBIT(data, 4, "Extended UIUC");
+    XBIT(data, 4, "Length");
 
-    XBIT_HF(4, hf_ulmap_pusc_burst_allocation_uiuc);
-    XBIT_HF(2, hf_ulmap_pusc_burst_allocation_segment);
-    XBIT_HF(7, hf_ulmap_pusc_burst_allocation_ul_permbase);
-    XBIT_HF(8, hf_ulmap_pusc_burst_allocation_ofdma_symbol_offset);
-    XBIT_HF(6, hf_ulmap_pusc_burst_allocation_subchannel_offset);
-    XBIT_HF(10, hf_ulmap_pusc_burst_allocation_duration);
-    XBIT_HF(2, hf_ulmap_pusc_burst_allocation_repetition_coding_indication);
-    XBIT_HF(1, hf_ulmap_reserved_uint);
+    XBIT(data, 4, "UIUC");
+    XBIT(data, 2, "Segment");
+    XBIT(data, 7, "UL_PermBase");
+    XBIT(data, 8, "OFDMA symbol offset");
+    XBIT(data, 6, "Subchannel offset");
+    XBIT(data,10, "Duration");
+    XBIT(data, 2, "Repetition coding indication");
+    XBIT(data, 1, "Reserved");
     return BIT_TO_NIB(bit);
 }
 
@@ -1257,28 +1010,32 @@ static gint Fast_Ranging_IE(proto_tree *uiuc_tree, gint offset, gint length, tvb
     /* 8.4.5.4.21 [2] Fast_Ranging_IE */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     gint hidi;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302g, NULL, "Fast_Ranging_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "Fast_Ranging_IE");
+    tree = proto_item_add_subtree(ti, ett_302g);
 
-    XBIT_HF(4, hf_ulmap_fast_ranging_extended_uiuc);
-    XBIT_HF(4, hf_ulmap_fast_ranging_length);
+    XBIT(data, 4, "Extended UIUC");
+    XBIT(data, 4, "Length");
 
-    XBIT_HF_VALUE(hidi, 1, hf_ulmap_fast_ranging_ho_id_indicator);
-    XBIT_HF(7, hf_ulmap_reserved_uint);
+    XBIT(hidi, 1, "HO_ID indicator");
+    XBIT(data, 7, "Reserved");
     if (hidi == 1) {
-        XBIT_HF(8, hf_ulmap_fast_ranging_ho_id);
-        /* XBIT_HF(40, hf_ulmap_reserved_uint); TODO */
+        XBIT(data,  8, "HO_ID");
+        /* XBIT(data, 40, "Reserved"); TODO */
     } else {
-        proto_tree_add_item(tree, hf_ulmap_fast_ranging_mac_address, tvb, BITHI(bit, 48), ENC_NA);
+        /* XBIT(data, 48, "MAC address"); TODO */
+        proto_tree_add_text(tree, tvb, BITHI(bit, 48), "MAC address");
         bit += 48;
     }
-    XBIT_HF(4, hf_ulmap_fast_ranging_uiuc);
-    XBIT_HF(10, hf_ulmap_fast_ranging_duration);
-    XBIT_HF(2, hf_ulmap_fast_ranging_repetition_coding_indication);
+    XBIT(data, 4, "UIUC");
+    XBIT(data,10, "Duration");
+    XBIT(data, 2, "Repetition coding indication");
     return BIT_TO_NIB(bit);
 }
 
@@ -1288,18 +1045,21 @@ static gint UL_Allocation_Start_IE(proto_tree *uiuc_tree, gint offset, gint leng
     /* 8.4.5.4.15 [2] UL_Allocation_Start_IE */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302a, NULL, "UL_Allocation_start_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "UL_Allocation_start_IE");
+    tree = proto_item_add_subtree(ti, ett_302a);
 
-    XBIT_HF(4, hf_ulmap_allocation_start_extended_uiuc);
-    XBIT_HF(4, hf_ulmap_allocation_start_length);
+    XBIT(data, 4, "Extended UIUC");
+    XBIT(data, 4, "Length");
 
-    XBIT_HF(8, hf_ulmap_allocation_start_ofdma_symbol_offset);
-    XBIT_HF(7, hf_ulmap_allocation_start_subchannel_offset);
-    XBIT_HF(1, hf_ulmap_reserved_uint);
+    XBIT(data, 8, "OFDMA symbol offset");
+    XBIT(data, 7, "Subchannel offset");
+    XBIT(data, 1, "Reserved");
     return BIT_TO_NIB(bit);
 }
 
@@ -1316,85 +1076,91 @@ static gint CQICH_Enhanced_Allocation_IE(proto_tree *uiuc_tree, gint offset, gin
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
     gint data;
-    proto_item *tree;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     gint i, cnum, bapm;
     guint pad;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302b, NULL, "CQICH_Enhanced_Alloc_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "CQICH_Enhanced_Alloc_IE");
+    tree = proto_item_add_subtree(ti, ett_302b);
 
-    XBIT_HF(4, hf_ulmap_cqich_enhanced_alloc_extended_2_uiuc);
-    XBIT_HF(8, hf_ulmap_cqich_enhanced_alloc_length);
+    XBIT(data, 4, "Extended-2 UIUC");
+    XBIT(data, 8, "Length");
 
     if (cqich_id_size == 0) {
-        proto_tree_add_uint_format_value(tree, hf_ulmap_cqich_enhanced_alloc_cqich_id, tvb, BITHI(bit, 1), cqich_id_size, "n/a (size == 0 bits)");
+        proto_tree_add_text(tree, tvb, BITHI(bit, 1), "CQICH_ID: n/a (size == 0 bits)");
     } else {
         /* variable from 0-9 bits */
         data = TVB_BIT_BITS16(bit, tvb, cqich_id_size);
-        proto_tree_add_uint_format_value(tree, hf_ulmap_cqich_enhanced_alloc_cqich_id, tvb, BITHI(bit, cqich_id_size), data, "%d (%d bits)", data, cqich_id_size);
+        proto_tree_add_text(tree, tvb, BITHI(bit, cqich_id_size), "CQICH_ID: %d (%d bits)", data, cqich_id_size);
         bit += cqich_id_size;
     }
 
-    XBIT_HF(3, hf_ulmap_cqich_enhanced_alloc_period);
-    XBIT_HF(3, hf_ulmap_cqich_enhanced_alloc_frame_offset);
-    XBIT_HF(3, hf_ulmap_cqich_enhanced_alloc_duration);
-    XBIT_HF_VALUE(cnum, 4, hf_ulmap_cqich_enhanced_alloc_cqich_num);
+    XBIT(data, 3, "Period (p)");
+    XBIT(data, 3, "Frame offset");
+    XBIT(data, 3, "Duration (d)");
+    XBIT(cnum, 4, "CQICH_Num");
     cnum += 1;
     for (i = 0; i < cnum; i++) {
-        XBIT_HF(3, hf_ulmap_cqich_enhanced_alloc_feedback_type);
-        XBIT_HF(6, hf_ulmap_cqich_enhanced_alloc_allocation_index);
-        XBIT_HF(3, hf_ulmap_cqich_enhanced_alloc_cqich_type);
-        XBIT_HF(1, hf_ulmap_cqich_enhanced_alloc_sttd_indication);
+        XBIT(data, 3, "Feedback Type");
+        XBIT(data, 6, "Allocation Index");
+        XBIT(data, 3, "CQICH Type");
+        XBIT(data, 1, "STTD indication");
     }
-    XBIT_HF_VALUE(bapm, 1, hf_ulmap_cqich_enhanced_alloc_band_amc_precoding_mode);
+    XBIT(bapm, 1, "Band_AMC_Precoding_Mode");
     if (bapm == 1) {
-        XBIT_HF(3, hf_ulmap_cqich_enhanced_alloc_nr_precoders_feedback);
+        XBIT(data, 3, "Nr_Precoders_Feedback (=N)");
     }
 
     pad = BIT_PADDING(bit,8);
     if (pad) {
-        proto_tree_add_bytes_format_value(tree, hf_ulmap_padding, tvb, BITHI(bit, pad), NULL, "%d bits", pad);
+        proto_tree_add_text(tree, tvb, BITHI(bit, pad), "Padding: %d bits", pad);
         bit += pad;
     }
     return BIT_TO_NIB(bit);
 }
 
-static gint HO_Anchor_Active_UL_MAP_IE(proto_tree *uiuc_tree, packet_info* pinfo, gint offset, gint length, tvbuff_t *tvb)
+static gint HO_Anchor_Active_UL_MAP_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbuff_t *tvb)
 {
     /* UL-MAP Extended-2 IE = 1 */
     /* 8.4.5.4.18 [2] HO_Anchor_Active_UL_MAP_IE (not implemented) */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint nib;
     gint data;
-    proto_item *tree;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     nib = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302d, NULL, "HO_Anchor_Active_UL_MAP_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "HO_Anchor_Active_UL_MAP_IE");
+    tree = proto_item_add_subtree(ti, ett_302d);
 
-    VNIB(data, 1, hf_ulmap_ie_diuc_ext2);
-    VNIB(data, 2, hf_ulmap_ie_length);
-    proto_tree_add_expert(tree, pinfo, &ei_ulmap_not_implemented, tvb, NIBHI(nib,length-3));
+    XNIB(data, 1, "Extended-2 UIUC");
+    XNIB(data, 2, "Length");
+    proto_tree_add_text(tree, tvb, NIBHI(nib,length-3), "(not implemented)");
     return nib;
 }
 
-static gint HO_Active_Anchor_UL_MAP_IE(proto_tree *uiuc_tree, packet_info* pinfo, gint offset, gint length, tvbuff_t *tvb)
+static gint HO_Active_Anchor_UL_MAP_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbuff_t *tvb)
 {
     /* UL-MAP Extended-2 IE = 2 */
     /* 8.4.5.4.19 [2] HO_Active_Anchor_UL_MAP_IE (not implemented) */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint nib;
     gint data;
-    proto_item *tree;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     nib = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302e, NULL, "HO_Active_Anchor_UL_MAP_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "HO_Active_Anchor_UL_MAP_IE");
+    tree = proto_item_add_subtree(ti, ett_302e);
 
-    VNIB(data, 1, hf_ulmap_ie_diuc_ext2);
-    VNIB(data, 2, hf_ulmap_ie_length);
-    proto_tree_add_expert(tree, pinfo, &ei_ulmap_not_implemented, tvb, NIBHI(nib,length-3));
+    XNIB(data, 1, "Extended-2 UIUC");
+    XNIB(data, 2, "Length");
+    proto_tree_add_text(tree, tvb, NIBHI(nib,length-3), "(not implemented)");
     return nib;
 }
 
@@ -1405,54 +1171,56 @@ static gint Anchor_BS_switch_IE(proto_tree *uiuc_tree, gint offset, gint length,
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
     gint data;
-    proto_item *tree;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     gint nbss, acod, cqai, pad;
     gint i;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302i, NULL, "Anchor_BS_switch_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "Anchor_BS_switch_IE");
+    tree = proto_item_add_subtree(ti, ett_302i);
 
-    XBIT_HF(4, hf_ulmap_anchor_bs_switch_extended_2_uiuc);
-    XBIT_HF(8, hf_ulmap_anchor_bs_switch_length);
+    XBIT(data, 4, "Extended-2 UIUC");
+    XBIT(data, 8, "Length");
 
-    XBIT_HF_VALUE(nbss, 4, hf_ulmap_anchor_bs_switch_n_anchor_bs_switch);
+    XBIT(nbss, 4, "N_Anchor_BS_switch");
     for (i = 0; i < nbss; i++) {
-        XBIT_HF(12, hf_ulmap_anchor_bs_switch_reduced_cid);
-        XBIT_HF_VALUE(acod, 2, hf_ulmap_anchor_bs_switch_action_code);
+        XBIT(data,12, "Reduced CID");
+        XBIT(acod, 2, "Action Code");
         if (acod == 1) {
-            XBIT_HF(3, hf_ulmap_anchor_bs_switch_action_time);
-            XBIT_HF(3, hf_ulmap_anchor_bs_switch_temp_bs_id);
-            XBIT_HF(2, hf_ulmap_reserved_uint);
+            XBIT(data, 3, "Action Time (A)");
+            XBIT(data, 3, "TEMP_BS_ID");
+            XBIT(data, 2, "Reserved");
         }
         if (acod == 0 || acod == 1) {
-	    XBIT_HF(1, hf_ulmap_anchor_bs_switch_ak_change_indicator);
-            XBIT_HF_VALUE(cqai, 1, hf_ulmap_anchor_bs_switch_cqich_allocation_indicator);
+	    XBIT(data, 1, "AK Change Indicator");
+            XBIT(cqai, 1, "CQICH Allocation Indicator");
             if (cqai == 1) {
                 /* variable bits from 0-9 */
                 if (cqich_id_size == 0) {
-                    proto_tree_add_uint_format_value(tree, hf_ulmap_anchor_bs_switch_cqich_id, tvb, BITHI(bit, 1), cqich_id_size, "n/a (size == 0 bits)");
+                    proto_tree_add_text(tree, tvb, BITHI(bit, 1), "CQICH_ID: n/a (size == 0 bits)");
                 } else {
                     data = TVB_BIT_BITS16(bit, tvb, cqich_id_size);
-                    proto_tree_add_uint_format_value(tree, hf_ulmap_anchor_bs_switch_cqich_id, tvb, BITHI(bit, cqich_id_size),
-                        data, "%d (%d bits)", data, cqich_id_size);
+                    proto_tree_add_text(tree, tvb, BITHI(bit, cqich_id_size),
+                        "CQICH_ID: %d (%d bits)", data, cqich_id_size);
                     bit += cqich_id_size;
                 }
-                XBIT_HF(6, hf_ulmap_anchor_bs_switch_feedback_channel_offset);
-                XBIT_HF(2, hf_ulmap_anchor_bs_switch_period);
-                XBIT_HF(3, hf_ulmap_anchor_bs_switch_frame_offset);
-                XBIT_HF(3, hf_ulmap_anchor_bs_switch_duration);
-                XBIT_HF(2, hf_ulmap_anchor_bs_switch_mimo_permutation_feedback_code);
+                XBIT(data, 6, "Feedback channel offset");
+                XBIT(data, 2, "Period (=p)");
+                XBIT(data, 3, "Frame offset");
+                XBIT(data, 3, "Duration (=d)");
+                XBIT(data, 2, "MIMO_permutation_feedback_code");
                 pad = BIT_PADDING(bit,8);
                 if (pad) {
-                    proto_tree_add_uint_format_value(tree, hf_ulmap_reserved, tvb, BITHI(bit,pad), 0, "%d bits", pad);
+                    proto_tree_add_text(tree, tvb, BITHI(bit,pad), "Reserved: %d bits", pad);
                 }
             }
         } else {
-            XBIT_HF(2, hf_ulmap_reserved_uint);
+            XBIT(data, 2, "Reserved");
         }
     }
-    XBIT_HF(4, hf_ulmap_reserved_uint);
+    XBIT(data, 4, "Reserved");
     return BIT_TO_NIB(bit);
 }
 
@@ -1463,119 +1231,124 @@ static gint UL_sounding_command_IE(proto_tree *uiuc_tree, gint offset, gint leng
     /* see 8.4.6.2.7.1 */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
-    gint stype, srlf, iafb, pad, sept, nssym, ncid, amod;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
+    gint stype, ssrf, srlf, iafb, pad, sept, nssym, ncid, amod;
     gint i, j;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_315d, NULL, "UL_Sounding_Command_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "UL_Sounding_Command_IE");
+    tree = proto_item_add_subtree(ti, ett_315d);
 
-    XBIT_HF(4, hf_ulmap_sounding_command_extended_2_uiuc);
-    XBIT_HF(8, hf_ulmap_sounding_command_length);
+    XBIT(data, 4, "Extended-2 UIUC");
+    XBIT(data, 8, "Length");
 
-    XBIT_HF_VALUE(stype, 1, hf_ulmap_sounding_command_type);
-    XBIT_HF(1, hf_ulmap_sounding_command_send_sounding_report_flag);
-    XBIT_HF_VALUE(srlf, 1, hf_ulmap_sounding_command_relevance_flag);
+    XBIT(stype, 1, "Sounding_Type");
+    XBIT(ssrf, 1, "Send Sounding Report Flag");
+    XBIT(srlf, 1, "Sounding Relevance Flag");
     if (srlf == 0) {
-        XBIT_HF(1, hf_ulmap_sounding_command_relevance);
-        XBIT_HF(2, hf_ulmap_reserved_uint);
+        XBIT(data, 1, "Sounding_Relevance");
+        XBIT(data, 2, "Reserved");
     } else {
-        XBIT_HF(3, hf_ulmap_reserved_uint);
+        XBIT(data, 3, "Reserved");
     }
-    XBIT_HF_VALUE(iafb, 2, hf_ulmap_sounding_command_include_additional_feedback);
+    XBIT(iafb, 2, "Include additional feedback");
     if (stype == 0) {
-        XBIT_HF_VALUE(nssym, 3, hf_ulmap_sounding_command_num_sounding_symbols);
-        XBIT_HF(1, hf_ulmap_reserved_uint);
+        XBIT(nssym, 3, "Num_Sounding_Symbols");
+        XBIT(data, 1, "Reserved");
         for (i = 0; i < nssym; i++) {
-            XBIT_HF_VALUE(sept, 1, hf_ulmap_sounding_command_separability_type);
+	    XBIT(sept, 1, "Separability Type");
             if (sept == 0) {
-                XBIT_HF(3, hf_ulmap_sounding_command_max_cyclic_shift_index_p);
-                XBIT_HF(1, hf_ulmap_reserved_uint);
+                XBIT(data, 3, "Max Cyclic Shift Index P");
+                XBIT(data, 1, "Reserved");
             } else {
-                XBIT_HF(3, hf_ulmap_sounding_command_decimation_value);
-                XBIT_HF(1, hf_ulmap_sounding_command_decimation_offset_randomization);
+                XBIT(data, 3, "Decimation Value D");
+                XBIT(data, 1, "Decimation offset randomization");
             }
-            XBIT_HF(3, hf_ulmap_sounding_command_symbol_index);
-            XBIT_HF_VALUE(ncid, 7, hf_ulmap_sounding_command_number_of_cids);
-            XBIT_HF(1, hf_ulmap_reserved_uint);
+            XBIT(data, 3, "Sounding symbol index");
+            XBIT(ncid, 7, "Number of CIDs");
+            XBIT(data, 1, "Reserved");
             for (j = 0; j < ncid; j++) {
-                XBIT_HF(12, hf_ulmap_sounding_command_shorted_basic_cid);
-                XBIT_HF(2, hf_ulmap_sounding_command_power_assignment_method);
-                XBIT_HF(1, hf_ulmap_sounding_command_power_boost);
-                XBIT_HF(1, hf_ulmap_sounding_command_multi_antenna_flag);
-                XBIT_HF_VALUE(amod, 1, hf_ulmap_sounding_command_allocation_mode);
+                XBIT(data,12, "Shorted Basic CID");
+                XBIT(data, 2, "Power Assignment Method");
+                XBIT(data, 1, "Power boost");
+                XBIT(data, 1, "Multi-Antenna Flag");
+                XBIT(amod, 1, "Allocation Mode");
                 if (amod == 1) {
-                    XBIT_HF(12, hf_ulmap_sounding_command_band_bit_map);
-                    XBIT_HF(2, hf_ulmap_reserved_uint);
+                    XBIT(data,12, "Band bit map");
+                    XBIT(data, 2, "Reserved");
                 } else {
-                    XBIT_HF(7, hf_ulmap_sounding_command_starting_frequency_band);
-                    XBIT_HF(7, hf_ulmap_sounding_command_number_of_frequency_bands);
+                    XBIT(data, 7, "Starting frequency band");
+                    XBIT(data, 7, "Number of frequency bands");
                 }
                 if (srlf == 1) {
-                    XBIT_HF(1, hf_ulmap_sounding_command_relevance);
+                    XBIT(data, 1, "Sounding_Relevance");
                 } else {
-                    XBIT_HF(1, hf_ulmap_reserved_uint);
+                    XBIT(data, 1, "Reserved");
                 }
                 if (sept == 0) {
-                    XBIT_HF(5, hf_ulmap_sounding_command_cyclic_time_shift_index);
+                    XBIT(data, 5, "Cyclic time shift index m");
                 } else {
-                    XBIT_HF(6, hf_ulmap_sounding_command_decimation_offset);
+                    XBIT(data, 6, "Decimation offset d");
                     if (iafb == 1) {
-                        XBIT_HF(1, hf_ulmap_sounding_command_use_same_symbol_for_additional_feedback);
-                        XBIT_HF(2, hf_ulmap_reserved_uint);
+                        XBIT(data, 1, "Use same symbol for additional feedback");
+                        XBIT(data, 2, "Reserved");
                     } else {
-                        XBIT_HF(3, hf_ulmap_reserved_uint);
+                        XBIT(data, 3, "Reserved");
                     }
                 }
-                XBIT_HF(3, hf_ulmap_sounding_command_periodicity);
+                XBIT(data, 3, "Periodicity");
             }
         }
     } else {
-        XBIT_HF(3, hf_ulmap_sounding_command_permutation);
-        XBIT_HF(6, hf_ulmap_sounding_command_dl_permbase);
-        XBIT_HF_VALUE(nssym, 3, hf_ulmap_sounding_command_num_sounding_symbols);
+        XBIT(data, 3, "Permutation");
+        XBIT(data, 6, "DL_PermBase");
+        XBIT(nssym, 3, "Num_Sounding_symbols");
         for (i = 0; i < nssym; i++) {
-            XBIT_HF_VALUE(ncid, 7, hf_ulmap_sounding_command_number_of_cids);
-            XBIT_HF(1, hf_ulmap_reserved_uint);
+            XBIT(ncid, 7, "Number of CIDs");
+            XBIT(data, 1, "Reserved");
             for (j = 0; j < ncid; j++) {
-                XBIT_HF(12, hf_ulmap_sounding_command_shortened_basic_cid);
+                XBIT(data, 12, "Shortened basic CID");
                 if (srlf) {
-                    XBIT_HF(1, hf_ulmap_sounding_command_relevance);
-                    XBIT_HF(3, hf_ulmap_reserved_uint);
+                    XBIT(data, 1, "Sounding_Relevance");
+                    XBIT(data, 3, "Reserved");
                 }
-                XBIT_HF(7, hf_ulmap_sounding_command_subchannel_offset);
-                XBIT_HF(1, hf_ulmap_sounding_command_power_boost);
-                XBIT_HF(3, hf_ulmap_sounding_command_number_of_subchannels);
-                XBIT_HF(3, hf_ulmap_sounding_command_periodicity);
-                XBIT_HF(2, hf_ulmap_sounding_command_power_assignment_method);
+                XBIT(data, 7, "Subchannel offset");
+                XBIT(data, 1, "Power boost");
+                XBIT(data, 3, "Number of subchannels");
+                XBIT(data, 3, "Periodicity");
+                XBIT(data, 2, "Power assignment method");
             }
         }
     }
     pad = BIT_PADDING(bit,8);
     if (pad) {
-        proto_tree_add_bytes_format_value(tree, hf_ulmap_padding, tvb, BITHI(bit, pad), NULL, "%d bits", pad);
+        proto_tree_add_text(tree, tvb, BITHI(bit,pad), "Padding: %d bits",pad);
         bit += pad;
     }
     return BIT_TO_NIB(bit);
 }
 
-static gint MIMO_UL_Enhanced_IE(proto_tree *uiuc_tree, packet_info* pinfo, gint offset, gint length, tvbuff_t *tvb)
+static gint MIMO_UL_Enhanced_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbuff_t *tvb)
 {
     /* UL-MAP Extended-2 IE = 6 */
     /* 8.4.5.4.20 [2] MIMO_UL_Enhanced_IE (not implemented) */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint nib;
     gint data;
-    proto_item *tree;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     nib = offset;
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302f, NULL, "MIMO_UL_Enhanced_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "MIMO_UL_Enhanced_IE");
+    tree = proto_item_add_subtree(ti, ett_302f);
 
-    VNIB(data, 1, hf_ulmap_ie_diuc_ext2);
-    VNIB(data, 2, hf_ulmap_ie_length);
-    proto_tree_add_expert(tree, pinfo, &ei_ulmap_not_implemented, tvb, NIBHI(nib,length-3));
+    XNIB(data, 1, "Extended-2 UIUC");
+    XNIB(data, 2, "Length");
+    proto_tree_add_text(tree, tvb, NIBHI(nib,length-3), "(not implemented)");
     return nib;
 }
 
@@ -1585,7 +1358,9 @@ static gint HARQ_ULMAP_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbuf
     /* 8.4.5.4.24 HARQ_ULMAP_IE */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     gint bitlength;
     gint lastbit;
     gint pad, mode, alsi, nsub;
@@ -1594,23 +1369,24 @@ static gint HARQ_ULMAP_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbuf
     bit = NIB_TO_BIT(offset);
     bitlength = NIB_TO_BIT(length);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302j, NULL, "HARQ_ULMAP_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "HARQ_ULMAP_IE");
+    tree = proto_item_add_subtree(ti, ett_302j);
 
-    XBIT_HF(4, hf_ulmap_harq_ulmap_extended_2_uiuc);
-    XBIT_HF(8, hf_ulmap_harq_ulmap_length);
+    XBIT(data, 4, "Extended-2 UIUC");
+    XBIT(data, 8, "Length");
 
-    XBIT_HF_VALUE(RCID_Type, 2, hf_ulmap_harq_ulmap_rcid_type);
-    XBIT_HF(2, hf_ulmap_reserved_uint);
+    XBIT(RCID_Type, 2, "RCID_Type");
+    XBIT(data, 2, "Reserved");
     lastbit = bit + bitlength -16 - 4;
     while (bit < lastbit) {
-        XBIT_HF_VALUE(mode, 3, hf_ulmap_harq_ulmap_mode);
-        XBIT_HF_VALUE(alsi, 1, hf_ulmap_harq_ulmap_allocation_start_indication);
+        XBIT(mode, 3, "Mode");
+        XBIT(alsi, 1, "Allocation Start Indication");
         if (alsi == 1) {
-            XBIT_HF(8, hf_ulmap_harq_ulmap_ofdma_symbol_offset);
-            XBIT_HF(7, hf_ulmap_harq_ulmap_subchannel_offset);
-            XBIT_HF(1, hf_ulmap_reserved_uint);
+            XBIT(data, 8, "OFDMA Symbol offset");
+            XBIT(data, 7, "Subchannel offset");
+            XBIT(data, 1, "Reserved");
         }
-        XBIT_HF_VALUE(nsub, 4, hf_ulmap_harq_ulmap_n_sub_burst);
+        XBIT(nsub, 4, "N sub Burst");
         nsub++;
         for (i = 0; i < nsub; i++) {
             if (mode == 0) {
@@ -1633,7 +1409,7 @@ static gint HARQ_ULMAP_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbuf
 
     pad = NIB_TO_BIT(offset) + bitlength - bit;
     if (pad) {
-        proto_tree_add_bytes_format_value(tree, hf_ulmap_padding, tvb, BITHI(bit, pad), NULL, "%d bits", pad);
+        proto_tree_add_text(tree, tvb, BITHI(bit,pad), "Padding: %d bits",pad);
         bit += pad;
     }
     return BIT_TO_NIB(bit);
@@ -1645,19 +1421,22 @@ static gint HARQ_ACKCH_Region_Allocation_IE(proto_tree *uiuc_tree, gint offset, 
     /* 8.4.5.4.25 [2] HARQ_ACKCH_Region_Allocation_IE */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302t, NULL, "HARQ_ACKCH_Region_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "HARQ_ACKCH_Region_IE");
+    tree = proto_item_add_subtree(ti, ett_302t);
 
-    XBIT_HF(4, hf_ulmap_harq_ackch_region_alloc_extended_2_uiuc);
-    XBIT_HF(8, hf_ulmap_harq_ackch_region_alloc_length);
+    XBIT(data, 4, "Extended-2 UIUC");
+    XBIT(data, 8, "Length");
 
-    XBIT_HF(8, hf_ulmap_harq_ackch_region_alloc_ofdma_symbol_offset);
-    XBIT_HF(7, hf_ulmap_harq_ackch_region_alloc_subchannel_offset);
-    XBIT_HF(5, hf_ulmap_harq_ackch_region_alloc_num_ofdma_symbols);
-    XBIT_HF(4, hf_ulmap_harq_ackch_region_alloc_num_subchannels);
+    XBIT(data, 8, "OFDMA Symbol Offset");
+    XBIT(data, 7, "Subchannel Offset");
+    XBIT(data, 5, "No. OFDMA Symbols");
+    XBIT(data, 4, "No. Subchannels");
     return BIT_TO_NIB(bit);
 }
 
@@ -1667,68 +1446,71 @@ static gint AAS_SDMA_UL_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbu
     /* 8.4.5.4.27 [2] AAS_SDMA_UL_IE  */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     gint nreg, pad, user, encm, ppmd, padj;
     gint aasp = 0; /* TODO AAS UL preamble used */
     gint ii, jj;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302u, NULL, "AAS_SDMA_UL_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "AAS_SDMA_UL_IE");
+    tree = proto_item_add_subtree(ti, ett_302u);
 
-    XBIT_HF(4, hf_ulmap_aas_sdma_extended_2_uiuc);
-    XBIT_HF(8, hf_ulmap_aas_sdma_length);
+    XBIT(data, 4, "Extended-2 UIUC");
+    XBIT(data, 8, "Length");
 
-    XBIT_HF_VALUE(RCID_Type, 2, hf_ulmap_aas_sdma_rcid_type);
-    XBIT_HF_VALUE(nreg, 4, hf_ulmap_aas_sdma_num_burst_region);
-    XBIT_HF(2, hf_ulmap_reserved_uint);
+    XBIT(RCID_Type, 2, "RCID_Type");
+    XBIT(nreg, 4, "Num Burst Region");
+    XBIT(data, 2, "Reserved");
     for (ii = 0; ii < nreg; ii++) {
-        XBIT_HF(12, hf_ulmap_aas_sdma_slot_offset);
-        XBIT_HF(10, hf_ulmap_aas_sdma_slot_duration);
-        XBIT_HF_VALUE(user, 3, hf_ulmap_aas_sdma_number_of_users);
-        XBIT_HF(3, hf_ulmap_reserved_uint);
+        XBIT(data,12, "Slot offset");
+        XBIT(data,10, "Slot duration");
+        XBIT(user, 3, "Number of users");
+        XBIT(data, 3, "Reserved");
         for (jj = 0; jj < user; jj++) {
             bit += RCID_IE(tree, bit, length, tvb, RCID_Type);
-            XBIT_HF_VALUE(encm, 2, hf_ulmap_aas_sdma_encoding_mode);
-            XBIT_HF_VALUE(padj, 1, hf_ulmap_aas_sdma_power_adjust);
-            XBIT_HF_VALUE(ppmd, 1, hf_ulmap_aas_sdma_pilot_pattern_modifier);
+            XBIT(encm, 2, "Encoding Mode");
+            XBIT(padj, 1, "Power Adjust");
+            XBIT(ppmd, 1, "Pilot Pattern Modifier");
             if (aasp) {
-                XBIT_HF(4, hf_ulmap_aas_sdma_preamble_modifier_index);
+                XBIT(data, 4, "Preamble Modifier Index");
             }
             if (ppmd) {
-                XBIT_HF(2, hf_ulmap_aas_sdma_pilot_pattern);
-                XBIT_HF(2, hf_ulmap_reserved_uint);
+                XBIT(data, 2, "Pilot Pattern");
+                XBIT(data, 2, "Reserved");
             }
             if (encm == 0) {
-                XBIT_HF(4, hf_ulmap_aas_sdma_diuc);
-                XBIT_HF(2, hf_ulmap_aas_sdma_repetition_coding_indication);
-                XBIT_HF(2, hf_ulmap_reserved_uint);
+                XBIT(data, 4, "DIUC");
+                XBIT(data, 2, "Repetition Coding Indication");
+                XBIT(data, 2, "Reserved");
             }
             if (encm == 1) {
-                XBIT_HF(4, hf_ulmap_aas_sdma_diuc);
-                XBIT_HF(2, hf_ulmap_aas_sdma_repetition_coding_indication);
-                XBIT_HF(4, hf_ulmap_aas_sdma_acid);
-                XBIT_HF(1, hf_ulmap_aas_sdma_ai_sn);
-                XBIT_HF(1, hf_ulmap_reserved_uint);
+                XBIT(data, 4, "DIUC");
+                XBIT(data, 2, "Repetition Coding Indication");
+                XBIT(data, 4, "ACID");
+                XBIT(data, 1, "AI_SN");
+                XBIT(data, 1, "Reserved");
             }
             if (encm == 2) {
-                XBIT_HF(4, hf_ulmap_aas_sdma_nep);
-                XBIT_HF(4, hf_ulmap_aas_sdma_nsch);
-                XBIT_HF(2, hf_ulmap_aas_sdma_spid);
-                XBIT_HF(4, hf_ulmap_aas_sdma_acid);
-                XBIT_HF(1, hf_ulmap_aas_sdma_ai_sn);
-                XBIT_HF(1, hf_ulmap_reserved_uint);
+                XBIT(data, 4, "N(EP)");
+                XBIT(data, 4, "N(SCH)");
+                XBIT(data, 2, "SPID");
+                XBIT(data, 4, "ACID");
+                XBIT(data, 1, "AI_SN");
+                XBIT(data, 1, "Reserved");
             }
             if (encm == 3) {
-                XBIT_HF(4, hf_ulmap_aas_sdma_diuc);
-                XBIT_HF(2, hf_ulmap_aas_sdma_repetition_coding_indication);
-                XBIT_HF(2, hf_ulmap_aas_sdma_spid);
-                XBIT_HF(4, hf_ulmap_aas_sdma_acid);
-                XBIT_HF(1, hf_ulmap_aas_sdma_ai_sn);
-                XBIT_HF(3, hf_ulmap_reserved_uint);
+                XBIT(data, 4, "DIUC");
+                XBIT(data, 2, "Repetition Coding Indication");
+                XBIT(data, 2, "SPID");
+                XBIT(data, 4, "ACID");
+                XBIT(data, 1, "AI_SN");
+                XBIT(data, 3, "Reserved");
             }
             if (padj) {
-                XBIT_HF(8, hf_ulmap_aas_sdma_power_adjustment);
+                XBIT(data, 8, "Power Adjustment");
 
             }
         }
@@ -1736,7 +1518,7 @@ static gint AAS_SDMA_UL_IE(proto_tree *uiuc_tree, gint offset, gint length, tvbu
 
     pad = BIT_PADDING(bit,8);
     if (pad) {
-        proto_tree_add_bytes_format_value(tree, hf_ulmap_padding, tvb, BITHI(bit, pad), NULL, "%d bits", pad);
+        proto_tree_add_text(tree, tvb, BITHI(bit, pad), "Padding: %d bits", pad);
         bit += pad;
     }
     return BIT_TO_NIB(bit);
@@ -1748,39 +1530,42 @@ static gint Feedback_Polling_IE(proto_tree *uiuc_tree, gint offset, gint length,
     /* 8.4.5.4.28 [2] Feedback_Polling_IE */
     /* offset of TLV in nibbles, length of TLV in nibbles */
     gint bit;
-    proto_item *tree;
+    gint data;
+    proto_item *ti = NULL;
+    proto_item *tree = NULL;
     gint nalloc, dula, pad, adur;
     gint i;
 
     bit = NIB_TO_BIT(offset);
 
-    tree = proto_tree_add_subtree(uiuc_tree, tvb, NIBHI(offset, length), ett_302v, NULL, "Feedback_Polling_IE");
+    ti = proto_tree_add_text(uiuc_tree, tvb, NIBHI(offset, length), "Feedback_Polling_IE");
+    tree = proto_item_add_subtree(ti, ett_302v);
 
-    XBIT_HF(4, hf_ulmap_feedback_polling_extended_2_uiuc);
-    XBIT_HF(8, hf_ulmap_feedback_polling_length);
+    XBIT(data, 4, "Extended-2 UIUC");
+    XBIT(data, 8, "Length");
 
-    XBIT_HF_VALUE(nalloc, 4, hf_ulmap_feedback_polling_num_allocation);
-    XBIT_HF_VALUE(dula, 1, hf_ulmap_feedback_polling_dedicated_ul_allocation_included);
-    XBIT_HF(3, hf_ulmap_reserved_uint);
+    XBIT(nalloc, 4, "Num_Allocation");
+    XBIT(dula, 1, "Dedicated UL Allocation included");
+    XBIT(data, 3, "Reserved");
     for (i = 0; i < nalloc; i++) {
-        XBIT_HF(16, hf_ulmap_feedback_polling_basic_cid);
-        XBIT_HF_VALUE(adur, 3, hf_ulmap_feedback_polling_allocation_duration);
+        XBIT(data,16, "Basic CID");
+        XBIT(adur, 3, "Allocation Duration (d)");
         if (adur != 0) {
-            XBIT_HF(4, hf_ulmap_feedback_polling_type);
-            XBIT_HF(3, hf_ulmap_feedback_polling_frame_offset);
-            XBIT_HF(2, hf_ulmap_feedback_polling_period);
+            XBIT(data, 4, "Feedback type");
+            XBIT(data, 3, "Frame Offset");
+            XBIT(data, 2, "Period (p)");
             if (dula == 1) {
-                XBIT_HF(4, hf_ulmap_feedback_polling_uiuc);
-                XBIT_HF(8, hf_ulmap_feedback_polling_ofdma_symbol_offset);
-                XBIT_HF(7, hf_ulmap_feedback_polling_subchannel_offset);
-                XBIT_HF(3, hf_ulmap_feedback_polling_duration);
-                XBIT_HF(2, hf_ulmap_feedback_polling_repetition_coding_indication);
+                XBIT(data, 4, "UIUC");
+                XBIT(data, 8, "OFDMA Symbol Offset");
+                XBIT(data, 7, "Subchannel offset");
+                XBIT(data, 3, "Duration");
+                XBIT(data, 2, "Repetition coding indication");
             }
         }
     }
     pad = BIT_PADDING(bit,8);
     if (pad) {
-        proto_tree_add_bytes_format_value(tree, hf_ulmap_padding, tvb, BITHI(bit, pad), NULL, "%d bits", pad);
+        proto_tree_add_text(tree, tvb, BITHI(bit, pad), "Padding: %d bits", pad);
         bit += pad;
     }
     return BIT_TO_NIB(bit);
@@ -1791,14 +1576,14 @@ static gint Feedback_Polling_IE(proto_tree *uiuc_tree, gint offset, gint length,
  * UL-MAP Miscellany
  *******************************************************************/
 
-gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gint length _U_, tvbuff_t *tvb)
+gint dissect_ulmap_ie( proto_tree *ie_tree, gint offset, gint length _U_, tvbuff_t *tvb)
 {
     /* decode a single UL-MAP IE and return the
      * length of the IE in nibbles
      * offset = start of IE (nibbles)
      * length = total length of tvb (nibbles) */
-    proto_item *ti;
-    proto_tree *tree;
+    proto_item *ti = NULL;
+    proto_tree *tree = NULL;
     gint nibble;
     gint uiuc, ext_uiuc, ext2_uiuc, len, aas_or_amc;
     guint cid;
@@ -1814,7 +1599,8 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
     if (uiuc == 0)
     {
         /* 8.4.5.4.9 FAST-FEEDBACK channel */
-        tree = proto_tree_add_subtree(ie_tree, tvb, NIBHI(nibble, 5+8), ett_ulmap_ffb, NULL, "FAST FEEDBACK Allocation IE");
+        ti = proto_tree_add_text(ie_tree, tvb, NIBHI(nibble, 5+8), "FAST FEEDBACK Allocation IE");
+        tree = proto_item_add_subtree(ti, ett_ulmap_ffb);
 
         proto_tree_add_uint(tree, hf_ulmap_ie_cid, tvb, NIBHI(nibble, 4), cid);
         nibble += 4;
@@ -1835,7 +1621,8 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
         ext2_uiuc = TVB_NIB_NIBBLE(5+nibble, tvb);
         len = TVB_NIB_BYTE(5+nibble+1, tvb);
 
-        tree = proto_tree_add_subtree_format(ie_tree, tvb, NIBHI(nibble, 5+3+len*2), ett_290b, NULL, "UIUC: %d (Extended-2 IE)", uiuc);
+        ti = proto_tree_add_text(ie_tree, tvb, NIBHI(nibble, 5+3+len*2), "UIUC: %d (Extended-2 IE)", uiuc);
+        tree = proto_item_add_subtree(ti, ett_290b);
 
         proto_tree_add_uint(tree, hf_ulmap_ie_cid, tvb, NIBHI(nibble, 4), cid);
         nibble += 4;
@@ -1859,11 +1646,11 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
                 break;
             case 0x01:
                 /* 8.4.5.4.18 HO_Anchor_Active_UL_MAP_IE */
-                nibble = HO_Anchor_Active_UL_MAP_IE(tree, pinfo, nibble, len, tvb);
+                nibble = HO_Anchor_Active_UL_MAP_IE(tree, nibble, len, tvb);
                 break;
             case 0x02:
                 /* 8.4.5.4.19 HO_Active_Anchor_UL_MAP_IE */
-                nibble = HO_Active_Anchor_UL_MAP_IE(tree, pinfo, nibble, len, tvb);
+                nibble = HO_Active_Anchor_UL_MAP_IE(tree, nibble, len, tvb);
                 break;
             case 0x03:
                 /* 8.4.5.4.23 Anchor_BS_switch_IE */
@@ -1875,7 +1662,7 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
                 break;
             case 0x06:
                 /* 8.4.5.4.20 MIMO_UL_Enhanced_IE */
-                nibble = MIMO_UL_Enhanced_IE(tree, pinfo, nibble, len, tvb);
+                nibble = MIMO_UL_Enhanced_IE(tree, nibble, len, tvb);
                 break;
             case 0x07:
                 /* 8.4.5.4.24 HARQ_ULMAP_IE */
@@ -1895,8 +1682,8 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
                 break;
 
             default:
-                proto_tree_add_bytes_format(tree, hf_ulmap_ie_reserved_extended2_duic, tvb, NIBHI(nibble, len), NULL, "(reserved Extended-2 UIUC: %d)", ext2_uiuc);
-                nibble += len;
+                proto_tree_add_text(tree, tvb, NIBHI(nibble, len), "(reserved Extended-2 UIUC: %d)", ext2_uiuc);
+		nibble += len;
                 break;
 
         }
@@ -1904,7 +1691,8 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
     else if (uiuc == 12)
     {
         /* 8.4.5.4 [2] CDMA bandwidth request, CDMA ranging */
-        tree = proto_tree_add_subtree(ie_tree, tvb, NIBHI(nibble, 5+8), ett_287_1, NULL, "CDMA Bandwidth/Ranging Request IE");
+        ti = proto_tree_add_text(ie_tree, tvb, NIBHI(nibble, 5+8), "CDMA Bandwidth/Ranging Request IE");
+        tree = proto_item_add_subtree(ti, ett_287_1);
 
         proto_tree_add_uint(tree, hf_ulmap_ie_cid, tvb, NIBHI(nibble, 4), cid);
         nibble += 4;
@@ -1923,7 +1711,8 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
     else if (uiuc == 13)
     {
         /* 8.4.5.4.2 [2] PAPR reduction allocation, safety zone - table 289 */
-        tree = proto_tree_add_subtree(ie_tree, tvb, NIBHI(nibble,5+8), ett_289, NULL, "PAPR/Safety/Sounding Zone IE");
+        ti = proto_tree_add_text(ie_tree, tvb, NIBHI(nibble,5+8), "PAPR/Safety/Sounding Zone IE");
+        tree = proto_item_add_subtree(ti, ett_289);
 
 
         proto_tree_add_uint(tree, hf_ulmap_ie_cid, tvb, NIBHI(nibble, 4), cid);
@@ -1944,7 +1733,8 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
     else if (uiuc == 14)
     {
         /* 8.4.5.4.3 [2] CDMA allocation IE */
-        tree = proto_tree_add_subtree(ie_tree, tvb, NIBHI(nibble,5+10), ett_290, &ti, "CDMA allocation IE");
+        ti = proto_tree_add_text(ie_tree, tvb, NIBHI(nibble,5+10), "CDMA allocation IE");
+        tree = proto_item_add_subtree(ti, ett_290);
 
         proto_tree_add_uint(tree, hf_ulmap_ie_cid, tvb, NIBHI(nibble, 4), cid);
         nibble += 4;
@@ -1980,7 +1770,8 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
         ext_uiuc = TVB_NIB_NIBBLE(5+nibble, tvb);
         len = TVB_NIB_NIBBLE(5+nibble+1, tvb);
 
-        tree = proto_tree_add_subtree_format(ie_tree, tvb, NIBHI(nibble, 5+2+len*2), ett_291, NULL, "UIUC: %d (Extended IE)", uiuc);
+        ti = proto_tree_add_text(ie_tree, tvb, NIBHI(nibble, 5+2+len*2), "UIUC: %d (Extended IE)", uiuc);
+        tree = proto_item_add_subtree(ti, ett_291);
 
         proto_tree_add_uint(tree, hf_ulmap_ie_cid, tvb, NIBHI(nibble,4), cid);
         nibble += 4;
@@ -2024,7 +1815,7 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
                 break;
             case 0x06:
                 /* 8.4.5.4.11 MIMO_UL_IE */
-                nibble = MIMO_UL_IE(tree, pinfo, nibble, len, tvb);
+                nibble = MIMO_UL_IE(tree, nibble, len, tvb);
                 break;
             case 0x07:
                 /* 8.4.5.4.22 ULMAP_Fast_Tracking_IE */
@@ -2043,8 +1834,8 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
                 nibble = UL_Allocation_Start_IE(tree, nibble, len, tvb);
                 break;
             default:
-                proto_tree_add_bytes_format_value(tree, hf_ulmap_ie_reserved_extended_duic, tvb, NIBHI(nibble,len), NULL, "(reserved Extended UIUC: %d)", ext_uiuc);
-                nibble += len;
+                proto_tree_add_text(tree, tvb, NIBHI(nibble,len), "(reserved Extended UIUC: %d)", ext_uiuc);
+		nibble += len;
                 break;
         }
     }
@@ -2056,7 +1847,8 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
 
         if (aas_or_amc) len += 3;
 
-        tree = proto_tree_add_subtree(ie_tree, tvb, NIBHI(nibble, 5+len), ett_287_2, NULL, "Data Grant Burst Profile");
+        ti = proto_tree_add_text(ie_tree, tvb, NIBHI(nibble, 5+len), "Data Grant Burst Profile");
+        tree = proto_item_add_subtree(ti, ett_287_2);
 
         proto_tree_add_uint(tree, hf_ulmap_ie_cid, tvb, NIBHI(nibble, 4), cid);
         nibble += 4;
@@ -2070,7 +1862,7 @@ gint dissect_ulmap_ie( proto_tree *ie_tree, packet_info* pinfo, gint offset, gin
 
         if (aas_or_amc) {
             data = TVB_NIB_BITS12(nibble, tvb);
-            proto_tree_add_uint(tree, hf_ulmap_uiuc10_slot_offset, tvb, NIBHI(nibble,3), data);
+            proto_tree_add_text(tree, tvb, NIBHI(nibble,3), "Slot offset: %d", data);
             nibble += 3;
         }
     }
@@ -2107,22 +1899,23 @@ static void dissect_mac_mgmt_msg_ulmap_decoder(tvbuff_t *tvb, packet_info *pinfo
 
     /* UL-MAP IEs */
     length = tvb_len - offset; /* remaining length in bytes */
-    ie_tree = proto_tree_add_subtree_format(ulmap_tree, tvb, offset, length, ett_ulmap_ie, NULL, "UL-MAP IEs (%u bytes)", length);
+    ti = proto_tree_add_text(ulmap_tree, tvb, offset, length, "UL-MAP IEs (%u bytes)", length);
+    ie_tree = proto_item_add_subtree(ti, ett_ulmap_ie);
 
     /* length = BYTE_TO_NIB(length); */ /* convert length to nibbles */
     nib = BYTE_TO_NIB(offset);
     while (nib < ((tvb_len*2)-1)) {
-        nib += dissect_ulmap_ie(ie_tree, pinfo, nib, tvb_len*2, tvb);
+        nib += dissect_ulmap_ie(ie_tree, nib, tvb_len*2, tvb);
     }
     pad = NIB_PADDING(nib);
     if (pad) {
-        proto_tree_add_bytes_format(ulmap_tree, hf_ulmap_padding, tvb, NIBHI(nib,1), NULL, "Padding nibble");
+        proto_tree_add_text(ulmap_tree, tvb, NIBHI(nib,1), "Padding nibble");
         nib++;
     }
 }
 
 /*gint wimax_decode_ulmapc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)*/
-gint wimax_decode_ulmapc(proto_tree *base_tree, packet_info* pinfo, gint offset, gint length, tvbuff_t *tvb)
+gint wimax_decode_ulmapc(proto_tree *base_tree, gint offset, gint length, tvbuff_t *tvb)
 {
     /* 8.4.5.6.2 [2] Compressed UL-MAP */
     /* returns length in nibbles */
@@ -2149,14 +1942,15 @@ gint wimax_decode_ulmapc(proto_tree *base_tree, packet_info* pinfo, gint offset,
     proto_tree_add_uint(tree, hf_ulmap_ofdma_sym, tvb, NIBHI(nib,2), data); /* added 2005 */
     nib += 2;
 
-    ie_tree = proto_tree_add_subtree_format(tree, tvb, NIBHI(nib,length-nib), ett_306_ul, NULL, "UL-MAP IEs (%u bytes)", NIB_ADDR(length-nib));
+    ti = proto_tree_add_text(tree, tvb, NIBHI(nib,length-nib), "UL-MAP IEs (%u bytes)", NIB_ADDR(length-nib));
+    ie_tree = proto_item_add_subtree(ti, ett_306_ul);
     while (nib < length-1) {
-        nib += dissect_ulmap_ie(ie_tree, pinfo, nib, length-nib, tvb);
+        nib += dissect_ulmap_ie(ie_tree, nib, length-nib, tvb);
     }
 
     /* padding */
     if (nib & 1) {
-        proto_tree_add_bytes_format(tree, hf_ulmap_padding, tvb, NIBHI(nib,1), NULL, "Padding nibble");
+        proto_tree_add_text(tree, tvb, NIBHI(nib,1), "Padding Nibble");
         nib++;
     }
 
@@ -2173,64 +1967,66 @@ gint wimax_decode_ulmap_reduced_aas(proto_tree *base_tree, gint offset, gint len
      * return length in bits */
     gint bit;
     guint data;
-    proto_tree *tree;
-    gint azci, azpi, umii, phmi, powi;
+    proto_item *ti = NULL;
+    proto_tree *tree = NULL;
+    gint azci, azpi, umii, phmi, powi, fbck;
 
     bit = offset;
 
-    tree = proto_tree_add_subtree(base_tree, tvb, BITHI(bit,length), ett_308b, NULL, "Reduced_AAS_Private_UL_MAP");
+    ti = proto_tree_add_text(base_tree, tvb, BITHI(bit,length), "Reduced_AAS_Private_UL_MAP");
+    tree = proto_item_add_subtree(ti, ett_308b);
 
     /* Decode and display the Reduced AAS private UL-MAP */
-    XBIT_HF_VALUE(azci, 1, hf_ulmap_reduced_aas_aas_zone_configuration_included);
-    XBIT_HF_VALUE(azpi, 1, hf_ulmap_reduced_aas_aas_zone_position_included);
-    XBIT_HF_VALUE(umii, 1, hf_ulmap_reduced_aas_ul_map_information_included);
-    XBIT_HF_VALUE(phmi, 1, hf_ulmap_reduced_aas_phy_modification_included);
-    XBIT_HF_VALUE(powi, 1, hf_ulmap_reduced_aas_power_control_included);
-    XBIT_HF(2, hf_ulmap_reduced_aas_include_feedback_header);
-    XBIT_HF(2, hf_ulmap_reduced_aas_encoding_mode);
+    XBIT(azci, 1, "AAS zone configuration included");
+    XBIT(azpi, 1, "AAS zone position included");
+    XBIT(umii, 1, "UL-MAP information included");
+    XBIT(phmi, 1, "PHY modification included");
+    XBIT(powi, 1, "Power Control included");
+    XBIT(fbck, 2, "Include Feedback Header");
+    XBIT(data, 2, "Encoding Mode");
 
     if (azci) {
-        XBIT_HF(2, hf_ulmap_reduced_aas_permutation);
-        XBIT_HF(7, hf_ulmap_reduced_aas_ul_permbase);
-        XBIT_HF(2, hf_ulmap_reduced_aas_preamble_indication);
-        XBIT_HF(5, hf_ulmap_reduced_aas_padding);
+        XBIT(data, 2, "Permutation");
+        XBIT(data, 7, "UL_PermBase");
+        XBIT(data, 2, "Preamble Indication");
+        XBIT(data, 5, "Padding");
     }
     if (azpi) {
-        XBIT_HF(8, hf_ulmap_reduced_aas_zone_symbol_offset);
-        XBIT_HF(8, hf_ulmap_reduced_aas_zone_length);
+        XBIT(data, 8, "Zone Symbol Offset");
+        XBIT(data, 8, "Zone Length");
     }
     if (umii) {
-        XBIT_HF(8, hf_ulmap_reduced_aas_ucd_count);
+        XBIT(data, 8, "UCD Count");
         data = TVB_BIT_BITS64(bit,tvb,32);
-        proto_tree_add_uint64(tree, hf_ulmap_reduced_aas_private_map_alloc_start_time, tvb, BITHI(bit,32), data);
+        proto_tree_add_text(tree, tvb, BITHI(bit,32), "Private Map Allocation Start Time: %u",data);
         bit += 32;
     }
     if (phmi) {
-        XBIT_HF(1, hf_ulmap_reduced_aas_preamble_select);
-        XBIT_HF(4, hf_ulmap_reduced_aas_preamble_shift_index);
-        XBIT_HF(1, hf_ulmap_reduced_aas_pilot_pattern_modifier);
+        XBIT(data, 1, "Preamble Select");
+        XBIT(data, 4, "Preamble Shift Index");
+        XBIT(data, 1, "Pilot Pattern Modifier");
         data = TVB_BIT_BITS32(bit,tvb,22);
-        proto_tree_add_uint64(tree, hf_ulmap_reduced_aas_pilot_pattern_index, tvb, BITHI(bit,22), data);
+        proto_tree_add_text(tree, tvb, BITHI(bit,22), "Pilot Pattern Index: %u",data);
         bit += 22;
     }
     if (powi) {
-        XBIT_HF(8, hf_ulmap_reduced_aas_power_control);
+        XBIT(data, 8, "Power Control");
     }
-    XBIT_HF(3, hf_ulmap_reduced_aas_ul_frame_offset);
-    XBIT_HF(12, hf_ulmap_reduced_aas_slot_offset);
-    XBIT_HF(10, hf_ulmap_reduced_aas_slot_duration);
-    XBIT_HF(4, hf_ulmap_reduced_aas_uiuc_nep);
+    XBIT(data, 3, "UL Frame Offset");
+    XBIT(data,12, "Slot Offset");
+    XBIT(data,10, "Slot Duration");
+    XBIT(data, 4, "UIUC / N(EP)");
     if (harq) {
-        XBIT_HF(4, hf_ulmap_reduced_aas_acid);
-        XBIT_HF(1, hf_ulmap_reduced_aas_ai_sn);
-        XBIT_HF(3, hf_ulmap_reserved_uint);
+        XBIT(data, 4, "ACID");
+        XBIT(data, 1, "AI_SN");
+        XBIT(data, 3, "Reserved");
         if (ir_type) {
-            XBIT_HF(4, hf_ulmap_reduced_aas_nsch);
-            XBIT_HF(2, hf_ulmap_reduced_aas_spid);
-            XBIT_HF(2, hf_ulmap_reserved_uint);
+            XBIT(data, 4, "N(SCH)");
+            XBIT(data, 2, "SPID");
+            XBIT(data, 2, "Reserved");
         }
     }
-    XBIT_HF(2, hf_ulmap_reduced_aas_repetition_coding_indication);
+    XBIT(data, 2, "Repetition Coding Indication");
 
     return (bit - offset); /* length in bits */
 }
@@ -2279,41 +2075,6 @@ void proto_register_mac_mgmt_msg_ulmap(void)
 			{
 				"Num OFDMA Symbols", "wmx.ulmap.ofdma.sym",
 				FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL
-			}
-		},
-		{
-			&hf_ulmap_ie_diuc_ext,
-			{
-				"Extended DIUC", "wmx.ulmap.ie.ext_diuc",
-				FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL
-			}
-		},
-		{
-			&hf_ulmap_ie_diuc_ext2,
-			{
-				"Extended-2 DIUC", "wmx.ulmap.ie.ext2_diuc",
-				FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL
-			}
-		},
-		{
-			&hf_ulmap_ie_length,
-			{
-				"Length", "wmx.ilmap.ie.length",
-				FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL
-			}
-		},
-		{
-			&hf_ulmap_ie_reserved_extended2_duic,
-			{
-				"Reserved Extended-2 DIUC", "wmx.ulmap.ie.ext2_diuc_reserved",
-				FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL
-			}
-		},
-		{
-			&hf_ulmap_ie_reserved_extended_duic,
-			{
-				"Reserved Extended DIUC", "wmx.ulmap.ie.ext_diuc_reserved",
-				FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL
 			}
 		},
 		{
@@ -2433,15 +2194,8 @@ void proto_register_mac_mgmt_msg_ulmap(void)
 		{
 			&hf_ulmap_uiuc10_rep,
 			{
-				"Repetition Coding indication", "wmx.ulmap.uiuc10.rep",
+				"Repetition Coding indication", "wmx.ulmap.uiuc12.rep",
 				FT_UINT16, BASE_DEC, NULL, 0x0030, NULL, HFILL
-			}
-		},
-		{
-			&hf_ulmap_uiuc10_slot_offset,
-			{
-				"Slot offset", "wmx.ulmap.uiuc10.slot_offset",
-				FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL
 			}
 		},
 		{
@@ -2484,22 +2238,6 @@ void proto_register_mac_mgmt_msg_ulmap(void)
 			{
 				"Reserved", "wmx.ulmap.uiuc13.rsv",
 				FT_UINT32,	BASE_DEC, NULL, 0x00000001, NULL, HFILL
-			}
-		},
-#if 0
-		{
-			&hf_ulmap_crc16,
-			{
-				"CRC-16", "wmx.ulmap.crc16",
-				FT_UINT32,	BASE_HEX, NULL, 0x0, NULL, HFILL
-			}
-		},
-#endif
-		{
-			&hf_ulmap_padding,
-			{
-				"Padding", "wmx.ulmap.padding",
-				FT_BYTES,	BASE_NONE, NULL, 0x0, NULL, HFILL
 			}
 		},
 		{
@@ -2600,290 +2338,8 @@ void proto_register_mac_mgmt_msg_ulmap(void)
 				"Length", "wmx.ulmap.uiuc15.len",
 				FT_UINT8,  BASE_DEC, NULL, 0x0, NULL, HFILL
 			}
-		},
+		}
 #endif
-		/* Generated via "one time" script to help create filterable fields */
-		{ &hf_ulmap_dedicated_ul_control_length, { "Length", "wmx.ulmap.dedicated_ul_control.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_dedicated_ul_control_control_header, { "Control Header", "wmx.ulmap.dedicated_ul_control.control_header", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_dedicated_ul_control_num_sdma_layers, { "Num SDMA layers", "wmx.ulmap.dedicated_ul_control.num_sdma_layers", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_dedicated_ul_control_pilot_pattern, { "Pilot Pattern", "wmx.ulmap.dedicated_ul_control.pilot_pattern", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_dedicated_mimo_ul_control_matrix, { "Matrix", "wmx.ulmap.dedicated_mimo_ul_control.matrix", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_dedicated_mimo_ul_control_n_layer, { "N_layer", "wmx.ulmap.dedicated_mimo_ul_control.n_layer", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_chase_dedicated_ul_control_indicator, { "Dedicated UL Control Indicator", "wmx.ulmap.harq_chase.dedicated_ul_control_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_chase_uiuc, { "UIUC", "wmx.ulmap.harq_chase.uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_chase_repetition_coding_indication, { "Repetition Coding Indication", "wmx.ulmap.harq_chase.repetition_coding_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_chase_duration, { "Duration", "wmx.ulmap.harq_chase.duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_chase_acid, { "ACID", "wmx.ulmap.harq_chase.acid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_chase_ai_sn, { "AI_SN", "wmx.ulmap.harq_chase.ai_sn", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_chase_ack_disable, { "ACK_disable", "wmx.ulmap.harq_chase.ack_disable", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reserved_uint, { "Reserved", "wmx.ulmap.reserved.uint", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_ctc_dedicated_ul_control_indicator, { "Dedicated UL Control Indicator", "wmx.ulmap.harq_ir_ctc.dedicated_ul_control_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_ctc_nep, { "N(EP)", "wmx.ulmap.harq_ir_ctc.nep", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_ctc_nsch, { "N(SCH)", "wmx.ulmap.harq_ir_ctc.nsch", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_ctc_spid, { "SPID", "wmx.ulmap.harq_ir_ctc.spid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_ctc_acin, { "ACIN", "wmx.ulmap.harq_ir_ctc.acin", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_ctc_ai_sn, { "AI_SN", "wmx.ulmap.harq_ir_ctc.ai_sn", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_ctc_ack_disable, { "ACK_disable", "wmx.ulmap.harq_ir_ctc.ack_disable", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_cc_dedicated_ul_control_indicator, { "Dedicated UL Control Indicator", "wmx.ulmap.harq_ir_cc.dedicated_ul_control_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_cc_uiuc, { "UIUC", "wmx.ulmap.harq_ir_cc.uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_cc_repetition_coding_indication, { "Repetition Coding Indication", "wmx.ulmap.harq_ir_cc.repetition_coding_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_cc_duration, { "Duration", "wmx.ulmap.harq_ir_cc.duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_cc_spid, { "SPID", "wmx.ulmap.harq_ir_cc.spid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_cc_acid, { "ACID", "wmx.ulmap.harq_ir_cc.acid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_cc_ai_sn, { "AI_SN", "wmx.ulmap.harq_ir_cc.ai_sn", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ir_cc_ack_disable, { "ACK_disable", "wmx.ulmap.harq_ir_cc.ack_disable", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_chase_harq_mu_indicator, { "MU indicator", "wmx.ulmap.mimo_ul_chase_harq.mu_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_chase_harq_dedicated_mimo_ulcontrol_indicator, { "Dedicated MIMO ULControl Indicator", "wmx.ulmap.mimo_ul_chase_harq.dedicated_mimo_ulcontrol_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_chase_harq_ack_disable, { "ACK Disable", "wmx.ulmap.mimo_ul_chase_harq.ack_disable", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_chase_harq_matrix, { "Matrix", "wmx.ulmap.mimo_ul_chase_harq.matrix", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_chase_harq_duration, { "Duration", "wmx.ulmap.mimo_ul_chase_harq.duration", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_chase_harq_uiuc, { "UIUC", "wmx.ulmap.mimo_ul_chase_harq.uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_chase_harq_repetition_coding_indication, { "Repetition Coding Indication", "wmx.ulmap.mimo_ul_chase_harq.repetition_coding_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_chase_harq_acid, { "ACID", "wmx.ulmap.mimo_ul_chase_harq.acid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_chase_harq_ai_sn, { "AI_SN", "wmx.ulmap.mimo_ul_chase_harq.ai_sn", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_mu_indicator, { "MU indicator", "wmx.ulmap.mimo_ul_ir_harq.mu_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_dedicated_mimo_ul_control_indicator, { "Dedicated MIMO UL Control Indicator", "wmx.ulmap.mimo_ul_ir_harq.dedicated_mimo_ul_control_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_ack_disable, { "ACK Disable", "wmx.ulmap.mimo_ul_ir_harq.ack_disable", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_matrix, { "Matrix", "wmx.ulmap.mimo_ul_ir_harq.matrix", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_nsch, { "N(SCH)", "wmx.ulmap.mimo_ul_ir_harq.nsch", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_nep, { "N(EP)", "wmx.ulmap.mimo_ul_ir_harq.nep", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_spid, { "SPID", "wmx.ulmap.mimo_ul_ir_harq.spid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_acid, { "ACID", "wmx.ulmap.mimo_ul_ir_harq.acid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_ai_sn, { "AI_SN", "wmx.ulmap.mimo_ul_ir_harq.ai_sn", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_cc_mu_indicator, { "MU indicator", "wmx.ulmap.mimo_ul_ir_harq_cc.mu_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_cc_dedicated_mimo_ul_control_indicator, { "Dedicated MIMO UL Control Indicator", "wmx.ulmap.mimo_ul_ir_harq_cc.dedicated_mimo_ul_control_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_cc_ack_disable, { "ACK Disable", "wmx.ulmap.mimo_ul_ir_harq_cc.ack_disable", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_cc_matrix, { "Matrix", "wmx.ulmap.mimo_ul_ir_harq_cc.matrix", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_cc_duration, { "Duration", "wmx.ulmap.mimo_ul_ir_harq_cc.duration", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_cc_uiuc, { "UIUC", "wmx.ulmap.mimo_ul_ir_harq_cc.uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_cc_repetition_coding_indication, { "Repetition Coding Indication", "wmx.ulmap.mimo_ul_ir_harq_cc.repetition_coding_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_cc_acid, { "ACID", "wmx.ulmap.mimo_ul_ir_harq_cc.acid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_cc_ai_sn, { "AI_SN", "wmx.ulmap.mimo_ul_ir_harq_cc.ai_sn", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_ir_harq_cc_spid, { "SPID", "wmx.ulmap.mimo_ul_ir_harq_cc.spid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_stc_harq_tx_count, { "Tx count", "wmx.ulmap.mimo_ul_stc_harq.tx_count", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_stc_harq_duration, { "Duration", "wmx.ulmap.mimo_ul_stc_harq.duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_stc_harq_sub_burst_offset_indication, { "Sub-burst offset indication", "wmx.ulmap.mimo_ul_stc_harq.sub_burst_offset_indication", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_stc_harq_sub_burst_offset, { "Sub-burst offset", "wmx.ulmap.mimo_ul_stc_harq.sub_burst_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_stc_harq_ack_disable, { "ACK Disable", "wmx.ulmap.mimo_ul_stc_harq.ack_disable", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_stc_harq_uiuc, { "UIUC", "wmx.ulmap.mimo_ul_stc_harq.uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_stc_harq_repetition_coding_indication, { "Repetition Coding Indication", "wmx.ulmap.mimo_ul_stc_harq.repetition_coding_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mimo_ul_stc_harq_acid, { "ACID", "wmx.ulmap.mimo_ul_stc_harq.acid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_power_control, { "Power Control", "wmx.ulmap.power_control", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_power_measurement_frame, { "Power measurement frame", "wmx.ulmap.power_measurement_frame", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mini_subcha_alloc_extended_2_uiuc, { "Extended-2 UIUC", "wmx.ulmap.mini_subcha_alloc.extended_2_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mini_subcha_alloc_length, { "Length", "wmx.ulmap.mini_subcha_alloc.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mini_subcha_alloc_ctype, { "Ctype", "wmx.ulmap.mini_subcha_alloc.ctype", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mini_subcha_alloc_duration, { "Duration", "wmx.ulmap.mini_subcha_alloc.duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mini_subcha_alloc_cid, { "CID", "wmx.ulmap.mini_subcha_alloc.cid", FT_UINT32, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mini_subcha_alloc_uiuc, { "UIUC", "wmx.ulmap.mini_subcha_alloc.uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mini_subcha_alloc_repetition, { "Repetition", "wmx.ulmap.mini_subcha_alloc.repetition", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_mini_subcha_alloc_padding, { "Padding", "wmx.ulmap.mini_subcha_alloc.padding", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_ul_extended_uiuc, { "Extended UIUC", "wmx.ulmap.aas_ul.extended_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_ul_length, { "Length", "wmx.ulmap.aas_ul.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_ul_permutation, { "Permutation", "wmx.ulmap.aas_ul.permutation", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_ul_ul_permbase, { "UL_PermBase", "wmx.ulmap.aas_ul.ul_permbase", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_ul_ofdma_symbol_offset, { "OFDMA symbol offset", "wmx.ulmap.aas_ul.ofdma_symbol_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_ul_aas_zone_length, { "AAS zone length", "wmx.ulmap.aas_ul.aas_zone_length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_ul_uplink_preamble_config, { "Uplink preamble config", "wmx.ulmap.aas_ul.uplink_preamble_config", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_ul_preamble_type, { "Preamble type", "wmx.ulmap.aas_ul.preamble_type", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_extended_uiuc, { "Extended UIUC", "wmx.ulmap.cqich_alloc.extended_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_length, { "Length", "wmx.ulmap.cqich_alloc.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_cqich_id, { "CQICH_ID", "wmx.ulmap.cqich_alloc.cqich_id", FT_UINT32, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_allocation_offset, { "Allocation offset", "wmx.ulmap.cqich_alloc.allocation_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_period, { "Period (p)", "wmx.ulmap.cqich_alloc.period", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_frame_offset, { "Frame offset", "wmx.ulmap.cqich_alloc.frame_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_duration, { "Duration (d)", "wmx.ulmap.cqich_alloc.duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_report_configuration_included, { "Report configuration included", "wmx.ulmap.cqich_alloc.report_configuration_included", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_feedback_type, { "Feedback Type", "wmx.ulmap.cqich_alloc.feedback_type", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_report_type, { "Report type", "wmx.ulmap.cqich_alloc.report_type", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_cinr_preamble_report_type, { "CINR preamble report type", "wmx.ulmap.cqich_alloc.cinr_preamble_report_type", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_zone_permutation, { "Zone permutation", "wmx.ulmap.cqich_alloc.zone_permutation", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_zone_type, { "Zone type", "wmx.ulmap.cqich_alloc.zone_type", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_zone_prbs_id, { "Zone PRBS_ID", "wmx.ulmap.cqich_alloc.zone_prbs_id", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_major_group_indication, { "Major group indication", "wmx.ulmap.cqich_alloc.major_group_indication", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_pusc_major_group_bitmap, { "PUSC Major group bitmap", "wmx.ulmap.cqich_alloc.pusc_major_group_bitmap", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_cinr_zone_measurement_type, { "CINR zone measurement type", "wmx.ulmap.cqich_alloc.cinr_zone_measurement_type", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_averaging_parameter_included, { "Averaging parameter included", "wmx.ulmap.cqich_alloc.averaging_parameter_included", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_averaging_parameter, { "Averaging parameter", "wmx.ulmap.cqich_alloc.averaging_parameter", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_alloc_mimo_permutation_feedback_cycle, { "MIMO_permutation_feedback_cycle", "wmx.ulmap.cqich_alloc.mimo_permutation_feedback_cycle", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_zone_extended_uiuc, { "Extended UIUC", "wmx.ulmap.zone.extended_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_zone_length, { "Length", "wmx.ulmap.zone.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_zone_ofdma_symbol_offset, { "OFDMA symbol offset", "wmx.ulmap.zone.ofdma_symbol_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_zone_permutation, { "Permutation", "wmx.ulmap.zone.permutation", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_zone_ul_permbase, { "UL_PermBase", "wmx.ulmap.zone.ul_permbase", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_zone_amc_type, { "AMC type", "wmx.ulmap.zone.amc_type", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_zone_use_all_sc_indicator, { "Use All SC indicator", "wmx.ulmap.zone.use_all_sc_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_zone_disable_subchannel_rotation, { "Disable subchannel rotation", "wmx.ulmap.zone.disable_subchannel_rotation", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_phymod_ul_extended_uiuc, { "Extended UIUC", "wmx.ulmap.phymod_ul.extended_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_phymod_ul_length, { "Length", "wmx.ulmap.phymod_ul.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_phymod_ul_preamble_modifier_type, { "Preamble Modifier Type", "wmx.ulmap.phymod_ul.preamble_modifier_type", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_phymod_ul_preamble_frequency_shift_index, { "Preamble frequency shift index", "wmx.ulmap.phymod_ul.preamble_frequency_shift_index", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_phymod_ul_preamble_time_shift_index, { "Preamble Time Shift index", "wmx.ulmap.phymod_ul.preamble_time_shift_index", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_phymod_ul_pilot_pattern_modifier, { "Pilot Pattern Modifier", "wmx.ulmap.phymod_ul.pilot_pattern_modifier", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_phymod_ul_pilot_pattern_index, { "Pilot Pattern Index", "wmx.ulmap.phymod_ul.pilot_pattern_index", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_tracking_extended_uiuc, { "Extended UIUC", "wmx.ulmap.fast_tracking.extended_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_tracking_length, { "Length", "wmx.ulmap.fast_tracking.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_tracking_map_index, { "Map Index", "wmx.ulmap.fast_tracking.map_index", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_tracking_power_correction, { "Power correction", "wmx.ulmap.fast_tracking.power_correction", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_tracking_frequency_correction, { "Frequency correction", "wmx.ulmap.fast_tracking.frequency_correction", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_tracking_time_correction, { "Time correction", "wmx.ulmap.fast_tracking.time_correction", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_pusc_burst_allocation_extended_uiuc, { "Extended UIUC", "wmx.ulmap.pusc_burst_allocation.extended_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_pusc_burst_allocation_length, { "Length", "wmx.ulmap.pusc_burst_allocation.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_pusc_burst_allocation_uiuc, { "UIUC", "wmx.ulmap.pusc_burst_allocation.uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_pusc_burst_allocation_segment, { "Segment", "wmx.ulmap.pusc_burst_allocation.segment", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_pusc_burst_allocation_ul_permbase, { "UL_PermBase", "wmx.ulmap.pusc_burst_allocation.ul_permbase", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_pusc_burst_allocation_ofdma_symbol_offset, { "OFDMA symbol offset", "wmx.ulmap.pusc_burst_allocation.ofdma_symbol_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_pusc_burst_allocation_subchannel_offset, { "Subchannel offset", "wmx.ulmap.pusc_burst_allocation.subchannel_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_pusc_burst_allocation_duration, { "Duration", "wmx.ulmap.pusc_burst_allocation.duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_pusc_burst_allocation_repetition_coding_indication, { "Repetition coding indication", "wmx.ulmap.pusc_burst_allocation.repetition_coding_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_ranging_extended_uiuc, { "Extended UIUC", "wmx.ulmap.fast_ranging.extended_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_ranging_length, { "Length", "wmx.ulmap.fast_ranging.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_ranging_ho_id_indicator, { "HO_ID indicator", "wmx.ulmap.fast_ranging.ho_id_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_ranging_ho_id, { "HO_ID", "wmx.ulmap.fast_ranging.ho_id", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_ranging_mac_address, { "MAC address", "wmx.ulmap.fast_ranging.mac_address", FT_ETHER, BASE_NONE, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_ranging_uiuc, { "UIUC", "wmx.ulmap.fast_ranging.uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_ranging_duration, { "Duration", "wmx.ulmap.fast_ranging.duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_fast_ranging_repetition_coding_indication, { "Repetition coding indication", "wmx.ulmap.fast_ranging.repetition_coding_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_allocation_start_extended_uiuc, { "Extended UIUC", "wmx.ulmap.allocation_start.extended_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_allocation_start_length, { "Length", "wmx.ulmap.allocation_start.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_allocation_start_ofdma_symbol_offset, { "OFDMA symbol offset", "wmx.ulmap.allocation_start.ofdma_symbol_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_allocation_start_subchannel_offset, { "Subchannel offset", "wmx.ulmap.allocation_start.subchannel_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_extended_2_uiuc, { "Extended-2 UIUC", "wmx.ulmap.cqich_enhanced_alloc.extended_2_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_length, { "Length", "wmx.ulmap.cqich_enhanced_alloc.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_cqich_id, { "CQICH_ID", "wmx.ulmap.cqich_enhanced_alloc.cqich_id", FT_UINT32, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_period, { "Period (p)", "wmx.ulmap.cqich_enhanced_alloc.period", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_frame_offset, { "Frame offset", "wmx.ulmap.cqich_enhanced_alloc.frame_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_duration, { "Duration (d)", "wmx.ulmap.cqich_enhanced_alloc.duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_cqich_num, { "CQICH_Num", "wmx.ulmap.cqich_enhanced_alloc.cqich_num", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_feedback_type, { "Feedback Type", "wmx.ulmap.cqich_enhanced_alloc.feedback_type", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_allocation_index, { "Allocation Index", "wmx.ulmap.cqich_enhanced_alloc.allocation_index", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_cqich_type, { "CQICH Type", "wmx.ulmap.cqich_enhanced_alloc.cqich_type", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_sttd_indication, { "STTD indication", "wmx.ulmap.cqich_enhanced_alloc.sttd_indication", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_band_amc_precoding_mode, { "Band_AMC_Precoding_Mode", "wmx.ulmap.cqich_enhanced_alloc.band_amc_precoding_mode", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_cqich_enhanced_alloc_nr_precoders_feedback, { "Nr_Precoders_Feedback (=N)", "wmx.ulmap.cqich_enhanced_alloc.nr_precoders_feedback", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_extended_2_uiuc, { "Extended-2 UIUC", "wmx.ulmap.anchor_bs_switch.extended_2_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_length, { "Length", "wmx.ulmap.anchor_bs_switch.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_n_anchor_bs_switch, { "N_Anchor_BS_switch", "wmx.ulmap.anchor_bs_switch.n_anchor_bs_switch", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_reduced_cid, { "Reduced CID", "wmx.ulmap.anchor_bs_switch.reduced_cid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_action_code, { "Action Code", "wmx.ulmap.anchor_bs_switch.action_code", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_action_time, { "Action Time (A)", "wmx.ulmap.anchor_bs_switch.action_time", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_temp_bs_id, { "TEMP_BS_ID", "wmx.ulmap.anchor_bs_switch.temp_bs_id", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_ak_change_indicator, { "AK Change Indicator", "wmx.ulmap.anchor_bs_switch.ak_change_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_cqich_allocation_indicator, { "CQICH Allocation Indicator", "wmx.ulmap.anchor_bs_switch.cqich_allocation_indicator", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_feedback_channel_offset, { "Feedback channel offset", "wmx.ulmap.anchor_bs_switch.feedback_channel_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_cqich_id, { "CQICH_ID", "wmx.ulmap.anchor_bs_switch.cqich_id", FT_UINT32, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_period, { "Period (=p)", "wmx.ulmap.anchor_bs_switch.period", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_frame_offset, { "Frame offset", "wmx.ulmap.anchor_bs_switch.frame_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_duration, { "Duration (=d)", "wmx.ulmap.anchor_bs_switch.duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_anchor_bs_switch_mimo_permutation_feedback_code, { "MIMO_permutation_feedback_code", "wmx.ulmap.anchor_bs_switch.mimo_permutation_feedback_code", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_extended_2_uiuc, { "Extended-2 UIUC", "wmx.ulmap.sounding_command.extended_2_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_length, { "Length", "wmx.ulmap.sounding_command.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_type, { "Sounding_Type", "wmx.ulmap.sounding_command.sounding_command.type", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_send_sounding_report_flag, { "Send Sounding Report Flag", "wmx.ulmap.sounding_command.send_sounding_report_flag", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_relevance_flag, { "Sounding Relevance Flag", "wmx.ulmap.sounding_command.relevance_flag", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_relevance, { "Sounding_Relevance", "wmx.ulmap.sounding_command.sounding_relevance", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_include_additional_feedback, { "Include additional feedback", "wmx.ulmap.sounding_command.include_additional_feedback", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_num_sounding_symbols, { "Num_Sounding_Symbols", "wmx.ulmap.sounding_command.num_sounding_symbols", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_separability_type, { "Separability Type", "wmx.ulmap.sounding_command.separability_type", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_max_cyclic_shift_index_p, { "Max Cyclic Shift Index P", "wmx.ulmap.sounding_command.max_cyclic_shift_index_p", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_decimation_value, { "Decimation Value D", "wmx.ulmap.sounding_command.decimation_value", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_decimation_offset_randomization, { "Decimation offset randomization", "wmx.ulmap.sounding_command.decimation_offset_randomization", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_symbol_index, { "Sounding symbol index", "wmx.ulmap.sounding_command.sounding_command.symbol_index", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_number_of_cids, { "Number of CIDs", "wmx.ulmap.sounding_command.number_of_cids", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_shorted_basic_cid, { "Shorted Basic CID", "wmx.ulmap.sounding_command.shorted_basic_cid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_power_assignment_method, { "Power Assignment Method", "wmx.ulmap.sounding_command.power_assignment_method", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_power_boost, { "Power boost", "wmx.ulmap.sounding_command.power_boost", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_multi_antenna_flag, { "Multi-Antenna Flag", "wmx.ulmap.sounding_command.multi_antenna_flag", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_allocation_mode, { "Allocation Mode", "wmx.ulmap.sounding_command.allocation_mode", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_band_bit_map, { "Band bit map", "wmx.ulmap.sounding_command.band_bit_map", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_starting_frequency_band, { "Starting frequency band", "wmx.ulmap.sounding_command.starting_frequency_band", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_number_of_frequency_bands, { "Number of frequency bands", "wmx.ulmap.sounding_command.number_of_frequency_bands", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_cyclic_time_shift_index, { "Cyclic time shift index m", "wmx.ulmap.sounding_command.cyclic_time_shift_index", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_decimation_offset, { "Decimation offset d", "wmx.ulmap.sounding_command.decimation_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_use_same_symbol_for_additional_feedback, { "Use same symbol for additional feedback", "wmx.ulmap.sounding_command.use_same_symbol_for_additional_feedback", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_periodicity, { "Periodicity", "wmx.ulmap.sounding_command.periodicity", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_permutation, { "Permutation", "wmx.ulmap.sounding_command.permutation", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_dl_permbase, { "DL_PermBase", "wmx.ulmap.sounding_command.dl_permbase", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_shortened_basic_cid, { "Shortened basic CID", "wmx.ulmap.sounding_command.shortened_basic_cid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_subchannel_offset, { "Subchannel offset", "wmx.ulmap.sounding_command.subchannel_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_sounding_command_number_of_subchannels, { "Number of subchannels", "wmx.ulmap.sounding_command.number_of_subchannels", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ulmap_extended_2_uiuc, { "Extended-2 UIUC", "wmx.ulmap.harq_ulmap.extended_2_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ulmap_length, { "Length", "wmx.ulmap.harq_ulmap.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ulmap_rcid_type, { "RCID_Type", "wmx.ulmap.harq_ulmap.rcid_type", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ulmap_mode, { "Mode", "wmx.ulmap.harq_ulmap.mode", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ulmap_allocation_start_indication, { "Allocation Start Indication", "wmx.ulmap.harq_ulmap.allocation_start_indication", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ulmap_ofdma_symbol_offset, { "OFDMA Symbol offset", "wmx.ulmap.harq_ulmap.ofdma_symbol_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ulmap_subchannel_offset, { "Subchannel offset", "wmx.ulmap.harq_ulmap.subchannel_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ulmap_n_sub_burst, { "N sub Burst", "wmx.ulmap.harq_ulmap.n_sub_burst", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ackch_region_alloc_extended_2_uiuc, { "Extended-2 UIUC", "wmx.ulmap.harq_ackch_region_alloc.extended_2_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ackch_region_alloc_length, { "Length", "wmx.ulmap.harq_ackch_region_alloc.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ackch_region_alloc_ofdma_symbol_offset, { "OFDMA Symbol Offset", "wmx.ulmap.harq_ackch_region_alloc.ofdma_symbol_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ackch_region_alloc_subchannel_offset, { "Subchannel Offset", "wmx.ulmap.harq_ackch_region_alloc.subchannel_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ackch_region_alloc_num_ofdma_symbols, { "No. OFDMA Symbols", "wmx.ulmap.harq_ackch_region_alloc.num_ofdma_symbols", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_harq_ackch_region_alloc_num_subchannels, { "No. Subchannels", "wmx.ulmap.harq_ackch_region_alloc.num_subchannels", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_extended_2_uiuc, { "Extended-2 UIUC", "wmx.ulmap.aas_sdma.extended_2_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_length, { "Length", "wmx.ulmap.aas_sdma.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_rcid_type, { "RCID_Type", "wmx.ulmap.aas_sdma.rcid_type", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_num_burst_region, { "Num Burst Region", "wmx.ulmap.aas_sdma.num_burst_region", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_slot_offset, { "Slot offset", "wmx.ulmap.aas_sdma.slot_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_slot_duration, { "Slot duration", "wmx.ulmap.aas_sdma.slot_duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_number_of_users, { "Number of users", "wmx.ulmap.aas_sdma.number_of_users", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_encoding_mode, { "Encoding Mode", "wmx.ulmap.aas_sdma.encoding_mode", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_power_adjust, { "Power Adjust", "wmx.ulmap.aas_sdma.power_adjust", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_pilot_pattern_modifier, { "Pilot Pattern Modifier", "wmx.ulmap.aas_sdma.pilot_pattern_modifier", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_preamble_modifier_index, { "Preamble Modifier Index", "wmx.ulmap.aas_sdma.preamble_modifier_index", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_pilot_pattern, { "Pilot Pattern", "wmx.ulmap.aas_sdma.pilot_pattern", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_diuc, { "DIUC", "wmx.ulmap.aas_sdma.diuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_repetition_coding_indication, { "Repetition Coding Indication", "wmx.ulmap.aas_sdma.repetition_coding_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_acid, { "ACID", "wmx.ulmap.aas_sdma.acid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_ai_sn, { "AI_SN", "wmx.ulmap.aas_sdma.ai_sn", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_nep, { "N(EP)", "wmx.ulmap.aas_sdma.nep", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_nsch, { "N(SCH)", "wmx.ulmap.aas_sdma.nsch", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_spid, { "SPID", "wmx.ulmap.aas_sdma.spid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_aas_sdma_power_adjustment, { "Power Adjustment", "wmx.ulmap.aas_sdma.power_adjustment", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_extended_2_uiuc, { "Extended-2 UIUC", "wmx.ulmap.feedback_polling.extended_2_uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_length, { "Length", "wmx.ulmap.feedback_polling.length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_num_allocation, { "Num_Allocation", "wmx.ulmap.feedback_polling.num_allocation", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_dedicated_ul_allocation_included, { "Dedicated UL Allocation included", "wmx.ulmap.feedback_polling.dedicated_ul_allocation_included", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_basic_cid, { "Basic CID", "wmx.ulmap.feedback_polling.basic_cid", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_allocation_duration, { "Allocation Duration (d)", "wmx.ulmap.feedback_polling.allocation_duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_type, { "Feedback type", "wmx.ulmap.feedback_polling.feedback_polling.type", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_frame_offset, { "Frame Offset", "wmx.ulmap.feedback_polling.frame_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_period, { "Period (p)", "wmx.ulmap.feedback_polling.perio", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_uiuc, { "UIUC", "wmx.ulmap.feedback_polling.uiuc", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_ofdma_symbol_offset, { "OFDMA Symbol Offset", "wmx.ulmap.feedback_polling.ofdma_symbol_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_subchannel_offset, { "Subchannel offset", "wmx.ulmap.feedback_polling.subchannel_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_duration, { "Duration", "wmx.ulmap.feedback_polling.duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_feedback_polling_repetition_coding_indication, { "Repetition coding indication", "wmx.ulmap.feedback_polling.repetition_coding_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_aas_zone_configuration_included, { "AAS zone configuration included", "wmx.ulmap.reduced_aas.aas_zone_configuration_included", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_aas_zone_position_included, { "AAS zone position included", "wmx.ulmap.reduced_aas.aas_zone_position_included", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_ul_map_information_included, { "UL-MAP information included", "wmx.ulmap.reduced_aas.ul_map_information_included", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_phy_modification_included, { "PHY modification included", "wmx.ulmap.reduced_aas.phy_modification_included", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_power_control_included, { "Power Control included", "wmx.ulmap.reduced_aas.power_control_included", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_include_feedback_header, { "Include Feedback Header", "wmx.ulmap.reduced_aas.include_feedback_header", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_encoding_mode, { "Encoding Mode", "wmx.ulmap.reduced_aas.encoding_mode", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_permutation, { "Permutation", "wmx.ulmap.reduced_aas.permutation", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_ul_permbase, { "UL_PermBase", "wmx.ulmap.reduced_aas.ul_permbase", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_preamble_indication, { "Preamble Indication", "wmx.ulmap.reduced_aas.preamble_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_padding, { "Padding", "wmx.ulmap.reduced_aas.padding", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_zone_symbol_offset, { "Zone Symbol Offset", "wmx.ulmap.reduced_aas.zone_symbol_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_zone_length, { "Zone Length", "wmx.ulmap.reduced_aas.zone_length", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_ucd_count, { "UCD Count", "wmx.ulmap.reduced_aas.ucd_count", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_private_map_alloc_start_time, { "Private Map Allocation Start Time", "wmx.ulmap.reduced_aas.private_map_alloc_start_time", FT_UINT64, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_pilot_pattern_index, { "Pilot Pattern Index", "wmx.ulmap.reduced_aas.pilot_pattern_index", FT_UINT64, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_preamble_select, { "Preamble Select", "wmx.ulmap.reduced_aas.preamble_select", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_preamble_shift_index, { "Preamble Shift Index", "wmx.ulmap.reduced_aas.preamble_shift_index", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_pilot_pattern_modifier, { "Pilot Pattern Modifier", "wmx.ulmap.reduced_aas.pilot_pattern_modifier", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_power_control, { "Power Control", "wmx.ulmap.reduced_aas.power_control", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_ul_frame_offset, { "UL Frame Offset", "wmx.ulmap.reduced_aas.ul_frame_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_slot_offset, { "Slot Offset", "wmx.ulmap.reduced_aas.slot_offset", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_slot_duration, { "Slot Duration", "wmx.ulmap.reduced_aas.slot_duration", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_uiuc_nep, { "UIUC / N(EP)", "wmx.ulmap.reduced_aas.uiuc_nep", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_acid, { "ACID", "wmx.ulmap.reduced_aas.acid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_ai_sn, { "AI_SN", "wmx.ulmap.reduced_aas.ai_sn", FT_UINT8, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_nsch, { "N(SCH)", "wmx.ulmap.reduced_aas.nsch", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_spid, { "SPID", "wmx.ulmap.reduced_aas.spid", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ulmap_reduced_aas_repetition_coding_indication, { "Repetition Coding Indication", "wmx.ulmap.reduced_aas.repetition_coding_indication", FT_UINT16, BASE_DEC, NULL, 0x00, NULL, HFILL }},
 	};
 
 	/* Setup protocol subtree array */
@@ -2937,22 +2393,14 @@ void proto_register_mac_mgmt_msg_ulmap(void)
 			&ett_315d,
 		};
 
-	static ei_register_info ei[] = {
-		{ &ei_ulmap_not_implemented, { "wmx.ulmap.not_implemented", PI_UNDECODED, PI_WARN, "Not implemented", EXPFILL }},
-	};
-
-	expert_module_t* expert_mac_mgmt_msg_ulmap;
-
 	proto_mac_mgmt_msg_ulmap_decoder = proto_register_protocol (
-		"WiMax ULMAP Messages", /* name       */
-		"WiMax ULMAP",    /* short name */
-		"wmx.ulmap"       /* abbrev     */
-		);
+                "WiMax ULMAP Messages", /* name       */
+                "WiMax ULMAP",    /* short name */
+                "wmx.ulmap"       /* abbrev     */
+                );
 
 	proto_register_field_array(proto_mac_mgmt_msg_ulmap_decoder, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_mac_mgmt_msg_ulmap = expert_register_protocol(proto_mac_mgmt_msg_ulmap_decoder);
-	expert_register_field_array(expert_mac_mgmt_msg_ulmap, ei, array_length(ei));
 }
 
 void proto_reg_handoff_mac_mgmt_msg_ulmap(void)
@@ -2962,16 +2410,3 @@ void proto_reg_handoff_mac_mgmt_msg_ulmap(void)
 	ulmap_handle = create_dissector_handle(dissect_mac_mgmt_msg_ulmap_decoder, proto_mac_mgmt_msg_ulmap_decoder);
 	dissector_add_uint("wmx.mgmtmsg", MAC_MGMT_MSG_UL_MAP, ulmap_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

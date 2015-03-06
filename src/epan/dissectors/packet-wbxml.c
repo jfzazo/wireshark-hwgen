@@ -44,10 +44,15 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
+
 /* We need the function tvb_get_guintvar() */
 #include "packet-wap.h"
 
@@ -1117,7 +1122,7 @@ static const value_string vals_wbxml_public_ids[] = {
 	/* 0x110F -- 0x11FF: unassigned */
 	{ 0x1200, "-//3GPP2.COM//DTD IOTA 1.0//EN" },
 	{ 0x1201, "-//SYNCML//DTD SyncML 1.2//EN" },
-	{ 0x1202, "-//SYNCML//DTD MetaInf 1.2//EN" },
+  	{ 0x1202, "-//SYNCML//DTD MetaInf 1.2//EN" },
  	{ 0x1203, "-//SYNCML//DTD DevInf 1.2//EN" },
  	{ 0x1204, "-//NOKIA//DTD LANDMARKS 1.0//EN" },
 
@@ -7134,8 +7139,9 @@ dissect_wbxml_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 						  "(edit WBXML preferences to show)");
 			return;
 		} /* Else: render the WBXML tokens */
-		wbxml_content_tree = proto_tree_add_subtree(wbxml_tree, tvb, offset, -1,
-					  ett_wbxml_content, &ti, "Data representation");
+		ti = proto_tree_add_text (wbxml_tree, tvb, offset, -1,
+					  "Data representation");
+		wbxml_content_tree = proto_item_add_subtree (ti, ett_wbxml_content);
 
 		/* The parse_wbxml_X() functions will process the content correctly,
 		 * irrespective of the WBXML version used. For the WBXML body, this

@@ -23,10 +23,14 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/to_str.h>
+#include <epan/wmem/wmem.h>
 #include <epan/ipproto.h>
 #include <epan/expert.h>
+#include <epan/ipv6-utils.h>
+#include <epan/ipv4.h>
 #include "packet-wccp.h"
 
 void proto_register_wccp(void);
@@ -404,11 +408,13 @@ static guint dissect_web_cache_list_entry(tvbuff_t *tvb, int offset,
 static int wccp_bucket_info(guint8 bucket_info, proto_tree *bucket_tree,
                             guint32 start, tvbuff_t *tvb, int offset);
 static const gchar *bucket_name(guint8 bucket);
-static void dissect_wccp2_info(tvbuff_t *tvb, int offset,
+static guint16 dissect_wccp2_header(tvbuff_t *tvb, int offset,
+                                    proto_tree *wccp_tree);
+static void dissect_wccp2_info(tvbuff_t *tvb, int offset, guint16 length,
                                packet_info *pinfo, proto_tree *wccp_tree, guint32 wccp_message_type);
 
 /* WCCP 2r1 IPv6 utlility functions */
-static void find_wccp_address_table(tvbuff_t *tvb, int offset,
+static void find_wccp_address_table(tvbuff_t *tvb, int offset, guint16 length,
                                     packet_info *pinfo _U_, proto_tree *wccp_tree _U_);
 /* The V2 dissectors will return the remaining length of the packet
    and a negative number if there are missing bytes to finish the
@@ -483,14 +489,11 @@ static gint dissect_wccp2_web_cache_value_element(tvbuff_t *tvb, int offset,
 static const gchar *assignment_bucket_name(guint8 bucket);
 static void dissect_32_bit_capability_flags(tvbuff_t *tvb, int curr_offset,
                                             guint16 capability_val_len, gint ett, const capability_flag *flags,
-                                            proto_tree *element_tree, proto_item *header,
-                                            proto_item *length_item, packet_info *pinfo);
+                                            proto_tree *element_tree, proto_item *header);
 static void dissect_transmit_t_capability(tvbuff_t *tvb, proto_item *te, int curr_offset,
-                                          guint16 capability_val_len, gint ett, proto_tree *element_tree,
-                                          proto_item *length_item, packet_info *pinfo);
+                                          guint16 capability_val_len, gint ett, proto_tree *element_tree);
 static void dissect_timer_scale_capability(tvbuff_t *tvb, int curr_offset,
-                                           guint16 capability_val_len, gint ett, proto_tree *element_tree,
-                                           proto_item *length_item, packet_info *pinfo);
+                                           guint16 capability_val_len, gint ett, proto_tree *element_tree);
 
 
 
@@ -502,7 +505,7 @@ static void dissect_timer_scale_capability(tvbuff_t *tvb, int curr_offset,
  */
 
 static void
-find_wccp_address_table(tvbuff_t *tvb, int offset,
+find_wccp_address_table(tvbuff_t *tvb, int offset, guint16 length,
                         packet_info *pinfo, proto_tree *wccp_tree _U_)
 {
   guint16 type;
@@ -516,32 +519,12 @@ find_wccp_address_table(tvbuff_t *tvb, int offset,
   wccp_wccp_address_table.table_ipv4 = (guint32 *) NULL;
   wccp_wccp_address_table.table_ipv6 = (struct e_in6_addr *)NULL;
 
-  for (;;) {
-    if (4 > tvb_reported_length_remaining(tvb, offset)) {
-      /* We've run out of packet data without finding an address table,
-         so there's no address table in the packet. */
-      return;
-    }
-    if (4 > tvb_captured_length_remaining(tvb, offset)) {
-      /* We've run out of captured date without finding an address table,
-         so we've no way of determining whether there's an address table
-         or not. */
-      return;
-    }
+  while (length >= 4) {
     type = tvb_get_ntohs(tvb, offset);
     item_length = tvb_get_ntohs(tvb, offset+2);
 
-    if ((item_length + 4) > tvb_reported_length_remaining(tvb, offset)) {
-      /* We've run out of packet data without finding an address table,
-         so there's no address table in the packet. */
+    if (item_length > tvb_length_remaining(tvb, offset))
       return;
-    }
-    if ((item_length + 4) > tvb_captured_length_remaining(tvb, offset)) {
-        /* We've run out of captured date without finding an address table,
-           so we've no way of determining whether there's an address table
-           or not. */
-        return;
-      }
 
     if (type == WCCP2r1_ADDRESS_TABLE)
       {
@@ -550,7 +533,12 @@ find_wccp_address_table(tvbuff_t *tvb, int offset,
         return;
       }
 
-    offset = offset + (item_length + 4);
+    /* check if we _can_ advance */
+    if (length < (item_length+4))
+      return;
+
+    offset = offset + item_length + 4;
+    length = length - item_length - 4;
   }
 }
 
@@ -677,8 +665,6 @@ dissect_wccp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
   proto_item *wccp_tree_item;
   guint32 wccp_message_type;
   guint16 length;
-  gint wccp2_length;
-  proto_item *length_item;
   guint32 cache_count;
   guint32 ipaddr;
   guint i;
@@ -752,7 +738,7 @@ dissect_wccp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
                                    hf_cache_ip, tvb, offset, 4,
                                    ipaddr,
                                    "Web Cache %d IP Address: %s", i,
-                                   tvb_ip_to_str(tvb, offset));
+                                   ip_to_str((guint8 *)&ipaddr));
         offset += 4;
       }
       for (i = 0; i < 256; i += 4) {
@@ -772,29 +758,9 @@ dissect_wccp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     case WCCP2_REMOVAL_QUERY:
     case WCCP2_REDIRECT_ASSIGN:
     default:    /* assume unknown packets are v2 */
-      /* 5.5 WCCP Message Header */
-
-      proto_tree_add_item(wccp_tree, hf_message_header_version, tvb, offset, 2,
-                          ENC_BIG_ENDIAN);
-      offset += 2;
-
-      length = tvb_get_ntohs(tvb, offset);
-      length_item = proto_tree_add_uint(wccp_tree, hf_message_header_length, tvb, offset, 2, length);
-      offset += 2;
-
-      /* Is the length plus the length of the data preceding it longer than
-         the length of our packet? */
-      wccp2_length = tvb_reported_length_remaining(tvb, offset);
-      if (length > (guint)wccp2_length) {
-        expert_add_info_format(pinfo, length_item, &ei_wccp_length_bad,
-                               "The length as specified by the length field is bigger than the length of the packet");
-        length = wccp2_length - offset;
-      } else {
-        /* Truncate the packet to the specified length. */
-        tvb_set_reported_length(tvb, offset + length);
-      }
-      proto_item_set_len(wccp_tree_item, offset + length);
-      dissect_wccp2_info(tvb, offset, pinfo, wccp_tree, wccp_message_type);
+      length = dissect_wccp2_header(tvb, offset, wccp_tree);
+      offset += 4;
+      dissect_wccp2_info(tvb, offset, length, pinfo, wccp_tree, wccp_message_type);
       break;
   }
 
@@ -804,6 +770,7 @@ dissect_wccp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 static guint
 dissect_hash_data(tvbuff_t *tvb, int offset, proto_tree *wccp_tree)
 {
+  proto_item *bucket_item;
   proto_tree *bucket_tree;
   proto_item *tf;
   proto_tree *field_tree;
@@ -815,8 +782,9 @@ dissect_hash_data(tvbuff_t *tvb, int offset, proto_tree *wccp_tree)
                       ENC_BIG_ENDIAN);
   offset += 4;
 
-  bucket_tree = proto_tree_add_subtree(wccp_tree, tvb, offset, 32,
-                                    ett_buckets, NULL, "Hash information");
+  bucket_item = proto_tree_add_text(wccp_tree, tvb, offset, 32,
+                                    "Hash information");
+  bucket_tree = proto_item_add_subtree(bucket_item, ett_buckets);
 
   for (i = 0, n = 0; i < 32; i++) {
     bucket_info = tvb_get_guint8(tvb, offset);
@@ -834,10 +802,12 @@ static guint
 dissect_web_cache_list_entry(tvbuff_t *tvb, int offset, int idx,
                              proto_tree *wccp_tree)
 {
+  proto_item *tl;
   proto_tree *list_entry_tree;
 
-  list_entry_tree = proto_tree_add_subtree_format(wccp_tree, tvb, offset, 4 + HASH_INFO_SIZE,
-                           ett_cache_info, NULL, "Web-Cache List Entry(%d)", idx);
+  tl = proto_tree_add_text(wccp_tree, tvb, offset, 4 + HASH_INFO_SIZE,
+                           "Web-Cache List Entry(%d)", idx);
+  list_entry_tree = proto_item_add_subtree(tl, ett_cache_info);
   proto_tree_add_item(list_entry_tree, hf_cache_ip, tvb, offset, 4,
                       ENC_BIG_ENDIAN);
   offset += 4;
@@ -873,12 +843,27 @@ bucket_name(guint8 bucket)
   }
 }
 
+
+/* 5.5 WCCP Message Header */
+static guint16
+dissect_wccp2_header(tvbuff_t *tvb, int offset, proto_tree *wccp_tree)
+{
+  guint16 length;
+
+  proto_tree_add_item(wccp_tree, hf_message_header_version, tvb, offset, 2,
+                      ENC_BIG_ENDIAN);
+  offset += 2;
+  length = tvb_get_ntohs(tvb, offset);
+  proto_tree_add_uint(wccp_tree, hf_message_header_length, tvb, offset, 2, length);
+  return length;
+}
+
+
 static void
-dissect_wccp2_info(tvbuff_t *tvb, int offset,
+dissect_wccp2_info(tvbuff_t *tvb, int offset, guint16 length,
                    packet_info *pinfo, proto_tree *wccp_tree,
                    guint32 message_type)
 {
-  int length_remaining;
   guint16 type;
   guint16 item_length;
   proto_item *tf;
@@ -918,10 +903,32 @@ dissect_wccp2_info(tvbuff_t *tvb, int offset,
   /* ugly hack: we first need to check for the address table
      compnent, otherwise we cannot print the IP's.
   */
-  find_wccp_address_table(tvb,offset,pinfo,wccp_tree);
+  find_wccp_address_table(tvb,offset,length,pinfo,wccp_tree);
 
-  while ((length_remaining = tvb_reported_length_remaining(tvb, offset)) > 0) {
+  while (length != 0) {
+
+    if (length < 4) {
+      tf = proto_tree_add_text(wccp_tree, tvb, offset, length,
+                               "Invalid WCCP Type/Length values");
+
+      expert_add_info_format(pinfo, tf, &ei_wccp_length_bad,
+                             "The packet only has %d bytes left. That is not enough for a WCCP item type and length.",
+                             length);
+      break;
+    }
+
     type = tvb_get_ntohs(tvb, offset);
+    item_length = tvb_get_ntohs(tvb, offset+2);
+
+
+    if (item_length > tvb_length_remaining(tvb, offset)) {
+      tf = proto_tree_add_text(wccp_tree, tvb, offset, length,
+                               "Excessive WCCP Length values");
+      expert_add_info_format(pinfo, tf, &ei_wccp_length_bad,
+                             "The length of the item is %d but there are only %d bytes remaining in the packet, I counted %d remaining",
+                             item_length, tvb_length_remaining(tvb, offset), length);
+      break;
+    }
     switch (type) {
 
     case WCCP2_SECURITY_INFO:
@@ -1012,15 +1019,21 @@ dissect_wccp2_info(tvbuff_t *tvb, int offset,
       break;
     }
 
-    info_tree = proto_tree_add_subtree(wccp_tree, tvb, offset, -1, ett, &tf,
+    tf = proto_tree_add_text(wccp_tree, tvb, offset, item_length + 4, "%s",
                              val_to_str(type, info_type_vals, "Unknown info type (%u)"));
-
+    info_tree = proto_item_add_subtree(tf, ett);
     proto_tree_add_item(info_tree, hf_item_type, tvb, offset, 2, ENC_BIG_ENDIAN);
-
-    item_length = tvb_get_ntohs(tvb, offset+2);
     proto_tree_add_item(info_tree, hf_item_length, tvb, offset+2, 2, ENC_BIG_ENDIAN);
 
     offset += 4;
+    length -= 4;
+
+    if (length < item_length) {
+      expert_add_info_format(pinfo, tf, &ei_wccp_length_bad,
+                             "The item has length %d but the remaining WCCP data is only %d long",
+                             item_length,
+                             length);
+    }
 
     if (dissector != NULL) {
       gint remaining_item_length = (*dissector)(tvb, offset, item_length, pinfo, info_tree);
@@ -1028,22 +1041,28 @@ dissect_wccp2_info(tvbuff_t *tvb, int offset,
       /* warn if we left bytes */
       if (remaining_item_length > 0)
         expert_add_info_format(pinfo, tf, &ei_wccp_length_bad,
-                               "The item is %d bytes too long",
+                               "The dissector left %d bytes undecoded",
                                remaining_item_length);
 
       /* error if we needed more bytes */
       if (remaining_item_length < 0)
         expert_add_info_format(pinfo, tf, &ei_wccp_length_bad,
-                               "The item is %d bytes too short",
-                               -remaining_item_length);
+                               "The dissector needed %d more bytes to decode the packet, but the item is not that long",
+                               remaining_item_length);
 
       /* we assume that the item length is correct and jump forward */
     } else {
       proto_tree_add_item(info_tree, hf_item_data, tvb, offset, item_length, ENC_NA);
     }
+    /* avoid looping forever */
+    if (length < item_length)
+      return;
 
     offset += item_length;
-    proto_item_set_end(tf, tvb, offset);
+
+    /* should no happen....*/
+    DISSECTOR_ASSERT( ( (signed int) length - item_length) >= 0);
+    length -= item_length;
   }
 
 
@@ -1315,8 +1334,9 @@ dissect_wccp2_service_info(tvbuff_t *tvb, int offset, gint length,
   offset += 4;
 
   if (flags & WCCP2_SI_PORTS_DEFINED) {
-    ports_tree = proto_tree_add_subtree(info_tree, tvb, offset, 2*8,
-                             ett_service_info_ports, &tf, "Ports list: ");
+    tf = proto_tree_add_text(info_tree, tvb, offset, 2*8,
+                             "Ports list: ");
+    ports_tree = proto_item_add_subtree(tf, ett_service_info_ports);
 
     for (i = 0; i < 8; i++) {
       guint16 port = tvb_get_ntohs(tvb, offset);
@@ -1866,24 +1886,29 @@ dissect_wccp2r1_address_table_info(tvbuff_t *tvb, int offset,
 
   wccp_wccp_address_table.in_use = TRUE;
 
+  if (info_tree)
+    tf = proto_tree_get_parent(info_tree);
+
   if (length < 2*4)
     return length - 2*4;
 
 
   wccp_wccp_address_table.family = tvb_get_ntohs(tvb,offset);
-
-  proto_tree_add_item(info_tree, hf_address_table_family, tvb,
+  if (pinfo && info_tree)
+    proto_tree_add_item(info_tree, hf_address_table_family, tvb,
                         offset, 2, ENC_BIG_ENDIAN);
   EAT_AND_CHECK(2,2);
 
   address_length = tvb_get_ntohs(tvb,offset);
-  proto_tree_add_item(info_tree, hf_address_table_address_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+  if (info_tree)
+    proto_tree_add_item(info_tree, hf_address_table_address_length, tvb, offset, 2, ENC_BIG_ENDIAN);
   EAT_AND_CHECK(2,2);
 
   wccp_wccp_address_table.table_length =  tvb_get_ntohl(tvb,offset);
-  tf = proto_tree_add_item(info_tree, hf_address_table_length, tvb, offset, 4, ENC_BIG_ENDIAN);
-  element_tree = proto_item_add_subtree(tf, ett_table_element);
-
+  if (pinfo && info_tree) {
+    tf = proto_tree_add_item(info_tree, hf_address_table_length, tvb, offset, 4, ENC_BIG_ENDIAN);
+    element_tree = proto_item_add_subtree(tf, ett_table_element);
+  }
   EAT(4);
 
   /* check if the length is valid and allocate the tables if needed*/
@@ -1892,7 +1917,7 @@ dissect_wccp2r1_address_table_info(tvbuff_t *tvb, int offset,
     if (wccp_wccp_address_table.table_ipv4 == NULL)
       wccp_wccp_address_table.table_ipv4 = (guint32 *)
         wmem_alloc0(pinfo->pool, wccp_wccp_address_table.table_length * 4);
-    if (address_length != 4) {
+    if ((address_length != 4) && (pinfo && info_tree)) {
       expert_add_info_format(pinfo, tf, &ei_wccp_length_bad,
                              "The Address length must be 4, but I found  %d for IPv4 addresses. Correcting this.",
                              address_length);
@@ -1903,7 +1928,7 @@ dissect_wccp2r1_address_table_info(tvbuff_t *tvb, int offset,
     if (wccp_wccp_address_table.table_ipv6 == NULL)
       wccp_wccp_address_table.table_ipv6 = (struct e_in6_addr *)
         wmem_alloc0(pinfo->pool, wccp_wccp_address_table.table_length * sizeof(struct e_in6_addr));
-    if (address_length != 16) {
+    if ((address_length != 16) && (pinfo && info_tree)) {
       expert_add_info_format(pinfo, tf, &ei_wccp_length_bad,
                              "The Address length must be 16, but I found %d for IPv6 addresses.  Correcting this",
                              address_length);
@@ -1911,8 +1936,10 @@ dissect_wccp2r1_address_table_info(tvbuff_t *tvb, int offset,
     }
     break;
   default:
-    expert_add_info_format(pinfo, tf, &ei_wccp_address_table_family_unknown,
+    if (pinfo && info_tree) {
+      expert_add_info_format(pinfo, tf, &ei_wccp_address_table_family_unknown,
                     "Unknown address family: %d", wccp_wccp_address_table.family);
+    }
   };
 
   /* now read the addresses and print/store them */
@@ -1922,7 +1949,8 @@ dissect_wccp2r1_address_table_info(tvbuff_t *tvb, int offset,
 
     /* do we have space? */
     if (length < address_length) {
-      expert_add_info_format(pinfo, tf, &ei_wccp_length_bad, "Ran out of space to decode");
+      if (pinfo && tf)
+        expert_add_info_format(pinfo, tf, &ei_wccp_length_bad, "Ran out of space to decode");
 
       /* first clean up: */
       wccp_wccp_address_table.in_use = FALSE;
@@ -2086,14 +2114,16 @@ dissect_wccp2_hash_assignment_data_element(tvbuff_t *tvb, int offset, gint lengt
                                            proto_tree *info_tree)
 
 {
+  proto_item *bucket_item;
   proto_tree *bucket_tree;
   int i;
   guint8 bucket_info;
   int n;
 
 
-  bucket_tree = proto_tree_add_subtree(info_tree, tvb, offset, 8*4,
-                                    ett_hash_assignment_buckets, NULL, "Hash Assignment Data");
+  bucket_item = proto_tree_add_text(info_tree, tvb, offset, 8*4,
+                                    "Hash Assignment Data");
+  bucket_tree = proto_item_add_subtree(bucket_item, ett_hash_assignment_buckets);
 
   for (i = 0, n = 0; i < 32; i++) {
     if (length == 0) {
@@ -2123,8 +2153,9 @@ dissect_wccp2_mask_assignment_data_element(tvbuff_t *tvb, int offset, gint lengt
   gint new_length,start;
 
 
-  mask_tree = proto_tree_add_subtree(info_tree, tvb, offset, 4,
-                                  ett_mask_assignment_data_element, &mask_item, "Mask Assignment Data");
+  mask_item = proto_tree_add_text(info_tree, tvb, offset, 4,
+                                  "Mask Assignment Data");
+  mask_tree = proto_item_add_subtree(mask_item, ett_mask_assignment_data_element);
   start = offset;
 
   new_length=dissect_wccp2_mask_value_set_list(tvb, offset, length, pinfo, mask_tree);
@@ -2147,10 +2178,12 @@ static gint
 dissect_wccp2_alternate_mask_assignment_data_element(tvbuff_t *tvb, int offset, gint length, packet_info *pinfo,
                                                      proto_tree *info_tree)
 {
+  proto_item *mask_item;
   proto_tree *mask_tree;
 
-  mask_tree = proto_tree_add_subtree(info_tree, tvb, offset, length,
-                                  ett_alternate_mask_assignment_data_element, NULL, "Alternate Mask Assignment Data");
+  mask_item = proto_tree_add_text(info_tree, tvb, offset, length,
+                                  "Alternate Mask Assignment Data");
+  mask_tree = proto_item_add_subtree(mask_item, ett_alternate_mask_assignment_data_element);
 
   if (length < 4)
     return length-4;
@@ -2207,8 +2240,10 @@ dissect_wccp2_extended_assignment_data_element(tvbuff_t *tvb, int offset, gint l
     return length-4;
 
 
-  item_tree = proto_tree_add_subtree(info_tree, tvb, offset, length,
-                               ett_extended_assigment_data_element, &header, "Extended Assignment Data Element");
+  header = proto_tree_add_text(info_tree, tvb, offset, length,
+                               "Extended Assignment Data Element");
+
+  item_tree = proto_item_add_subtree(header, ett_extended_assigment_data_element);
 
   type_of_assignment = tvb_get_ntohs(tvb, offset);
   proto_tree_add_item(item_tree, hf_extended_assignment_data_type, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -2277,66 +2312,68 @@ dissect_wccp2_capability_element(tvbuff_t *tvb, int offset, gint length,
   if (length < 4)
     return length - 4;
 
+
   capability_type = tvb_get_ntohs(tvb, offset);
-  element_tree = proto_tree_add_subtree_format(info_tree, tvb, offset, -1, ett_capability_element, &te,
-                                               "Type: %s",
-                                               val_to_str(capability_type,
-                                                          capability_type_vals,
-                                                          "Unknown (0x%08X)"));
-  header = te;
+  capability_val_len = tvb_get_ntohs(tvb, offset + 2);
+  header = te = proto_tree_add_item(info_tree, hf_capability_element_type, tvb, offset, 2, ENC_BIG_ENDIAN);
 
-  proto_tree_add_item(element_tree, hf_capability_element_type, tvb, offset, 2, ENC_BIG_ENDIAN);
-
-  capability_val_len = tvb_get_ntohs(tvb, offset+2);
-  tf = proto_tree_add_uint(element_tree, hf_capability_element_length, tvb, offset+2, 2, capability_val_len);
   proto_item_set_len(te, capability_val_len + 4);
+  element_tree = proto_item_add_subtree(te, ett_capability_element);
+
+  tf = proto_tree_add_uint(element_tree, hf_capability_element_length, tvb, offset+2, 2, capability_val_len);
+
+  proto_tree_add_text(element_tree, tvb, offset, 2,
+                      "Type: %s",
+                      val_to_str(capability_type,
+                                 capability_type_vals, "Unknown (0x%08X)"));
+  if (capability_val_len < 4) {
+    expert_add_info_format(pinfo, tf, &ei_wccp_capability_element_length,
+                "Value Length: %u (illegal, must be >= 4)", capability_val_len);
+    return -length;
+  }
 
   if (length < (4+capability_val_len))
-    return length - (4 + capability_val_len);
+    return length - 4 - capability_val_len;
 
   switch (capability_type) {
   case WCCP2_FORWARDING_METHOD:
     dissect_32_bit_capability_flags(tvb, offset,
                                     capability_val_len,
                                     ett_capability_forwarding_method,
-                                    forwarding_method_flags, element_tree,
-                                    header, tf, pinfo);
+                                    forwarding_method_flags, element_tree, header);
     break;
 
   case WCCP2_ASSIGNMENT_METHOD:
     dissect_32_bit_capability_flags(tvb, offset,
                                     capability_val_len,
                                     ett_capability_assignment_method,
-                                    assignment_method_flags, element_tree,
-                                    header, tf, pinfo);
+                                    assignment_method_flags, element_tree, header);
     break;
 
   case WCCP2_PACKET_RETURN_METHOD:
     dissect_32_bit_capability_flags(tvb, offset,
                                     capability_val_len,
                                     ett_capability_return_method,
-                                    packet_return_method_flags, element_tree,
-                                    header, tf, pinfo);
+                                    packet_return_method_flags, element_tree, header);
     break;
 
   case WCCP2_TRANSMIT_T:
     dissect_transmit_t_capability(tvb, te, offset,
                                   capability_val_len,
-                                  ett_capability_transmit_t, element_tree,
-                                  tf, pinfo);
+                                  ett_capability_transmit_t,element_tree);
     break;
 
   case WCCP2_TIMER_SCALE:
     dissect_timer_scale_capability(tvb, offset,
                                    capability_val_len,
-                                   ett_capability_timer_scale, element_tree,
-                                   tf, pinfo);
+                                   ett_capability_timer_scale, element_tree);
     break;
   default:
     proto_tree_add_text(element_tree, tvb,
                         offset, capability_val_len,
                         "Value: %s",
-                        tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, capability_val_len));
+                        tvb_bytes_to_ep_str(tvb, offset,
+                                         capability_val_len));
     break;
   }
   return length - 4 - capability_val_len;
@@ -2358,7 +2395,8 @@ dissect_wccp2_mask_value_set_list(tvbuff_t *tvb, int offset,
   if (length < 4)
     return length - 4;
 
-  element_tree = proto_tree_add_subtree(info_tree, tvb, offset, 4, ett_mv_set_list, &te, "Mask/Value Set List");
+  te = proto_tree_add_text(info_tree, tvb, offset, 4, "Mask/Value Set List");
+  element_tree = proto_item_add_subtree(te, ett_mv_set_list);
   start = offset;
 
 
@@ -2414,6 +2452,7 @@ dissect_wccp2_mask_element(tvbuff_t *tvb, int offset, gint length, packet_info *
 static gint dissect_wccp2_alternate_mask_value_set_list(tvbuff_t *tvb, int offset,
                                                         int length, packet_info *pinfo, proto_tree *info_tree)
 {
+  proto_item *header;
   proto_tree *list_tree;
   guint num_of_val_elements;
   guint i;
@@ -2421,8 +2460,9 @@ static gint dissect_wccp2_alternate_mask_value_set_list(tvbuff_t *tvb, int offse
   if (length < 4)
     return length - 4;
 
-  list_tree = proto_tree_add_subtree(info_tree, tvb, offset, length,
-                               ett_alternate_mask_value_set, NULL, "Alternate Mask/Value Set List");
+  header = proto_tree_add_text(info_tree, tvb, offset, length,
+                               "Alternate Mask/Value Set List");
+  list_tree = proto_item_add_subtree(header, ett_alternate_mask_value_set);
 
   num_of_val_elements = tvb_get_ntohl(tvb, offset);
   proto_tree_add_uint(list_tree, hf_alt_assignment_mask_value_set_list_num_elements, tvb, offset, 4, num_of_val_elements);
@@ -2449,9 +2489,9 @@ dissect_wccp2_alternate_mask_value_set_element(tvbuff_t *tvb, int offset, gint l
   gint new_length, total_length;
   guint i;
 
-  element_tree = proto_tree_add_subtree_format(info_tree, tvb, offset, 0,
-                               ett_alternate_mask_value_set_element, &header,
+  header = proto_tree_add_text(info_tree, tvb, offset, 0,
                                "Alternate Mask/Value Set Element(%d)", el_index);
+  element_tree = proto_item_add_subtree(header, ett_alternate_mask_value_set_element);
 
   total_length = 0;
 
@@ -2520,8 +2560,7 @@ dissect_wccp2_web_cache_value_element(tvbuff_t *tvb, int offset, gint length,  p
 static void
 dissect_32_bit_capability_flags(tvbuff_t *tvb, int curr_offset,
                                 guint16 capability_val_len, gint ett, const capability_flag *flags,
-                                proto_tree *element_tree, proto_item *header,
-                                proto_item *length_item, packet_info *pinfo)
+                                proto_tree *element_tree, proto_item *header)
 {
   guint32 capability_val;
   proto_item *tm;
@@ -2529,14 +2568,10 @@ dissect_32_bit_capability_flags(tvbuff_t *tvb, int curr_offset,
   int i;
   gboolean first = TRUE;
 
-  if (capability_val_len != 4) {
-    expert_add_info_format(pinfo, length_item, &ei_wccp_capability_element_length,
-                "Value Length: %u (illegal, must be == 4)", capability_val_len);
-    return;
-  }
-
   capability_val = tvb_get_ntohl(tvb, curr_offset + 4);
   tm = proto_tree_add_uint(element_tree, hf_capability_info_value, tvb, curr_offset + 4, 4, capability_val);
+
+  DISSECTOR_ASSERT(capability_val_len == 4);
 
   for (i = 0; flags[i].short_name != NULL; i++) {
     if (capability_val & flags[i].value) {
@@ -2566,32 +2601,30 @@ dissect_32_bit_capability_flags(tvbuff_t *tvb, int curr_offset,
 /* 6.11.4 Capability Type WCCP2_TRANSMIT_T */
 static void
 dissect_transmit_t_capability(tvbuff_t *tvb, proto_item *te, int curr_offset,
-                              guint16 capability_val_len, gint ett, proto_tree *element_tree,
-                              proto_item *length_item, packet_info *pinfo)
+                              guint16 capability_val_len, gint ett, proto_tree *element_tree)
 {
   guint16 upper_limit, lower_limit;
+  proto_item *tm;
   proto_tree *method_tree;
 
-  if (capability_val_len != 4) {
-    expert_add_info_format(pinfo, length_item, &ei_wccp_capability_element_length,
-                "Value Length: %u (illegal, must be == 4)", capability_val_len);
-    return;
-  }
+  DISSECTOR_ASSERT(capability_val_len == 4);
 
   upper_limit = tvb_get_ntohs(tvb, curr_offset);
   lower_limit = tvb_get_ntohs(tvb, curr_offset + 2);
 
   if ( upper_limit == 0) {
-    method_tree = proto_tree_add_subtree(element_tree, tvb, curr_offset, 2,
-                             ett, NULL, "Only accepting one value");
+    tm = proto_tree_add_text(element_tree, tvb, curr_offset, 2,
+                             "Only accepting one value");
+    method_tree = proto_item_add_subtree(tm, ett);
     proto_tree_add_text(method_tree, tvb, curr_offset, 2,
                         "Reserved, must be 0: %d", upper_limit);
 
     proto_tree_add_item(method_tree, hf_capability_transmit_t , tvb, curr_offset+2, 2, ENC_BIG_ENDIAN);
     proto_item_append_text(te, " %d ms", lower_limit);
   } else {
-    method_tree = proto_tree_add_subtree(element_tree, tvb, curr_offset, 2,
-                             ett, NULL, "Accepting a range");
+    tm = proto_tree_add_text(element_tree, tvb, curr_offset, 2,
+                             "Accepting a range");
+    method_tree = proto_item_add_subtree(tm, ett);
     proto_tree_add_item(method_tree, hf_capability_transmit_t_upper_limit,
                         tvb, curr_offset, 2, ENC_BIG_ENDIAN);
 
@@ -2604,26 +2637,23 @@ dissect_transmit_t_capability(tvbuff_t *tvb, proto_item *te, int curr_offset,
 
 static void
 dissect_timer_scale_capability(tvbuff_t *tvb, int curr_offset,
-                               guint16 capability_val_len, gint ett, proto_tree *element_tree,
-                               proto_item *length_item, packet_info *pinfo)
+                               guint16 capability_val_len, gint ett, proto_tree *element_tree)
 {
   guint8 a,c;
+  proto_item *tm;
   proto_tree *method_tree;
 
-  if (capability_val_len != 4) {
-    expert_add_info_format(pinfo, length_item, &ei_wccp_capability_element_length,
-                "Value Length: %u (illegal, must be == 4)", capability_val_len);
-    return;
-  }
+  DISSECTOR_ASSERT(capability_val_len == 4);
 
   a = tvb_get_guint8(tvb, curr_offset);
   c = tvb_get_guint8(tvb, curr_offset+2);
 
   if ( a == 0) {
     if ( c == 0) {
-      method_tree = proto_tree_add_subtree(element_tree, tvb, curr_offset, 2,
-                               ett, NULL, "Only accepting one value");
+      tm = proto_tree_add_text(element_tree, tvb, curr_offset, 2,
+                               "Only accepting one value");
 
+      method_tree = proto_item_add_subtree(tm, ett);
       proto_tree_add_text(method_tree, tvb, curr_offset, 1,
                           "Reserved, must be 0: %d", a);
 
@@ -2642,8 +2672,9 @@ dissect_timer_scale_capability(tvbuff_t *tvb, int curr_offset,
       proto_tree_add_text(element_tree, tvb, curr_offset, 1,
                                "Error C is 0, but A is not");
     } else {
-      method_tree = proto_tree_add_subtree(element_tree, tvb, curr_offset, 2,
-                               ett, NULL, "Accepting a range");
+      tm = proto_tree_add_text(element_tree, tvb, curr_offset, 2,
+                               "Accepting a range");
+      method_tree = proto_item_add_subtree(tm, ett);
       proto_tree_add_item(method_tree, hf_capability_timer_scale_timeout_scale_upper_limit,
                           tvb, curr_offset, 1, ENC_BIG_ENDIAN);
 
@@ -2662,13 +2693,15 @@ dissect_timer_scale_capability(tvbuff_t *tvb, int curr_offset,
 static gint
 dissect_wccp2_value_element(tvbuff_t *tvb, int offset, gint length, int idx, packet_info *pinfo, proto_tree *info_tree)
 {
+  proto_item *tl;
   proto_tree *element_tree;
 
   if (length < 4)
     return length - 16;
 
-  element_tree = proto_tree_add_subtree_format(info_tree, tvb, offset, 16, ett_value_element, NULL, "Value Element(%u) %s",
+  tl = proto_tree_add_text(info_tree, tvb, offset, 16, "Value Element(%u) %s",
                            idx,decode_wccp_encoded_address(tvb, offset+4+4+2+2, pinfo, info_tree));
+  element_tree = proto_item_add_subtree(tl, ett_value_element);
 
   proto_tree_add_item(element_tree, hf_value_element_src_ip, tvb, offset, 4, ENC_BIG_ENDIAN);
   EAT_AND_CHECK(4,4);
@@ -2697,8 +2730,9 @@ dissect_wccp2_mask_value_set_element(tvbuff_t *tvb, int offset, gint length, int
   guint i;
   gint new_length;
 
-  element_tree = proto_tree_add_subtree_format(info_tree, tvb, offset, 0,
-                           ett_mv_set_element, &tl, "Mask/Value Set Element(%d)", idx);
+  tl = proto_tree_add_text(info_tree, tvb, offset, 0,
+                           "Mask/Value Set Element(%d)", idx);
+  element_tree = proto_item_add_subtree(tl, ett_mv_set_element);
 
   new_length = dissect_wccp2_mask_element(tvb,offset,length,pinfo,element_tree);
   NOTE_EATEN_LENGTH(new_length);
@@ -2737,6 +2771,7 @@ dissect_wccp2_alternate_assignment_info(tvbuff_t *tvb, int offset, gint length,
 
   guint32 n_routers;
   guint i;
+  proto_item *te;
   proto_tree *element_tree;
   gint new_length;
 
@@ -2775,11 +2810,11 @@ dissect_wccp2_alternate_assignment_info(tvbuff_t *tvb, int offset, gint length,
     if (length < 12)
       return length - 12*(n_routers-i);
 
-    element_tree = proto_tree_add_subtree_format(info_tree, tvb, offset, 12,
-                             ett_router_alt_assignment_element, NULL,
+    te = proto_tree_add_text(info_tree, tvb, offset, 12,
                              "Router %d Assignment Element: IP address %s", i,
                              decode_wccp_encoded_address(tvb, offset, pinfo, info_tree));
 
+    element_tree = proto_item_add_subtree(te, ett_router_alt_assignment_element);
     dissect_wccp2_router_assignment_element(tvb, offset, length , pinfo, element_tree);
     EAT(12);
   }
@@ -3294,12 +3329,12 @@ proto_register_wccp(void)
     &ett_wc_identity_info,
     &ett_router_view_info,
     &ett_wc_view_info,
+    &ett_query_info,
     &ett_router_assignment_element,
     &ett_hash_buckets_assignment_wc_element,
     &ett_hash_buckets_assignment_buckets,
     &ett_router_alt_assignment_element,
     &ett_router_assignment_info,
-    &ett_query_info,
     &ett_capabilities_info,
     &ett_capability_element,
     &ett_capability_forwarding_method,
@@ -3307,13 +3342,6 @@ proto_register_wccp(void)
     &ett_capability_return_method,
     &ett_capability_transmit_t,
     &ett_capability_timer_scale,
-    &ett_alt_assignment_info,
-    &ett_alt_assignment_map,
-    &ett_address_table,
-    &ett_assignment_map,
-    &ett_command_extension,
-    &ett_alternate_mask_value_set,
-    &ett_alternate_mask_value_set_element,
     &ett_mv_set_list,
     &ett_mv_set_element,
     &ett_mv_set_value_list,
@@ -3321,7 +3349,14 @@ proto_register_wccp(void)
     &ett_web_cache_value_element_list,
     &ett_alternate_mv_set_element,
     &ett_value_element,
+    &ett_alt_assignment_info,
+    &ett_alt_assignment_map,
+    &ett_assignment_map,
+    &ett_address_table,
     &ett_unknown_info,
+    &ett_alternate_mask_value_set,
+    &ett_alternate_mask_value_set_element,
+    &ett_command_extension,
   };
 
   static ei_register_info ei[] = {

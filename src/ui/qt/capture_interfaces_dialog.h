@@ -23,47 +23,44 @@
 #ifndef CAPTURE_INTERFACES_DIALOG_H
 #define CAPTURE_INTERFACES_DIALOG_H
 
-#include <config.h>
+#include "config.h"
 
 #ifdef HAVE_LIBPCAP
 
 #include <QDialog>
 #include <QPushButton>
+#include <QTableWidget>
 
 typedef struct if_stat_cache_s if_stat_cache_t;
 
 #include "interface_tree.h"
 #include "preferences_dialog.h"
 
+/*
+ * Symbolic names for column indices.
+ */
+enum
+{
+    CAPTURE = 0,
+    INTERFACE,
+    TRAFFIC,
+    LINK,
+    PMODE,
+    SNAPLEN,
+#if defined(HAVE_PCAP_CREATE)
+    BUFFER,
+    MONITOR,
+#elif defined(_WIN32) && !defined(HAVE_PCAP_CREATE)
+    BUFFER,
+#endif
+    FILTER,
+    NUM_COLUMNS
+};
+
+
 namespace Ui {
 class CaptureInterfacesDialog;
 }
-
-#include <QStyledItemDelegate>
-
-class InterfaceTreeDelegate : public QStyledItemDelegate
-{
-    Q_OBJECT
-private:
-    QTreeWidget* tree_;
-
-public:
-    InterfaceTreeDelegate(QObject *parent = 0);
-    ~InterfaceTreeDelegate();
-
-    QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const;
-    void setTree(QTreeWidget* tree) { tree_ = tree; }
-    bool eventFilter(QObject *object, QEvent *event);
-
-private slots:
-    void pmode_changed(QString index);
-#if defined (HAVE_PCAP_CREATE)
-    void monitor_changed(QString index);
-#endif
-    void link_changed(QString index);
-    void snaplen_changed(int value);
-    void buffer_changed(int value);
-};
 
 class CaptureInterfacesDialog : public QDialog
 {
@@ -74,7 +71,8 @@ public:
     ~CaptureInterfacesDialog();
 
     void SetTab(int index);
-    void updateInterfaces();
+    void UpdateInterfaces();
+    //void updateStatistics(void);
 
 private slots:
     void on_capturePromModeCheckBox_toggled(bool checked);
@@ -84,32 +82,21 @@ private slots:
     void on_gbNewFileAuto_toggled(bool checked);
     void on_cbExtraCaptureInfo_toggled(bool checked);
     void on_cbResolveMacAddresses_toggled(bool checked);
-    void on_compileBPF_clicked();
-    void on_manage_clicked();
     void on_cbResolveNetworkNames_toggled(bool checked);
     void on_cbResolveTransportNames_toggled(bool checked);
-    void start_button_clicked();
+    void on_bStart_clicked();
+    void on_bStop_clicked();
     void on_buttonBox_rejected();
     void on_buttonBox_helpRequested();
-    void interfaceClicked(QTreeWidgetItem *item, int column);
-    void interfaceSelected();
-    void updateWidgets();
+    void tableItemClicked(QTableWidgetItem * item);
     void updateStatistics(void);
-    void allFilterChanged();
-    void refreshInterfaceList();
-    void updateLocalInterfaces();
-    void on_browseButton_clicked();
-    void changeEvent(QEvent* event);
+    //void on_tbInterfaces_hideEvent(QHideEvent *evt);
+    //void on_tbInterfaces_showEvent(QShowEvent *evt);
 
 signals:
     void startCapture();
     void stopCapture();
     void getPoints(int row, PointList *pts);
-    void setSelectedInterfaces();
-    void setFilterValid(bool valid);
-    void interfacesChanged();
-    void ifsChanged();
-    void interfaceListChanged();
 
 private:
     Ui::CaptureInterfacesDialog *ui;
@@ -119,10 +106,6 @@ private:
     QPushButton *stop_bt_;
     if_stat_cache_t *stat_cache_;
     QTimer *stat_timer_;
-    InterfaceTreeDelegate interface_item_delegate_;
-    QMap<int, int> deviceMap;
-
-    bool saveOptionsToPreferences();
 };
 
 #endif /* HAVE_LIBPCAP */

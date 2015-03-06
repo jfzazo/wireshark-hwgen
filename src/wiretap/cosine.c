@@ -23,9 +23,11 @@
 
 #include "config.h"
 #include "wtap-int.h"
+#include <wsutil/buffer.h>
 #include "cosine.h"
 #include "file_wrappers.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -155,7 +157,7 @@
 #define COSINE_REC_MAGIC_STR2	COSINE_HDR_MAGIC_STR2
 
 #define COSINE_HEADER_LINES_TO_CHECK	200
-#define COSINE_LINE_LENGTH		240
+#define COSINE_LINE_LENGTH        	240
 
 #define COSINE_MAX_PACKET_LEN	65536
 
@@ -260,26 +262,26 @@ static gboolean cosine_check_file_type(wtap *wth, int *err, gchar **err_info)
 }
 
 
-wtap_open_return_val cosine_open(wtap *wth, int *err, gchar **err_info)
+int cosine_open(wtap *wth, int *err, gchar **err_info)
 {
 	/* Look for CoSine header */
 	if (!cosine_check_file_type(wth, err, err_info)) {
 		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+			return -1;
+		return 0;
 	}
 
 	if (file_seek(wth->fh, 0L, SEEK_SET, err) == -1)	/* rewind */
-		return WTAP_OPEN_ERROR;
+		return -1;
 
 	wth->file_encap = WTAP_ENCAP_COSINE;
 	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_COSINE;
 	wth->snapshot_length = 0; /* not known */
 	wth->subtype_read = cosine_read;
 	wth->subtype_seek_read = cosine_seek_read;
-	wth->file_tsprec = WTAP_TSPREC_CSEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_CSEC;
 
-	return WTAP_OPEN_MINE;
+	return 1;
 }
 
 /* Find the next packet and parse it; called from wtap_read(). */
@@ -444,8 +446,8 @@ parse_cosine_hex_dump(FILE_T fh, struct wtap_pkthdr *phdr, int pkt_len,
 	int	i, hex_lines, n, caplen = 0;
 
 	/* Make sure we have enough room for the packet */
-	ws_buffer_assure_space(buf, COSINE_MAX_PACKET_LEN);
-	pd = ws_buffer_start_ptr(buf);
+	buffer_assure_space(buf, COSINE_MAX_PACKET_LEN);
+	pd = buffer_start_ptr(buf);
 
 	/* Calculate the number of hex dump lines, each
 	 * containing 16 bytes of data */
@@ -502,16 +504,3 @@ parse_single_hex_dump_line(char* rec, guint8 *buf, guint byte_offset)
 
 	return num_items_scanned;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

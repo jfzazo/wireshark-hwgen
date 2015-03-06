@@ -103,23 +103,10 @@ union erf_subhdr {
 #define RECORDS_FOR_ERF_CHECK 20
 #define FCS_BITS	32
 
-wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info);
+int erf_open(wtap *wth, int *err, gchar **err_info);
 int erf_dump_can_write_encap(int encap);
 int erf_dump_open(wtap_dumper *wdh, int *err);
 
 int erf_populate_interfaces(wtap *wth);
 
 #endif /* __W_ERF_H__ */
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

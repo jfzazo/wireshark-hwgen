@@ -35,6 +35,7 @@
 #include <epan/strutil.h>
 #include <epan/asn1.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 
 #include "packet-per.h"
 #include "packet-h450-ros.h"
@@ -73,7 +74,7 @@ static int hf_h450_ros_returnResultProblem = -1;  /* ReturnResultProblem */
 static int hf_h450_ros_returnErrorProblem = -1;   /* ReturnErrorProblem */
 
 /*--- End of included file: packet-h450-ros-hf.c ---*/
-#line 44 "../../asn1/h450-ros/packet-h450-ros-template.c"
+#line 45 "../../asn1/h450-ros/packet-h450-ros-template.c"
 
 /* Initialize the subtree pointers */
 
@@ -89,7 +90,7 @@ static gint ett_h450_ros_Reject = -1;
 static gint ett_h450_ros_T_problem = -1;
 
 /*--- End of included file: packet-h450-ros-ett.c ---*/
-#line 47 "../../asn1/h450-ros/packet-h450-ros-template.c"
+#line 48 "../../asn1/h450-ros/packet-h450-ros-template.c"
 
 static expert_field ei_ros_undecoded = EI_INIT;
 
@@ -582,7 +583,7 @@ dissect_h450_ros_ROS(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, pr
 
 
 /*--- End of included file: packet-h450-ros-fn.c ---*/
-#line 76 "../../asn1/h450-ros/packet-h450-ros-template.c"
+#line 77 "../../asn1/h450-ros/packet-h450-ros-template.c"
 
 /*--- proto_register_h450_ros -----------------------------------------------*/
 void proto_register_h450_ros(void) {
@@ -674,7 +675,7 @@ void proto_register_h450_ros(void) {
         "ReturnErrorProblem", HFILL }},
 
 /*--- End of included file: packet-h450-ros-hfarr.c ---*/
-#line 83 "../../asn1/h450-ros/packet-h450-ros-template.c"
+#line 84 "../../asn1/h450-ros/packet-h450-ros-template.c"
   };
 
   /* List of subtrees */
@@ -692,7 +693,7 @@ void proto_register_h450_ros(void) {
     &ett_h450_ros_T_problem,
 
 /*--- End of included file: packet-h450-ros-ettarr.c ---*/
-#line 88 "../../asn1/h450-ros/packet-h450-ros-template.c"
+#line 89 "../../asn1/h450-ros/packet-h450-ros-template.c"
   };
 
   static ei_register_info ei[] = {

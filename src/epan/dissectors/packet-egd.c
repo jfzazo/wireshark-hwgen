@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <string.h>
 #include <epan/packet.h>
 
 #define EGD_PORT 18246 /* 0x4746 */
@@ -247,15 +248,3 @@ void proto_reg_handoff_egd(void)
   data_handle = find_dissector("data");
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

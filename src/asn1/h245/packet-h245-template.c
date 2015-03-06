@@ -32,16 +32,21 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/strutil.h>
+#include <wsutil/pint.h>
 #include <epan/addr_resolv.h>
+
+#include <string.h>
+
 #include <epan/prefs.h>
 #include <epan/t35.h>
+#include <epan/wmem/wmem.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
 #include <epan/tap.h>
-#include <wsutil/pint.h>
 #include "packet-tpkt.h"
 #include "packet-per.h"
 #include "packet-h323.h"
@@ -74,8 +79,6 @@ static int hf_h245Manufacturer = -1;
 static int hf_h245_subMessageIdentifier_standard = -1;
 static int h245_tap = -1;
 static int h245dg_tap = -1;
-static int hf_h245_debug_dissector_try_string = -1;
-
 h245_packet_info *h245_pi=NULL;
 
 static gboolean h245_reassembly = TRUE;
@@ -390,7 +393,7 @@ static int ett_h245_returnedFunction = -1;
 static int dissect_h245_MultimediaSystemControlMessage(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_);
 static void reset_h245_pi(void *dummy _U_)
 {
-	h245_pi = NULL; /* Make sure we don't leave wmem_packet_scoped() memory lying around */
+	h245_pi = NULL; /* Make sure we don't leave ep_alloc()ated memory lying around */
 }
 
 #include "packet-h245-fn.c"
@@ -422,11 +425,11 @@ dissect_h245_h245(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, PSNAME);
 
-	it=proto_tree_add_protocol_format(parent_tree, proto_h245, tvb, 0, -1, PSNAME);
+	it=proto_tree_add_protocol_format(parent_tree, proto_h245, tvb, 0, tvb_length(tvb), PSNAME);
 	tr=proto_item_add_subtree(it, ett_h245);
 
 	/* assume that whilst there is more tvb data, there are more h245 commands */
-	while ( tvb_reported_length_remaining( tvb, offset>>3 )>0 ){
+	while ( tvb_length_remaining( tvb, offset>>3 )>0 ){
 		CLEANUP_PUSH(reset_h245_pi, NULL);
 		h245_pi=wmem_new(wmem_packet_scope(), h245_packet_info);
 		init_h245_packet_info(h245_pi);
@@ -447,7 +450,7 @@ dissect_h245_FastStart_OLC(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
   upcoming_channel = NULL;
   codec_type = NULL;
 
-  dissect_OpenLogicalChannel_PDU(tvb, pinfo, tree, NULL);
+  dissect_OpenLogicalChannel_PDU(tvb, pinfo, tree);
 
   if (h245_pi != NULL)
 	  h245_pi->msg_type = H245_OpenLogChn;
@@ -473,9 +476,6 @@ void proto_register_h245(void) {
       { "subMessageIdentifier", "h245.subMessageIdentifier.standard",
         FT_UINT32, BASE_DEC, VALS(h245_h239subMessageIdentifier_vals), 0,
         NULL, HFILL }},
-  	{ &hf_h245_debug_dissector_try_string,
-      { "*** DEBUG dissector_try_string", "h245.debug.dissector_try_string", FT_STRING, BASE_NONE,
-        NULL, 0, NULL, HFILL }},
 
 #include "packet-h245-hfarr.c"
   };
@@ -581,9 +581,9 @@ void proto_reg_handoff_h245(void) {
 
 
 	h245_handle = find_dissector("h245");
-	dissector_add_for_decode_as("tcp.port", h245_handle);
+	dissector_add_handle("tcp.port", h245_handle);
 	MultimediaSystemControlMessage_handle = find_dissector("h245dg");
-	dissector_add_for_decode_as("udp.port", MultimediaSystemControlMessage_handle);
+	dissector_add_handle("udp.port", MultimediaSystemControlMessage_handle);
 }
 
 static void init_h245_packet_info(h245_packet_info *pi)

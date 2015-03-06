@@ -33,7 +33,6 @@ S<[ B<-S> ]>
 S<[ B<-t> ]>
 S<[ B<-T> ]>
 S<[ B<-u> ]>
-S<[ B<-v> ]>
 S<[ B<-x> ]>
 S<[ B<-y> ]>
 S<[ B<-z> ]>
@@ -267,10 +266,6 @@ values (CSV) files.
 Displays the capture duration, in seconds.  This is the
 difference in time between the earliest packet seen and
 latest packet seen.
-
-=item -v
-
-Displays the tool's version and exits.
 
 =item -x
 

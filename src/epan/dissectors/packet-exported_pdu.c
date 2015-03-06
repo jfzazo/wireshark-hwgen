@@ -23,10 +23,15 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 #include <epan/to_str.h>
+#include <epan/tap.h>
 #include <epan/exported_pdu.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-mtp3.h"
 #include "packet-dvbci.h"
 
@@ -50,7 +55,7 @@ static int hf_exported_pdu_ss7_opc = -1;
 static int hf_exported_pdu_ss7_dpc = -1;
 static int hf_exported_pdu_orig_fno = -1;
 static int hf_exported_pdu_dvbci_evt = -1;
-static int hf_exported_pdu_exported_pdu = -1;
+
 
 /* Initialize the subtree pointers */
 static gint ett_exported_pdu = -1;
@@ -96,6 +101,7 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     int tag_len;
     int next_proto_type = -1;
     char *proto_name = NULL;
+    const guchar *src_addr, *dst_addr;
     dissector_handle_t proto_handle;
     mtp3_addr_pc_t *mtp3_addr;
     guint8 dvb_ci_dir;
@@ -123,23 +129,27 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                 break;
             case EXP_PDU_TAG_IPV4_SRC:
                 proto_tree_add_item(tag_tree, hf_exported_pdu_ipv4_src, tvb, offset, 4, ENC_BIG_ENDIAN);
-                TVB_SET_ADDRESS(&pinfo->net_src, AT_IPv4, tvb, offset, 4);
-                TVB_SET_ADDRESS(&pinfo->src, AT_IPv4, tvb, offset, 4);
+                src_addr = tvb_get_ptr(tvb, offset, 4);
+                SET_ADDRESS(&pinfo->net_src, AT_IPv4, 4, src_addr);
+                SET_ADDRESS(&pinfo->src, AT_IPv4, 4, src_addr);
                 break;
             case EXP_PDU_TAG_IPV4_DST:
                 proto_tree_add_item(tag_tree, hf_exported_pdu_ipv4_dst, tvb, offset, 4, ENC_BIG_ENDIAN);
-                TVB_SET_ADDRESS(&pinfo->net_dst, AT_IPv4, tvb, offset, 4);
-                TVB_SET_ADDRESS(&pinfo->dst, AT_IPv4, tvb, offset, 4);
+                dst_addr = tvb_get_ptr(tvb, offset, 4);
+                SET_ADDRESS(&pinfo->net_dst, AT_IPv4, 4, dst_addr);
+                SET_ADDRESS(&pinfo->dst, AT_IPv4, 4, dst_addr);
                 break;
             case EXP_PDU_TAG_IPV6_SRC:
                 proto_tree_add_item(tag_tree, hf_exported_pdu_ipv6_src, tvb, offset, 16, ENC_NA);
-                TVB_SET_ADDRESS(&pinfo->net_src, AT_IPv6, tvb, offset, 16);
-                TVB_SET_ADDRESS(&pinfo->src, AT_IPv6, tvb, offset, 16);
+                src_addr = tvb_get_ptr(tvb, offset, 16);
+                SET_ADDRESS(&pinfo->net_src, AT_IPv6, 16, src_addr);
+                SET_ADDRESS(&pinfo->src, AT_IPv6, 16, src_addr);
                 break;
             case EXP_PDU_TAG_IPV6_DST:
                 proto_tree_add_item(tag_tree, hf_exported_pdu_ipv6_dst, tvb, offset, 16, ENC_NA);
-                TVB_SET_ADDRESS(&pinfo->net_dst, AT_IPv6, tvb, offset, 16);
-                TVB_SET_ADDRESS(&pinfo->dst, AT_IPv6, tvb, offset, 16);
+                dst_addr = tvb_get_ptr(tvb, offset, 16);
+                SET_ADDRESS(&pinfo->net_dst, AT_IPv6, 16, dst_addr);
+                SET_ADDRESS(&pinfo->dst, AT_IPv6, 16, dst_addr);
                 break;
             case EXP_PDU_TAG_PORT_TYPE:
                 pinfo->ptype = (port_type)tvb_get_ntohl(tvb, offset);
@@ -205,7 +215,7 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             break;
     }
 
-    proto_tree_add_item(exported_pdu_tree, hf_exported_pdu_exported_pdu, payload_tvb, 0, -1, ENC_NA);
+    proto_tree_add_text(exported_pdu_tree, payload_tvb, 0, -1,"Exported PDU");
 }
 
 /* Register the protocol with Wireshark.
@@ -298,12 +308,7 @@ proto_register_exported_pdu(void)
             { "DVB-CI event", "exported_pdu.dvb-ci.event",
                FT_UINT8, BASE_HEX, VALS(dvbci_event), 0,
               NULL, HFILL }
-        },
-        { &hf_exported_pdu_exported_pdu,
-            { "Exported PDU", "exported_pdu.exported_pdu",
-               FT_BYTES, BASE_NONE, NULL, 0,
-              NULL, HFILL }
-        },
+        }
     };
 
     /* Setup protocol subtree array */

@@ -28,16 +28,20 @@
 #include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
+#include <epan/epan.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-sip.h>
 
 #include "ui/simple_dialog.h"
+#include "../globals.h"
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/tap_param_dlg.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 #define SUM_STR_MAX  1024
 
@@ -671,7 +675,7 @@ gtk_sipstat_init(const char *opt_arg, void *userdata _U_)
 }
 
 static tap_param sip_stat_params[] = {
-    { PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+    { PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg sip_stat_dlg = {

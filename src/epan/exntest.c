@@ -23,11 +23,8 @@
 #include <config.h>
 #include "exceptions.h"
 
-#include <wsutil/ws_diag_control.h>
-
 gboolean failed = FALSE;
 
-DIAG_OFF(shadow)
 void
 run_tests(void)
 {
@@ -98,6 +95,7 @@ run_tests(void)
         printf("02: FINALLY called %u times (not 1) on no exception\n", finally_called);
         failed = TRUE;
     }
+
 
     /* check that finally is called on an uncaught exception */
     ex_thrown = finally_called = 0;
@@ -201,7 +199,6 @@ run_tests(void)
     if(failed == FALSE )
         printf("success\n");
 }
-DIAG_ON(shadow)
 
 int main(void)
 {
@@ -210,16 +207,3 @@ int main(void)
     except_deinit();
     exit(failed?1:0);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

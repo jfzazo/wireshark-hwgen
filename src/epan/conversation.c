@@ -27,7 +27,7 @@
 #include <string.h>
 #include <glib.h>
 #include "packet.h"
-#include "to_str.h"
+#include "emem.h"
 #include "conversation.h"
 
 /* define DEBUG_CONVERSATION for pretty debug printing */
@@ -458,15 +458,14 @@ conversation_match_no_addr2_or_port2(gconstpointer v, gconstpointer w)
 }
 
 /*
- * Free the proto_data.  The conversation itself is wmem-allocated with
- * file scope.
+ * Free the proto_data.  The conversation itself is se_allocated.
  */
 static void
-free_data_list(gpointer value)
+free_data_list(gpointer key _U_, gpointer value, gpointer user_data _U_)
 {
 	conversation_t *conv = (conversation_t *)value;
 
-	/* TODO: file scoped wmem_list? There's no singly-linked wmem_ list */
+	/* TODO: se_slist? */
 	g_slist_free(conv->data_list);
 
 	/* Not really necessary, but... */
@@ -482,20 +481,23 @@ conversation_cleanup(void)
 {
 	/*  Clean up the hash tables, but only after freeing any proto_data
 	 *  that may be hanging off the conversations.
-	 *  The conversation keys are wmem-allocated with file scope so we
-	 *  don't have to clean them up.
+	 *  The conversation keys are se_ allocated so we don't have to clean them up.
 	 */
 	conversation_keys = NULL;
 	if (conversation_hashtable_exact != NULL) {
+		g_hash_table_foreach(conversation_hashtable_exact, free_data_list, NULL);
 		g_hash_table_destroy(conversation_hashtable_exact);
 	}
 	if (conversation_hashtable_no_addr2 != NULL) {
+		g_hash_table_foreach(conversation_hashtable_no_addr2, free_data_list, NULL);
 		g_hash_table_destroy(conversation_hashtable_no_addr2);
 	}
 	if (conversation_hashtable_no_port2 != NULL) {
+		g_hash_table_foreach(conversation_hashtable_no_port2, free_data_list, NULL);
 		g_hash_table_destroy(conversation_hashtable_no_port2);
 	}
 	if (conversation_hashtable_no_addr2_or_port2 != NULL) {
+		g_hash_table_foreach(conversation_hashtable_no_addr2_or_port2, free_data_list, NULL);
 		g_hash_table_destroy(conversation_hashtable_no_addr2_or_port2);
 	}
 
@@ -521,17 +523,17 @@ conversation_init(void)
 	 * above.
 	 */
 	conversation_hashtable_exact =
-	    g_hash_table_new_full(conversation_hash_exact,
-	      conversation_match_exact, NULL, free_data_list);
+	    g_hash_table_new(conversation_hash_exact,
+	      conversation_match_exact);
 	conversation_hashtable_no_addr2 =
-	    g_hash_table_new_full(conversation_hash_no_addr2,
-	      conversation_match_no_addr2, NULL, free_data_list);
+	    g_hash_table_new(conversation_hash_no_addr2,
+	      conversation_match_no_addr2);
 	conversation_hashtable_no_port2 =
-	    g_hash_table_new_full(conversation_hash_no_port2,
-	      conversation_match_no_port2, NULL, free_data_list);
+	    g_hash_table_new(conversation_hash_no_port2,
+	      conversation_match_no_port2);
 	conversation_hashtable_no_addr2_or_port2 =
-	    g_hash_table_new_full(conversation_hash_no_addr2_or_port2,
-	      conversation_match_no_addr2_or_port2, NULL, free_data_list);
+	    g_hash_table_new(conversation_hash_no_addr2_or_port2,
+	      conversation_match_no_addr2_or_port2);
 
 	/*
 	 * Start the conversation indices over at 0.
@@ -611,12 +613,8 @@ conversation_remove_from_hashtable(GHashTable *hashtable, conversation_t *conv)
 	if (conv == chain_head) {
 		/* We are currently the front of the chain */
 		if (NULL == conv->next) {
-			/* We are the only conversation in the chain, no need to
-			 * update next pointer, but do not call
-			 * g_hash_table_remove() either because the conv data
-			 * will be re-inserted. The memory is released when
-			 * conversion_cleanup() is called. */
-			g_hash_table_steal(hashtable, conv->key_ptr);
+			/* We are the only conversation in the chain */
+			g_hash_table_remove(hashtable, conv->key_ptr);
 		}
 		else {
 			/* Update the head of the chain */
@@ -679,8 +677,8 @@ conversation_new(const guint32 setup_frame, const address *addr1, const address 
 	conversation_key *new_key;
 
 	DPRINT(("creating conversation for frame #%d: %s:%d -> %s:%d (ptype=%d)",
-		    setup_frame, address_to_str(wmem_packet_scope(), addr1), port1,
-		    address_to_str(wmem_packet_scope(), addr2), port2, ptype));
+		    setup_frame, ep_address_to_str(addr1), port1,
+		    ep_address_to_str(addr2), port2, ptype));
 
 	if (options & NO_ADDR2) {
 		if (options & (NO_PORT2|NO_PORT2_FORCE)) {
@@ -696,16 +694,16 @@ conversation_new(const guint32 setup_frame, const address *addr1, const address 
 		}
 	}
 
-	new_key = wmem_new(wmem_file_scope(), struct conversation_key);
+	new_key = se_new(struct conversation_key);
 	new_key->next = conversation_keys;
 	conversation_keys = new_key;
-	WMEM_COPY_ADDRESS(wmem_file_scope(), &new_key->addr1, addr1);
-	WMEM_COPY_ADDRESS(wmem_file_scope(), &new_key->addr2, addr2);
+	SE_COPY_ADDRESS(&new_key->addr1, addr1);
+	SE_COPY_ADDRESS(&new_key->addr2, addr2);
 	new_key->ptype = ptype;
 	new_key->port1 = port1;
 	new_key->port2 = port2;
 
-	conversation = wmem_new(wmem_file_scope(), conversation_t);
+	conversation = se_new(conversation_t);
 	memset(conversation, 0, sizeof(conversation_t));
 
 	conversation->index = new_index;
@@ -769,13 +767,10 @@ conversation_set_port2(conversation_t *conv, const guint32 port)
 void
 conversation_set_addr2(conversation_t *conv, const address *addr)
 {
-	char* addr_str;
-	DISSECTOR_ASSERT_HINT(!(conv->options & CONVERSATION_TEMPLATE),
-			"Use the conversation_create_from_template function when the CONVERSATION_TEMPLATE bit is set in the options mask");
+   DISSECTOR_ASSERT_HINT(!(conv->options & CONVERSATION_TEMPLATE),
+            "Use the conversation_create_from_template function when the CONVERSATION_TEMPLATE bit is set in the options mask");
 
-	addr_str = address_to_str(NULL, addr);
-	DPRINT(("called for addr=%s", addr_str));
-	wmem_free(NULL, addr_str);
+	DPRINT(("called for addr=%s",ep_address_to_str(addr)));
 
 	/*
 	 * If the address 2 value is not wildcarded, don't set it.
@@ -790,7 +785,7 @@ conversation_set_addr2(conversation_t *conv, const address *addr)
 		conversation_remove_from_hashtable(conversation_hashtable_no_port2, conv);
 	}
 	conv->options &= ~NO_ADDR2;
-	WMEM_COPY_ADDRESS(wmem_file_scope(), &conv->key_ptr->addr2, addr);
+	SE_COPY_ADDRESS(&conv->key_ptr->addr2, addr);
 	if (conv->options & NO_PORT2) {
 		conversation_insert_into_hashtable(conversation_hashtable_no_port2, conv);
 	} else {
@@ -869,7 +864,7 @@ conversation_lookup_hashtable(GHashTable *hashtable, const guint32 frame_num, co
  *
  *	otherwise, if "port_b" wasn't specified as a wildcard, we try to
  *	match any address 2 with the specified port 2 (addr_a/port_a and
- *	{any}/port_b) and, if that succeeds, we return a pointer to the
+ *	{any}/addr_b) and, if that succeeds, we return a pointer to the
  *	matched conversation;
  *
  *	otherwise, if "addr_b" wasn't specified as a wildcard, we try to
@@ -1230,7 +1225,7 @@ p_compare(gconstpointer a, gconstpointer b)
 void
 conversation_add_proto_data(conversation_t *conv, const int proto, void *proto_data)
 {
-	conv_proto_data *p1 = wmem_new(wmem_file_scope(), conv_proto_data);
+	conv_proto_data *p1 = se_new(conv_proto_data);
 
 	p1->proto = proto;
 	p1->proto_data = proto_data;
@@ -1335,8 +1330,8 @@ find_or_create_conversation(packet_info *pinfo)
 	conversation_t *conv=NULL;
 
 	DPRINT(("called for frame #%d: %s:%d -> %s:%d (ptype=%d)",
-		pinfo->fd->num, address_to_str(wmem_packet_scope(), &pinfo->src), pinfo->srcport,
-		address_to_str(wmem_packet_scope(), &pinfo->dst), pinfo->destport, pinfo->ptype));
+		pinfo->fd->num, ep_address_to_str(&pinfo->src), pinfo->srcport,
+		ep_address_to_str(&pinfo->dst), pinfo->destport, pinfo->ptype));
 	DINDENT();
 
 	/* Have we seen this conversation before? */

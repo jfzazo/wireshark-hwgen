@@ -20,9 +20,14 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 AM_DISTCHECK_CONFIGURE_FLAGS=@GUI_CONFIGURE_FLAGS@
-# Make sure to keep ACLOCAL_AMFLAGS in Makefile.am and AC_CONFIG_MACRO_DIRS
-# in configure.ac in sync, otherwise there will be an error running autogen.sh.
 ACLOCAL_AMFLAGS = `./aclocal-flags`
+
+if HAVE_LIBPY
+py_dissectors_dir = -DPYTHON_DIR=\"@pythondir@\"
+else
+py_dissectors_dir = -DPYTHON_DIR=
+endif
+
 
 if HAVE_WARNINGS_AS_ERRORS
 AM_CLEAN_CFLAGS = -Werror
@@ -44,9 +49,9 @@ bin_PROGRAMS = \
 	@rawshark_bin@		\
 	@echld_test_bin@
 
-EXTRA_PROGRAMS = wireshark-gtk wireshark tshark tfshark capinfos captype editcap \
+EXTRA_PROGRAMS = wireshark wireshark-qt tshark tfshark capinfos captype editcap \
 	mergecap dftest randpkt text2pcap dumpcap reordercap rawshark \
-	echld_test
+	wireshark_cxx echld_test
 
 #
 # Wireshark configuration files are put in $(pkgdatadir).
@@ -78,20 +83,23 @@ dist_diameter_DATA = $(_CUSTOM_diameter_xml_files_) \
 	diameter/eap.xml \
 	diameter/Ericsson.xml \
 	diameter/etsie2e4.xml \
+	diameter/gqpolicy.xml \
+	diameter/imscxdx.xml \
 	diameter/mobileipv4.xml \
 	diameter/mobileipv6.xml \
 	diameter/nasreq.xml \
 	diameter/sip.xml \
 	diameter/Starent.xml \
 	diameter/sunping.xml \
-	diameter/TGPP.xml \
-	diameter/TGPP2.xml \
+	diameter/TGPPGmb.xml \
+	diameter/TGPPRx.xml \
+	diameter/TGPPS9.xml \
+	diameter/TGPPSh.xml \
 	diameter/Vodafone.xml \
 	diameter/AlcatelLucent.xml \
 	diameter/Nokia.xml \
-	diameter/NokiaSolutionsAndNetworks.xml \
+	diameter/NokiaSiemensNetworks.xml \
 	diameter/SKT.xml \
-	diameter/HP.xml \
 	diameter/VerizonWireless.xml
 
 #
@@ -120,130 +128,100 @@ dist_dtds_DATA = \
 radiusdir = $(pkgdatadir)/radius
 include radius/Custom.make
 dist_radius_DATA = $(_CUSTOM_radius_dict_) \
-	radius/README.radius_dictionary \
-	radius/custom.includes \
-	radius/dictionary \
-	radius/dictionary.3com \
-	radius/dictionary.3gpp \
-	radius/dictionary.3gpp2 \
-	radius/dictionary.acc \
+	radius/README.radius_dictionary  \
+	radius/custom.includes  \
+	radius/dictionary  \
+	radius/dictionary.3com  \
+	radius/dictionary.3gpp  \
+	radius/dictionary.3gpp2  \
+	radius/dictionary.acc  \
 	radius/dictionary.acme \
 	radius/dictionary.airespace \
-	radius/dictionary.actelis \
-	radius/dictionary.aerohive \
-	radius/dictionary.alcatel \
+	radius/dictionary.alcatel  \
 	radius/dictionary.alcatel.esam \
 	radius/dictionary.alcatel.sr \
 	radius/dictionary.alcatel-lucent.aaa \
-	radius/dictionary.alteon \
-	radius/dictionary.altiga \
+	radius/dictionary.alcatel-lucent.xylan \
+	radius/dictionary.alteon  \
+	radius/dictionary.altiga  \
 	radius/dictionary.alvarion \
-	radius/dictionary.alvarion.wimax.v2_2 \
 	radius/dictionary.apc \
-	radius/dictionary.aptis \
-	radius/dictionary.arbor \
-	radius/dictionary.aruba \
-	radius/dictionary.ascend \
+	radius/dictionary.aptis  \
+	radius/dictionary.aruba  \
+	radius/dictionary.ascend  \
 	radius/dictionary.asn \
 	radius/dictionary.audiocodes \
 	radius/dictionary.avaya \
 	radius/dictionary.azaire \
-	radius/dictionary.bay \
-	radius/dictionary.bluecoat \
-	radius/dictionary.bintec \
-	radius/dictionary.broadsoft \
-	radius/dictionary.brocade \
-	radius/dictionary.bskyb \
-	radius/dictionary.bristol \
-	radius/dictionary.bt \
-	radius/dictionary.camiant \
-	radius/dictionary.cablelabs \
-	radius/dictionary.cabletron \
+	radius/dictionary.bay  \
+	radius/dictionary.bintec  \
+	radius/dictionary.bristol  \
+	radius/dictionary.cablelabs  \
+	radius/dictionary.cabletron  \
 	radius/dictionary.chillispot \
-	radius/dictionary.cisco \
-	radius/dictionary.cisco.asa \
-	radius/dictionary.cisco.bbsm \
-	radius/dictionary.cisco.vpn3000 \
-	radius/dictionary.cisco.vpn5000 \
-	radius/dictionary.citrix \
+	radius/dictionary.cisco  \
+	radius/dictionary.cisco.bbsm  \
+	radius/dictionary.cisco.vpn3000  \
+	radius/dictionary.cisco.vpn5000  \
 	radius/dictionary.clavister \
-	radius/dictionary.colubris \
-	radius/dictionary.columbia_university \
-	radius/dictionary.compatible \
-	radius/dictionary.compat \
-	radius/dictionary.cosine \
-	radius/dictionary.dante \
+	radius/dictionary.colubris  \
+	radius/dictionary.columbia_university  \
+	radius/dictionary.compat  \
+	radius/dictionary.cosine  \
 	radius/dictionary.dhcp \
-	radius/dictionary.dlink \
 	radius/dictionary.digium \
-	radius/dictionary.dragonwave \
-	radius/dictionary.efficientip \
 	radius/dictionary.eltex \
 	radius/dictionary.epygi \
-	radius/dictionary.equallogic \
-	radius/dictionary.ericsson \
-	radius/dictionary.ericsson.ab \
-	radius/dictionary.ericsson.packet.core.networks \
-	radius/dictionary.erx \
-	radius/dictionary.extreme \
-	radius/dictionary.f5 \
-	radius/dictionary.fdxtended \
+	radius/dictionary.ericsson  \
+	radius/dictionary.erx  \
+	radius/dictionary.extreme  \
 	radius/dictionary.fortinet \
-	radius/dictionary.foundry \
-	radius/dictionary.freedhcp \
-	radius/dictionary.freeradius \
-	radius/dictionary.freeradius.internal \
+	radius/dictionary.foundry  \
+	radius/dictionary.freeradius  \
+	radius/dictionary.freeradius.internal  \
 	radius/dictionary.freeswitch \
-	radius/dictionary.gandalf \
-	radius/dictionary.garderos \
-	radius/dictionary.gemtek \
+	radius/dictionary.gandalf  \
+	radius/dictionary.garderos  \
+	radius/dictionary.gemtek  \
 	radius/dictionary.h3c \
 	radius/dictionary.hp \
 	radius/dictionary.huawei \
-	radius/dictionary.iana \
 	radius/dictionary.iea \
-	radius/dictionary.infoblox \
 	radius/dictionary.infonet \
 	radius/dictionary.ipunplugged \
 	radius/dictionary.issanni \
-	radius/dictionary.itk \
+	radius/dictionary.itk  \
 	radius/dictionary.jradius \
-	radius/dictionary.juniper \
-	radius/dictionary.kineto \
-	radius/dictionary.karlnet \
+	radius/dictionary.juniper  \
+	radius/dictionary.karlnet  \
 	radius/dictionary.lancom \
-	radius/dictionary.livingston \
-	radius/dictionary.localweb \
+	radius/dictionary.livingston  \
+	radius/dictionary.localweb  \
 	radius/dictionary.lucent \
 	radius/dictionary.manzara \
-	radius/dictionary.meinberg \
-	radius/dictionary.merit \
-	radius/dictionary.meru \
-	radius/dictionary.microsoft \
-	radius/dictionary.mikrotik \
+	radius/dictionary.merit  \
+	radius/dictionary.microsoft  \
+	radius/dictionary.mikrotik  \
 	radius/dictionary.motorola \
 	radius/dictionary.motorola.wimax \
-	radius/dictionary.navini \
-	radius/dictionary.netscreen \
+	radius/dictionary.navini  \
+	radius/dictionary.netscreen  \
 	radius/dictionary.networkphysics \
 	radius/dictionary.nexans \
-	radius/dictionary.nokia \
+	radius/dictionary.nokia  \
 	radius/dictionary.nokia.conflict \
-	radius/dictionary.nomadix \
+	radius/dictionary.nomadix  \
 	radius/dictionary.nortel \
 	radius/dictionary.ntua \
 	radius/dictionary.openser \
 	radius/dictionary.packeteer \
-	radius/dictionary.paloalto \
 	radius/dictionary.patton \
-	radius/dictionary.perle \
-	radius/dictionary.propel \
+	radius/dictionary.propel  \
 	radius/dictionary.prosoft \
-	radius/dictionary.proxim \
-	radius/dictionary.purewave \
 	radius/dictionary.quiconnect \
-	radius/dictionary.quintum \
-	radius/dictionary.redcreek \
+	radius/dictionary.quintum  \
+	radius/dictionary.redback  \
+	radius/dictionary.redcreek  \
 	radius/dictionary.rfc2865 \
 	radius/dictionary.rfc2866 \
 	radius/dictionary.rfc2867 \
@@ -267,55 +245,34 @@ dist_radius_DATA = $(_CUSTOM_radius_dict_) \
 	radius/dictionary.rfc5904 \
 	radius/dictionary.rfc6519 \
 	radius/dictionary.rfc6572 \
-	radius/dictionary.rfc6677 \
-	radius/dictionary.rfc6911 \
-	radius/dictionary.rfc6929 \
-	radius/dictionary.rfc6930 \
-	radius/dictionary.rfc7055 \
-	radius/dictionary.rfc7155 \
-	radius/dictionary.rfc7268 \
-	radius/dictionary.riverbed \
 	radius/dictionary.riverstone \
-	radius/dictionary.ruckus \
 	radius/dictionary.roaringpenguin \
-	radius/dictionary.sg \
-	radius/dictionary.shasta \
-	radius/dictionary.shiva \
-	radius/dictionary.siemens \
+	radius/dictionary.shasta  \
+	radius/dictionary.shiva  \
 	radius/dictionary.slipstream \
 	radius/dictionary.sofaware \
-	radius/dictionary.sonicwall \
-	radius/dictionary.springtide \
-	radius/dictionary.starent \
-	radius/dictionary.starent.vsa1 \
-	radius/dictionary.surfnet \
-	radius/dictionary.symbol \
-	radius/dictionary.t_systems_nova \
-	radius/dictionary.telebit \
+	radius/dictionary.sonicwall  \
+	radius/dictionary.springtide  \
+	radius/dictionary.starent  \
+	radius/dictionary.t_systems_nova  \
+	radius/dictionary.telebit  \
 	radius/dictionary.telkom \
-	radius/dictionary.terena \
-	radius/dictionary.trapeze \
-	radius/dictionary.travelping \
+	radius/dictionary.trapeze  \
 	radius/dictionary.tropos \
-	radius/dictionary.ukerna \
-	radius/dictionary.unix \
-	radius/dictionary.usr \
+	radius/dictionary.ukerna  \
+	radius/dictionary.unix  \
+	radius/dictionary.usr  \
 	radius/dictionary.utstarcom \
-	radius/dictionary.valemount \
-	radius/dictionary.versanet \
+	radius/dictionary.valemount  \
+	radius/dictionary.versanet  \
 	radius/dictionary.vqp \
 	radius/dictionary.walabi \
 	radius/dictionary.waverider \
 	radius/dictionary.wichorus \
-	radius/dictionary.wimax \
-	radius/dictionary.wimax.alvarion \
+	radius/dictionary.wimax  \
 	radius/dictionary.wimax.wichorus \
-	radius/dictionary.wispr \
+	radius/dictionary.wispr  \
 	radius/dictionary.xedia \
-	radius/dictionary.xylan \
-	radius/dictionary.yubico \
-	radius/dictionary.zeus \
-	radius/dictionary.zte \
 	radius/dictionary.zyxel
 
 #
@@ -334,6 +291,9 @@ wimaxasncpdir = $(pkgdatadir)/wimaxasncp
 dist_wimaxasncp_DATA = \
 	wimaxasncp/dictionary.xml \
 	wimaxasncp/dictionary.dtd
+
+PLATFORM_PCAP_SRC = \
+	capture-pcap-util-unix.c
 
 if HAVE_PLUGINS
 -include plugins/Custom.make
@@ -361,17 +321,17 @@ include Makefile.common
 
 if ENABLE_STATIC
 if HAVE_GTK
-wireshark_gtk_LDFLAGS = -Wl,-static -all-static
+wireshark_LDFLAGS = -Wl,-static -all-static
 endif
 if HAVE_Qt
-wireshark_LDFLAGS = -Wl,-static -all-static
+wireshark_qt_LDFLAGS = -Wl,-static -all-static
 endif
 else
 if HAVE_GTK
-wireshark_gtk_LDFLAGS = -export-dynamic
+wireshark_LDFLAGS = -export-dynamic
 endif
 if HAVE_Qt
-wireshark_LDFLAGS = -export-dynamic
+wireshark_qt_LDFLAGS = -export-dynamic
 endif
 endif
 
@@ -397,12 +357,11 @@ endif
 # although it's also possible that -lgmodule is in GTK_LIBS but not
 # GLIB_LIBS (that's the case on my machine right now, for example).
 #
-wireshark_common_ldadd = \
-	capchild/libcapchild.a		\
-	caputils/libcaputils.a		\
+wireshark_ldadd = \
 	ui/libui.a			\
 	ui/libui_dirty.a		\
 	codecs/libcodec.a		\
+	filetap/libfiletap.la		\
 	wiretap/libwiretap.la		\
 	epan/libwireshark.la		\
 	wsutil/libwsutil.la		\
@@ -415,32 +374,49 @@ wireshark_common_ldadd = \
 	@APPLICATIONSERVICES_FRAMEWORKS@	\
 	@SYSTEMCONFIGURATION_FRAMEWORKS@	\
 	@COREFOUNDATION_FRAMEWORKS@	\
+	@PY_LIBS@			\
 	@LIBGCRYPT_LIBS@		\
 	@LIBGNUTLS_LIBS@		\
 	@LIBSMI_LDFLAGS@		\
-	@SBC_LIBS@			\
-	@GLIB_LIBS@
+	@PORTAUDIO_LIBS@		\
+	@GLIB_LIBS@			\
+	-lm
 
 if HAVE_Qt
-wireshark_SOURCES = $(WIRESHARK_COMMON_SRC) wireshark-qt.cpp
-wireshark_INCLUDES = $(WIRESHARK_COMMON_INCLUDES)
-wireshark_CFLAGS = $(AM_CLEAN_CFLAGS)
-wireshark_LDADD = \
+wireshark_qt_SOURCES = $(WIRESHARK_COMMON_SRC)
+wireshark_qt_INCLUDES = $(WIRESHARK_COMMON_INCLUDES)
+wireshark_qt_CFLAGS = $(AM_CLEAN_CFLAGS) $(py_dissectors_dir)
+wireshark_qt_LDADD = \
 	ui/qt/libqtui.a \
-	$(wireshark_common_ldadd) \
+	$(wireshark_ldadd) \
 	@Qt_LIBS@
+
+#
+# XXX - this makes wireshark_qt_LDFLAGS not work; we should figure out
+# another way to get wireshark-qt linked as a C++ program, perhaps by
+# having a top-level wireshark-qt.cpp file that contains main() and
+# hthat calls the UI code from ui/qt.
+#
+wireshark_qt_LINK = $(CXXLINK)
 endif
 
 if HAVE_GTK
-wireshark_gtk_SOURCES = $(WIRESHARK_COMMON_SRC)
-wireshark_gtk_INCLUDES = $(WIRESHARK_COMMON_INCLUDES)
-wireshark_gtk_CFLAGS = $(AM_CLEAN_CFLAGS)
-wireshark_gtk_LDADD = \
+wireshark_SOURCES = $(WIRESHARK_COMMON_SRC)
+wireshark_INCLUDES = $(WIRESHARK_COMMON_INCLUDES)
+wireshark_CFLAGS = $(AM_CLEAN_CFLAGS) $(py_dissectors_dir)
+wireshark_LDADD = \
 	ui/gtk/libgtkui.a \
-	$(wireshark_common_ldadd) \
-	@PORTAUDIO_LIBS@		\
+	$(wireshark_ldadd) \
 	@GTK_LIBS@
 endif
+
+# Ideally we could trigger automatic c++ linking here with
+#   nodist_EXTRA_wireshark_SOURCES = dummy.cpp
+# Unfortunately that check is done by automake and not configure.
+# We do the following to try to avoid using c++ to link Wireshark at
+# all times.
+nodist_EXTRA_wireshark_cxx_SOURCES = dummy.cpp
+wireshark_cxx_SOURCES =
 
 if ENABLE_STATIC
 tshark_LDFLAGS = -Wl,-static -all-static
@@ -450,8 +426,6 @@ endif
 
 # Libraries and plugin flags with which to link tshark.
 tshark_LDADD = \
-	capchild/libcapchild.a		\
-	caputils/libcaputils.a		\
 	ui/cli/libcliui.a		\
 	ui/libui.a			\
 	wiretap/libwiretap.la		\
@@ -468,11 +442,12 @@ tshark_LDADD = \
 	@KRB5_LIBS@			\
 	@SYSTEMCONFIGURATION_FRAMEWORKS@	\
 	@COREFOUNDATION_FRAMEWORKS@	\
+	@PY_LIBS@			\
 	@LIBGCRYPT_LIBS@		\
 	@LIBGNUTLS_LIBS@		\
-	@LIBSMI_LDFLAGS@
-
-tshark_CFLAGS = $(AM_CLEAN_CFLAGS)
+	@LIBSMI_LDFLAGS@		\
+	-lm
+tshark_CFLAGS = $(AM_CLEAN_CFLAGS) $(py_dissectors_dir)
 
 if ENABLE_STATIC
 tfshark_LDFLAGS = -Wl,-static -all-static
@@ -484,6 +459,7 @@ endif
 tfshark_LDADD = \
 	ui/cli/libcliui.a		\
 	ui/libui.a			\
+	filetap/libfiletap.la		\
 	wiretap/libwiretap.la		\
 	epan/libwireshark.la		\
 	wsutil/libwsutil.la		\
@@ -496,10 +472,11 @@ tfshark_LDADD = \
 	@KRB5_LIBS@			\
 	@SYSTEMCONFIGURATION_FRAMEWORKS@	\
 	@COREFOUNDATION_FRAMEWORKS@	\
+	@PY_LIBS@			\
 	@LIBGNUTLS_LIBS@		\
-	@LIBSMI_LDFLAGS@
-
-tfshark_CFLAGS = $(AM_CLEAN_CFLAGS)
+	@LIBSMI_LDFLAGS@		\
+	-lm
+tfshark_CFLAGS = $(AM_CLEAN_CFLAGS) $(py_dissectors_dir)
 
 if ENABLE_STATIC
 rawshark_LDFLAGS = -Wl,-static -all-static
@@ -509,7 +486,6 @@ endif
 
 # Libraries and plugin flags with which to link rawshark.
 rawshark_LDADD = \
-	caputils/libcaputils.a		\
 	ui/libui.a			\
 	wiretap/libwiretap.la		\
 	epan/libwireshark.la		\
@@ -525,17 +501,18 @@ rawshark_LDADD = \
 	@KRB5_LIBS@			\
 	@SYSTEMCONFIGURATION_FRAMEWORKS@	\
 	@COREFOUNDATION_FRAMEWORKS@	\
+	@PY_LIBS@			\
 	@LIBGCRYPT_LIBS@		\
 	@LIBGNUTLS_LIBS@		\
-	@LIBSMI_LDFLAGS@
-
-rawshark_CFLAGS = $(AM_CLEAN_CFLAGS)
+	@LIBSMI_LDFLAGS@		\
+	-lm
+rawshark_CFLAGS = $(AM_CLEAN_CFLAGS) $(py_dissectors_dir)
 
 # Libraries with which to link text2pcap.
 text2pcap_LDADD = \
 	wsutil/libwsutil.la		\
-	@GLIB_LIBS@
-
+	@GLIB_LIBS@			\
+	-lm
 # Don't turn on -Werror for text2pcap: its source includes text2pcap-scanner.c
 # which is generated (and therefore not always clean).
 # We could generate text2pcap.o as a library with -Werror but for now it
@@ -555,21 +532,21 @@ capinfos_LDADD = \
 	wsutil/libwsutil.la		\
 	@GLIB_LIBS@			\
 	@LIBGCRYPT_LIBS@
-capinfos_CFLAGS = $(AM_CLEAN_CFLAGS)
+capinfos_CFLAGS = $(AM_CLEAN_CFLAGS) $(py_dissectors_dir)
 
 # Libraries with which to link captype.
 captype_LDADD = \
 	wiretap/libwiretap.la		\
 	wsutil/libwsutil.la		\
 	@GLIB_LIBS@
-captype_CFLAGS = $(AM_CLEAN_CFLAGS)
+captype_CFLAGS = $(AM_CLEAN_CFLAGS) $(py_dissectors_dir)
 
 # Libraries with which to link editcap.
 editcap_LDADD = \
 	wiretap/libwiretap.la		\
 	wsutil/libwsutil.la		\
 	@GLIB_LIBS@
-editcap_CFLAGS = $(AM_CLEAN_CFLAGS)
+editcap_CFLAGS = $(AM_CLEAN_CFLAGS) $(py_dissectors_dir)
 
 # Libraries with which to link reordercap.
 reordercap_LDADD = \
@@ -587,8 +564,8 @@ randpkt_LDADD = \
 	@SOCKET_LIBS@			\
 	@NSL_LIBS@			\
 	@C_ARES_LIBS@			\
-	@ADNS_LIBS@
-
+	@ADNS_LIBS@			\
+	-lm
 randpkt_CFLAGS = $(AM_CLEAN_CFLAGS)
 
 # Libraries and plugin flags with which to link dftest.
@@ -606,11 +583,12 @@ dftest_LDADD = \
 	@C_ARES_LIBS@			\
 	@ADNS_LIBS@			\
 	@KRB5_LIBS@			\
+	@PY_LIBS@			\
 	@LIBGCRYPT_LIBS@		\
 	@LIBGNUTLS_LIBS@		\
-	@LIBSMI_LDFLAGS@
-
-dftest_CFLAGS = $(AM_CLEAN_CFLAGS)
+	@LIBSMI_LDFLAGS@		\
+	-lm
+dftest_CFLAGS = $(AM_CLEAN_CFLAGS) $(py_dissectors_dir)
 
 echld_test_LDADD = \
 	epan/libwireshark.la		\
@@ -621,7 +599,8 @@ echld_test_LDADD = \
 	@SOCKET_LIBS@			\
 	@NSL_LIBS@			\
 	@C_ARES_LIBS@			\
-	@ADNS_LIBS@
+	@ADNS_LIBS@			\
+	-lm
 
 echld_test_DEPENDENCIES = \
 	echld/libechld.la \
@@ -632,7 +611,6 @@ echld_test_CFLAGS = $(AM_CLEAN_CFLAGS)
 
 # Libraries with which to link dumpcap.
 dumpcap_LDADD = \
-	caputils/libcaputils.a		\
 	wsutil/libwsutil.la		\
 	@GLIB_LIBS@			\
 	@PCAP_LIBS@			\
@@ -646,8 +624,8 @@ dumpcap_LDFLAGS = $(PIE_LDFLAGS)
 
 # Common headers
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/wiretap \
-	$(LIBGNUTLS_CFLAGS) $(LIBGCRYPT_CFLAGS) $(LIBSMI_CFLAGS) \
-	@LUA_CFLAGS@ $(SBC_CFLAGS) -DTOP_SRCDIR=\"$(abs_top_srcdir)\"
+	$(LIBGNUTLS_CFLAGS) $(LIBGCRYPT_CFLAGS) $(LIBSMI_CFLAGS) $(PY_CFLAGS) \
+	@LUA_INCLUDES@ -DTOP_SRCDIR=\"$(abs_top_srcdir)\"
 
 #
 # Build the version string
@@ -710,7 +688,6 @@ MAINTAINERCLEANFILES =		\
 	ylwrap
 
 EXTRA_DIST = \
-	.mailmap		\
 	INSTALL.configure	\
 	Makefile.am.inc		\
 	Makefile.common		\
@@ -720,6 +697,7 @@ EXTRA_DIST = \
 	README.bsd		\
 	README.DECT		\
 	README.hpux		\
+	README.irix		\
 	README.linux		\
 	README.macos		\
 	README.tru64		\
@@ -731,16 +709,18 @@ EXTRA_DIST = \
 	aclocal-fallback/glib-2.0.m4 \
 	aclocal-fallback/gtk-2.0.m4 \
 	aclocal-fallback/gtk-3.0.m4 \
-	aclocal-fallback/ax_check_compile_flag.m4	\
-	aclocal-fallback/ax_gcc_x86_cpuid.m4	\
-	aclocal-fallback/ax_ext.m4	\
-	aclocal-fallback/ax_gcc_x86_avx_xgetbv.m4	\
 	aclocal-flags		\
 	adns_dll.dep		\
 	adns_dll.rc		\
 	autogen.sh		\
 	capinfos.c		\
 	captype.c		\
+	capture_win_ifnames.c	\
+	capture_win_ifnames.h	\
+	capture-wpcap.c		\
+	capture-wpcap.h		\
+	capture_wpcap_packet.c  \
+	capture_wpcap_packet.h  \
 	cfilters		\
 	colorfilters		\
 	config.h.win32		\
@@ -756,16 +736,17 @@ EXTRA_DIST = \
 	debian/headers-check.c	\
 	debian/libwireshark-data.install	\
 	debian/libwireshark-dev.install	\
-	debian/libwireshark0.install	\
-	debian/libwireshark0.symbols	\
+	debian/libwireshark5.install	\
+	debian/libwireshark5.symbols	\
 	debian/libwiretap-dev.install	\
-	debian/libwiretap0.docs	\
-	debian/libwiretap0.install	\
-	debian/libwiretap0.symbols	\
+	debian/libwiretap4.docs	\
+	debian/libwiretap4.install	\
+	debian/libwiretap4.symbols	\
 	debian/libwsutil-dev.install	\
-	debian/libwsutil0.install	\
-	debian/libwsutil0.symbols	\
+	debian/libwsutil4.install	\
+	debian/libwsutil4.symbols	\
 	debian/license-text-about-dialog	\
+	debian/patches/01_Disable-building-documentation-in-PDF-and-release-no.patch	\
 	debian/patches/04_asn2wrs_ply.patch	\
 	debian/patches/05_note-README-when-running-as-root.patch	\
 	debian/patches/06_release-version.patch	\
@@ -811,27 +792,24 @@ EXTRA_DIST = \
 	debian/wireshark-dev.manpages \
 	debian/wireshark-dev.prerm \
 	debian/wireshark-doc.docs	\
-	debian/wireshark-gtk.docs	\
-	debian/wireshark-gtk.install	\
-	debian/wireshark.manpages \
-	debian/wireshark.menu	\
 	debian/wireshark-qt.docs	\
 	debian/wireshark-qt.install	\
+	debian/wireshark.docs	\
+	debian/wireshark.install	\
+	debian/wireshark.manpages \
+	debian/wireshark.menu	\
 	dfilters		\
-	doxygen_global.cfg	\
 	doxygen.cfg.in		\
-	dumpcap.c		\
+	dumpcap.c	\
 	editcap.c		\
 	epan/print.ps		\
+	filetap/CMakeLists.txt	\
 	fix/FIX.xml		\
 	fix/FIX40.xml		\
 	fix/FIX41.xml		\
 	fix/FIX42.xml		\
 	fix/FIX43.xml		\
 	fix/FIX44.xml		\
-	fix/FIX50.xml		\
-	fix/FIX50SP1.xml	\
-	fix/FIX50SP2.xml	\
 	fix/README		\
 	fix/Values.xsl		\
 	fix/hfDecl.xsl		\
@@ -876,6 +854,9 @@ EXTRA_DIST = \
 	image/capture_comment_add.png	\
 	image/capture_comment_disabled.png	\
 	image/capture_comment_update.png	\
+	image/capture_start_24.png		\
+	image/capture_start_active_24.png	\
+	image/capture_stop_24.png		\
 	image/clist_ascend.xpm			\
 	image/clist_descend.xpm			\
 	image/copy-8.png			\
@@ -901,19 +882,12 @@ EXTRA_DIST = \
 	image/expert_indicators.svg	\
 	image/expert_none.png	\
 	image/expert_note.png	\
-	image/expert_ok.png	\
 	image/expert_warn.png	\
 	image/file_dlg_win32.rc \
+	image/filetap.rc.in	\
 	image/hi16-app-wireshark.png	\
 	image/hi32-app-wireshark.png	\
 	image/hi48-app-wireshark.png	\
-	image/languages/de.svg		\
-	image/languages/en.svg		\
-	image/languages/fr.svg		\
-	image/languages/it.svg		\
-	image/languages/ja_JP.svg	\
-	image/languages/pl.svg		\
-	image/languages/zh_CN.svg	\
 	image/layout_1.png		\
 	image/layout_2.png		\
 	image/layout_3.png		\
@@ -944,146 +918,6 @@ EXTRA_DIST = \
 	image/stock_dialog_warning_48.xpm	\
 	image/text2pcap.rc.in			\
 	image/tfshark.rc.in			\
-	image/toolbar/12x12/media-playback-start.png	\
-	image/toolbar/12x12/media-playback-start.svg	\
-	image/toolbar/12x12/media-playback-start@2x.png	\
-	image/toolbar/16x16/edit-find.png		\
-	image/toolbar/16x16/edit-find.svg		\
-	image/toolbar/16x16/edit-find@2x.png		\
-	image/toolbar/16x16/go-first.png		\
-	image/toolbar/16x16/go-first.svg		\
-	image/toolbar/16x16/go-first@2x.png		\
-	image/toolbar/16x16/go-jump.png			\
-	image/toolbar/16x16/go-jump.svg			\
-	image/toolbar/16x16/go-jump@2x.png		\
-	image/toolbar/16x16/go-last.png			\
-	image/toolbar/16x16/go-last.svg			\
-	image/toolbar/16x16/go-last@2x.png		\
-	image/toolbar/16x16/go-next.png			\
-	image/toolbar/16x16/go-next.svg			\
-	image/toolbar/16x16/go-next@2x.png		\
-	image/toolbar/16x16/go-previous.png		\
-	image/toolbar/16x16/go-previous.svg		\
-	image/toolbar/16x16/go-previous@2x.png		\
-	image/toolbar/16x16/x-capture-file-close.png	\
-	image/toolbar/16x16/x-capture-file-close.svg	\
-	image/toolbar/16x16/x-capture-file-close@2x.png	\
-	image/toolbar/16x16/x-capture-file-close@2x.svg	\
-	image/toolbar/16x16/x-capture-file-reload.png	\
-	image/toolbar/16x16/x-capture-file-reload.svg	\
-	image/toolbar/16x16/x-capture-file-reload@2x.png	\
-	image/toolbar/16x16/x-capture-file-save.png	\
-	image/toolbar/16x16/x-capture-file-save.svg	\
-	image/toolbar/16x16/x-capture-file-save@2x.png	\
-	image/toolbar/16x16/x-capture-file-save@2x.svg	\
-	image/toolbar/16x16/x-capture-options-gear.svg	\
-	image/toolbar/16x16/x-capture-options-wrench.svg	\
-	image/toolbar/16x16/x-capture-options.png	\
-	image/toolbar/16x16/x-capture-options@2x.png	\
-	image/toolbar/16x16/x-capture-restart-fin.svg	\
-	image/toolbar/16x16/x-capture-restart-triangle1.svg	\
-	image/toolbar/16x16/x-capture-restart-triangle2.svg	\
-	image/toolbar/16x16/x-capture-restart-turn1.svg	\
-	image/toolbar/16x16/x-capture-restart-turn2.svg	\
-	image/toolbar/16x16/x-capture-restart.png	\
-	image/toolbar/16x16/x-capture-restart@2x.png	\
-	image/toolbar/16x16/x-capture-start.on.png	\
-	image/toolbar/16x16/x-capture-start.on.svg	\
-	image/toolbar/16x16/x-capture-start.on@2x.png	\
-	image/toolbar/16x16/x-capture-start.png		\
-	image/toolbar/16x16/x-capture-start.svg		\
-	image/toolbar/16x16/x-capture-start@2x.png	\
-	image/toolbar/16x16/x-capture-stop-red.svg	\
-	image/toolbar/16x16/x-capture-stop-white.svg	\
-	image/toolbar/16x16/x-capture-stop.png		\
-	image/toolbar/16x16/x-capture-stop@2x.png	\
-	image/toolbar/16x16/x-colorize-packets.png	\
-	image/toolbar/16x16/x-colorize-packets.svg	\
-	image/toolbar/16x16/x-colorize-packets@2x.png	\
-	image/toolbar/16x16/x-resize-columns.png	\
-	image/toolbar/16x16/x-resize-columns.svg	\
-	image/toolbar/16x16/x-resize-columns@2x.png	\
-	image/toolbar/16x16/x-stay-last.png		\
-	image/toolbar/16x16/x-stay-last.svg		\
-	image/toolbar/16x16/x-stay-last@2x.png		\
-	image/toolbar/16x16/zoom-in.png			\
-	image/toolbar/16x16/zoom-in.svg			\
-	image/toolbar/16x16/zoom-in@2x.png		\
-	image/toolbar/16x16/zoom-original.png		\
-	image/toolbar/16x16/zoom-original.svg		\
-	image/toolbar/16x16/zoom-original@2x.png	\
-	image/toolbar/16x16/zoom-out.png		\
-	image/toolbar/16x16/zoom-out.svg		\
-	image/toolbar/16x16/zoom-out@2x.png		\
-	image/toolbar/24x24/edit-find.png	\
-	image/toolbar/24x24/edit-find.svg	\
-	image/toolbar/24x24/edit-find@2x.png	\
-	image/toolbar/24x24/go-first.png	\
-	image/toolbar/24x24/go-first.svg	\
-	image/toolbar/24x24/go-first@2x.png	\
-	image/toolbar/24x24/go-jump.png		\
-	image/toolbar/24x24/go-jump.svg		\
-	image/toolbar/24x24/go-jump@2x.png	\
-	image/toolbar/24x24/go-last.png		\
-	image/toolbar/24x24/go-last.svg		\
-	image/toolbar/24x24/go-last@2x.png	\
-	image/toolbar/24x24/go-next.png		\
-	image/toolbar/24x24/go-next.svg		\
-	image/toolbar/24x24/go-next@2x.png	\
-	image/toolbar/24x24/go-previous.png	\
-	image/toolbar/24x24/go-previous.svg	\
-	image/toolbar/24x24/go-previous@2x.png	\
-	image/toolbar/24x24/x-capture-file-close.png		\
-	image/toolbar/24x24/x-capture-file-close.svg		\
-	image/toolbar/24x24/x-capture-file-close@2x.png		\
-	image/toolbar/24x24/x-capture-file-close@2x.svg		\
-	image/toolbar/24x24/x-capture-file-reload.png		\
-	image/toolbar/24x24/x-capture-file-reload.svg		\
-	image/toolbar/24x24/x-capture-file-reload@2x.png	\
-	image/toolbar/24x24/x-capture-file-save.png		\
-	image/toolbar/24x24/x-capture-file-save.svg		\
-	image/toolbar/24x24/x-capture-file-save@2x.png		\
-	image/toolbar/24x24/x-capture-file-save@2x.svg		\
-	image/toolbar/24x24/x-capture-options-gear.svg		\
-	image/toolbar/24x24/x-capture-options-wrench.svg	\
-	image/toolbar/24x24/x-capture-options.png		\
-	image/toolbar/24x24/x-capture-options@2x.png		\
-	image/toolbar/24x24/x-capture-restart-fin.svg		\
-	image/toolbar/24x24/x-capture-restart-triangle1.svg	\
-	image/toolbar/24x24/x-capture-restart-triangle2.svg	\
-	image/toolbar/24x24/x-capture-restart-turn1.svg		\
-	image/toolbar/24x24/x-capture-restart-turn2.svg		\
-	image/toolbar/24x24/x-capture-restart.png		\
-	image/toolbar/24x24/x-capture-restart@2x.png		\
-	image/toolbar/24x24/x-capture-start.on.png		\
-	image/toolbar/24x24/x-capture-start.on.svg		\
-	image/toolbar/24x24/x-capture-start.on@2x.png		\
-	image/toolbar/24x24/x-capture-start.png		\
-	image/toolbar/24x24/x-capture-start.svg		\
-	image/toolbar/24x24/x-capture-start@2x.png	\
-	image/toolbar/24x24/x-capture-stop-red.svg	\
-	image/toolbar/24x24/x-capture-stop-white.svg	\
-	image/toolbar/24x24/x-capture-stop.png		\
-	image/toolbar/24x24/x-capture-stop@2x.png	\
-	image/toolbar/24x24/x-colorize-packets.png	\
-	image/toolbar/24x24/x-colorize-packets.svg	\
-	image/toolbar/24x24/x-colorize-packets@2x.png	\
-	image/toolbar/24x24/x-resize-columns-motion.svg	\
-	image/toolbar/24x24/x-resize-columns.png	\
-	image/toolbar/24x24/x-resize-columns.svg	\
-	image/toolbar/24x24/x-resize-columns@2x.png	\
-	image/toolbar/24x24/x-stay-last.png		\
-	image/toolbar/24x24/x-stay-last.svg		\
-	image/toolbar/24x24/x-stay-last@2x.png		\
-	image/toolbar/24x24/zoom-in.png			\
-	image/toolbar/24x24/zoom-in.svg			\
-	image/toolbar/24x24/zoom-in@2x.png		\
-	image/toolbar/24x24/zoom-original.png		\
-	image/toolbar/24x24/zoom-original.svg		\
-	image/toolbar/24x24/zoom-original@2x.png	\
-	image/toolbar/24x24/zoom-out.png		\
-	image/toolbar/24x24/zoom-out.svg		\
-	image/toolbar/24x24/zoom-out@2x.png		\
 	image/toolbar.qrc			\
 	image/toolbar/analyze_24.xpm 		\
 	image/toolbar/audio_player_24.xpm	\
@@ -1096,7 +930,15 @@ EXTRA_DIST = \
 	image/toolbar/capture_filter_24.xpm	\
 	image/toolbar/capture_interfaces_16.png	\
 	image/toolbar/capture_interfaces_24.png	\
+	image/toolbar/capture_options_16.png	\
+	image/toolbar/capture_options_24.png	\
 	image/toolbar/capture_prepare_16.xpm	\
+	image/toolbar/capture_restart_16.png	\
+	image/toolbar/capture_restart_24.png	\
+	image/toolbar/capture_start_16.png	\
+	image/toolbar/capture_start_24.png	\
+	image/toolbar/capture_stop_16.png	\
+	image/toolbar/capture_stop_24.png	\
 	image/toolbar/checkbox_16.xpm		\
 	image/toolbar/colorize_24.xpm		\
 	image/toolbar/conversations_16.xpm	\
@@ -1136,10 +978,11 @@ EXTRA_DIST = \
 	image/toolbar/remote_globe_16.png	\
 	image/toolbar/remote_sat_16.png	\
 	image/toolbar/resize_columns_24.xpm	\
-	image/toolbar/svg-to-png.sh	\
 	image/toolbar/telephone_16.xpm	\
 	image/toolbar/telephony_16.xpm	\
 	image/toolbar/time_24.xpm	\
+	image/toolbar/toolbar_wireshark_file_16.png	\
+	image/toolbar/toolbar_wireshark_file_24.png	\
 	image/toolbar/voip_flow_24.xpm	\
 	image/toolbar/web_support_24.xpm	\
 	image/toolbar/wep_closed_24.xpm \
@@ -1158,7 +1001,6 @@ EXTRA_DIST = \
 	image/WiresharkDoc-128.png	\
 	image/WiresharkDoc-256.png	\
 	image/wiretap.rc.in	\
-	image/wsicon.qrc	\
 	image/wsicon.svg	\
 	image/wsicon16.png	\
 	image/wsicon24.png	\
@@ -1172,12 +1014,6 @@ EXTRA_DIST = \
 	image/wsicon-ask.png	\
 	image/wsicon-ask.svg	\
 	image/wsiconcap.svg	\
-	image/wsiconcap16.png	\
-	image/wsiconcap24.png	\
-	image/wsiconcap32.png	\
-	image/wsiconcap48.png	\
-	image/wsiconcap64.png	\
-	image/wsiconcap128.png	\
 	image/wsiconcap256.png	\
 	image/wsiconcap512.png	\
 	image/wsiconcap1024.png	\
@@ -1190,13 +1026,11 @@ EXTRA_DIST = \
 	image/wssplash.png	\
 	ipmap.html		\
 	macosx-setup.sh		\
-	macosx-support-lib-patches/glib-gconvert.c.patch \
+        macosx-support-lib-patches/glib-gconvert.c.patch \
 	macosx-support-lib-patches/glib-pkgconfig.patch \
 	macosx-support-lib-patches/gnutls-pkgconfig.patch \
 	macosx-support-lib-patches/portaudio-pa_mac_core.h.patch \
 	macosx-support-lib-patches/portaudio-pa_mac_core.c.patch \
-	macosx-support-lib-patches/qt-fix-pc-file \
-	macosx-support-lib-patches/qt-fix-pc-files \
 	make-version.pl		\
 	manuf			\
 	manuf.tmpl		\
@@ -1212,28 +1046,31 @@ EXTRA_DIST = \
 	wireshark.pc.in		\
 	wka.tmpl		\
 	CMakeLists.txt		\
-	CMakeListsCustom.txt.example		\
 	cmakeconfig.h.in	\
 	wsutil/CMakeLists.txt	\
 	CMakeOptions.txt	\
 	wiretap/CMakeLists.txt	\
 	README.cmake		\
 	ConfigureChecks.cmake	\
-	cmake/modules/CheckCCompilerFlag.cmake	\
-	cmake/modules/CheckCLinkerFlag.cmake	\
+	cmake/TestFileOffsetBits.c	\
+	cmake/TestLargeFiles.c.cmakein	\
+	cmake/TestWindowsFSeek.c	\
 	cmake/modules/CMakeInstallDirs.cmake	\
 	cmake/modules/COPYING-CMAKE-SCRIPTS	\
+	cmake/modules/CheckCCompilerFlag.cmake	\
+	cmake/modules/CheckCLinkerFlag.cmake	\
+	cmake/modules/FeatureSummary.cmake	\
 	cmake/modules/FindADNS.cmake		\
 	cmake/modules/FindAIRPCAP.cmake		\
 	cmake/modules/FindASCIIDOC.cmake	\
 	cmake/modules/FindCAP.cmake		\
 	cmake/modules/FindCARES.cmake		\
-	cmake/modules/FindChocolatey.cmake	\
-	cmake/modules/FindDOXYGEN.cmake		\
 	cmake/modules/FindFOP.cmake		\
-	cmake/modules/FindFreetype.cmake	\
 	cmake/modules/FindGCRYPT.cmake		\
 	cmake/modules/FindGEOIP.cmake		\
+	cmake/modules/FindChocolatey.cmake	\
+	cmake/modules/FindDOXYGEN.cmake		\
+	cmake/modules/FindFreetype.cmake	\
 	cmake/modules/FindGLIB2.cmake		\
 	cmake/modules/FindGMODULE2.cmake	\
 	cmake/modules/FindGNUTLS.cmake		\
@@ -1242,48 +1079,35 @@ EXTRA_DIST = \
 	cmake/modules/FindGTK3.cmake		\
 	cmake/modules/FindHtmlViewer.cmake	\
 	cmake/modules/FindKERBEROS.cmake	\
+	cmake/modules/FindNL.cmake		\
 	cmake/modules/FindLEX.cmake		\
 	cmake/modules/FindLUA.cmake		\
 	cmake/modules/FindLYNX.cmake		\
 	cmake/modules/FindM.cmake		\
-	cmake/modules/FindNL.cmake		\
-	cmake/modules/FindOS_X_FRAMEWORKS.cmake	\
 	cmake/modules/FindPCAP.cmake		\
 	cmake/modules/FindPOD.cmake		\
 	cmake/modules/FindPORTAUDIO.cmake	\
-	cmake/modules/FindPowerShell.cmake	\
 	cmake/modules/FindSBC.cmake		\
 	cmake/modules/FindSED.cmake		\
 	cmake/modules/FindSETCAP.cmake		\
 	cmake/modules/FindSH.cmake		\
 	cmake/modules/FindSMI.cmake		\
-	cmake/modules/FindWinSparkle.cmake		\
-	cmake/modules/FindWireshark.cmake	\
 	cmake/modules/FindWSWinLibs.cmake	\
 	cmake/modules/FindXMLLINT.cmake		\
 	cmake/modules/FindXSLTPROC.cmake	\
 	cmake/modules/FindYACC.cmake		\
 	cmake/modules/FindYAPP.cmake		\
 	cmake/modules/FindZLIB.cmake		\
-	cmake/modules/gmxTestLargeFiles.cmake	\
-	cmake/modules/hhc.cmake	\
 	cmake/modules/LICENSE.txt		\
-	cmake/modules/LocatePythonModule.cmake	\
-	cmake/modules/readme.txt		\
 	cmake/modules/UseABICheck.cmake		\
 	cmake/modules/UseAsn2Wrs.cmake		\
 	cmake/modules/UseCheckAPI.cmake		\
-	cmake/modules/UseCustomIncludes.cmake		\
 	cmake/modules/UseLemon.cmake		\
 	cmake/modules/UseMakeDissectorReg.cmake	\
 	cmake/modules/UseMakeTapReg.cmake	\
 	cmake/modules/UseWinLibs.cmake		\
-	cmake/modules/WiresharkConfig.cmake.in	\
-	cmake/modules/WiresharkConfigVersion.cmake.in \
-	cmake/modules/WiresharkPlugin.cmake	\
-	cmake/TestFileOffsetBits.c	\
-	cmake/TestLargeFiles.c.cmakein	\
-	cmake/TestWindowsFSeek.c	\
+	cmake/modules/gmxTestLargeFiles.cmake	\
+	cmake/modules/readme.txt		\
 	ui/win32/Makefile.nmake			\
 	ui/win32/console_win32.c		\
 	ui/win32/console_win32.h		\
@@ -1309,42 +1133,13 @@ endif
 endif
 
 
-DIST_SUBDIRS = \
-	asn1		\
-	capchild	\
-	caputils	\
-	codecs		\
-	doc		\
-	epan		\
-	echld		\
-	ui		\
-	ui/cli		\
-	ui/gtk		\
-	ui/qt		\
-	help		\
-	packaging	\
-	plugins		\
-	tools		\
-	wiretap		\
-	wsutil		\
-	docbook
+DIST_SUBDIRS = asn1 codecs doc epan echld filetap ui ui/cli ui/gtk ui/qt help packaging plugins tools wiretap wsutil docbook
 
-SUBDIRS = \
-	tools			\
-	wsutil			\
-	wiretap			\
-	epan			\
-	capchild		\
-	caputils		\
-	@echld_dir@		\
-	@plugins_dir@		\
-	packaging		\
-	help			\
-	ui			\
-	@wireshark_SUBDIRS@	\
-	ui/cli			\
-	.			\
-	doc
+if HAVE_PLUGINS
+SUBDIRS = tools wsutil wiretap filetap epan @echld_dir@ plugins packaging help ui @wireshark_SUBDIRS@ ui/cli . doc
+else
+SUBDIRS = tools wsutil wiretap filetap epan @echld_dir@ packaging help ui @wireshark_SUBDIRS@ ui/cli . doc
+endif
 
 help/faq.txt: $(srcdir)/help/faq.py
 	$(AM_V_GEN)(cd help ; \
@@ -1374,136 +1169,37 @@ patch-bzip2: distdir
 	fi
 	$(am__remove_distdir)
 
-#
-# Install icons and other desktop files for (for use with GNOME, KDE, or
-# any other freedesktop.org-compliant desktops).
-#
-# We use $(datadir).  If the desktop doesn't look for them there,
-# the desktop is broken; the latest XDG Base Directory Specification
-# at
-#
-#    http://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html
-#
-# says
-#
-# $XDG_DATA_DIRS defines the preference-ordered set of base directories
-# to search for data files in addition to the $XDG_DATA_HOME base
-# directory. The directories in $XDG_DATA_DIRS should be seperated with a
-# colon ':'.
-#
-# If $XDG_DATA_DIRS is either not set or empty, a value equal to
-# /usr/local/share/:/usr/share/ should be used.
-#
-# so:
-#
-#    if this is configured to install under /usr, that should Just Work,
-#    unless XDG_DATA_DIRS is set incorrectly or the desktop isn't
-#    compliant with the latest version of the spec;
-#
-#    if this installs under the default /usr/share, that should Just Work,
-#    unless XDG_DATA_DIRS is set incorrectly or the desktop isn't
-#    compliant with the latest version of the spec;
-#
-#    if this is configured to install somewhere else, whoever configured
-#    it should also have made sure that XDG_DATA_DIRS was set correctly
-#    and, if that doesn't work, the desktop isn't compliant with the
-#    latest version of the spec.
-#
-# We install these as part of the standard installation process, just
-# as, for example, Inkscape does with its icons.  See bug 10737.
+# Install some desktop files (for use with GNOME, KDE, or any other freedesktop.org-compliant desktops)
+# No, these do not go into $(datarootdir): the desktop won't look for them there.
+# Yes, that violate's autofoo's principle of relocatability.
+# What we (probably) should do is check `pkg-config --variable=prefix gtk+-2.0` to know where
+# to install this stuff...
 #
 # Do not use the -T flag to the install command, as it's not portable.
 # Some versions of install don't support a -T flag at all, and the
 # FreeBSD install command has a -T flag that takes an argument and
 # that has completely different semantics.
-#
-# We neither need nor want any of this on OS X, nor do we want it if
-# we're not building Wireshark (that being the only desktop app).
-#
-install-data-local:
-if BUILDING_WIRESHARK
-if NOT_OS_X
-	mkdir -p $(DESTDIR)$(datadir)/mime/packages
-	install -m 644 $(srcdir)/wireshark-mime-package.xml $(DESTDIR)$(datadir)/mime/packages/wireshark.xml
-	mkdir -p $(DESTDIR)$(datadir)/applications
+install_desktop_files:
+	mkdir -p $(DESTDIR)/usr/share/{mime/packages,applications}
+	install -m 644 $(srcdir)/wireshark-mime-package.xml $(DESTDIR)/usr/share/mime/packages/wireshark.xml
 	if test x$(DESKTOP_FILE_INSTALL) != x ; then \
-		$(DESKTOP_FILE_INSTALL) --dir $(DESTDIR)$(datadir)/applications $(srcdir)/wireshark.desktop; \
+		$(DESKTOP_FILE_INSTALL) --dir $(DESTDIR)/usr/share/applications $(srcdir)/wireshark.desktop; \
 	else \
-		install -m 644 $(srcdir)/wireshark.desktop $(DESTDIR)$(datadir)/applications/wireshark.desktop; \
+		install -m 644 $(srcdir)/wireshark.desktop $(DESTDIR)/usr/share/applications/wireshark.desktop; \
 	fi
 	for size in 16 24 32 48 64 128 256; \
 	do \
-		mkdir -p $(DESTDIR)$(datadir)/icons/hicolor/$${size}x$${size}/apps ; \
-		install -m 644 $(srcdir)/image/wsicon$${size}.png $(DESTDIR)$(datadir)/icons/hicolor/$${size}x$${size}/apps/wireshark.png ; \
-		mkdir -p $(DESTDIR)$(datadir)/icons/hicolor/$${size}x$${size}/mimetypes ; \
-		install -m 644 $(srcdir)/image/WiresharkDoc-$${size}.png $(DESTDIR)$(datadir)/icons/hicolor/$${size}x$${size}/mimetypes/application-wireshark-doc.png ; \
+		mkdir -p $(DESTDIR)/usr/share/icons/hicolor/$${size}x$${size}/{apps,mimetypes} ; \
+		install -m 644 $(srcdir)/image/wsicon$${size}.png $(DESTDIR)/usr/share/icons/hicolor/$${size}x$${size}/apps/wireshark.png ; \
+		install -m 644 $(srcdir)/image/WiresharkDoc-$${size}.png $(DESTDIR)/usr/share/icons/hicolor/$${size}x$${size}/mimetypes/application-wireshark-doc.png ; \
 	done
-	mkdir -p $(DESTDIR)$(datadir)/icons/hicolor/scalable/apps
-	install -m 644 $(srcdir)/image/wsicon.svg $(DESTDIR)$(datadir)/icons/hicolor/scalable/apps/wireshark.svg
-endif
-endif
-
-uninstall-local:
-if BUILDING_WIRESHARK
-if NOT_OS_X
-	rm -f $(DESTDIR)$(datadir)/mime/packages/wireshark.xml
-	rm -f $(DESTDIR)$(datadir)/applications/wireshark.desktop
-	for size in 16 24 32 48 64 128 256; \
-	do \
-		rm -f $(DESTDIR)$(datadir)/icons/hicolor/$${size}x$${size}/apps/wireshark.png ; \
-		rm -f $(DESTDIR)$(datadir)/icons/hicolor/$${size}x$${size}/mimetypes/application-wireshark-doc.png ; \
-	done
-	rm -f $(DESTDIR)$(datadir)/icons/hicolor/scalable/apps/wireshark.svg
-endif
-endif
-
-install-data-hook: update-databases-and-caches-install
-uninstall-hook: update-databases-and-caches-uninstall
-
-#
-# XXX - which of this stuff can, and should, we do ourselves?
-#
-# If we're "installing" under $(DESTDIR) as part of the process of
-# building a package, we probably don't need to, and shouldn't, do
-# any of this.
-#
-# If we're installing for use, we may need to do some of this; which
-# of them do we need to tell where to search, especially if we're
-# installing somewhere other than under /usr or /usr/local?
-#
-# What if we're installing in the user's home directory?
-#
-# What if we're installing under /opt?
-#
-# We only need to run ldconfig on systems where it's necessary in order
-# to update a shared library cache to know about our shared libraries.
-#
-# We only need to run update-desktop-database and update-mime-database
-# on freedesktop.org desktops.
-#
-# We only need to run gtk-update-icon-cache if we're installing a GTK+
-# version of Wireshark.
-#
-# We neither need nor want any of this on OS X, nor do we want it if
-# we're not building Wireshark (that being the only desktop app).
-#
-update-databases-and-caches-common:
-if BUILDING_WIRESHARK
-if NOT_OS_X
-	@echo "You may need to run \"ldconfig\" as root"
-	@echo "You may need to run \"update-desktop-database $(datadir)/applications\""
-	@echo "You may need to run \"update-mime-database $(datadir)/mime\""
-	@echo "You may need to run \"gtk-update-icon-cache -f -t $(datadir)/icons/hicolor\""
-endif
-endif
-
-update-databases-and-caches-install: update-databases-and-caches-common
-
-update-databases-and-caches-uninstall: update-databases-and-caches-common
+	mkdir -p $(DESTDIR)/usr/share/icons/hicolor/scalable/apps
+	install -m 644 image/wsicon.svg $(DESTDIR)/usr/share/icons/hicolor/scalable/apps/wireshark.svg
+	@echo "Don't forget to run \"update-desktop-database\" and \"update-mime-database /usr/share/mime\""
 
 # Used by svr4-package and osx-package
-# We load top_stagedir with an absolute path so that libtool doesn't freak.
-top_stagedir=$(abs_top_builddir)/packaging/staging
+# We load top_stagedir with an explicit path so that libtool doesn't freak.
+top_stagedir=`cd $(top_builddir) && pwd`/packaging/staging
 stagedir=$(top_stagedir)/$(PACKAGE).inst
 
 host_cpu=@host_cpu@
@@ -1543,15 +1239,21 @@ rpm-package: dist
 		false; \
 	fi
 
+debian-package: debian/rules
+	@if test x$(HAVE_DPKG_BUILDPACKAGE) = xyes ; then \
+		dpkg-buildpackage -rfakeroot -us -uc ; \
+	else \
+		echo "Error: Debian packaging tools not found." ; \
+		echo "Package build abandoned." ; \
+	fi
+
 # XXX - This assumes we're building from the source directory.
 osx-app: $(PROGRAMS) $(SCRIPTS) $(MANS) $(DATA) packaging/macosx/Info.plist
 	@if test x$(HAVE_OSX_PACKAGING) = xyes ; then \
 		rm -rf $(stagedir) ; \
 		$(MAKE) DESTDIR=$(stagedir) install; \
-		cd $(srcdir)/packaging/macosx ; \
-		./osx-app.sh @OSX_APP_FLAGS@ \
-			--create-bundle \
-			--binary-path ../staging/$(PACKAGE).inst$(bindir) ; \
+		cd $(srcdir)/packaging/macosx ;  \
+		./osx-app.sh @OSX_APP_FLAGS@ -bp ../staging/$(PACKAGE).inst$(bindir) ; \
 	else \
 		echo "Error: OS X packaging tools not found." ; \
 		echo "Package build abandoned." ; \
@@ -1563,7 +1265,7 @@ packaging/macosx/COPYING.txt: COPYING
 
 osx-package: osx-app packaging/macosx/COPYING.txt
 	@if test x$(HAVE_OSX_PACKAGING) = xyes ; then \
-		cd $(srcdir)/packaging/macosx ; \
+		cd $(srcdir)/packaging/macosx ;  \
 		chmod +x ./osx-dmg.sh ; \
 		./osx-dmg.sh @OSX_DMG_FLAGS@ ; \
 	fi
@@ -1571,13 +1273,14 @@ osx-package: osx-app packaging/macosx/COPYING.txt
 osx-install: osx-app
 	@if test x$(HAVE_OSX_PACKAGING) = xyes ; then \
 		echo "Copying Wireshark.app to /Applications" ; \
-		cp -pr $(srcdir)/packaging/macosx/Wireshark.app /Applications ; \
+		cp -pr $(srcdir)/packaging/macosx/Wireshark.app /Applications ;  \
 	fi
 
 clean-local:
 	rm -rf $(top_stagedir)
 
 dumpabi:
+	$(MAKE) -C filetap dumpabi-libfiletap
 	$(MAKE) -C wiretap dumpabi-libwiretap
 	$(MAKE) -C epan dumpabi-libwireshark
 	$(MAKE) -C wsutil dumpabi-libwsutil
@@ -1586,14 +1289,13 @@ checkapi_local:
 	$(PERL) $(top_srcdir)/tools/checkAPIs.pl -build \
 	-sourcedir=$(srcdir) \
 	$(TSHARK_TAP_SRC) \
-	$(wireshark_gtk_SOURCES)
-#	$(EXTRA_wireshark_gtk_SOURCES)
+	$(wireshark_SOURCES)
+#	$(EXTRA_wireshark_SOURCES)
 
 checkapi: checkapi_local
 	cd wiretap && $(MAKE) checkapi
+	cd filetap && $(MAKE) checkapi
 	cd codecs && $(MAKE) checkapi
-	cd capchild && $(MAKE) checkapi
-	cd caputils && $(MAKE) checkapi
 	cd ui && $(MAKE) checkapi
 	cd ui/gtk && $(MAKE) checkapi
 ##	cd epan && $(MAKE) checkapi
@@ -1609,8 +1311,6 @@ wsar_html: doxygen.cfg doxygen_global.cfg FORCE
 if HAVE_DOXYGEN
 	rm -rf wsar_html
 	cd epan && $(MAKE) $@
-	cd capchild && $(MAKE) $@
-	cd caputils && $(MAKE) $@
 	cd ui && $(MAKE) $@
 	(umask 022 ; $(DOXYGEN) doxygen.cfg)
 endif
@@ -1620,3 +1320,4 @@ if HAVE_DOXYGEN
 	rm -f wsar_html.zip
 	zip -rq wsar_html.zip wsar_html
 endif
+

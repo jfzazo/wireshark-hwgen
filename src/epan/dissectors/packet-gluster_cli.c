@@ -33,6 +33,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 #include "packet-rpc.h"
@@ -253,7 +255,7 @@ static const vsff gluster_cli_2_proc[] = {
 		gluster_cli_2_common_call, gluster_cli_2_common_reply
 	},
 	{
-		GLUSTER_CLI_2_GET_VOLUME, "GET_VOLUME",
+       		GLUSTER_CLI_2_GET_VOLUME, "GET_VOLUME",
 		gluster_cli_2_common_call, gluster_cli_2_common_reply
 	},
 	{
@@ -536,15 +538,3 @@ proto_reg_handoff_gluster_cli(void)
 							hf_gluster_cli_2_proc);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

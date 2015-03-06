@@ -27,11 +27,15 @@
 
 #include "config.h"
 
+#include <glib.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 
+#include "wtap.h"
 #include "wtap-int.h"
+#include <wsutil/buffer.h>
 #include "file_wrappers.h"
 #include "packetlogger.h"
 
@@ -57,7 +61,7 @@ static gboolean packetlogger_read_packet(wtap *wth, FILE_T fh, struct wtap_pkthd
 					 Buffer *buf, int *err,
 					 gchar **err_info);
 
-wtap_open_return_val packetlogger_open(wtap *wth, int *err, gchar **err_info)
+int packetlogger_open(wtap *wth, int *err, gchar **err_info)
 {
 	gboolean little_endian = FALSE;
 	packetlogger_header_t pl_hdr;
@@ -67,14 +71,15 @@ wtap_open_return_val packetlogger_open(wtap *wth, int *err, gchar **err_info)
 	if(!packetlogger_read_header(&pl_hdr, wth->fh, little_endian,
 	    err, err_info)) {
 		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+			return -1;
+		return 0;
 	}
 
-	if (!wtap_read_bytes(wth->fh, &type, 1, err, err_info)) {
-		if (*err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+	if (file_read(&type, 1, wth->fh) <= 0) {
+		*err = file_error(wth->fh, err_info);
+		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+			return -1;
+		return 0;
 	}
 
 	/*
@@ -95,11 +100,11 @@ wtap_open_return_val packetlogger_open(wtap *wth, int *err, gchar **err_info)
 	/* Verify this file belongs to us */
 	if (!((8 <= pl_hdr.len) && (pl_hdr.len < 65536) &&
 	      (type < 0x04 || type == 0xFB || type == 0xFC || type == 0xFE || type == 0xFF)))
-		return WTAP_OPEN_NOT_MINE;
+		return 0;
 
 	/* No file header. Reset the fh to 0 so we can read the first packet */
 	if (file_seek(wth->fh, 0, SEEK_SET, err) == -1)
-		return WTAP_OPEN_ERROR;
+		return -1;
 
 	/* This is a PacketLogger file */
 	packetlogger = (packetlogger_t *)g_malloc(sizeof(packetlogger_t));
@@ -112,9 +117,9 @@ wtap_open_return_val packetlogger_open(wtap *wth, int *err, gchar **err_info)
 
 	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_PACKETLOGGER;
 	wth->file_encap = WTAP_ENCAP_PACKETLOGGER;
-	wth->file_tsprec = WTAP_TSPREC_USEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_USEC;
 
-	return WTAP_OPEN_MINE; /* Our kind of file */
+	return 1; /* Our kind of file */
 }
 
 static gboolean
@@ -146,12 +151,9 @@ static gboolean
 packetlogger_read_header(packetlogger_header_t *pl_hdr, FILE_T fh,
 			 gboolean little_endian, int *err, gchar **err_info)
 {
-	if (!wtap_read_bytes_or_eof(fh, &pl_hdr->len, 4, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &pl_hdr->ts_secs, 4, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &pl_hdr->ts_usecs, 4, err, err_info))
-		return FALSE;
+	wtap_file_read_expected_bytes(&pl_hdr->len, 4, fh, err, err_info);
+	wtap_file_read_expected_bytes(&pl_hdr->ts_secs, 4, fh, err, err_info);
+	wtap_file_read_expected_bytes(&pl_hdr->ts_usecs, 4, fh, err, err_info);
 
 	/* Convert multi-byte values to host endian */
 	if (little_endian) {
@@ -195,7 +197,6 @@ packetlogger_read_packet(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr, Buffer 
 	}
 
 	phdr->rec_type = REC_TYPE_PACKET;
-	phdr->pkt_encap = wth->file_encap;
 	phdr->presence_flags = WTAP_HAS_TS;
 
 	phdr->len = pl_hdr.len - 8;
@@ -206,16 +207,3 @@ packetlogger_read_packet(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr, Buffer 
 
 	return wtap_read_packet_bytes(fh, buf, phdr->caplen, err, err_info);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

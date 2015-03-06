@@ -230,23 +230,21 @@ static char* param_get_packet_count(char** err) {
 
 
 
-static echld_bool_t param_set_dfilter(char* val , char** err) {
+static echld_bool_t param_set_dfilter(char* val , char** err _U_) {
 	dfilter_t *dfn = NULL;
-	gchar *err_msg;
 
 	if (child.state != IDLE && child.state != DONE ) {
 		*err = g_strdup("Only while idle or done");
 		return FALSE;
+	} else if ( dfilter_compile(val, &dfn) ) {
+		if (child.dfilter) g_free(child.dfilter);
+		if (child.df) dfilter_free(child.df);
+		child.df = dfn;
+		child.dfilter = g_strdup(val);
+		return TRUE;
 	} else {
-		if ( dfilter_compile(val, &dfn, err) ) {
-			if (child.dfilter) g_free(child.dfilter);
-			if (child.df) dfilter_free(child.df);
-			child.df = dfn;
-			child.dfilter = g_strdup(val);
-			return TRUE;
-		} else {
-			return FALSE;
-		}
+		*err = g_strdup(dfilter_error_msg);
+		return FALSE;
 	}
 }
 
@@ -278,6 +276,7 @@ static char* param_get_file_list(char** err) {
 	GError* gerror  = NULL;
 	GDir* dir = g_dir_open(".", 0, &gerror);
 	GString* str = g_string_new("{ what='file_list', files=[");
+	char* s;
 	const char* file;
 
 	if (gerror) {
@@ -293,7 +292,9 @@ static char* param_get_file_list(char** err) {
 	g_string_truncate(str, str->len-2); /* ',\n' */
 	g_string_append(str, "]}");
 
-	return g_string_free(str,FALSE);
+	s=str->str;
+	g_string_free(str,FALSE);
+	return s;
 }
 
 #ifdef PCAP_NG_DEFAULT

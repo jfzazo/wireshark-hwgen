@@ -43,21 +43,9 @@ typedef struct _ws_ip
 } ws_ip;
 
 void capture_ip(const guchar *, int, int, packet_counts *);
+guint16 ip_checksum(const guint8 *ptr, int len);
 
 /* Export the DSCP extended value-string table for other protocols */
 WS_DLL_PUBLIC value_string_ext dscp_vals_ext;
 
 #endif
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

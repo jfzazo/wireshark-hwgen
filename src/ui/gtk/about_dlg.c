@@ -28,8 +28,7 @@
 #include <gtk/gtk.h>
 
 #include <wsutil/filesystem.h>
-#include <wsutil/copyright_info.h>
-#include <wsutil/ws_version_info.h>
+#include <wsutil/plugins.h>
 #ifdef HAVE_LIBSMI
 #include <epan/oids.h>
 #endif
@@ -41,6 +40,7 @@
 #endif
 
 #include "../log.h"
+#include "../version_info.h"
 #include "../register.h"
 
 #include "ui/last_open_dir.h"
@@ -53,6 +53,7 @@
 #include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/main.h"
 #include "ui/gtk/plugins_dlg.h"
+#include "ui/gtk/gui_utils.h"
 #include "ui/gtk/stock_icons.h"
 #include "ui/gtk/wssplash.h"
 
@@ -215,11 +216,17 @@ splash_update(register_action_e action, const char *message, gpointer client_dat
       case RA_PLUGIN_REGISTER:
 	action_msg = "Registering plugins ...";
 	break;
+      case RA_PYTHON_REGISTER:
+	action_msg = "Registering Python dissectors ...";
+	break;
       case RA_HANDOFF:
 	action_msg = "Handing off dissector ...";
 	break;
       case RA_PLUGIN_HANDOFF:
 	action_msg = "Handing off plugins ...";
+	break;
+      case RA_PYTHON_HANDOFF:
+	action_msg = "Handing off Python dissectors ...";
 	break;
       case RA_LUA_PLUGINS:
 	action_msg = "Loading Lua plugins ...";
@@ -245,6 +252,9 @@ splash_update(register_action_e action, const char *message, gpointer client_dat
 					  preferences and configuration */
 #ifdef HAVE_LUA
       ul_count += wslua_count_plugins (); /* get count of lua plugins */
+#endif
+#ifdef HAVE_PYTHON
+      ul_count += 2;   /* additional 2 for python register and handoff */
 #endif
     }
 
@@ -306,7 +316,7 @@ about_wireshark_page_new(void)
 
   /* Construct the message string */
   message = g_strdup_printf(
-       "Version %s\n"
+       "Version " VERSION "%s\n"
        "\n"
        "%s"
        "\n"
@@ -317,7 +327,7 @@ about_wireshark_page_new(void)
        "Wireshark is Open Source Software released under the GNU General Public License.\n"
        "\n"
        "Check the man page and http://www.wireshark.org for more information.",
-       get_ws_vcs_version_info(), get_copyright_info(), comp_info_str->str,
+       wireshark_gitversion, get_copyright_info(), comp_info_str->str,
        runtime_info_str->str);
 
   msg_label = gtk_label_new(message);
@@ -381,7 +391,7 @@ about_folders_page_new(void)
   char *path;
   static const gchar *titles[] = { "Name", "Folder", "Typical Files"};
   GtkWidget *scrolledwindow;
-#if defined(HAVE_LIBSMI) || defined(HAVE_GEOIP) || defined(HAVE_EXTCAP)
+#if defined (HAVE_LIBSMI) || defined (HAVE_GEOIP)
   gint i;
   gchar **resultArray;
 #endif
@@ -450,6 +460,12 @@ about_folders_page_new(void)
       "dissector plugins");
 #endif
 
+#ifdef HAVE_PYTHON
+  /* global python bindings */
+  about_folders_row(table, "Python Bindings", get_wspython_dir(),
+      "python bindings");
+#endif
+
 #ifdef HAVE_GEOIP
   /* GeoIP */
   path = geoip_db_get_paths();
@@ -474,18 +490,6 @@ about_folders_page_new(void)
 		      "SMI MIB/PIB search path");
   g_strfreev(resultArray);
   g_free(path);
-#endif
-
-#ifdef HAVE_EXTCAP
-  /* extcap */
-  constpath = get_extcap_dir();
-
-  resultArray = g_strsplit(constpath, G_SEARCHPATH_SEPARATOR_S, 10);
-
-  for(i = 0; resultArray[i]; i++)
-    about_folders_row(table, "Extcap path", g_strstrip(resultArray[i]),
-		      "Extcap Plugins search path");
-  g_strfreev(resultArray);
 #endif
 
   gtk_container_add(GTK_CONTAINER(scrolledwindow), table);

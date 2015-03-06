@@ -27,9 +27,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/dissectors/packet-tcp.h>
 #include <epan/prefs.h>
-#include "packet-tcp.h"
 
 void proto_register_hdfs(void);
 void proto_reg_handoff_hdfs(void);
@@ -535,8 +537,8 @@ dissect_hdfs_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 
     if (tree) {
 
-        proto_item *ti;
-        proto_tree *hdfs_tree;
+        proto_item *ti = NULL;
+        proto_tree *hdfs_tree = NULL;
 
         ti = proto_tree_add_item(tree, proto_hdfs, tvb, 0, -1, ENC_NA);
         hdfs_tree = proto_item_add_subtree(ti, ett_hdfs);
@@ -654,8 +656,7 @@ dissect_hdfs_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 }
 
 /* determine PDU length of protocol  */
-static guint get_hdfs_message_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                                  int offset _U_, void *data _U_)
+static guint get_hdfs_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset _U_)
 {
     int len = tvb_reported_length(tvb);
 
@@ -1071,7 +1072,7 @@ proto_reg_handoff_hdfs(void)
     static guint saved_tcp_port;
 
     if (!initialized) {
-        dissector_add_for_decode_as("tcp.port", hdfs_handle);
+        dissector_add_handle("tcp.port", hdfs_handle);  /* for "decode as" */
         initialized = TRUE;
     } else if (saved_tcp_port != 0) {
         dissector_delete_uint("tcp.port", saved_tcp_port, hdfs_handle);

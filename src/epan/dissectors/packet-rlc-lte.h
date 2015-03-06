@@ -52,12 +52,11 @@ typedef struct rlc_lte_info
     guint8          rlcMode;
     guint8          direction;
     guint8          priority;
-    guint8          UMSequenceNumberLength;
     guint16         ueid;
     guint16         channelType;
     guint16         channelId;
     guint16         pduLength;
-    gboolean        extendedLiField;
+    guint8          UMSequenceNumberLength;
 } rlc_lte_info;
 
 
@@ -87,10 +86,8 @@ typedef struct rlc_lte_tap_info {
 
 
 /* Configure number of PDCP SN bits to use for DRB channels. */
-void set_rlc_lte_drb_pdcp_seqnum_length(packet_info *pinfo, guint16 ueid, guint8 drbid, guint8 userplane_seqnum_length);
+void set_rlc_lte_drb_pdcp_seqnum_length(guint16 ueid, guint8 drbid, guint8 userplane_seqnum_length);
 
-/* Configure LI field for AM DRB channels. */
-void set_rlc_lte_drb_li_field(packet_info *pinfo, guint16 ueid, guint8 drbid, gboolean ul_ext_li_field, gboolean dl_ext_li_field);
 
 /*****************************************************************/
 /* UDP framing format                                            */
@@ -146,8 +143,6 @@ void set_rlc_lte_drb_li_field(packet_info *pinfo, guint16 ueid, guint8 drbid, gb
 #define RLC_LTE_CHANNEL_ID_TAG      0x07
 /* 2 bytes, network order */
 
-#define RLC_LTE_EXT_LI_FIELD_TAG    0x08
-/* 0 byte, tag presence indicates that AM DRB PDU is using an extended LI field of 15 bits */
 
 /* RLC PDU. Following this tag comes the actual RLC PDU (there is no length, the PDU
    continues until the end of the frame) */

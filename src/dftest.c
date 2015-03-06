@@ -20,7 +20,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,9 +35,7 @@
 #include <epan/prefs.h>
 #include <epan/dfilter/dfilter.h>
 
-#ifdef HAVE_PLUGINS
 #include <wsutil/plugins.h>
-#endif
 #include <wsutil/filesystem.h>
 #include <wsutil/privileges.h>
 #include <wsutil/report_err.h>
@@ -60,7 +58,6 @@ main(int argc, char **argv)
 	int		gpf_open_errno, gpf_read_errno;
 	int		pf_open_errno, pf_read_errno;
 	dfilter_t	*df;
-	gchar		*err_msg;
 
 	/*
 	 * Get credential information for later use.
@@ -81,15 +78,6 @@ main(int argc, char **argv)
 
 	timestamp_set_type(TS_RELATIVE);
 	timestamp_set_seconds_type(TS_SECONDS_DEFAULT);
-
-#ifdef HAVE_PLUGINS
-	/* Register all the plugin types we have. */
-	epan_register_plugin_types(); /* Types known to libwireshark */
-
-	/* Scan for plugins.  This does *not* call their registration routines;
-	   that's done later. */
-	scan_plugins();
-#endif
 
 	/* Register all dissectors; we must do this before checking for the
 	   "-g" flag, as the "-g" flag dumps a list of fields registered
@@ -145,9 +133,8 @@ main(int argc, char **argv)
 	printf("Filter: \"%s\"\n", text);
 
 	/* Compile it */
-	if (!dfilter_compile(text, &df, &err_msg)) {
-		fprintf(stderr, "dftest: %s\n", err_msg);
-		g_free(err_msg);
+	if (!dfilter_compile(text, &df)) {
+		fprintf(stderr, "dftest: %s\n", dfilter_error_msg);
 		epan_cleanup();
 		exit(2);
 	}
@@ -205,16 +192,3 @@ write_failure_message(const char *filename, int err)
 	fprintf(stderr, "dftest: An error occurred while writing to the file \"%s\": %s.\n",
 		filename, g_strerror(err));
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

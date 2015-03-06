@@ -22,6 +22,7 @@
  */
 
 #include "config.h"
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/to_str.h>
 
@@ -76,7 +77,6 @@ static int hf_pp_pdu_payload = -1;
 static int hf_pp_pid_type = -1;
 static int hf_pp_pid_len = -1;
 static int hf_pp_pid_value = -1;
-static int hf_pp_pid_pad_bytes = -1;
 
 /* Begin field and enum declarations */
 enum
@@ -367,8 +367,8 @@ value_string_ext pp_pid_vals_ext = VALUE_STRING_EXT_INIT(pp_pid_vals);
 static guint dissect_one_tlv(tvbuff_t *tvb, proto_tree *tree,
                 guint offset)
 {
-    proto_item *ti;
-    proto_tree *tlv_tree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_pp_tlv, &ti, "Property");
+    proto_item *ti = proto_tree_add_text(tree, tvb, offset, 0, "Property");
+    proto_tree *tlv_tree = proto_item_add_subtree(ti, ett_pp_tlv);
 
     guint len;
     guint pad_len;
@@ -377,13 +377,13 @@ static guint dissect_one_tlv(tvbuff_t *tvb, proto_tree *tree,
     const char *name = val_to_str_ext(type, &pp_pid_vals_ext, TYPE_UNKNOWN);
     proto_item_append_text(ti, " : %s", name);
 
-    proto_tree_add_item(tlv_tree, hf_pp_pid_type, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tlv_tree, hf_pp_pid_type, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     len = tvb_get_ntohs(tvb, offset);
     proto_item_set_len(ti, 4 + len);
 
-    proto_tree_add_item(tlv_tree, hf_pp_pid_len, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tlv_tree, hf_pp_pid_len, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     proto_tree_add_item(tlv_tree, hf_pp_pid_value, tvb, offset, len, ENC_NA);
@@ -392,7 +392,7 @@ static guint dissect_one_tlv(tvbuff_t *tvb, proto_tree *tree,
     pad_len = ~(offset-1) & 3;
     if(pad_len)
     {
-        proto_tree_add_item(tlv_tree, hf_pp_pid_pad_bytes, tvb, offset, pad_len, ENC_NA);
+        proto_tree_add_text(tlv_tree, tvb, offset, pad_len, "%d %s", pad_len, pad_len > 1 ? "pad bytes" : "pad byte");
         offset += pad_len;
     }
     return offset;
@@ -417,7 +417,7 @@ dissect_multiple_get_pids(tvbuff_t *tvb, proto_item *tree, guint offset, guint l
 
     while(offset < end)
     {
-        proto_tree_add_item(tree, hf_pp_get_type, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_item(tree, hf_pp_get_type, tvb, offset, 2, ENC_NA);
         offset += 2;
     }
     return len;
@@ -432,18 +432,18 @@ dissect_data_payload(tvbuff_t *tvb, proto_item *tree, guint offset, guint len)
 
     while(offset < end)
     {
-        proto_item *ti;
-        proto_tree *data_tree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_pp_data, &ti, "xDMX Data: ");
-        proto_tree_add_item(data_tree, hf_pp_data_encoding, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_item *ti = proto_tree_add_text(tree, tvb, offset, 0, "xDMX Data: ");
+        proto_tree *data_tree = proto_item_add_subtree(ti, ett_pp_data);
+        proto_tree_add_item(data_tree, hf_pp_data_encoding, tvb, offset, 2, ENC_NA);
         offset += 2;
         blklen = tvb_get_ntohs(tvb, offset);
-        proto_tree_add_item(data_tree, hf_pp_data_len, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_item(data_tree, hf_pp_data_len, tvb, offset, 2, ENC_NA);
         offset += 2;
         proto_tree_add_item(data_tree, hf_pp_reserved, tvb, offset++, 1, ENC_NA);
         stc = tvb_get_guint8(tvb, offset);
-        proto_tree_add_item(data_tree, hf_pp_data_start_code, tvb, offset++, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(data_tree, hf_pp_data_start_code, tvb, offset++, 1, ENC_NA);
         xdmx = tvb_get_ntohs(tvb, offset);
-        proto_tree_add_item(data_tree, hf_pp_data_dst, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_item(data_tree, hf_pp_data_dst, tvb, offset, 2, ENC_NA);
         offset += 2;
         proto_tree_add_item(data_tree, hf_pp_data_levels, tvb, offset, blklen, ENC_NA);
         proto_item_append_text(ti, "%d Channels at xDMX %d (Univ %d.%d) StartCode: %d ", blklen, xdmx,  xdmx / 512 + 1, xdmx % 512,  stc);
@@ -455,37 +455,36 @@ dissect_data_payload(tvbuff_t *tvb, proto_item *tree, guint offset, guint len)
 static guint
 dissect_arp_reply(tvbuff_t *tvb, proto_tree *tree, guint offset, guint len)
 {
-    proto_tree_add_item(tree, hf_pp_arp_id,     tvb, offset,   4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_pp_arp_id, tvb, offset, 4, ENC_NA);
     offset += 4;
-    proto_tree_add_item(tree, hf_pp_arp_ip,     tvb, offset,   4, ENC_NA);
+    proto_tree_add_item(tree, hf_pp_arp_ip, tvb, offset, 4, ENC_NA);
     offset += 4;
-    proto_tree_add_item(tree, hf_pp_arp_manuf,  tvb, offset++, 1, ENC_BIG_ENDIAN);
-    proto_tree_add_item(tree, hf_pp_arp_class,  tvb, offset++, 1, ENC_BIG_ENDIAN);
-    proto_tree_add_item(tree, hf_pp_arp_type,   tvb, offset++, 1, ENC_BIG_ENDIAN);
-    proto_tree_add_item(tree, hf_pp_arp_numdmx, tvb, offset++, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_pp_arp_manuf, tvb, offset++, 1, ENC_NA);
+    proto_tree_add_item(tree, hf_pp_arp_class, tvb, offset++, 1, ENC_NA);
+    proto_tree_add_item(tree, hf_pp_arp_type, tvb, offset++, 1, ENC_NA);
+    proto_tree_add_item(tree, hf_pp_arp_numdmx, tvb, offset++, 1, ENC_NA);
     return len;
 }
 
 static guint
 dissect_one_pdu(tvbuff_t *tvb, proto_tree *tree, guint offset)
 {
-    proto_item *ti;
-    proto_tree *pdu_tree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_pp_pdu, &ti, "PDU");
+    proto_item *ti = proto_tree_add_text(tree, tvb, offset, 0, "PDU");
+    proto_tree *pdu_tree = proto_item_add_subtree(ti, ett_pp_pdu);
 
     guint len;
 
     guint type = tvb_get_ntohs(tvb, offset);
     const char *name = val_to_str(type, pp_pdu_vals, TYPE_UNKNOWN);
-
     proto_item_append_text(ti, " : %s", name);
 
-    proto_tree_add_item(pdu_tree, hf_pp_pdu_type, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(pdu_tree, hf_pp_pdu_type, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     len = tvb_get_ntohs(tvb, offset);
     proto_item_set_len(ti, 4 + len);
 
-    proto_tree_add_item(pdu_tree, hf_pp_pdu_len, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(pdu_tree, hf_pp_pdu_len, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     switch(type)
@@ -526,19 +525,21 @@ dissect_multiple_pdus(tvbuff_t *tvb, proto_item *ti,
 static int
 dissect_header(tvbuff_t *tvb, proto_tree *parent, guint offset)
 {
-    proto_tree *tree = proto_tree_add_subtree(parent, tvb, offset, PATHPORT_HEADER_LENGTH, ett_pathport, NULL, "Header");
+    proto_item *ti = proto_tree_add_item(parent, proto_pathport, tvb, offset, PATHPORT_HEADER_LENGTH, ENC_NA);
+    proto_tree *tree = proto_item_add_subtree(ti, ett_pathport);
+    proto_item_set_text(ti, "Header");
 
-    proto_tree_add_item(tree, hf_pp_prot,     tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_pp_prot,     tvb, offset, 2, ENC_NA);
     offset += 2;
-    proto_tree_add_item(tree, hf_pp_version,  tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_pp_version,  tvb, offset, 2, ENC_NA);
     offset += 2;
-    proto_tree_add_item(tree, hf_pp_seq,      tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_pp_seq,      tvb, offset, 2, ENC_NA);
     offset += 2;
     proto_tree_add_item(tree, hf_pp_reserved, tvb, offset, 6, ENC_NA);
     offset += 6;
-    proto_tree_add_item(tree, hf_pp_src,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_pp_src,      tvb, offset, 4, ENC_NA);
     offset += 4;
-    proto_tree_add_item(tree, hf_pp_dst,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_pp_dst,      tvb, offset, 4, ENC_NA);
     offset += 4;
     return offset;
 }
@@ -546,7 +547,7 @@ dissect_header(tvbuff_t *tvb, proto_tree *parent, guint offset)
 static gboolean
 packet_is_pathport(tvbuff_t *tvb)
 {
-    if(tvb_captured_length(tvb) < PATHPORT_MIN_LENGTH)
+    if(tvb_length(tvb) < PATHPORT_MIN_LENGTH)
         return FALSE;
 
     if(tvb_get_ntohs(tvb, 0) != PATHPORT_PROTO_MAGIC)
@@ -583,7 +584,7 @@ static int dissect_pathport_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree
     /* Set the info column to reflect the first PDU in the packet */
     col_clear(pinfo->cinfo, COL_INFO);
     srcid = tvb_get_ntohl(tvb, PATHPORT_HEADER_SRCID_OFFSET);
-    type  = tvb_get_ntohs(tvb, PATHPORT_HEADER_LENGTH);
+    type = tvb_get_ntohs(tvb, PATHPORT_HEADER_LENGTH);
 
     if(type == PP_ARP_REQUEST)
     {
@@ -618,7 +619,7 @@ static int dissect_pathport_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 
     pathport_tree = proto_item_add_subtree(ti, ett_pathport);
     offset = dissect_header(tvb, pathport_tree, PATHPORT_HEADER_OFFSET);
-    remaining_len = tvb_reported_length_remaining(tvb, offset);
+    remaining_len = tvb_reported_length(tvb) - PATHPORT_HEADER_LENGTH;
     offset = dissect_multiple_pdus(tvb, tree, offset, remaining_len);
 
     return offset;
@@ -644,45 +645,47 @@ dissect_pathport_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
 }
 
 /* Register the protocol with Wireshark.
+ *
+ * This format is require because a script is used to build the C function that
+ * calls all the protocol registration.
  */
 void
 proto_register_pathport(void)
 {
     static hf_register_info hf[] = {
 /* Packet Header */
-        {&hf_pp_prot,               {"Protocol", "pathport.prot", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_reserved,           {"Reserved", "pathport.resv", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_version,            {"Version", "pathport.version", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_seq,                {"Sequence", "pathport.seq", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_src,                {"Source ID", "pathport.src", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_dst,                {"Destination ID", "pathport.dst", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+        {&hf_pp_prot,               {"Protocol", "pathport.prot", FT_UINT16, BASE_HEX, NULL, 0x0, "", HFILL }},
+        {&hf_pp_reserved,           {"Reserved", "pathport.resv", FT_BYTES, BASE_NONE, NULL, 0x0, "", HFILL }},
+        {&hf_pp_version,            {"Version", "pathport.version", FT_UINT16, BASE_HEX, NULL, 0x0, "", HFILL }},
+        {&hf_pp_seq,                {"Sequence", "pathport.seq", FT_UINT16, BASE_DEC, NULL, 0x0, "", HFILL }},
+        {&hf_pp_src,                {"Source ID", "pathport.src", FT_UINT32, BASE_HEX, NULL, 0x0, "", HFILL }},
+        {&hf_pp_dst,                {"Destination ID", "pathport.dst", FT_UINT32, BASE_HEX, NULL, 0x0, "", HFILL }},
 
 /* PDU Header */
-        {&hf_pp_pdu_type,           {"PDU", "pathport.pdu", FT_UINT16, BASE_HEX, VALS(pp_pdu_vals), 0x0, NULL, HFILL }},
-        {&hf_pp_pdu_len,            {"Length", "pathport.len", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_pdu_payload,        {"Payload", "pathport.payload", FT_BYTES, 0, NULL, 0x0, NULL, HFILL }},
+        {&hf_pp_pdu_type,           {"PDU", "pathport.pdu", FT_UINT16, BASE_HEX, VALS(pp_pdu_vals), 0x0, "", HFILL }},
+        {&hf_pp_pdu_len,            {"Length", "pathport.len", FT_UINT16, BASE_DEC, NULL, 0x0, "", HFILL }},
+        {&hf_pp_pdu_payload,        {"Payload", "pathport.payload", FT_BYTES, 0, NULL, 0x0, "", HFILL }},
 
 /* Property structures */
-        {&hf_pp_get_type,           {"Get", "pathport.get.pid", FT_UINT16, BASE_HEX | BASE_EXT_STRING, &pp_pid_vals_ext, 0x0, NULL, HFILL }},
-        {&hf_pp_pid_type,           {"Property", "pathport.pid", FT_UINT16, BASE_HEX | BASE_EXT_STRING, &pp_pid_vals_ext, 0x0, NULL, HFILL }},
-        {&hf_pp_pid_len,            {"Length", "pathport.pid.len", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_pid_value,          {"Value", "pathport.pid.value", FT_BYTES, 0, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_pid_pad_bytes,      {"Pad bytes", "pathport.pid.pad_bytes", FT_BYTES, 0, NULL, 0x0, NULL, HFILL }},
+        {&hf_pp_get_type,           {"Get", "pathport.get.pid", FT_UINT16, BASE_HEX | BASE_EXT_STRING, &pp_pid_vals_ext, 0x0, "", HFILL }},
+        {&hf_pp_pid_type,           {"Property", "pathport.pid", FT_UINT16, BASE_HEX | BASE_EXT_STRING, &pp_pid_vals_ext, 0x0, "", HFILL }},
+        {&hf_pp_pid_len,            {"Length", "pathport.pid.len", FT_UINT16, BASE_DEC, NULL, 0x0, "", HFILL }},
+        {&hf_pp_pid_value,          {"Value", "pathport.pid.value", FT_BYTES, 0, NULL, 0x0, "", HFILL }},
 
 /* Pathport XDMX Data */
-        {&hf_pp_data_encoding,      {"Data Encoding", "pathport.data.encoding", FT_UINT16, BASE_HEX, VALS(pp_data_encoding_vals), 0x0, NULL, HFILL }},
-        {&hf_pp_data_start_code,    {"DMX Start Code", "pathport.data.startcode", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_data_len,           {"Data Length", "pathport.data.len", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_data_dst,           {"xDMX Destination", "pathport.data.dst", FT_UINT16, BASE_HEX, NULL, 0x0,NULL, HFILL }},
-        {&hf_pp_data_levels,        {"Levels", "pathport.data.levels", FT_NONE, 0, NULL, 0x0, NULL, HFILL }},
+        {&hf_pp_data_encoding,      {"Data Encoding", "pathport.data.encoding", FT_UINT16, BASE_HEX, VALS(pp_data_encoding_vals), 0x0, "", HFILL }},
+        {&hf_pp_data_start_code,    {"DMX Start Code", "pathport.data.startcode", FT_UINT8, BASE_HEX, NULL, 0x0, "", HFILL }},
+        {&hf_pp_data_len,           {"Data Length", "pathport.data.len", FT_UINT16, BASE_HEX, NULL, 0x0, "", HFILL }},
+        {&hf_pp_data_dst,           {"xDMX Destination", "pathport.data.dst", FT_UINT16, BASE_HEX, NULL, 0x0,"", HFILL }},
+        {&hf_pp_data_levels,        {"Levels", "pathport.data.levels", FT_NONE, 0, NULL, 0x0, "", HFILL }},
 
 /* PP_ARP Reply structures */
-        {&hf_pp_arp_id,             {"ID", "pathport.arp.id", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_arp_manuf,          {"Manufacturer", "pathport.arp.manuf", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_arp_class,          {"Device Class", "pathport.arp.class", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_arp_type,           {"Device Type", "pathport.arp.type", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_arp_numdmx,         {"Subcomponents", "pathport.arp.numdmx", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_pp_arp_ip,             {"IP", "pathport.arp.ip", FT_IPv4, 0, NULL, 0x0, NULL, HFILL }}
+        {&hf_pp_arp_id,             {"ID", "pathport.arp.id", FT_UINT32, BASE_HEX, NULL, 0x0, "", HFILL }},
+        {&hf_pp_arp_manuf,          {"Manufacturer", "pathport.arp.manuf", FT_UINT8, BASE_HEX, NULL, 0x0, "", HFILL }},
+        {&hf_pp_arp_class,          {"Device Class", "pathport.arp.class", FT_UINT8, BASE_HEX, NULL, 0x0, "", HFILL }},
+        {&hf_pp_arp_type,           {"Device Type", "pathport.arp.type", FT_UINT8, BASE_HEX, NULL, 0x0, "", HFILL }},
+        {&hf_pp_arp_numdmx,         {"Subcomponents", "pathport.arp.numdmx", FT_UINT8, BASE_HEX, NULL, 0x0, "", HFILL }},
+        {&hf_pp_arp_ip,             {"IP", "pathport.arp.ip", FT_IPv4, 0, NULL, 0x0, "", HFILL }}
     };
 
     /* Setup protocol subtree array */

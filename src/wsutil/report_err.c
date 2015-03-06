@@ -30,6 +30,7 @@
 #include "config.h"
 
 #include <glib.h>
+#include <stdarg.h>
 #include "report_err.h"
 
 static void (*report_failure_func)(const char *, va_list);
@@ -93,16 +94,3 @@ report_write_failure(const char *filename, int err)
 {
 	(*report_write_failure_func)(filename, err);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

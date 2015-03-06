@@ -2,10 +2,10 @@
 # the file README.windows and the Developer's Guide (available online).
 
 ##### Program name #####
-# Changing the name is experimental and may break the installer/uninstaller and possibly other stuff.
-# Application data will still be under the same dir as Wireshark so preference files, profiles, and etc
+# Changing the name is experimental and may break the installer/unistaller and possibly other stuff.
+# Application data will still be under the same dir as Wireshark so perference files profiles etc
 # will be shared with a "normal" Wireshark installation.
-# Note that support libraries need to be in PROGRAM_NAME-libs...
+# Note that suport libararies needs to be in PROGRAM_NAME-libs...
 
 !IFNDEF PROGRAM_NAME
 PROGRAM_NAME=Wireshark
@@ -28,26 +28,31 @@ WIRESHARK_TARGET_PLATFORM=win32
 
 ##### Versions #####
 
-# The VCS's description of our build. Updated by make-version.pl
-VCS_REVISION=0
+# The Git description of our build. Updated by make-version.pl
+GIT_REVISION=0
 
 # The current Wireshark version. Recommended: Leave unchanged.
 # Updated by make-version.pl
 VERSION_MAJOR=1
-VERSION_MINOR=99
-VERSION_MICRO=2
-VERSION_BUILD=$(VCS_REVISION)
+VERSION_MINOR=12
+VERSION_MICRO=4
+VERSION_BUILD=$(GIT_REVISION)
 
 # Local build information. Recommended: Unique string for your
 # environment, e.g. "-JackStackBarbecue". Updated by make-version.pl
 # Defaults to the environment variable WIRESHARK_VERSION_EXTRA
 
-VERSION_EXTRA=$(WIRESHARK_VERSION_EXTRA)
+VERSION_EXTRA=
 
 # The version of the wiretap library. Recommended: Leave unchanged.
 WTAP_VERSION_MAJOR=$(VERSION_MAJOR)
 WTAP_VERSION_MINOR=$(VERSION_MINOR)
 WTAP_VERSION_MICRO=0
+
+# The version of the filetap library. Recommended: Leave unchanged.
+FTAP_VERSION_MAJOR=$(VERSION_MAJOR)
+FTAP_VERSION_MINOR=$(VERSION_MINOR)
+FTAP_VERSION_MICRO=0
 
 ##### Directories #####
 
@@ -58,9 +63,9 @@ WTAP_VERSION_MICRO=0
 #
 !IFNDEF WIRESHARK_LIB_DIR
 !IFDEF WIRESHARK_BASE_DIR
-WIRESHARK_LIB_DIR=$(WIRESHARK_BASE_DIR)\$(PROGRAM_NAME)-$(WIRESHARK_TARGET_PLATFORM)-libs
+WIRESHARK_LIB_DIR=$(WIRESHARK_BASE_DIR)\$(PROGRAM_NAME)-$(WIRESHARK_TARGET_PLATFORM)-libs-1.12
 !ELSE
-WIRESHARK_LIB_DIR=C:\$(PROGRAM_NAME)-$(WIRESHARK_TARGET_PLATFORM)-libs
+WIRESHARK_LIB_DIR=C:\$(PROGRAM_NAME)-$(WIRESHARK_TARGET_PLATFORM)-libs-1.12
 !ENDIF
 !ENDIF
 
@@ -190,7 +195,31 @@ MSVC_VARIANT=MSVC2010EE
 NASM=$(WIRESHARK_LIB_DIR)\nasm-2.09.08\nasm.exe
 
 #
-# The Python interpreter is used as part of the buildsystem
+# Optional: the Python library enables scripting support.
+#
+# If you don't have the Python library, comment this line out, so that
+# PYTHON_EMBED isn't defined.
+#
+# NOTE: The Python library must have been compiled with the same
+# compiler (MSVC_VARIANT) as Wireshark. Known python.org Python
+# CRT versions:
+#
+# Python version    CRT (32-bit)    CRT (64-bit)
+# 2.4.4             7.1             ?
+# 2.6.1             9.0             ?
+# 2.6.2             ?               9.0
+# 2.7.1             9.0             9.0
+# 3.2.2             9.0             9.0
+#
+# If you versions of Python and Visual C++ use different CRTs
+# comment this out.
+#
+# XXX The DLL path in epan/wspython/wspy_libws.py likely needs to
+# be fixed before this is enabled by default.
+#PYTHON_EMBED=1
+
+#
+# Optional: the Python interpreter is used as part of the buildsystem
 #
 # This will override the automatic detection below.
 #PYTHON_VER=27
@@ -209,10 +238,7 @@ NASM=$(WIRESHARK_LIB_DIR)\nasm-2.09.08\nasm.exe
 
 # Find native Python automatically if PYTHON(_DIR) wasn't defined
 !IF !DEFINED(PYTHON) && !DEFINED(PYTHON_DIR)
-!IF EXIST(c:\tools\python2\python.exe)
-# Chocolatey default
-PYTHON_DIR=C:\tools\python2
-!ELSE IF EXIST(c:\Python27\python.exe)
+!IF EXIST(c:\Python27\python.exe)
 PYTHON_VER=27
 !ELSE IF EXIST(c:\Python26\python.exe)
 PYTHON_VER=26
@@ -232,11 +258,6 @@ PYTHON="$(PYTHON_DIR)\python.exe"
 PATH=$(PYTHON_DIR);$(PATH)
 !ENDIF
 
-# If all else fails, try to find it on the PATH
-!IF !DEFINED(PYTHON)
-PYTHON=python
-!ENDIF
-
 #### Save files as pcap-ng by default. Comment out to use pcap instead. ####
 PCAP_NG_DEFAULT=^#define PCAP_NG_DEFAULT 1
 
@@ -245,7 +266,6 @@ PCAP_NG_DEFAULT=^#define PCAP_NG_DEFAULT 1
 WANT_PACKET_EDITOR=^#define WANT_PACKET_EDITOR 1
 
 !if "$(WIRESHARK_TARGET_PLATFORM)" == "win32"
-DOWNLOAD_TAG=2014-10-01
 ##### Win32 Libraries #####
 #
 # Mandatory: GLib settings
@@ -321,8 +341,6 @@ GTK_INST_VERSION=3.4
 # installation directory:
 # http://stackoverflow.com/questions/913642/qmake-and-qt-install-prefix-how-can-i-select-a-new-location-for-qt-library
 #
-# NOTE> the qmake command given below returns a path with forward slashes,
-#	which will need to be changed to backslashes for things to work properly
 #QT5_BASE_DIR=output of "qmake -query QT_INSTALL_PREFIX"
 !IF !DEFINED(QT5_BASE_DIR)
 # Wireshark custom
@@ -338,10 +356,6 @@ QT5_BASE_DIR=C:\Qt\5.2.1\msvc2010
 QT5_BASE_DIR=C:\Qt\5.2.1\msvc2012
 !ELSE IF EXIST(C:\Qt\5.2.1\msvc2012_64)
 QT5_BASE_DIR=C:\Qt\5.2.1\msvc2012_64
-!ELSE IF EXIST(C:\Qt\Qt5.3.0\5.3\msvc2013)
-QT5_BASE_DIR=C:\Qt\Qt5.3.0\5.3\msvc2013
-!ELSE IF EXIST(C:\Qt\5.3\msvc2013)
-QT5_BASE_DIR=C:\Qt\5.3\msvc2013
 # Digia official, installed in $(WIRESHARK_LIB_DIR)
 !ELSE IF EXIST($(WIRESHARK_LIB_DIR)\Qt5.1.1\5.1.1\msvc2010)
 QT5_BASE_DIR=$(WIRESHARK_LIB_DIR)\Qt5.1.1\5.1.1\msvc2010
@@ -358,8 +372,7 @@ QT5_BASE_DIR=$(WIRESHARK_LIB_DIR)\Qt5.1.1\5.1.1\msvc2010
 # PCAP_DIR isn't defined.
 #
 PCAP_DIR=$(WIRESHARK_LIB_DIR)\WPdpack
-# This macro is used by the NSIS installer script, PortableApps, and by the
-# setup target.
+# This macro is used by the nsis installer script, by the u3/portable apps and by the setup target.
 WINPCAP_VERSION=4_1_3
 WPD_VERSION=4_1_2
 
@@ -434,10 +447,19 @@ GCC_DLL=libgcc_s_sjlj-1.dll
 # isn't defined.
 #
 KFW_DIR=$(WIRESHARK_LIB_DIR)\kfw-3-2-2-i386-ws-vc6
-COMERR_DLL=comerr32.dll
-KRB5_DLL=krb5_32.dll
-K5SPRT_DLL=k5sprt32.dll
 
+#
+# Optional: the Nettle library enables ??? decryption.
+#
+# If you have the Nettle encryption library, set this to the
+# directory in which the nettle package is stored.
+#
+# If you don't have Nettle, comment this line out, so that NETTLE_DIR
+# isn't defined.
+#
+# NETTLE_DIR=$(WIRESHARK_LIB_DIR)\nettle-1.10
+
+#
 # Optional: the LUA library enables scripting support.
 #
 # If you have the LUA library, set this to the directory in which
@@ -507,7 +529,6 @@ GEOIP_PKG=1.5.1-2
 WINSPARKLE_PKG=0.3-44-g2c8d9d3-win32ws
 
 !else
-DOWNLOAD_TAG=2014-10-13
 ##### Win64 Libraries #####
 #
 # Mandatory: GLib settings
@@ -540,8 +561,8 @@ JASPER_DLL=libjasper-1.dll
 JPEG_DLL=libjpeg-8.dll
 LZMA_DLL=liblzma-5.dll
 PIXMAN_DLL=libpixman-1-0.dll
-PNG_DLL=libpng16-16.dll
-#SEH_DLL=libgcc_s_seh-1.dll
+PNG_DLL=libpng15-15.dll
+SEH_DLL=libgcc_s_seh-1.dll
 TIFF_DLL=libtiff-5.dll
 XML_DLL=libxml2-2.dll
 
@@ -549,8 +570,8 @@ XML_DLL=libxml2-2.dll
 !IF "$(GTK_NAME)" == "gtk2"
 GDK_DLL=libgdk-win32-2.0-0.dll
 GTK_DLL=libgtk-win32-2.0-0.dll
-GTK_PKG=2.24.23-3.39
-#GTK_PKG=2.24.23-1.1
+#GTK_PKG=2.24.10-2.7
+GTK_PKG=2.24.23-1.1
 PKG_SUFIX=ws
 !ELSE
 GDK_DLL=libgdk-3-0.dll
@@ -592,8 +613,6 @@ QT5_BASE_DIR=C:\Qt\Qt-5.1.1-MSVC2010-$(WIRESHARK_TARGET_PLATFORM)-ws
 # Digia official
 !ELSE IF EXIST(C:\Qt\Qt5.1.1\5.1.1\msvc2010)
 QT5_BASE_DIR=C:\Qt\Qt5.1.1\5.1.1\msvc2010
-!ELSE IF EXIST(C:\Qt\5.3\msvc2013_64)
-QT5_BASE_DIR=C:\Qt\5.3\msvc2013_64
 # Digia official, installed in $(WIRESHARK_LIB_DIR)
 !ELSE IF EXIST($(WIRESHARK_LIB_DIR)\Qt5.1.1\5.1.1\msvc2010)
 QT5_BASE_DIR=$(WIRESHARK_LIB_DIR)\Qt5.1.1\5.1.1\msvc2010
@@ -610,8 +629,7 @@ QT5_BASE_DIR=$(WIRESHARK_LIB_DIR)\Qt5.1.1\5.1.1\msvc2010
 # PCAP_DIR isn't defined.
 #
 PCAP_DIR=$(WIRESHARK_LIB_DIR)\WPdpack
-# This macro is used by the NSIS installer script, PortableApps, and by the
-# setup target.
+# This macro is used by the nsis installer script, by the u3/portable apps and by the setup target.
 WINPCAP_VERSION=4_1_3
 WPD_VERSION=4_1_2
 
@@ -685,10 +703,18 @@ GCC_DLL=libgcc_s_seh-1.dll
 # If you don't have KFW, comment this line out, so that KFW_DIR
 # isn't defined.
 #
-KFW_DIR=$(WIRESHARK_LIB_DIR)\kfw-3-2-2-x64-ws
-COMERR_DLL=comerr64.dll
-KRB5_DLL=krb5_64.dll
-K5SPRT_DLL=k5sprt64.dll
+#KFW_DIR=$(WIRESHARK_LIB_DIR)\kfw-3.2.2-ws1
+
+#
+# Optional: the Nettle library enables ??? decryption.
+#
+# If you have the Nettle encryption library, set this to the
+# directory in which the nettle package is stored.
+#
+# If you don't have Nettle, comment this line out, so that NETTLE_DIR
+# isn't defined.
+#
+# NETTLE_DIR=$(WIRESHARK_LIB_DIR)\nettle-1.10
 
 #
 # Optional: the LUA library enables scripting support.
@@ -776,21 +802,10 @@ GTK_SCHEMAS_DIR=\share\glib-2.0\schemas
 ##### Tools #####
 
 # Set the following mandatory commands to find the tools.
-# The easiest way is to use the corresponding packages from Cygwin.
+# The easiest way is to use the corresponding packages from cygwin.
 
-# Set up the path to the Cygwin binaries
-# First check whether a 32-bit Cygwin installation exists
-# If not, check for a 64-bit Cygwin installation
-!IF EXIST(C:\cygwin\bin)
-CYGWIN_PATH=C:\cygwin\bin
-!ELSE IF EXIST(C:\cygwin64\bin)
-CYGWIN_PATH=C:\cygwin64\bin
-!ELSE IF EXIST(C:\tools\cygwin\bin)
-# Chocolatey default
-CYGWIN_PATH=C:\tools\cygwin\bin
-!ELSE
-!ERROR Could not locate Cygwin, please set CYGWIN_PATH explicitly in config.nmake
-!ENDIF
+# Set up the path to the cygwin binaries
+CYGWIN_PATH=c:\cygwin\bin
 
 # command for a shell (cygwin's bash package recommended)
 SH_PROG=bash
@@ -806,11 +821,6 @@ SH_FLAGS=-o igncr
 
 SH=$(SH_PROG) $(SH_FLAGS)
 
-# PowerShell
-# Compatibility testing (...or should we always force version 2?)
-#POWERSHELL=powershell -Version 2.0 -executionpolicy bypass -File
-# Normal
-POWERSHELL=powershell -executionpolicy bypass -File
 
 # command for perl (cygwin's perl package recommended)
 PERL=perl
@@ -823,40 +833,30 @@ POD2HTML=$(SH) pod2html
 # command for sed (cygwin's sed recommended)
 SED=sed
 
-# Command for Flex. Cygwin's flex or Chocolatey's win_flex
+# Command for lex/flexx. Cygwin's flex or Chocolatey's win_flex
 # recommended.
 # Absolute or relative paths must be Windows-style
 
-#LEX=\custom\path\to\flex
+# Chocolatey's C:\Chocolatey\bin\win_flex and -\win_bison are
+# currently unusable without some manual adjustments to the
+# win_flex and win_bison wrapper scripts. Calling the executables
+# directly should work.
 
-# Find flex automatically
-!IF !DEFINED(LEX)
-!IF DEFINED(CHOCOLATEYINSTALL) && EXIST("$(CHOCOLATEYINSTALL)\bin\win_flex.exe")
-LEX=$(CHOCOLATEYINSTALL)\bin\win_flex
-!ELSE IF EXIST("$(CYGWIN_PATH)\flex.exe")
-# We add Cygwin to PATH below.
+#LEX=win_flex
+#LEX=C:\Chocolatey\lib\winflexbison.2.4.1.20140103\tools\win_flex
 LEX=flex
-!ENDIF
-!ENDIF
 
-# Command for Bison. Cygwin's bison or Chocolatey's win_bison
+# Command for yacc/bison. Cygwin's bison or Chocolatey's win_bison
 # recommended.
 # Absolute or relative paths must be Windows-style
 
-#YACC=\custom\path\to\bison
-
-# Find bison automatically
-!IF !DEFINED(YACC)
-!IF DEFINED(CHOCOLATEYINSTALL) && EXIST("$(CHOCOLATEYINSTALL)\bin\win_bison.exe")
-YACC=$(CHOCOLATEYINSTALL)\bin\win_bison
-!ELSE IF EXIST("$(CYGWIN_PATH)\bison.exe")
-# We add Cygwin to PATH below.
+#YACC=win_bison
+#YACC=C:\Chocolatey\lib\winflexbison.2.4.1.20140103\tools\win_bison
 YACC=bison
-!ENDIF
-!ENDIF
 
-# Make our text files Windows-native
-TEXTIFY=$(POWERSHELL) $(TOOLS_DIR)/textify.ps1
+# Commands to convert UNIX line endings to DOS/Windows
+UNIX2DOS=u2d
+TEXTIFY=$(SH) $(TOOLS_DIR)/textify.sh
 
 #
 # Optional: Build the NSIS installer.
@@ -876,23 +876,18 @@ TEXTIFY=$(POWERSHELL) $(TOOLS_DIR)/textify.ps1
 MAKENSIS="$(PROGRAM_FILES)\NSIS\makensis.exe"
 !ELSE IF EXIST("$(PROGRAM_FILES_W6432)\NSIS\makensis.exe")
 MAKENSIS="$(PROGRAM_FILES_W6432)\NSIS\makensis.exe"
-!ELSE IF EXIST("\Program Files (x86)\NSIS\makensis.exe")
-MAKENSIS="\Program Files (x86)\NSIS\makensis.exe"
 !ENDIF
 !ENDIF
 
 #
-# Optional: Build the PortableApps package (WiresharkPortable).
+# Optional: To build the NSIS PortableApps installer.
 #
-# If you have the PortableApps.com Platform installed set this to the main
-# PortableApps directory. In order to build packages you need to install
-# "PortableApps.com Launcher" and "NSIS Portable (Unicode)" *within* the
-# PortableApps environment.
+# If you have the NSIS Unicode package, set this to the NSIS Unicode executable.
 #
-# If you don't have the PortableApps.com Platform installed comment this line
-# out.
+# If you don't have NSIS Unicode, comment this line out, so that
+# MAKENSIS_UNICODE isn't defined.
 #
-PORTABLEAPPS_DIR="C:\PortableApps"
+MAKENSIS_UNICODE="$(PROGRAM_FILES)\NSIS\Unicode\makensis.exe"
 
 #
 # Optional: To build the developers API documentation with doxygen and dot.
@@ -920,8 +915,7 @@ PORTABLEAPPS_DIR="C:\PortableApps"
 HHC_DIR=$(PROGRAM_FILES)\HTML Help Workshop
 
 #
-# Optional: To reduce the size of dlls and exes, which is especially useful for
-# USB device distributions (PortableApps)
+# Optional: To reduce the size of dlls and exes, which is especially useful for USB device distributions (U3, PortableApps)
 #
 # If you have the UPX package, set this to the upx.exe executable.
 #
@@ -935,6 +929,11 @@ HHC_DIR=$(PROGRAM_FILES)\HTML Help Workshop
 UPX=$(WIRESHARK_LIB_DIR)\upx303w\upx.exe
 
 ##### Flags, PATHs and Miscellaneous #####
+
+# Santity check: Python embedding requires a valid PYTHON_DIR
+!IF DEFINED(PYTHON_EMBED) && !DEFINED(PYTHON_DIR)
+!ERROR PYTHON_EMBED requires that PYTHON_DIR is defined
+!ENDIF
 
 # "convert" the MSVC variant into the required MSC compiler version
 !IF "$(MSVC_VARIANT)" == "MSVC2005" || "$(MSVC_VARIANT)" == "MSVC2005EE" || "$(MSVC_VARIANT)" == "DOTNET20"
@@ -971,6 +970,12 @@ APPVER=5.02
 # Compiler flags:
 # /W3                               Warning level 3 (0 less - 4 most, 1 default).
 # /Zi                               Create .pdb file for debugging.
+# /FR                               Create .sbr file with complete symbolic information.
+#                                   add to standard CFLAGS if you want to build the .sbr files
+#                                     for Wireshark compiles.
+#                                     Warning: using /FR for Wireshark requires ~1Gig of additional disk space
+#                                     XXX: provides less functionality for VC8, ... than for previous compilers ?
+#                                     XXX: .bsc files not usable (not supported ?) with VC10 (Visual Studio 2010) ?
 # /MD                               Use "multithread- and DLL-specific version" of run-time libraries.
 #                                    msvc documentation states that /MD causes _MT and _DLL to be defined
 #                                    See: http://msdn.microsoft.com/en-us/library/2kzt1wy3%28v=VS.90%29.aspx
@@ -996,19 +1001,17 @@ APPVER=5.02
 #                                   (see http://msdn.microsoft.com/en-us/library/bb531344(v=vs.110).aspx)
 #                                   This definition prevents the complaint about the redefinition of inline by WinPCap
 #                                   in pcap-stdinc.h when compiling CPP files, e.g. the QT UI
-# /O2                               http://msdn.microsoft.com/en-us/library/8f8h5cxt.aspx
+#
+# -O2                               http://msdn.microsoft.com/en-us/library/8f8h5cxt.aspx
 #                                   Specifying the /O2 compiler option is the same as using the following options:
 #                                   /Ob (Inline Function Expansion), where the option parameter is 2 (/Ob2)
 #                                   /Og (Global Optimizations)
 #                                   /Oi (Generate Intrinsic Functions)
 #                                   /Ot (Favor Fast Code)
 #                                   /Oy (Frame-Pointer Omission)
-#                                   /Gs (Control Stack Checking Calls))
+#                                   /Gs (Buffer Security Check)
 #                                   /GF (Eliminate Duplicate Strings)
 #                                   /Gy (Enable Function-Level Linking)
-# /Zo                               Output debug info allowing debuggers to display local values and trace into inline
-#                                   functions.  For VS2013 Update 3.  Assume all VS2013 builds are at least Update 3.
-#                                   See http://msdn.microsoft.com/en-us/library/dn785163.aspx
 
 ##Note: LOCAL_CFLAGS are flags used for *all* compilations
 ##      STANDARD_CFLAGS (see below) are flags used just for *Wireshark* compilations
@@ -1035,7 +1038,7 @@ LOCAL_CFLAGS=$(LOCAL_CFLAGS) /D_ALLOW_KEYWORD_MACROS
 
 !IF "$(MSVC_VARIANT)" == "MSVC2013"   || \
         "$(MSVC_VARIANT)" == "MSVC2013EE"
-LOCAL_CFLAGS=$(LOCAL_CFLAGS) /DBUILD_WINDOWS /Zo
+LOCAL_CFLAGS=$(LOCAL_CFLAGS) /DBUILD_WINDOWS
 !ENDIF
 
 !IF "$(WIRESHARK_TARGET_PLATFORM)" != "win64"
@@ -1045,8 +1048,7 @@ LOCAL_CFLAGS=$(LOCAL_CFLAGS) /D_BIND_TO_CURRENT_CRT_VERSION=1
 # Additional compiler warnings to be treated as "Level 3"
 #  when compiling Wireshark sources. (Selected from "level 4" warnings).
 ## 4295: array is too small to include a terminating null character
-## 4189: local variable is initialized but not referenced
-WARNINGS_CFLAGS=/w34295 /w34189
+WARNINGS_CFLAGS=/w34295
 
 !ELSE
 !ERROR MSVC_VARIANT unknown
@@ -1083,22 +1085,24 @@ LOCAL_CFLAGS= $(LOCAL_CFLAGS) /MP
 LOCAL_CFLAGS= $(LOCAL_CFLAGS) /analyze:WX-
 !ENDIF
 
-## Do *not* redefine LOCAL_CFLAGS below this point !!
-
 #STANDARD_CFLAGS are flags used for *Wireshark* compiles (not stuff like lemon, etc)
 STANDARD_CFLAGS=/DWINPCAP_VERSION=$(WINPCAP_VERSION) $(LOCAL_CFLAGS) $(WARNINGS_CFLAGS)
 
+# Optional: Define WIRESHARK_GENERATE_BSC_FILE to generate .sbr files for input to bscmake
+!IFDEF WIRESHARK_GENERATE_BSC_FILE
+STANDARD_CFLAGS= $(STANDARD_CFLAGS) /FR
+!ENDIF
+
 #Comment out the following if warnings are not to be treated as errors
-WARNINGS_ARE_ERRORS=-WX
+#WARNINGS_ARE_ERRORS=-WX
 
 # Linker flags:
 # /DEBUG  generate debug info
 # /PROFILE generate map file(s) for profiling
 # /DEFAULTLIB:xxx use xxx as the standard C library
 # /NODEFAULTLIB:xxx don't use xxx as the standard C library
-# /RELEASE set the checksum in the header, stops debugger complaints
 #
-LOCAL_LDFLAGS=/DEBUG /MACHINE:$(TARGET_MACHINE) /RELEASE
+LOCAL_LDFLAGS=/DEBUG /MACHINE:$(TARGET_MACHINE)
 DLL_LDFLAGS =
 !IFDEF MANIFEST_INFO_REQUIRED
 DLL_LDFLAGS = /MANIFEST:no
@@ -1107,6 +1111,7 @@ DLL_LDFLAGS = /MANIFEST:no
 # Enable Safe Exception Handler.
 # http://msdn.microsoft.com/en-us/magazine/cc337897.aspx
 !IF $(MSC_VER_REQUIRED) >= 1300
+LOCAL_CFLAGS= $(LOCAL_CFLAGS) /GS
 !IF "$(WIRESHARK_TARGET_PLATFORM)" != "win64"
 LOCAL_LDFLAGS= $(LOCAL_LDFLAGS) /SafeSEH
 !ENDIF
@@ -1140,7 +1145,8 @@ ENABLE_LIBWIRESHARK=USE
 #
 # install (debug) directory for Wireshark (relative to your source dir)
 INSTALL_DIR=wireshark-gtk2
-INSTALL_DIR_QT=wireshark-qt-release
+
+
 
 ##### C-Runtime Redistributable #####
 #
@@ -1295,21 +1301,19 @@ MSVCR_DLL=$(PROGRAM_FILES)\Microsoft Visual Studio 12.0\VC\redist\$(TARGET_MACHI
 # You may want to install the FOP hyphenation patterns from
 # http://offo.sourceforge.net/hyphenation/
 !IFNDEF FOP
-
-!IF EXIST(docbook\fop-1.1\fop.bat)
-FOP=fop-1.1\fop.bat
-!ELSE IF EXIST($(WIRESHARK_LIB_DIR)\fop-1.1\fop.bat)
-FOP=$(WIRESHARK_LIB_DIR)\fop-1.1\fop.bat
-!ELSE IF EXIST(docbook\fop-1.0\fop.bat)
 FOP=fop-1.0\fop.bat
-!ELSE IF EXIST($(WIRESHARK_LIB_DIR)\fop-1.0\fop.bat)
-FOP=$(WIRESHARK_LIB_DIR)\fop-1.0\fop.bat
 !ENDIF
-
-!ENDIF FOP
 
 # Additional options to fop.
 FOP_OPTS=-Xmx256m
+
+# html help compiler
+# Comment this out if you don't have hhc.exe or you don't want the docs in
+# .chm format.
+#
+# Beware: hhc.exe is NOT part of the MSVC packages in HHC_DIR mentioned above,
+# so you'll need to install the HTML Help Workshop for this.
+HHC_EXE="$(HHC_DIR)\hhc.exe"
 
 # html to text converter for text version of release notes, e.g. elinks.
 # This could also be "lynx", or "true" if neither elinks nor lynx is installed
@@ -1375,8 +1379,8 @@ GLIB_CFLAGS=/I$(GTK_DIR)\include\glib-$(GLIB_VERSION) \
 GLIB_LIBS=$(GTK_DIR)\lib\glib-$(GLIB_VERSION).lib \
 	$(GTK_DIR)\lib\gmodule-$(GLIB_VERSION).lib \
 	$(GTK_DIR)\lib\gobject-$(GLIB_VERSION).lib
+GTHREAD_LIBS=$(GTK_DIR)\lib\gthread-$(GLIB_VERSION).lib
 
-PROGRAM_NAME_GTK=$(PROGRAM_NAME)-gtk
 
 # 2.18 was no good(Theming problem)
 !IF "$(GTK_INST_VERSION)" == "2.24" || "$(GTK_INST_VERSION)" == "2.22" || "$(GTK_INST_VERSION)" == "2.16" || "$(GTK_INST_VERSION)" == "2.14"
@@ -1438,7 +1442,7 @@ NEED_XML_DLL=USE
 # GTK+
 ## Note: If Wireshark is ever to be built with Gtk >= 3.10
 ##        then -DGTK_DISABLE_DEPRECATED must be removed
-##        and -DGDK_DISABLE_DEPRECATION_WARNINGS must
+##        and -DGDK_DISABLE_DEPRECIATION_WARNINGS must
 ##        be added below.
 ##       Wireshark changes to handle Gtk 3.10 deprecated features
 ##        will not be done since Wireshark is moving to Qt.
@@ -1614,17 +1618,24 @@ ADNS_CONFIG=
 !IFDEF KFW_DIR
 KFW_PATH=$(KFW_DIR)\bin
 KFW_CFLAGS=/I$(KFW_DIR)\include
-!IF "$(WIRESHARK_TARGET_PLATFORM)" == "win32"
 KFW_LIBS=$(KFW_DIR)\lib\krb5_32.lib
-!ELSE
-KFW_LIBS=$(KFW_DIR)\lib\krb5_64.lib
-!ENDIF
 # Nmake uses carets to escape special characters
 KFW_CONFIG=^#define HAVE_MIT_KERBEROS 1
 !else
 KFW_CFLAGS=
 KFW_LIBS=
 KFW_CONFIG=
+!ENDIF
+
+!IFDEF NETTLE_DIR
+NETTLE_CFLAGS=/I$(NETTLE_DIR)
+NETTLE_LIBS=$(NETTLE_DIR)\libnettle.lib
+# Nmake uses carets to escape special characters
+NETTLE_CONFIG=^#define HAVE_LIBNETTLE 1
+!else
+NETTLE_CFLAGS=
+NETTLE_LIBS=
+NETTLE_CONFIG=
 !ENDIF
 
 !IFDEF GNUTLS_PKG
@@ -1664,6 +1675,17 @@ LUA_LIBS=
 LUA_CONFIG=
 !ENDIF
 
+!IF DEFINED(PYTHON_EMBED)
+PYTHON_CFLAGS=/I$(PYTHON_DIR)\include
+PYTHON_LIBS=$(PYTHON_DIR)\libs\python$(PYTHON_VER).lib
+# Nmake uses carets to escape special characters
+PYTHON_CONFIG=^#define HAVE_PYTHON 1
+!else
+PYTHON_CFLAGS=
+PYTHON_LIBS=
+PYTHON_CONFIG=
+!ENDIF
+
 !IFDEF PORTAUDIO_DIR
 # Nmake uses carets to escape special characters
 PORTAUDIO_CONFIG=^#define HAVE_LIBPORTAUDIO 1
@@ -1680,8 +1702,6 @@ PORTAUDIO_CONFIG=
 !ENDIF
 
 !IFDEF HHC_DIR
-PATH=$(PATH);$(HHC_DIR)
-HHC_EXE=hhc.exe
 HHC_CFLAGS=-DHHC_DIR
 HHC_LIBS=htmlhelp.lib
 !ELSE
@@ -1694,6 +1714,11 @@ SMI_DIR=$(WIRESHARK_LIB_DIR)\libsmi-$(SMI_PKG)-$(WIRESHARK_TARGET_PLATFORM)ws
 SMI_CONFIG=^#define HAVE_LIBSMI 1
 SMI_CFLAGS=/I$(SMI_DIR)\include
 SMI_LIBS=$(SMI_DIR)\lib\libsmi-2.lib
+!ELSE
+SMI_DIR=
+SMI_LIBS=
+SMI_CFLAGS=
+SMI_CONFIG=
 !ENDIF
 
 !IFDEF GEOIP_PKG
@@ -1702,6 +1727,12 @@ GEOIP_CONFIG=^#define HAVE_GEOIP 1
 GEOIP_V6_CONFIG=^#define HAVE_GEOIP_V6 1
 GEOIP_CFLAGS=/I$(GEOIP_DIR)/include
 GEOIP_LIBS=$(GEOIP_DIR)\lib\libGeoIP-1.lib
+!ELSE
+GEOIP_DIR=
+GEOIP_LIBS=
+GEOIP_CFLAGS=
+GEOIP_CONFIG=
+GEOIP_V6_CONFIG=
 !ENDIF
 
 !IFDEF WINSPARKLE_PKG
@@ -1709,6 +1740,11 @@ WINSPARKLE_DIR=$(WIRESHARK_LIB_DIR)\WinSparkle-$(WINSPARKLE_PKG)
 WINSPARKLE_CONFIG=^#define HAVE_SOFTWARE_UPDATE 1
 WINSPARKLE_CFLAGS=/I$(WINSPARKLE_DIR)
 WINSPARKLE_LIBS=$(WINSPARKLE_DIR)\WinSparkle.lib
+!ELSE
+WINSPARKLE_DIR=
+WINSPARKLE_CONFIG=
+WINSPARKLE_CFLAGS=
+WINSPARKLE_LIBS=
 !ENDIF
 
 !IFDEF ENABLE_LIBWIRESHARK

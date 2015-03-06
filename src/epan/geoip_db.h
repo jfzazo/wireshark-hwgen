@@ -73,10 +73,9 @@ WS_DLL_PUBLIC int geoip_db_type(guint dbnum);
  * @param dbnum Database index
  * @param addr IPv4 address to look up
  * @param not_found The string to return if the lookup fails. May be NULL.
- *
- * @return The database entry if found, else not_found. Return value must be freed with wmem_free.
+ * @return The database entry if found, else not_found
  */
-WS_DLL_PUBLIC char *geoip_db_lookup_ipv4(guint dbnum, guint32 addr, const char *not_found);
+WS_DLL_PUBLIC const char *geoip_db_lookup_ipv4(guint dbnum, guint32 addr, const char *not_found);
 
 /**
  * Look up an IPv6 address in a database
@@ -84,10 +83,9 @@ WS_DLL_PUBLIC char *geoip_db_lookup_ipv4(guint dbnum, guint32 addr, const char *
  * @param dbnum Database index
  * @param addr IPv6 address to look up
  * @param not_found The string to return if the lookup fails. May be NULL.
- *
- * @return The database entry if found, else not_found. Return value must be freed with wmem_free.
+ * @return The database entry if found, else not_found
  */
-WS_DLL_PUBLIC char *geoip_db_lookup_ipv6(guint dbnum, struct e_in6_addr addr, const char *not_found);
+WS_DLL_PUBLIC const char *geoip_db_lookup_ipv6(guint dbnum, struct e_in6_addr addr, const char *not_found);
 
 /**
  * Get all configured paths

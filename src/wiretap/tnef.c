@@ -46,7 +46,7 @@ static gboolean tnef_read_file(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr,
      */
     *err = WTAP_ERR_BAD_FILE;
     *err_info = g_strdup_printf("tnef: File has %" G_GINT64_MODIFIER "d-byte packet, bigger than maximum of %u",
-                                file_size, WTAP_MAX_PACKET_SIZE);
+				file_size, WTAP_MAX_PACKET_SIZE);
     return FALSE;
   }
   packet_size = (int)file_size;
@@ -98,18 +98,22 @@ static gboolean tnef_seek_read(wtap *wth, gint64 seek_off,
 
 int tnef_open(wtap *wth, int *err, gchar **err_info)
 {
+  int bytes_read;
   guint32 magic;
 
-  if (!wtap_read_bytes(wth->fh, &magic, sizeof magic, err, err_info))
-    return (*err != WTAP_ERR_SHORT_READ) ? WTAP_OPEN_ERROR : WTAP_OPEN_NOT_MINE;
+  bytes_read = file_read(&magic, sizeof magic, wth->fh);
+  if (bytes_read != sizeof magic) {
+    *err = file_error(wth->fh, err_info);
+    return (*err != 0) ? -1 : 0;
+  }
 
   if (GUINT32_TO_LE(magic) != TNEF_SIGNATURE)
      /* Not a tnef file */
-     return WTAP_OPEN_NOT_MINE;
+     return 0;
 
   /* seek back to the start of the file  */
   if (file_seek(wth->fh, 0, SEEK_SET, err) == -1)
-    return WTAP_OPEN_ERROR;
+    return -1;
 
   wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_TNEF;
   wth->file_encap = WTAP_ENCAP_TNEF;
@@ -117,20 +121,7 @@ int tnef_open(wtap *wth, int *err, gchar **err_info)
 
   wth->subtype_read = tnef_read;
   wth->subtype_seek_read = tnef_seek_read;
-  wth->file_tsprec = WTAP_TSPREC_SEC;
+  wth->tsprecision = WTAP_FILE_TSPREC_SEC;
 
-  return WTAP_OPEN_MINE;
+  return 1;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

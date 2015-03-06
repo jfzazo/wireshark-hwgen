@@ -31,12 +31,15 @@
 #include <epan/dissectors/packet-wsp.h>
 
 #include "ui/simple_dialog.h"
+#include "../globals.h"
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/tap_param_dlg.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkwspstat(void);
 
@@ -396,7 +399,7 @@ gtk_wspstat_init(const char *opt_arg, void *userdata _U_)
 }
 
 static tap_param wsp_stat_params[] = {
-	{ PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+	{ PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg wsp_stat_dlg = {

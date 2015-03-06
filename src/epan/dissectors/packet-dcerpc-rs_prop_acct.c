@@ -26,6 +26,7 @@
 #include "config.h"
 
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "packet-dcerpc.h"
 
@@ -73,16 +74,3 @@ proto_reg_handoff_rs_prop_acct (void)
 	/* Register the protocol as dcerpc */
 	dcerpc_init_uuid (proto_rs_prop_acct, ett_rs_prop_acct, &uuid_rs_prop_acct, ver_rs_prop_acct, rs_prop_acct_dissectors, hf_rs_prop_acct_opnum);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

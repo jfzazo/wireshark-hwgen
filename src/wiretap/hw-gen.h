@@ -6,7 +6,7 @@
 #define _HWGEN_H
 
 #include <glib.h>
-#include <wiretap/wtap.h>
+#include <wtap.h>
 
 struct hwgen_hdr {
 	guint16	size;	
@@ -14,7 +14,7 @@ struct hwgen_hdr {
 	gint32	ifg;	
 }; 
 
-wtap_open_return_val hwgen_open(wtap *wth, int *err, gchar **err_info);
+int hwgen_open(wtap *wth, int *err, gchar **err_info);
 gboolean hwgen_dump_open(wtap_dumper *wdh, int *err);
 int hwgen_dump_can_write_encap(int encap);
 

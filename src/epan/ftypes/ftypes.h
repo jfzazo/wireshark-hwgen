@@ -69,7 +69,6 @@ enum ftenum {
 	FT_REL_OID,	/* RELATIVE-OID */
 	FT_SYSTEM_ID,
 	FT_STRINGZPAD,	/* for use with proto_tree_add_item() */
-	FT_FCWWN,
 	FT_NUM_TYPES /* last item number plus one */
 };
 
@@ -87,7 +86,6 @@ enum ftenum {
 #define FT_EUI64_LEN        8
 #define FT_AX25_ADDR_LEN    7
 #define FT_VINES_ADDR_LEN	6
-#define FT_FCWWN_LEN        8
 
 typedef enum ftenum ftenum_t;
 
@@ -203,6 +201,8 @@ typedef struct _fvalue_t {
 
 } fvalue_t;
 
+typedef void (*LogFunc)(const char*,...);
+
 fvalue_t*
 fvalue_new(ftenum_t ftype);
 
@@ -211,10 +211,10 @@ fvalue_init(fvalue_t *fv, ftenum_t ftype);
 
 WS_DLL_PUBLIC
 fvalue_t*
-fvalue_from_unparsed(ftenum_t ftype, const char *s, gboolean allow_partial_value, gchar **err_msg);
+fvalue_from_unparsed(ftenum_t ftype, const char *s, gboolean allow_partial_value, LogFunc logfunc);
 
 fvalue_t*
-fvalue_from_string(ftenum_t ftype, const char *s, gchar **err_msg);
+fvalue_from_string(ftenum_t ftype, const char *s, LogFunc logfunc);
 
 /* Returns the length of the string required to hold the
  * string representation of the the field value.
@@ -224,7 +224,7 @@ fvalue_from_string(ftenum_t ftype, const char *s, gchar **err_msg);
  * The length DOES NOT include the terminating NUL. */
 WS_DLL_PUBLIC
 int
-fvalue_string_repr_len(fvalue_t *fv, ftrepr_t rtype, int field_display);
+fvalue_string_repr_len(fvalue_t *fv, ftrepr_t rtype);
 
 /* Creates the string representation of the field value.
  * If given non-NULL 'buf', the string is written at the memory
@@ -235,12 +235,9 @@ fvalue_string_repr_len(fvalue_t *fv, ftrepr_t rtype, int field_display);
  * memory. if 'buf' was non-NULL, then the return value will be
  * 'buf'.
  *
- * field_display parameter should be a BASE_ value (enum field_display_e)
- * BASE_NONE should be used if field information isn't available.
- *
  * Returns NULL if the string cannot be represented in the given rtype.*/
 WS_DLL_PUBLIC char *
-fvalue_to_string_repr(fvalue_t *fv, ftrepr_t rtype, int field_display, char *buf);
+fvalue_to_string_repr(fvalue_t *fv, ftrepr_t rtype, char *buf);
 
 WS_DLL_PUBLIC ftenum_t
 fvalue_type_ftenum(fvalue_t *fv);

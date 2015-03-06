@@ -31,6 +31,7 @@
 #include <string.h>
 
 #include <wsutil/filesystem.h>
+#include <epan/emem.h>
 #include <epan/prefs.h>
 #include <epan/frequency-utils.h>
 #include <epan/crypt/wep-wpadefs.h>
@@ -50,8 +51,8 @@
 #include "ui/gtk/old-gtk-compat.h"
 #include "ui/gtk/packet_win.h"
 
-#include <caputils/airpcap.h>
-#include <caputils/airpcap_loader.h>
+#include <airpcap.h>
+#include "airpcap_loader.h"
 #include "airpcap_gui_utils.h"
 #include "airpcap_dlg.h"
 

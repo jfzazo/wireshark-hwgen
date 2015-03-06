@@ -25,9 +25,12 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include "packet-dcerpc.h"
 #include "packet-dcom.h"
+#include "guid-utils.h"
 
 void proto_register_remunk(void);
 void proto_reg_handoff_remunk(void);
@@ -180,7 +183,7 @@ dissect_remunk_remqueryinterface_resp(tvbuff_t *tvb, int offset,
         /* add interface instance to database (we currently only handle IPv4) */
         if(pinfo->net_src.type == AT_IPv4) {
             dcom_interface_new(pinfo,
-                               &pinfo->net_src,
+                               (guint8 *)pinfo->net_src.data,
                                &iid, oxid, oid, &ipid);
         }
 
@@ -368,16 +371,3 @@ proto_reg_handoff_remunk (void)
                      &uuid_remunk2, ver_remunk2,
                      remunk2_dissectors, hf_remunk_opnum);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

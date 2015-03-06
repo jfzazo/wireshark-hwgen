@@ -23,10 +23,12 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/conversation.h>
 #include <epan/ppptypes.h>
 #include <epan/reassemble.h>
+#include <epan/wmem/wmem.h>
 #include <epan/eap.h>
 #include <epan/expert.h>
 
@@ -71,7 +73,6 @@ static int hf_eap_leap_peer_challenge = -1;
 static int hf_eap_leap_peer_response = -1;
 static int hf_eap_leap_ap_challenge = -1;
 static int hf_eap_leap_ap_response = -1;
-static int hf_eap_leap_data = -1;
 static int hf_eap_leap_name = -1;
 
 static int hf_eap_ms_chap_v2_opcode = -1;
@@ -84,11 +85,8 @@ static int hf_eap_ms_chap_v2_peer_challenge = -1;
 static int hf_eap_ms_chap_v2_reserved = -1;
 static int hf_eap_ms_chap_v2_nt_response = -1;
 static int hf_eap_ms_chap_v2_flags = -1;
-static int hf_eap_ms_chap_v2_response = -1;
 static int hf_eap_ms_chap_v2_message = -1;
 static int hf_eap_ms_chap_v2_failure_request = -1;
-static int hf_eap_ms_chap_v2_data = -1;
-static int hf_eap_data = -1;
 
 static gint ett_eap = -1;
 
@@ -496,7 +494,9 @@ dissect_eap_mschapv2(proto_tree *eap_tree, tvbuff_t *tvb, packet_info *pinfo, in
       offset += 1;
       left   -= value_size;
     } else {
-      proto_tree_add_item(eap_tree, hf_eap_ms_chap_v2_response, tvb, offset, value_size, ENC_NA);
+      proto_tree_add_text(eap_tree, tvb, offset, value_size,
+              "EAP-MS-CHAP-v2 Response (Unknown Length): %s",
+              tvb_bytes_to_ep_str(tvb, offset, value_size));
       offset += value_size;
       left   -= value_size;
     }
@@ -517,7 +517,10 @@ dissect_eap_mschapv2(proto_tree *eap_tree, tvbuff_t *tvb, packet_info *pinfo, in
                             tvb, offset, left, ENC_ASCII|ENC_NA);
     break;
   default:
-    proto_tree_add_item(eap_tree, hf_eap_ms_chap_v2_data, tvb, offset, left, ENC_NA);
+    proto_tree_add_text(eap_tree, tvb, offset, left,
+            "EAP-MS-CHAP-v2 Data (%d byte%s): \"%s\"",
+            left, plurality(left, "", "s"),
+            tvb_bytes_to_ep_str(tvb, offset, left));
     break;
   }
 }
@@ -1124,7 +1127,10 @@ dissect_eap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
             break;
 
           default:
-            proto_tree_add_item(eap_tree, hf_eap_leap_data, tvb, offset, count, ENC_NA);
+            proto_tree_add_text(eap_tree, tvb, offset, count,
+                                "EAP-LEAP Data (%d byte%s): \"%s\"",
+                                count, plurality(count, "", "s"),
+                                tvb_bytes_to_ep_str(tvb, offset, count));
             break;
           }
         }
@@ -1169,9 +1175,11 @@ dissect_eap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
         **********************************************************************/
       case EAP_TYPE_EXT:
       {
-        proto_tree *exptree;
+        proto_item *expti   = NULL;
+        proto_tree *exptree = NULL;
 
-        exptree   = proto_tree_add_subtree(eap_tree, tvb, offset, size, ett_eap_exp_attr, NULL, "Expanded Type");
+        expti   = proto_tree_add_text(eap_tree, tvb, offset, size, "Expanded Type");
+        exptree = proto_item_add_subtree(expti, ett_eap_exp_attr);
         dissect_exteap(exptree, tvb, offset, size, pinfo);
       }
       break;
@@ -1179,7 +1187,12 @@ dissect_eap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
       /*********************************************************************
       **********************************************************************/
       default:
-        proto_tree_add_item(eap_tree, hf_eap_data, tvb, offset, size, ENC_NA);
+        if (tree) {
+          proto_tree_add_text(eap_tree, tvb, offset, size,
+                              "EAP Data (%d byte%s): \"%s\"",
+                              size, plurality(size, "", "s"),
+                              tvb_bytes_to_ep_str(tvb, offset, size));
+        }
         break;
         /*********************************************************************
         **********************************************************************/
@@ -1416,11 +1429,6 @@ proto_register_eap(void)
       FT_BYTES, BASE_NONE, NULL, 0x0,
       NULL, HFILL }},
 
-    { &hf_eap_leap_data, {
-      "EAP-LEAP Data", "eap.leap.data",
-      FT_BYTES, BASE_NONE, NULL, 0x0,
-      NULL, HFILL }},
-
     { &hf_eap_leap_name, {
       "EAP-LEAP Name", "eap.leap.name",
       FT_STRING, BASE_NONE, NULL, 0x0,
@@ -1476,11 +1484,6 @@ proto_register_eap(void)
       FT_UINT8, BASE_HEX, NULL, 0x0,
       NULL, HFILL }},
 
-    { &hf_eap_ms_chap_v2_response, {
-      "EAP-MS-CHAP-v2 Response (Unknown Length)", "eap.ms_chap_v2.response",
-      FT_BYTES, BASE_NONE, NULL, 0x0,
-      NULL, HFILL }},
-
     { &hf_eap_ms_chap_v2_message, {
       "EAP-MS-CHAP-v2 Message", "eap.ms_chap_v2.message",
       FT_STRING, BASE_NONE, NULL, 0x0,
@@ -1489,16 +1492,6 @@ proto_register_eap(void)
     { &hf_eap_ms_chap_v2_failure_request, {
       "EAP-MS-CHAP-v2 Failure-Request", "eap.ms_chap_v2.failure_request",
       FT_STRING, BASE_NONE, NULL, 0x0,
-      NULL, HFILL }},
-
-    { &hf_eap_ms_chap_v2_data, {
-      "EAP-MS-CHAP-v2 Data", "eap.ms_chap_v2.data",
-      FT_BYTES, BASE_NONE, NULL, 0x0,
-      NULL, HFILL }},
-
-    { &hf_eap_data, {
-      "EAP Data", "eap.data",
-      FT_BYTES, BASE_NONE, NULL, 0x0,
       NULL, HFILL }},
 
     /* Expanded type fields */

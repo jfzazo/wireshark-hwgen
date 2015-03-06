@@ -1,5 +1,5 @@
 /* tap_export_pdu.c
- * Routines for exporting PDUs to file
+ * Routines for exporting PDU:s to file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -22,30 +22,29 @@
 
 #include "config.h"
 
+#include <glib.h>
 
 #include "globals.h"
+#include "wtap.h"
 #include "pcap-encap.h"
+#include "version_info.h"
 #include "wsutil/tempfile.h"
-#include "wsutil/os_version_info.h"
-#include "wsutil/ws_version_info.h"
 
 #include <epan/tap.h>
 #include <epan/exported_pdu.h>
-#include <epan/epan_dissect.h>
 
 #include "ui/alert_box.h"
 #include "ui/simple_dialog.h"
 #include "tap_export_pdu.h"
 
 /* Main entry point to the tap */
-static int
-export_pdu_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const void *data)
+int
+export_pdu_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data)
 {
     const exp_pdu_data_t *exp_pdu_data = (const exp_pdu_data_t *)data;
     exp_pdu_t  *exp_pdu_tap_data = (exp_pdu_t *)tapdata;
     struct wtap_pkthdr pkthdr;
     int err;
-    gchar *err_info;
     int buffer_len;
     guint8 *packet_buf;
 
@@ -67,27 +66,12 @@ export_pdu_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const 
     pkthdr.len       = exp_pdu_data->tvb_reported_length + exp_pdu_data->tlv_buffer_len;
 
     pkthdr.pkt_encap = exp_pdu_tap_data->pkt_encap;
-
-    if (pinfo->fd->flags.has_user_comment)
-        pkthdr.opt_comment = g_strdup(epan_get_user_comment(edt->session, pinfo->fd));
-    else if (pinfo->fd->flags.has_phdr_comment)
-        pkthdr.opt_comment = g_strdup(pinfo->phdr->opt_comment);
-
+    pkthdr.opt_comment = g_strdup(pinfo->pkt_comment);
     pkthdr.presence_flags = WTAP_HAS_CAP_LEN|WTAP_HAS_INTERFACE_ID|WTAP_HAS_TS|WTAP_HAS_PACK_FLAGS;
 
     /* XXX: should the pkthdr.pseudo_header be set to the pinfo's pseudo-header? */
-    /* XXX: report errors! */
-    if (!wtap_dump(exp_pdu_tap_data->wdh, &pkthdr, packet_buf, &err, &err_info)) {
-        switch (err) {
 
-        case WTAP_ERR_UNWRITABLE_REC_DATA:
-            g_free(err_info);
-            break;
-
-        default:
-            break;
-        }
-    }
+    wtap_dump(exp_pdu_tap_data->wdh, &pkthdr, packet_buf, &err);
 
     g_free(packet_buf);
     g_free(pkthdr.opt_comment);
@@ -95,7 +79,7 @@ export_pdu_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const 
     return FALSE; /* Do not redraw */
 }
 
-static void
+void
 exp_pdu_file_open(exp_pdu_t *exp_pdu_tap_data)
 {
     int   import_file_fd;
@@ -107,7 +91,7 @@ exp_pdu_file_open(exp_pdu_t *exp_pdu_tap_data)
     wtapng_iface_descriptions_t *idb_inf;
     wtapng_if_descr_t            int_data;
     GString                     *os_info_str;
-    char                        *appname;
+    char                         appname[100];
 
     /* Choose a random name for the temporary import buffer */
     import_file_fd = create_tempfile(&tmpname, "Wireshark_PDU_");
@@ -117,27 +101,23 @@ exp_pdu_file_open(exp_pdu_t *exp_pdu_tap_data)
     os_info_str = g_string_new("");
     get_os_version_info(os_info_str);
 
-    appname = g_strdup_printf("Wireshark %s", get_ws_vcs_version_info());
+    g_snprintf(appname, sizeof(appname), "Wireshark " VERSION "%s", wireshark_gitversion);
 
     shb_hdr = g_new(wtapng_section_t,1);
     shb_hdr->section_length = -1;
     /* options */
     shb_hdr->opt_comment    = g_strdup_printf("Dump of PDUs from %s", cfile.filename);
-    /*
-     * UTF-8 string containing the description of the hardware used to create
-     * this section.
-     */
-    shb_hdr->shb_hardware   = NULL;
-    /*
-     * UTF-8 string containing the name of the operating system used to create
-     * this section.
-     */
-    shb_hdr->shb_os         = g_string_free(os_info_str, FALSE);
-    /*
-     * UTF-8 string containing the name of the application used to create
-     * this section.
-     */
-    shb_hdr->shb_user_appl  = appname;
+    shb_hdr->shb_hardware   = NULL;                    /* UTF-8 string containing the
+                                                       * description of the hardware used to create this section.
+                                                       */
+    shb_hdr->shb_os         = os_info_str->str;        /* UTF-8 string containing the name
+                                                       * of the operating system used to create this section.
+                                                       */
+    g_string_free(os_info_str, FALSE);                /* The actual string is not freed */
+    shb_hdr->shb_user_appl  = appname;                /* UTF-8 string containing the name
+                                                       *  of the application used to create this section.
+                                                       */
+
 
     /* Create fake IDB info */
     idb_inf = g_new(wtapng_iface_descriptions_t,1);
@@ -204,14 +184,13 @@ exp_pdu_file_open(exp_pdu_t *exp_pdu_tap_data)
 
 end:
     g_free(capfile_name);
-    g_free(shb_hdr);
-    g_free(appname);
 }
 
 gboolean
-do_export_pdu(const char *filter, gchar *tap_name, exp_pdu_t *exp_pdu_tap_data)
+do_export_pdu(const char *filter, gchar *tap_name, gpointer data)
 {
     GString        *error_string;
+    exp_pdu_t  *exp_pdu_tap_data = (exp_pdu_t *)data;
 
     /* Register this tap listener now */
     error_string = register_tap_listener(tap_name,             /* The name of the tap we want to listen to */

@@ -172,10 +172,15 @@ dissect_fractalgeneratorprotocol(tvbuff_t *message_tvb, packet_info *pinfo, prot
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "FractalGeneratorProtocol");
 
-  /* create the fractalgeneratorprotocol protocol tree */
-  fractalgeneratorprotocol_item = proto_tree_add_item(tree, proto_fractalgeneratorprotocol, message_tvb, 0, -1, ENC_NA);
-  fractalgeneratorprotocol_tree = proto_item_add_subtree(fractalgeneratorprotocol_item, ett_fractalgeneratorprotocol);
-
+  /* In the interest of speed, if "tree" is NULL, don't do any work not
+     necessary to generate protocol tree items. */
+  if (tree) {
+    /* create the fractalgeneratorprotocol protocol tree */
+    fractalgeneratorprotocol_item = proto_tree_add_item(tree, proto_fractalgeneratorprotocol, message_tvb, 0, -1, ENC_NA);
+    fractalgeneratorprotocol_tree = proto_item_add_subtree(fractalgeneratorprotocol_item, ett_fractalgeneratorprotocol);
+  } else {
+    fractalgeneratorprotocol_tree = NULL;
+  };
   /* dissect the message */
   dissect_fractalgeneratorprotocol_message(message_tvb, pinfo, fractalgeneratorprotocol_tree);
   return(TRUE);
@@ -229,16 +234,3 @@ proto_reg_handoff_fractalgeneratorprotocol(void)
   dissector_add_uint("sctp.ppi", FRACTALGENERATORPROTOCOL_PAYLOAD_PROTOCOL_ID_LEGACY, fractalgeneratorprotocol_handle);
   dissector_add_uint("sctp.ppi", FGP_PAYLOAD_PROTOCOL_ID, fractalgeneratorprotocol_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

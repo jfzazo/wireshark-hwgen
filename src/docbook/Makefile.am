@@ -53,6 +53,19 @@ else
 	@false
 endif
 
+# Convert an AsciiDoc document to a DocBook chapter
+# Used for chapter-by-chapter conversion from DocBook to AsciiDoc.
+# Can be removed after the User's Guide is converted.
+# .asciidoc -> whole book (.dbk) -> chapter (.xml)
+wsug_src/%.asciidoc : wsug_src/%.xml
+	$(A2X) --verbose \
+		--asciidoc-opts="--conf-file=asciidoc.conf" \
+		--no-xmllint \
+		--format=docbook --doctype=book \
+		$<
+	mv $*.xml $*.dbk
+	xmllint --xpath '//chapter | //preface' $*.dbk > $@
+
 if HAVE_XSLTPROC
 ALL_TARGETS=git_version_check wsug wsdg release_notes
 else
@@ -82,19 +95,11 @@ endif
 
 wsug: $(WSUG_TARGETS)
 
-user-guide.xml: user-guide.asciidoc $(WSUG_FILES)
-	$(A2X) --verbose \
-		--attribute=docinfo \
-		--asciidoc-opts="--conf-file=$(srcdir)/asciidoc.conf --conf-file=$(srcdir)/asciidoctor-asciidoc.conf" \
-		--no-xmllint \
-		--format=docbook \
-		$<
-
 # validate the content
-wsug.validated: $(WSUG_SOURCE)
+wsug.validated: $(WSUG_SOURCE) wsluarm
 if HAVE_XMLLINT
 	@ echo --- WSUG - VALIDATING XML ---
-	$(XMLLINT) --path .:$(srcdir) --valid --noout $<
+	$(XMLLINT) --valid --noout $<
 	touch $@
 else
 	@ echo --- WSUG - SKIP VALIDATION ---
@@ -107,11 +112,13 @@ wsug_html/index.html: $(WSUG_SOURCE) wsluarm
 	@ echo --- WSUG - HTML SINGLE PAGE ---
 	mkdir -p wsug_html/wsug_graphics/toolbar
 	cp $(srcdir)/wsug_graphics/*.* wsug_html/wsug_graphics
-	cp $(srcdir)/common_graphics/*.* wsug_html/wsug_graphics
 	cp $(srcdir)/wsug_graphics/toolbar/* wsug_html/wsug_graphics/toolbar
 	cp $(srcdir)/ws.css wsug_html
-	$(XSLTPROC) --stringparam base.dir wsug_html/ $(COMMON_XSLTPROC_ARGS) \
-		$(WSUG_XSLTPROC_ARGS) $(SINGLE_XSLTPROC_ARGS) $< > $@
+	$(XSLTPROC) --stringparam base.dir wsug_html/ --stringparam  use.id.as.filename 1 \
+		    --stringparam admon.graphics 1 --stringparam admon.graphics.path wsug_graphics/ \
+		    --stringparam section.autolabel 1 --stringparam  section.label.includes.component.label 1 \
+		    --stringparam html.stylesheet ws.css \
+		    --nonet http://docbook.sourceforge.net/release/xsl/current/html/docbook.xsl $< > $@
 	-chmod -R og+rX wsug_html
 
 # create html chunked page files
@@ -121,26 +128,26 @@ wsug_html_chunked/index.html: $(WSUG_SOURCE) wsluarm
 	@ echo --- WSUG - HTML CHUNKED ---
 	mkdir -p wsug_html_chunked/wsug_graphics/toolbar
 	cp $(srcdir)/wsug_graphics/*.* wsug_html_chunked/wsug_graphics
-	cp $(srcdir)/common_graphics/*.* wsug_html_chunked/wsug_graphics
 	cp $(srcdir)/wsug_graphics/toolbar/* wsug_html_chunked/wsug_graphics/toolbar
 	cp $(srcdir)/ws.css wsug_html_chunked
-	$(XSLTPROC) --stringparam base.dir wsug_html_chunked/ $(COMMON_XSLTPROC_ARGS) \
-		    $(WSUG_XSLTPROC_ARGS) $(CHUNKED_XSLTPROC_ARGS) $<
+	$(XSLTPROC) --stringparam base.dir wsug_html_chunked/ --stringparam  use.id.as.filename 1 \
+		    --stringparam admon.graphics 1 --stringparam admon.graphics.path wsug_graphics/ \
+		    --stringparam section.autolabel 1 --stringparam  section.label.includes.component.label 1 \
+		    --stringparam html.stylesheet ws.css \
+		    --nonet http://docbook.sourceforge.net/release/xsl/current/html/chunk.xsl $<
 	-chmod -R og+rX wsug_html_chunked
 
 # create pdf file (through XSL-FO), portrait pages on US letter paper
 # you will get lot's of errors, but that's ok
 user-guide-us.fo: $(WSUG_SOURCE) custom_layer_pdf.xsl wsluarm
 	@ echo --- WSUG - PDF US PAPER ---
-	$(XSLTPROC) --stringparam paper.type letter \
-		--nonet custom_layer_pdf.xsl $< > $@
+	$(XSLTPROC) --stringparam paper.type letter --nonet custom_layer_pdf.xsl $< > $@
 
 # create pdf file (through XSL-FO), portrait pages on A4 paper
 # you will get lot's of errors, but that's ok
 user-guide-a4.fo: $(WSUG_SOURCE) custom_layer_pdf.xsl wsluarm
 	@ echo --- WSUG - PDF A4 PAPER ---
-	$(XSLTPROC) --stringparam paper.type A4 \
-		--nonet custom_layer_pdf.xsl $< > $@
+	$(XSLTPROC) --stringparam paper.type A4 --nonet custom_layer_pdf.xsl $< > $@
 
 wsluarm: make-wsluarm.pl $(WSLUA_MODULES)
 	mkdir -p wsluarm_src
@@ -164,7 +171,7 @@ wsdg: $(WSDG_TARGETS)
 developer-guide.xml: developer-guide.asciidoc $(WSDG_FILES)
 	$(A2X) --verbose \
 		--attribute=docinfo \
-		--asciidoc-opts="--conf-file=$(srcdir)/asciidoc.conf --conf-file=$(srcdir)/asciidoctor-asciidoc.conf" \
+		--asciidoc-opts="--conf-file=asciidoc.conf" \
 		--no-xmllint \
 		--format=docbook \
 		$<
@@ -173,25 +180,26 @@ developer-guide.xml: developer-guide.asciidoc $(WSDG_FILES)
 wsdg.validated: $(WSDG_SOURCE)
 if HAVE_XMLLINT
 	@ echo --- WSDG - VALIDATING XML ---
-	$(XMLLINT) --path .:wsluarm_src:$(srcdir) --valid --noout $<
+	$(XMLLINT) --valid --noout $<
 	touch $@
 else
 	@ echo --- WSDG - SKIP VALIDATION ---
 endif
 
 # create html single page file
-wsdg_html: wsdg_html/index.html wsluarm
+wsdg_html: wsdg_html/index.html
 
 wsdg_html/index.html: $(WSDG_SOURCE)
 	@ echo --- WSDG - HTML SINGLE PAGE ---
 	mkdir -p wsdg_html/wsdg_graphics/toolbar
 	cp $(srcdir)/wsdg_graphics/*.* wsdg_html/wsdg_graphics
-	cp $(srcdir)/common_graphics/*.* wsdg_html/wsdg_graphics
-	cp $(srcdir)/wsdg_graphics/toolbar/* wsdg_html/wsdg_graphics/toolbar/
+	cp wsdg_graphics/toolbar/* wsdg_html/wsdg_graphics/toolbar/
 	cp $(srcdir)/ws.css wsdg_html
-	$(XSLTPROC) --stringparam base.dir wsdg_html/ $(COMMON_XSLTPROC_ARGS) \
-		--path .:wsluarm_src \
-		$(WSDG_XSLTPROC_ARGS) $(SINGLE_XSLTPROC_ARGS) $< > $@
+	$(XSLTPROC) --stringparam base.dir wsdg_html/ --stringparam  use.id.as.filename 1 \
+		    --stringparam admon.graphics 1 --stringparam admon.graphics.path wsdg_graphics/ \
+		    --stringparam section.autolabel 1 --stringparam  section.label.includes.component.label 1 \
+		    --stringparam html.stylesheet ws.css \
+		    --nonet http://docbook.sourceforge.net/release/xsl/current/html/docbook.xsl $< > $@
 	-chmod -R og+rX wsdg_html
 
 # create html chunked page files
@@ -201,29 +209,26 @@ wsdg_html_chunked/index.html: $(WSDG_SOURCE)
 	@ echo --- WSDG - HTML CHUNKED ---
 	mkdir -p wsdg_html_chunked/wsdg_graphics/toolbar
 	cp $(srcdir)/wsdg_graphics/*.* wsdg_html_chunked/wsdg_graphics
-	cp $(srcdir)/common_graphics/*.* wsdg_html_chunked/wsdg_graphics
-	cp $(srcdir)/wsdg_graphics/toolbar/* wsdg_html_chunked/wsdg_graphics/toolbar/
+	cp wsdg_graphics/toolbar/* wsdg_html_chunked/wsdg_graphics/toolbar/
 	cp $(srcdir)/ws.css wsdg_html_chunked
-	$(XSLTPROC) --stringparam base.dir wsdg_html_chunked/ $(COMMON_XSLTPROC_ARGS) \
-		--path .:wsluarm_src \
-		$(WSDG_XSLTPROC_ARGS) $(CHUNKED_XSLTPROC_ARGS) $<
+	$(XSLTPROC) --stringparam base.dir wsdg_html_chunked/ --stringparam  use.id.as.filename 1 \
+		    --stringparam admon.graphics 1 --stringparam admon.graphics.path wsdg_graphics/  \
+		    --stringparam section.autolabel 1 --stringparam  section.label.includes.component.label 1 \
+		    --stringparam html.stylesheet ws.css \
+		    --nonet http://docbook.sourceforge.net/release/xsl/current/html/chunk.xsl $<
 	-chmod -R og+rX wsdg_html_chunked
 
 # create pdf file (through XSL-FO), portrait pages on US letter paper
 # you will get lot's of errors, but that's ok
 developer-guide-us.fo: $(WSDG_SOURCE) custom_layer_pdf.xsl
 	@ echo --- WSDG - PDF US PAPER ---
-	$(XSLTPROC) --stringparam paper.type letter \
-		    --path .:wsluarm_src:$(srcdir) \
-		    --nonet custom_layer_pdf.xsl $< > $@
+	$(XSLTPROC) --stringparam paper.type letter --nonet custom_layer_pdf.xsl $< > $@
 
 # create pdf file (through XSL-FO), portrait pages on A4 paper
 # you will get lot's of errors, but that's ok
 developer-guide-a4.fo: $(WSDG_SOURCE) custom_layer_pdf.xsl
 	@ echo --- WSDG - PDF A4 PAPER ---
-	$(XSLTPROC) --stringparam paper.type A4 \
-		    --path .:wsluarm_src:$(srcdir) \
-		    --nonet custom_layer_pdf.xsl $< > $@
+	$(XSLTPROC) --stringparam paper.type A4 --nonet custom_layer_pdf.xsl $< > $@
 
 
 if HAVE_FOP
@@ -237,19 +242,18 @@ release_notes: $(RELEASE_NOTES_TARGETS)
 # create html single page file
 release-notes.html: $(RELEASE_NOTES_SOURCE)
 	@ echo --- RELEASE NOTES - HTML ---
-	$(A2X) --format=xhtml $(A2X_HTML_OPTS) $(srcdir)/release-notes.asciidoc
+	$(A2X) --format=xhtml $(A2X_HTML_OPTS) release-notes.asciidoc
 
 # create txt single page file (through HTML)
 release-notes.txt: $(RELEASE_NOTES_SOURCE)
 	@ echo --- RELEASE NOTES - TXT ---
-	TZ=UTC $(A2X) --format=text $(A2X_TEXT_OPTS) \
+	$(A2X) --format=text $(A2X_TEXT_OPTS) \
 		--xsltproc-opts "--stringparam generate.toc \"article nop\"" \
-		$(srcdir)/release-notes.asciidoc
-	mv $(srcdir)/release-notes.text $@
+		release-notes.asciidoc
+	mv release-notes.text $@
 
 news: release-notes.txt
 	cp release-notes.txt ../NEWS
-	-cp release-notes.txt $(top_srcdir)/NEWS
 
 # Apparently we can only run one instance of a2x at a time.
 .NOTPARALLEL: release-notes-us.pdf release-notes-a4.pdf
@@ -258,24 +262,24 @@ release-notes-us.pdf: $(RELEASE_NOTES_SOURCE) custom_layer_pdf.xsl
 	@ echo --- RELEASE NOTES - PDF US LETTER PAPER ---
 	$(A2X) --format=pdf $(A2X_HTML_OPTS) --fop \
 		--xsltproc-opts "--stringparam paper.type letter --nonet" \
-		--xsl-file=$(srcdir)/custom_layer_pdf.xsl \
-		$(srcdir)/release-notes.asciidoc
-	mv $(srcdir)/release-notes.pdf $@
+		--xsl-file=custom_layer_pdf.xsl \
+		release-notes.asciidoc
+	mv release-notes.pdf $@
 
 # create pdf file, portrait pages on A4 paper
 release-notes-a4.pdf: $(RELEASE_NOTES_SOURCE) custom_layer_pdf.xsl
 	@ echo --- RELEASE NOTES - PDF A4 PAPER ---
 	$(A2X) --format=pdf $(A2X_HTML_OPTS) --fop \
 		--xsltproc-opts "--stringparam paper.type A4 --nonet" \
-		--xsl-file=$(srcdir)/custom_layer_pdf.xsl \
-		$(srcdir)/release-notes.asciidoc
-	mv $(srcdir)/release-notes.pdf $@
+		--xsl-file=custom_layer_pdf.xsl \
+		release-notes.asciidoc
+	mv release-notes.pdf $@
 
 clean-local:
 	-rm -rf $(CLEANDIRS)
 
 EXTRA_DIST = \
-	$(WSUG_DIST)		\
+	$(WSUG_SOURCE)		\
 	$(WSDG_DIST)		\
 	$(RELEASE_NOTES_SOURCE)	\
 	check_git_version.sh	\

@@ -51,6 +51,7 @@ typedef struct _packet_info {
   struct epan_column_info *cinfo;   /**< Column formatting information */
   frame_data *fd;
   union wtap_pseudo_header *pseudo_header;
+  int file_type_subtype;            /**< Capture file type/subtype */
   struct wtap_pkthdr *phdr;         /**< Record metadata */
   GSList *data_src;                 /**< Frame data sources */
   address dl_src;                   /**< link-layer source address */
@@ -59,6 +60,7 @@ typedef struct _packet_info {
   address net_dst;                  /**< network-layer destination address */
   address src;                      /**< source address (net if present, DL otherwise )*/
   address dst;                      /**< destination address (net if present, DL otherwise )*/
+  guint32 ipproto;                  /**< IP protocol, if this is an IP packet */
   circuit_type ctype;               /**< type of circuit, for protocols with a VC identifier */
   guint32 circuit_id;               /**< circuit ID, for protocols with a VC identifier */
   const char *noreassembly_reason;  /**< reason why reassembly wasn't done, if any */
@@ -148,12 +150,21 @@ typedef struct _packet_info {
   tvbuff_t *gssapi_decrypted_tvb;
   gboolean gssapi_data_encrypted;
 
+  void    *private_data;        /**< pointer to data passed from one dissector to another */
   GHashTable *private_table;    /**< a hash table passed from one dissector to another */
 
   wmem_list_t *layers;      /**< layers of each protocol */
   guint8 curr_layer_num;       /**< The current "depth" or layer number in the current frame */
   guint16 link_number;
+  guint8  annex_a_used;         /**< used in packet-mtp2.c
+                                 * defined in wtap.h
+                                 * MTP2_ANNEX_A_NOT_USED      0
+                                 * MTP2_ANNEX_A_USED          1
+                                 * MTP2_ANNEX_A_USED_UNKNOWN  2
+                                 */
+  guint16 profinet_type;        /**< the type of PROFINET packet (0: not a PROFINET packet) */
 
+  struct _sccp_msg_info_t* sccp_info;
   guint16 clnp_srcref;          /**< clnp/cotp source reference (can't use srcport, this would confuse tpkt) */
   guint16 clnp_dstref;          /**< clnp/cotp destination reference (can't use dstport, this would confuse tpkt) */
 
@@ -168,6 +179,7 @@ typedef struct _packet_info {
   wmem_allocator_t *pool;      /**< Memory pool scoped to the pinfo struct */
   struct epan_session *epan;
   nstime_t     rel_ts;       /**< Relative timestamp (yes, it can be negative) */
+  const gchar  *pkt_comment; /**< NULL if not available */
   const gchar *heur_list_name;    /**< name of heur list if this packet is being heuristically dissected */
 } packet_info;
 

@@ -29,7 +29,6 @@ PacketCommentDialog::PacketCommentDialog(QWidget *parent, QString comment) :
     pc_ui_(new Ui::PacketCommentDialog)
 {
     pc_ui_->setupUi(this);
-    setWindowTitle(wsApp->windowTitleString(tr("Packet Comment")));
 
     pc_ui_->commentTextEdit->setPlainText(comment);
 }

@@ -26,31 +26,25 @@ set(WIRESHARK_QT_HEADERS
 	accordion_frame.h
 	byte_view_tab.h
 	byte_view_text.h
-	capture_file.h
 	capture_file_dialog.h
-	capture_file_properties_dialog.h
 	capture_filter_combo.h
 	capture_filter_edit.h
 	capture_filter_syntax_worker.h
 	capture_info_dialog.h
+	capture_interface_dialog.h
 	capture_interfaces_dialog.h
 	capture_preferences_frame.h
 	color_dialog.h
 	color_utils.h
 	column_preferences_frame.h
-	column_editor_frame.h
-	compiled_filter_output.h
-	conversation_dialog.h
 	decode_as_dialog.h
 	display_filter_combo.h
 	display_filter_edit.h
 	elided_label.h
-	endpoint_dialog.h
 	export_dissection_dialog.h
 	export_object_dialog.h
 	export_pdu_dialog.h
 	file_set_dialog.h
-	filter_action.h
 	filter_expressions_preferences_frame.h
 	follow_stream_dialog.h
 	follow_stream_text.h
@@ -68,7 +62,6 @@ set(WIRESHARK_QT_HEADERS
 	main_welcome.h
 	main_window.h
 	main_window_preferences_frame.h
-	manage_interfaces_dialog.h
 	module_preferences_scroll_area.h
 	packet_comment_dialog.h
 	packet_format_group_box.h
@@ -80,10 +73,8 @@ set(WIRESHARK_QT_HEADERS
 	profile_dialog.h
 	progress_bar.h
 	proto_tree.h
-	protocol_hierarchy_dialog.h
 	qcustomplot.h
 	recent_file_status.h
-	rtp_stream_dialog.h
 	sctp_all_assocs_dialog.h
 	sctp_assoc_analyse_dialog.h
 	sctp_chunk_statistics_dialog.h
@@ -93,33 +84,21 @@ set(WIRESHARK_QT_HEADERS
 	search_frame.h
 	sequence_diagram.h
 	sequence_dialog.h
-	simple_dialog.h
+	simple_dialog_qt.h
 	splash_overlay.h
 	stats_tree_dialog.h
+	summary_dialog.h
 	syntax_line_edit.h
 	tcp_stream_dialog.h
 	time_shift_dialog.h
-	traffic_table_dialog.h
 	uat_dialog.h
-	voip_calls_dialog.h
 	wireshark_application.h
-	wireshark_dialog.h
-)
 
-if(HAVE_PCAP_REMOTE)
-	set(WIRESHARK_QT_HEADERS
-		${WIRESHARK_QT_HEADERS}
-		remote_capture_dialog.h
-		remote_settings_dialog.h
-	)
-endif()
-
-file(GLOB EXTRA_QT_HEADERS
-	packet_list_record.h
-	qt_ui_utils.h
-	related_packet_delegate.h
-	sparkline_delegate.h
-	stock_icon.h
+	# No Q_OBJECT:
+	# packet_list_record.h
+	# qt_ui_utils.h
+	# related_packet_delegate.h
+	# sparkline_delegate.h
 )
 
 set(WIRESHARK_QT_SRC
@@ -127,20 +106,17 @@ set(WIRESHARK_QT_SRC
 	accordion_frame.cpp
 	byte_view_tab.cpp
 	byte_view_text.cpp
-	capture_file.cpp
 	capture_file_dialog.cpp
-	capture_file_properties_dialog.cpp
 	capture_filter_combo.cpp
 	capture_filter_edit.cpp
 	capture_filter_syntax_worker.cpp
 	capture_info_dialog.cpp
+	capture_interface_dialog.cpp
 	capture_interfaces_dialog.cpp
 	color_dialog.cpp
 	color_utils.cpp
 	capture_preferences_frame.cpp
 	column_preferences_frame.cpp
-	column_editor_frame.cpp
-	compiled_filter_output.cpp
 	decode_as_dialog.cpp
 	display_filter_combo.cpp
 	display_filter_edit.cpp
@@ -149,25 +125,25 @@ set(WIRESHARK_QT_SRC
 	export_object_dialog.cpp
 	export_pdu_dialog.cpp
 	file_set_dialog.cpp
-	filter_action.cpp
 	filter_expressions_preferences_frame.cpp
 	follow_stream_dialog.cpp
 	follow_stream_text.cpp
 	font_color_preferences_frame.cpp
 	import_text_dialog.cpp
 	interface_tree.cpp
+	io_graph_dialog.cpp
 	label_stack.cpp
 	layout_preferences_frame.cpp
 	lbm_lbtrm_transport_dialog.cpp
 	lbm_lbtru_transport_dialog.cpp
 	lbm_stream_dialog.cpp
 	lbm_uimflow_dialog.cpp
+	main.cpp
 	main_status_bar.cpp
 	main_welcome.cpp
 	main_window.cpp
 	main_window_preferences_frame.cpp
 	main_window_slots.cpp
-	manage_interfaces_dialog.cpp
 	module_preferences_scroll_area.cpp
 	packet_comment_dialog.cpp
 	packet_format_group_box.cpp
@@ -180,11 +156,9 @@ set(WIRESHARK_QT_SRC
 	profile_dialog.cpp
 	progress_bar.cpp
 	proto_tree.cpp
-	protocol_hierarchy_dialog.cpp
 	qt_ui_utils.cpp
 	recent_file_status.cpp
 	related_packet_delegate.cpp
-	rtp_stream_dialog.cpp
 	sctp_all_assocs_dialog.cpp
 	sctp_assoc_analyse_dialog.cpp
 	sctp_chunk_statistics_dialog.cpp
@@ -194,32 +168,18 @@ set(WIRESHARK_QT_SRC
 	search_frame.cpp
 	sequence_diagram.cpp
 	sequence_dialog.cpp
-	simple_dialog.cpp
+	simple_dialog_qt.cpp
 	splash_overlay.cpp
 	sparkline_delegate.cpp
-	stock_icon.cpp
+	summary_dialog.cpp
 	syntax_line_edit.cpp
 	tcp_stream_dialog.cpp
 	time_shift_dialog.cpp
-	traffic_table_dialog.cpp
 	uat_dialog.cpp
-	voip_calls_dialog.cpp
 	wireshark_application.cpp
-	wireshark_dialog.cpp
 )
 
-if(HAVE_PCAP_REMOTE)
-	set(WIRESHARK_QT_SRC
-		${WIRESHARK_QT_SRC}
-		remote_capture_dialog.cpp
-		remote_settings_dialog.cpp
-	)
-endif()
-
 set(WIRESHARK_QT_TAP_SRC
-	conversation_dialog.cpp
-	endpoint_dialog.cpp
-	io_graph_dialog.cpp
 	stats_tree_dialog.cpp
 )
 
@@ -234,12 +194,9 @@ set(DIRTY_FILES
 
 set(WIRESHARK_QT_UI
 	about_dialog.ui
-	capture_file_properties_dialog.ui
-	capture_interfaces_dialog.ui
 	capture_preferences_frame.ui
+	capture_interfaces_dialog.ui
 	column_preferences_frame.ui
-	column_editor_frame.ui
-	compiled_filter_output.ui
 	decode_as_dialog.ui
 	export_object_dialog.ui
 	export_pdu_dialog.ui
@@ -257,7 +214,6 @@ set(WIRESHARK_QT_UI
 	main_welcome.ui
 	main_window.ui
 	main_window_preferences_frame.ui
-	manage_interfaces_dialog.ui
 	module_preferences_scroll_area.ui
 	packet_comment_dialog.ui
 	packet_format_group_box.ui
@@ -265,8 +221,6 @@ set(WIRESHARK_QT_UI
 	preferences_dialog.ui
 	print_dialog.ui
 	profile_dialog.ui
-	protocol_hierarchy_dialog.ui
-	rtp_stream_dialog.ui
 	sctp_all_assocs_dialog.ui
 	sctp_assoc_analyse_dialog.ui
 	sctp_chunk_statistics_dialog.ui
@@ -277,40 +231,27 @@ set(WIRESHARK_QT_UI
 	sequence_dialog.ui
 	splash_overlay.ui
 	stats_tree_dialog.ui
+	summary_dialog.ui
 	tcp_stream_dialog.ui
 	time_shift_dialog.ui
-	traffic_table_dialog.ui
 	uat_dialog.ui
-	voip_calls_dialog.ui
 )
-
-if(HAVE_PCAP_REMOTE)
-	set(WIRESHARK_QT_UI
-		${WIRESHARK_QT_UI}
-		remote_capture_dialog.ui
-		remote_settings_dialog.ui
-	)
-endif()
 
 set(WIRESHARK_QT_QRC
 	../../image/about.qrc
 	../../image/display_filter.qrc
-	../../image/languages/languages.qrc
 	../../image/layout.qrc
 	../../image/status.qrc
 	../../image/toolbar.qrc
-	../../image/wsicon.qrc
 	i18n.qrc
+	welcome.qrc
 )
 
 set(WIRESHARK_QT_TS
-	wireshark_de.ts
-	wireshark_en.ts # lupdate -pluralonly
-	wireshark_fr.ts
-	wireshark_it.ts
-	wireshark_ja_JP.ts
-	wireshark_pl.ts
-	wireshark_zh_CN.ts
+	qtshark_de.ts
+	qtshark_en.ts # lupdate -pluralonly
+	qtshark_fr.ts
+	qtshark_zh_CN.ts
 )
 
 include_directories(
@@ -375,3 +316,4 @@ add_library(qtui STATIC
 )
 set_target_properties(qtui PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
 set_target_properties(qtui PROPERTIES FOLDER "UI")
+

@@ -51,12 +51,15 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/ipproto.h>
 #include <epan/prefs.h>
 #include "packet-igmp.h"
+#include "packet-dvmrp.h"
 
 void proto_register_dvmrp(void);
-void proto_reg_handoff_dvmrp(void);
 
 static int proto_dvmrp = -1;
 static int hf_version = -1;
@@ -317,7 +320,7 @@ dissect_v3_report(tvbuff_t *tvb, proto_tree *parent_tree, int offset)
 static int
 dissect_dvmrp_v3(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, int offset)
 {
-	guint8 code;
+	guint8 code,count;
 
 	/* version */
 	proto_tree_add_uint(parent_tree, hf_version, tvb, 0, 0, 3);
@@ -344,18 +347,20 @@ dissect_dvmrp_v3(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, int
 	/* PROBE and NEIGHBORS 2 packets have capabilities flags, unused
 	   for other packets */
 	if (code==DVMRP_V3_PROBE || code==DVMRP_V3_NEIGHBORS_2) {
-		static const int * capabilities[] = {
-			&hf_cap_netmask,
-			&hf_cap_snmp,
-			&hf_cap_mtrace,
-			&hf_cap_genid,
-			&hf_cap_prune,
-			&hf_cap_leaf,
-			NULL
-		};
+		proto_tree *tree;
+		proto_item *item;
 
-		proto_tree_add_bitmask(parent_tree, tvb, offset, hf_capabilities,
-			       ett_capabilities, capabilities, ENC_NA);
+		item = proto_tree_add_item(parent_tree, hf_capabilities,
+				tvb, offset, 1, ENC_NA);
+		tree = proto_item_add_subtree(item, ett_capabilities);
+
+		count = tvb_get_guint8(tvb, offset);
+		proto_tree_add_boolean(tree, hf_cap_netmask, tvb, offset, 1, count);
+		proto_tree_add_boolean(tree, hf_cap_snmp, tvb, offset, 1, count);
+		proto_tree_add_boolean(tree, hf_cap_mtrace, tvb, offset, 1, count);
+		proto_tree_add_boolean(tree, hf_cap_genid, tvb, offset, 1, count);
+		proto_tree_add_boolean(tree, hf_cap_prune, tvb, offset, 1, count);
+		proto_tree_add_boolean(tree, hf_cap_leaf, tvb, offset, 1, count);
 	}
 	offset += 1;
 
@@ -672,23 +677,31 @@ dissect_dvmrp_v1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, int
 }
 
 /* This function is only called from the IGMP dissector */
-static int
-dissect_dvmrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* data _U_)
+int
+dissect_dvmrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, int offset)
 {
 	proto_tree *tree;
 	proto_item *item;
-	int offset = 0;
 
-	col_set_str(pinfo->cinfo, COL_PROTOCOL, "DVMRP");
-	col_clear(pinfo->cinfo, COL_INFO);
+	if (!proto_is_protocol_enabled(find_protocol_by_id(proto_dvmrp))) {
+		/* we are not enabled, skip entire packet to be nice
+		   to the igmp layer. (so clicking on IGMP will display the data)
+		 */
+		return offset+tvb_length_remaining(tvb, offset);
+	}
 
 	item = proto_tree_add_item(parent_tree, proto_dvmrp, tvb, offset, -1, ENC_NA);
 	tree = proto_item_add_subtree(item, ett_dvmrp);
 
+
+	col_set_str(pinfo->cinfo, COL_PROTOCOL, "DVMRP");
+	col_clear(pinfo->cinfo, COL_INFO);
+
+
 	if ((tvb_length_remaining(tvb, offset)>=8)
 	 && (((tvb_get_guint8(tvb, 6)==0xff)
 	 && (tvb_get_guint8(tvb, 7)==0x03))
-	     || !strict_v3)) {
+         || !strict_v3)) {
 		offset = dissect_dvmrp_v3(tvb, pinfo, tree, offset);
 	} else {
 		offset = dissect_dvmrp_v1(tvb, pinfo, tree, offset);
@@ -775,7 +788,7 @@ proto_register_dvmrp(void)
 			  VALS(code_v3), 0, "DVMRP Packet Code", HFILL }},
 
 		{ &hf_capabilities,
-			{ "Capabilities", "dvmrp.capabilities", FT_UINT8, BASE_HEX,
+			{ "Capabilities", "dvmrp.capabilities", FT_NONE, BASE_NONE,
 			  NULL, 0, "DVMRP V3 Capabilities", HFILL }},
 
 		{&hf_cap_leaf,
@@ -879,7 +892,8 @@ proto_register_dvmrp(void)
 	};
 	module_t *module_dvmrp;
 
-	proto_dvmrp = proto_register_protocol("Distance Vector Multicast Routing Protocol", "DVMRP", "dvmrp");
+	proto_dvmrp = proto_register_protocol("Distance Vector Multicast Routing Protocol",
+	    "DVMRP", "dvmrp");
 	proto_register_field_array(proto_dvmrp, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
 
@@ -889,26 +903,3 @@ proto_register_dvmrp(void)
 		"Allow only packets with Major=0x03//Minor=0xFF as DVMRP V3 packets",
 		&strict_v3);
 }
-
-void
-proto_reg_handoff_dvmrp(void)
-{
-	dissector_handle_t dvmrp_handle;
-
-	dvmrp_handle = new_create_dissector_handle(dissect_dvmrp, proto_dvmrp);
-	dissector_add_uint("igmp.type", IGMP_DVMRP, dvmrp_handle);
-}
-
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -19,8 +19,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "ui/utf8_entities.h"
-
 #include "sctp_graph_dialog.h"
 #include "ui_sctp_graph_dialog.h"
 #include "sctp_assoc_analyse_dialog.h"
@@ -38,11 +36,6 @@ SCTPGraphDialog::SCTPGraphDialog(QWidget *parent, sctp_assoc_info_t *assoc, capt
     if (!selected_assoc) {
         selected_assoc = SCTPAssocAnalyseDialog::findAssocForPacket(cap_file_);
     }
-    Qt::WindowFlags flags = Qt::Window | Qt::WindowSystemMenuHint
-            | Qt::WindowMinimizeButtonHint
-            | Qt::WindowMaximizeButtonHint
-            | Qt::WindowCloseButtonHint;
-    this->setWindowFlags(flags);
     this->setWindowTitle(QString(tr("SCTP TSNs and SACKs over Time: %1 Port1 %2 Port2 %3")).arg(cf_get_display_name(cap_file_)).arg(selected_assoc->port1).arg(selected_assoc->port2));
     if ((direction == 1 && selected_assoc->n_array_tsn1 == 0) || (direction == 2 && selected_assoc->n_array_tsn2 == 0)) {
         QMessageBox msgBox;
@@ -232,7 +225,7 @@ void SCTPGraphDialog::drawSACKGraph()
         myScatter.setBrush(Qt::blue);
         ui->sctpPlot->graph(graphcount)->setScatterStyle(myScatter);
         ui->sctpPlot->graph(graphcount)->setLineStyle(QCPGraph::lsNone);
-        ui->sctpPlot->graph(graphcount)->setData(xn, yn);
+        ui->sctpPlot->graph(graphcount)->setData(xg, yg);
         typeStrings.insert(graphcount, QString(tr("NR Gap Ack")));
         graphcount++;
     }
@@ -434,7 +427,7 @@ void SCTPGraphDialog::save_graph(QDialog *dlg, QCustomPlot *plot)
             .arg(bmp_filter)
             .arg(jpeg_filter);
 
-    file_name = QFileDialog::getSaveFileName(dlg, wsApp->windowTitleString(tr("Save Graph As" UTF8_HORIZONTAL_ELLIPSIS)),
+    file_name = QFileDialog::getSaveFileName(dlg, tr("Wireshark: Save Graph As..."),
                                              path.canonicalPath(), filter, &extension);
 
     if (file_name.length() > 0) {

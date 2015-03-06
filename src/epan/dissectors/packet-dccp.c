@@ -48,12 +48,16 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/addr_resolv.h>
 #include <epan/ipproto.h>
 #include <epan/in_cksum.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+#include "packet-ip.h"
 #include <epan/conversation.h>
 #include <epan/tap.h>
 #include "packet-dccp.h"
@@ -627,7 +631,6 @@ dissect_dccp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     guint      offset                     = 0;
     guint      len                        = 0;
     guint      reported_len               = 0;
-    guint      csum_coverage_len;
     guint      advertised_dccp_header_len = 0;
     guint      options_len                = 0;
     e_dccphdr *dccph;
@@ -650,14 +653,14 @@ dissect_dccp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     proto_tree_add_uint_format_value(dccp_tree, hf_dccp_srcport, tvb,
                                      offset, 2, dccph->sport,
                                      "%s (%u)",
-                                     dccp_port_to_display(wmem_packet_scope(), dccph->sport),
+                                     ep_dccp_port_to_display(dccph->sport),
                                      dccph->sport);
     if (dccp_summary_in_tree) {
         proto_item_append_text(dccp_item, ", Src Port: %s (%u)",
-                               dccp_port_to_display(wmem_packet_scope(), dccph->sport), dccph->sport);
+                               ep_dccp_port_to_display(dccph->sport), dccph->sport);
     }
     col_add_fstr(pinfo->cinfo, COL_INFO,
-                 "%s ", dccp_port_to_display(wmem_packet_scope(), dccph->sport));
+                 "%s ", ep_dccp_port_to_display(dccph->sport));
     hidden_item =
         proto_tree_add_uint(dccp_tree, hf_dccp_port, tvb, offset, 2,
                             dccph->sport);
@@ -668,14 +671,14 @@ dissect_dccp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     proto_tree_add_uint_format_value(dccp_tree, hf_dccp_dstport, tvb,
                                      offset, 2, dccph->dport,
                                      "%s (%u)",
-                                     dccp_port_to_display(wmem_packet_scope(), dccph->dport),
+                                     ep_dccp_port_to_display(dccph->dport),
                                      dccph->dport);
     if (dccp_summary_in_tree) {
         proto_item_append_text(dccp_item, ", Dst Port: %s (%u)",
-                               dccp_port_to_display(wmem_packet_scope(), dccph->dport), dccph->dport);
+                               ep_dccp_port_to_display(dccph->dport), dccph->dport);
     }
     col_append_fstr(pinfo->cinfo, COL_INFO, " > %s",
-                    dccp_port_to_display(wmem_packet_scope(), dccph->dport));
+                    ep_dccp_port_to_display(dccph->dport));
     hidden_item =
         proto_tree_add_uint(dccp_tree, hf_dccp_port, tvb, offset, 2,
                             dccph->dport);
@@ -713,52 +716,61 @@ dissect_dccp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
      */
     reported_len = tvb_reported_length(tvb);
     len = tvb_length(tvb);
-    csum_coverage_len = dccp_csum_coverage(dccph, reported_len);
 
-    if (dccp_check_checksum && !pinfo->fragmented && len >= csum_coverage_len) {
-        /* We're supposed to check the checksum, and the packet isn't part
-         * of a fragmented datagram and isn't truncated, so we can checksum it.
-         * XXX - make a bigger scatter-gather list once we do fragment
-         * reassembly? */
-        /* Set up the fields of the pseudo-header. */
-        SET_CKSUM_VEC_PTR(cksum_vec[0], (const guint8 *)pinfo->src.data, pinfo->src.len);
-        SET_CKSUM_VEC_PTR(cksum_vec[1], (const guint8 *)pinfo->dst.data, pinfo->dst.len);
-        switch (pinfo->src.type) {
-        case AT_IPv4:
-            phdr[0] = g_htonl((IP_PROTO_DCCP << 16) + reported_len);
-            SET_CKSUM_VEC_PTR(cksum_vec[2], (const guint8 *) &phdr, 4);
-            break;
-        case AT_IPv6:
-            phdr[0] = g_htonl(reported_len);
-            phdr[1] = g_htonl(IP_PROTO_DCCP);
-            SET_CKSUM_VEC_PTR(cksum_vec[2], (const guint8 *) &phdr, 8);
-            break;
+    if (!pinfo->fragmented && len >= reported_len) {
+        /* The packet isn't part of a fragmented datagram and isn't
+            * truncated, so we can checksum it.
+            * XXX - make a bigger scatter-gather list once we do fragment
+            * reassembly? */
+        if (dccp_check_checksum) {
+            /* Set up the fields of the pseudo-header. */
+            cksum_vec[0].ptr = (const guint8 *)pinfo->src.data;
+            cksum_vec[0].len = pinfo->src.len;
+            cksum_vec[1].ptr = (const guint8 *)pinfo->dst.data;
+            cksum_vec[1].len = pinfo->dst.len;
+            cksum_vec[2].ptr = (const guint8 *) &phdr;
+            switch (pinfo->src.type) {
+            case AT_IPv4:
+                phdr[0] = g_htonl((IP_PROTO_DCCP << 16) + reported_len);
+                cksum_vec[2].len = 4;
+                break;
+            case AT_IPv6:
+                phdr[0] = g_htonl(reported_len);
+                phdr[1] = g_htonl(IP_PROTO_DCCP);
+                cksum_vec[2].len = 8;
+                break;
 
-        default:
-            /* DCCP runs only atop IPv4 and IPv6... */
-            DISSECTOR_ASSERT_NOT_REACHED();
-            break;
-        }
-        SET_CKSUM_VEC_TVB(cksum_vec[3], tvb, 0, csum_coverage_len);
-        computed_cksum = in_cksum(&cksum_vec[0], 4);
-        if (computed_cksum == 0) {
-            proto_tree_add_uint_format_value(dccp_tree,
-                                             hf_dccp_checksum, tvb,
-                                             offset, 2,
-                                             dccph->checksum,
-                                             "0x%04x [correct]",
-                                             dccph->checksum);
+            default:
+                /* DCCP runs only atop IPv4 and IPv6... */
+                break;
+            }
+            cksum_vec[3].ptr = tvb_get_ptr(tvb, 0, len);
+            cksum_vec[3].len = dccp_csum_coverage(dccph, reported_len);
+            computed_cksum = in_cksum(&cksum_vec[0], 4);
+            if (computed_cksum == 0) {
+                proto_tree_add_uint_format_value(dccp_tree,
+                                                 hf_dccp_checksum, tvb,
+                                                 offset, 2,
+                                                 dccph->checksum,
+                                                 "0x%04x [correct]",
+                                                 dccph->checksum);
+            } else {
+                hidden_item =
+                    proto_tree_add_boolean(dccp_tree, hf_dccp_checksum_bad,
+                                           tvb, offset, 2, TRUE);
+                PROTO_ITEM_SET_HIDDEN(hidden_item);
+                proto_tree_add_uint_format_value(
+                    dccp_tree, hf_dccp_checksum, tvb, offset, 2,
+                    dccph->checksum,
+                    "0x%04x [incorrect, should be 0x%04x]",
+                    dccph->checksum,
+                    in_cksum_shouldbe(dccph->checksum, computed_cksum));
+            }
         } else {
-            hidden_item =
-                proto_tree_add_boolean(dccp_tree, hf_dccp_checksum_bad,
-                                       tvb, offset, 2, TRUE);
-            PROTO_ITEM_SET_HIDDEN(hidden_item);
-            proto_tree_add_uint_format_value(
-                dccp_tree, hf_dccp_checksum, tvb, offset, 2,
-                dccph->checksum,
-                "0x%04x [incorrect, should be 0x%04x]",
-                dccph->checksum,
-                in_cksum_shouldbe(dccph->checksum, computed_cksum));
+            proto_tree_add_uint_format_value(dccp_tree, hf_dccp_checksum,
+                                             tvb,
+                                             offset, 2, dccph->checksum,
+                                             "0x%04x", dccph->checksum);
         }
     } else {
         proto_tree_add_uint_format_value(dccp_tree, hf_dccp_checksum, tvb,
@@ -1327,7 +1339,7 @@ proto_register_dccp(void)
     dccp_subdissector_table =
         register_dissector_table("dccp.port", "DCCP port", FT_UINT16,
                                  BASE_DEC);
-    heur_subdissector_list = register_heur_dissector_list("dccp");
+    register_heur_dissector_list("dccp", &heur_subdissector_list);
 
     /* reg preferences */
     dccp_module = prefs_register_protocol(proto_dccp, NULL);

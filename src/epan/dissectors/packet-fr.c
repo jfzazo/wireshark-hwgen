@@ -34,9 +34,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
-#include <epan/expert.h>
 #include <wiretap/wtap.h>
 
 #include "packet-llc.h"
@@ -46,12 +47,11 @@
 #include "packet-ipv6.h"
 #include "packet-ppp.h"
 #include "packet-fr.h"
-#include "packet-juniper.h"
-#include "packet-sflow.h"
 #include <epan/xdlc.h>
 #include <epan/etypes.h>
 #include <epan/oui.h>
 #include <epan/nlpid.h>
+#include <epan/greproto.h>
 
 void proto_register_fr(void);
 void proto_reg_handoff_fr(void);
@@ -110,13 +110,6 @@ static gint hf_fr_oui             = -1;
 static gint hf_fr_pid             = -1;
 static gint hf_fr_snaptype        = -1;
 static gint hf_fr_chdlctype       = -1;
-static gint hf_fr_first_addr_octet  = -1;
-static gint hf_fr_second_addr_octet  = -1;
-static gint hf_fr_third_addr_octet  = -1;
-
-static expert_field ei_fr_bogus_address = EI_INIT;
-static expert_field ei_fr_frame_relay_lapf = EI_INIT;
-static expert_field ei_fr_frame_relay_xid = EI_INIT;
 
 static dissector_handle_t eth_withfcs_handle;
 static dissector_handle_t gprs_ns_handle;
@@ -406,6 +399,7 @@ dissect_fr_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   int         offset      = 0;
   proto_item *ti          = NULL;
   proto_tree *fr_tree     = NULL;
+  proto_item *octet_item  = NULL;
   proto_tree *octet_tree  = NULL;
   guint8      fr_octet;
   int         is_response = FALSE;
@@ -446,24 +440,26 @@ dissect_fr_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
        * should dissect it as such, if possible.
        */
       addr = 0;
-      proto_tree_add_expert_format(fr_tree, pinfo, &ei_fr_bogus_address, tvb, offset, 1,
+      if (tree) {
+        proto_tree_add_text(fr_tree, tvb, offset, 1,
                             "Bogus 1-octet address field");
-      offset++;
+        offset++;
+      }
     } else {
-        static const int *first_address_bits[] = {&hf_fr_upper_dlci, &hf_fr_cr, &hf_fr_ea, NULL};
-        static const int *second_address_bits[] = {&hf_fr_second_dlci, &hf_fr_fecn,
-                                        &hf_fr_becn, &hf_fr_de, &hf_fr_ea, NULL};
-        static const int *third_address_bits[] = {&hf_fr_third_dlci, &hf_fr_ea, NULL};
-
       /*
        * The first octet contains the upper 6 bits of the DLCI, as well
        * as the C/R bit.
        */
       addr = (fr_octet & FRELAY_UPPER_DLCI) >> 2;
       is_response = (fr_octet & FRELAY_CR);
-
-      proto_tree_add_bitmask(fr_tree, tvb, offset, hf_fr_first_addr_octet,
-                                         ett_fr_address, first_address_bits, ENC_NA);
+      if (tree) {
+        octet_item = proto_tree_add_text(fr_tree, tvb, offset, 1,
+                                         "First address octet: 0x%02x", fr_octet);
+        octet_tree = proto_item_add_subtree(octet_item, ett_fr_address);
+        proto_tree_add_uint(octet_tree, hf_fr_upper_dlci, tvb, offset, 1, fr_octet);
+        proto_tree_add_boolean(octet_tree, hf_fr_cr, tvb, offset, 1, fr_octet);
+        proto_tree_add_boolean(octet_tree, hf_fr_ea, tvb, offset, 1, fr_octet);
+      }
       offset++;
 
       /*
@@ -472,8 +468,17 @@ dissect_fr_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
        */
       fr_octet = tvb_get_guint8(tvb, offset);
       addr = (addr << 4) | ((fr_octet & FRELAY_SECOND_DLCI) >> 4);
-      proto_tree_add_bitmask(fr_tree, tvb, offset, hf_fr_second_addr_octet,
-                                         ett_fr_address, second_address_bits, ENC_NA);
+      if (tree) {
+        octet_item = proto_tree_add_text(fr_tree, tvb, offset, 1,
+                                         "Second address octet: 0x%02x",
+                                         fr_octet);
+        octet_tree = proto_item_add_subtree(octet_item, ett_fr_address);
+        proto_tree_add_uint(octet_tree, hf_fr_second_dlci, tvb, offset, 1, fr_octet);
+        proto_tree_add_boolean(octet_tree, hf_fr_fecn, tvb, 0, offset, fr_octet);
+        proto_tree_add_boolean(octet_tree, hf_fr_becn, tvb, 0, offset, fr_octet);
+        proto_tree_add_boolean(octet_tree, hf_fr_de, tvb, 0, offset, fr_octet);
+        proto_tree_add_boolean(octet_tree, hf_fr_ea, tvb, offset, 1, fr_octet);
+      }
       offset++;
 
       if (!(fr_octet & FRELAY_EA)) {
@@ -490,24 +495,34 @@ dissect_fr_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
            * 7 more bits of DLCI.
            */
           addr = (addr << 7) | ((fr_octet & FRELAY_THIRD_DLCI) >> 1);
-          proto_tree_add_bitmask(fr_tree, tvb, offset, hf_fr_third_addr_octet,
-                                         ett_fr_address, third_address_bits, ENC_NA);
+          if (tree) {
+            octet_item = proto_tree_add_text(fr_tree, tvb, offset, 1,
+                                             "Third address octet: 0x%02x",
+                                             fr_octet);
+            octet_tree = proto_item_add_subtree(octet_item, ett_fr_address);
+            proto_tree_add_uint(octet_tree, hf_fr_third_dlci, tvb, offset, 1, fr_octet);
+            proto_tree_add_boolean(octet_tree, hf_fr_ea, tvb, offset, 1, fr_octet);
+          }
           offset++;
           fr_octet = tvb_get_guint8(tvb, offset);
           while (!(fr_octet & FRELAY_EA)) {
             /*
              * Bogus!  More than 4 octets of address.
              */
-            proto_tree_add_expert_format(fr_tree, pinfo, &ei_fr_bogus_address, tvb, offset, 1,
+            if (tree) {
+              proto_tree_add_text(fr_tree, tvb, offset, 1,
                                  "Bogus extra address octet");
+            }
             offset++;
             fr_octet = tvb_get_guint8(tvb, offset);
           }
         }
-
-        octet_tree = proto_tree_add_subtree_format(fr_tree, tvb, offset, 1,
-                                           ett_fr_address, NULL, "Final address octet: 0x%02x",
+        if (tree) {
+          octet_item = proto_tree_add_text(fr_tree, tvb, offset, 1,
+                                           "Final address octet: 0x%02x",
                                            fr_octet);
+          octet_tree = proto_item_add_subtree(octet_item, ett_fr_address);
+        }
 
         /*
          * Last octet - contains lower DLCI or DL-CORE control, DLCI or
@@ -638,15 +653,16 @@ static void
 dissect_fr_uncompressed(tvbuff_t *tvb, packet_info *pinfo,
                                     proto_tree *tree)
 {
-  proto_item *ti;
-  proto_tree *fr_tree;
+  proto_item *ti = NULL;
+  proto_tree *fr_tree = NULL;
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "FR");
   col_clear(pinfo->cinfo, COL_INFO);
 
-  ti = proto_tree_add_protocol_format(tree, proto_fr, tvb, 0, -1, "Frame Relay");
-  fr_tree = proto_item_add_subtree(ti, ett_fr);
-
+  if (tree) {
+      ti = proto_tree_add_protocol_format(tree, proto_fr, tvb, 0, -1, "Frame Relay");
+      fr_tree = proto_item_add_subtree(ti, ett_fr);
+  }
   dissect_fr_nlpid(tvb, 0, pinfo, tree, ti, fr_tree, XDLC_U);
 }
 
@@ -666,7 +682,8 @@ dissect_fr_nlpid(tvbuff_t *tvb, int offset, packet_info *pinfo,
   proto_item_set_end(ti, tvb, offset);
   fr_nlpid = tvb_get_guint8 (tvb,offset);
   if (fr_nlpid == 0) {
-    proto_tree_add_uint_format(fr_tree, hf_fr_nlpid, tvb, offset, 1, fr_nlpid, "Padding");
+    if (tree)
+      proto_tree_add_text(fr_tree, tvb, offset, 1, "Padding");
     offset++;
     if (ti != NULL) {
       /* Include the padding in the top-level protocol tree item. */
@@ -766,14 +783,14 @@ dissect_fr_nlpid(tvbuff_t *tvb, int offset, packet_info *pinfo,
 static void
 dissect_lapf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-  proto_tree_add_expert(tree, pinfo, &ei_fr_frame_relay_lapf, tvb, 0, 0);
+  proto_tree_add_text(tree, tvb, 0, 0, "Frame relay lapf not yet implemented");
   call_dissector(data_handle,tvb_new_subset_remaining(tvb,0),pinfo,tree);
 }
 
 static void
 dissect_fr_xid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-  proto_tree_add_expert(tree, pinfo, &ei_fr_frame_relay_xid, tvb, 0, 0);
+  proto_tree_add_text(tree, tvb, 0, 0, "Frame relay xid not yet implemented");
   call_dissector(data_handle,tvb_new_subset_remaining(tvb,0),pinfo,tree);
 }
 
@@ -932,21 +949,6 @@ proto_register_fr(void)
         FT_UINT16, BASE_HEX, VALS(chdlc_vals), 0x0,
         "Frame Relay Cisco HDLC Encapsulated Protocol", HFILL }},
 
-    { &hf_fr_first_addr_octet,
-      { "First address octet", "fr.first_addr_octet",
-        FT_UINT8, BASE_HEX, NULL, 0x0,
-        NULL, HFILL }},
-
-    { &hf_fr_second_addr_octet,
-      { "Second address octet", "fr.second_addr_octet",
-        FT_UINT8, BASE_HEX, NULL, 0x0,
-        NULL, HFILL }},
-
-    { &hf_fr_third_addr_octet,
-      { "Third address octet", "fr.third_addr_octet",
-        FT_UINT8, BASE_HEX, NULL, 0x0,
-        NULL, HFILL }},
-
   };
 
   /* Setup protocol subtree array */
@@ -955,12 +957,6 @@ proto_register_fr(void)
     &ett_fr_address,
     &ett_fr_control,
   };
-  static ei_register_info ei[] = {
-    { &ei_fr_bogus_address, { "fr.bogus_address", PI_PROTOCOL, PI_WARN, "Bogus address", EXPFILL }},
-    { &ei_fr_frame_relay_lapf, { "fr.frame_relay.lapf", PI_UNDECODED, PI_WARN, "Frame relay lapf not yet implemented", EXPFILL }},
-    { &ei_fr_frame_relay_xid, { "fr.frame_relay.xid", PI_UNDECODED, PI_WARN, "Frame relay xid not yet implemented", EXPFILL }},
-  };
-
   static const enum_val_t fr_encap_options[] = {
     { "frf-3.2", "FRF 3.2/Cisco HDLC", FRF_3_2 },
     { "gprs-ns", "GPRS Network Service", GPRS_NS },
@@ -968,13 +964,10 @@ proto_register_fr(void)
     { NULL, NULL, 0 },
   };
   module_t *frencap_module;
-  expert_module_t* expert_fr;
 
   proto_fr = proto_register_protocol("Frame Relay", "FR", "fr");
   proto_register_field_array(proto_fr, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
-  expert_fr = expert_register_protocol(proto_fr);
-  expert_register_field_array(expert_fr, ei, array_length(ei));
 
   fr_subdissector_table = register_dissector_table("fr.nlpid",
                                                    "Frame Relay NLPID", FT_UINT8, BASE_HEX);
@@ -1007,8 +1000,6 @@ proto_reg_handoff_fr(void)
   fr_handle = find_dissector("fr");
   dissector_add_uint("gre.proto", ETHERTYPE_RAW_FR, fr_handle);
   dissector_add_uint("wtap_encap", WTAP_ENCAP_FRELAY, fr_handle);
-  dissector_add_uint("juniper.proto", JUNIPER_PROTO_FRELAY, fr_handle);
-  dissector_add_uint("sflow_245.header_protocol", SFLOW_245_HEADER_FRAME_RELAY, fr_handle);
 
   fr_phdr_handle = create_dissector_handle(dissect_fr_phdr, proto_fr);
   dissector_add_uint("wtap_encap", WTAP_ENCAP_FRELAY_WITH_PHDR, fr_phdr_handle);
@@ -1019,16 +1010,3 @@ proto_reg_handoff_fr(void)
 
   osinl_incl_subdissector_table = find_dissector_table("osinl.incl");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

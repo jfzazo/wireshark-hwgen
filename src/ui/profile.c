@@ -28,10 +28,13 @@
 
 #include <glib.h>
 
+#include <epan/emem.h>
 #include <wsutil/filesystem.h>
+#include <epan/prefs.h>
 
 #include "profile.h"
 
+#include "ui/recent.h"
 #include "ui/simple_dialog.h"
 
 #include <wsutil/file_util.h>
@@ -114,6 +117,7 @@ const gchar *apply_profile_changes(void) {
     GList       *fl1, *fl2;
     profile_def *profile1, *profile2;
     gboolean     found;
+    emem_strbuf_t *message = ep_strbuf_new(NULL);
     const gchar *err_msg;
 
     /* First validate all profile names */
@@ -122,7 +126,8 @@ const gchar *apply_profile_changes(void) {
         profile1 = (profile_def *) fl1->data;
         g_strstrip(profile1->name);
         if ((err_msg = profile_name_is_valid(profile1->name)) != NULL) {
-            return err_msg;
+            ep_strbuf_printf(message, "%s", err_msg);
+            return message->str;
         }
         fl1 = g_list_next(fl1);
     }
@@ -134,11 +139,11 @@ const gchar *apply_profile_changes(void) {
         g_strstrip(profile1->name);
         if (profile1->status == PROF_STAT_COPY) {
             if (create_persconffile_profile(profile1->name, &pf_dir_path) == -1) {
-                err_msg = g_strdup_printf("Can't create directory\n\"%s\":\n%s.",
+                ep_strbuf_printf(message,
+                        "Can't create directory\n\"%s\":\n%s.",
                         pf_dir_path, g_strerror(errno));
 
                 g_free(pf_dir_path);
-                return err_msg;
             }
             profile1->status = PROF_STAT_EXISTS;
 
@@ -352,7 +357,7 @@ const gchar *
 profile_name_is_valid(const gchar *name)
 {
     gchar *reason = NULL;
-    gchar *message;
+    emem_strbuf_t  *message = ep_strbuf_new(NULL);
 
 #ifdef _WIN32
     char *invalid_dir_char = "\\/:*?\"<>|";
@@ -381,9 +386,9 @@ profile_name_is_valid(const gchar *name)
 #endif
 
     if (reason) {
-        message = g_strdup_printf("A profile name cannot %s\nProfiles unchanged.", reason);
+        ep_strbuf_printf(message, "A profile name cannot %s\nProfiles unchanged.", reason);
         g_free(reason);
-        return message;
+        return message->str;
     }
 
     return NULL;

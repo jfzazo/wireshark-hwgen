@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 /*
@@ -108,8 +109,8 @@ static const value_string names_tsp_type[] = {
 static void
 dissect_tsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	proto_tree	*tsp_tree;
-	proto_item	*tsp_item;
+	proto_tree	*tsp_tree = NULL;
+	proto_item	*tsp_item = NULL;
 
 	guint8		tsp_type;
 
@@ -120,9 +121,12 @@ dissect_tsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	col_add_str(pinfo->cinfo, COL_INFO,
 		    val_to_str(tsp_type, names_tsp_type, "Unknown message type (%u)"));
 
-	tsp_item = proto_tree_add_item(tree, proto_tsp,
+	if (tree) {
+		tsp_item = proto_tree_add_item(tree, proto_tsp,
 				tvb, 0, -1, ENC_NA);
-	tsp_tree = proto_item_add_subtree(tsp_item, ett_tsp);
+		if (tsp_item)
+			tsp_tree = proto_item_add_subtree(tsp_item, ett_tsp);
+	}
 
 	if (tsp_tree) {
 		proto_tree_add_uint(tsp_tree, hf_tsp_type,
@@ -174,55 +178,43 @@ proto_reg_handoff_tsp(void)
 void
 proto_register_tsp(void)
 {
-	static hf_register_info hf[] = {
-		{ &hf_tsp_type,
-		  { "Type", "tsp.type",
-		    FT_UINT8, BASE_DEC, VALS(names_tsp_type), 0x0,
-		    "Packet Type", HFILL }},
-		{ &hf_tsp_vers,
-		  { "Version", "tsp.version",
-		    FT_UINT8, BASE_DEC, NULL, 0x0,
-		    "Protocol Version Number", HFILL }},
-		{ &hf_tsp_seq,
-		  { "Sequence", "tsp.sequence",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "Sequence Number", HFILL }},
-		{ &hf_tsp_hopcnt,
-		  { "Hop Count", "tsp.hopcnt",
-		    FT_UINT8, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }},
-		{ &hf_tsp_time_sec,
-		  { "Seconds", "tsp.sec",
-		    FT_UINT32, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }},
-		{ &hf_tsp_time_usec,
-		  { "Microseconds", "tsp.usec",
-		    FT_UINT32, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }},
-		{ &hf_tsp_name,
-		  { "Machine Name", "tsp.name",
-		    FT_STRINGZ, BASE_NONE, NULL, 0x0,
-		    "Sender Machine Name", HFILL }}
-	};
+  static hf_register_info hf[] = {
+    { &hf_tsp_type,
+      { "Type", "tsp.type",
+	FT_UINT8, BASE_DEC, VALS(names_tsp_type), 0x0,
+	"Packet Type", HFILL }},
+    { &hf_tsp_vers,
+      { "Version", "tsp.version",
+	FT_UINT8, BASE_DEC, NULL, 0x0,
+	"Protocol Version Number", HFILL }},
+    { &hf_tsp_seq,
+      { "Sequence", "tsp.sequence",
+	FT_UINT16, BASE_DEC, NULL, 0x0,
+	"Sequence Number", HFILL }},
+    { &hf_tsp_hopcnt,
+      { "Hop Count", "tsp.hopcnt",
+	FT_UINT8, BASE_DEC, NULL, 0x0,
+	NULL, HFILL }},
+    { &hf_tsp_time_sec,
+      { "Seconds", "tsp.sec",
+	FT_UINT32, BASE_DEC, NULL, 0x0,
+	NULL, HFILL }},
+    { &hf_tsp_time_usec,
+      { "Microseconds", "tsp.usec",
+	FT_UINT32, BASE_DEC, NULL, 0x0,
+	NULL, HFILL }},
+    { &hf_tsp_name,
+      { "Machine Name", "tsp.name",
+	FT_STRINGZ, BASE_NONE, NULL, 0x0,
+	"Sender Machine Name", HFILL }}
+  };
 	static gint *ett[] = {
 		&ett_tsp
 	};
 
 	proto_tsp = proto_register_protocol("Time Synchronization Protocol",
-					    "TSP", "tsp");
+					"TSP", "tsp");
 	proto_register_field_array(proto_tsp, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

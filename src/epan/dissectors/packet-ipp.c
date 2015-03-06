@@ -24,7 +24,9 @@
 
 #include "config.h"
 
+#include <string.h>
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/strutil.h>
 #include <epan/to_str.h>
@@ -35,21 +37,6 @@ void proto_reg_handoff_ipp(void);
 
 static int proto_ipp = -1;
 static int hf_ipp_timestamp = -1;
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_ipp_request_id = -1;
-static int hf_ipp_name = -1;
-static int hf_ipp_tag = -1;
-static int hf_ipp_value_length = -1;
-static int hf_ipp_charstring_value = -1;
-static int hf_ipp_status_code = -1;
-static int hf_ipp_version = -1;
-static int hf_ipp_bool_value = -1;
-static int hf_ipp_name_length = -1;
-static int hf_ipp_job_state = -1;
-static int hf_ipp_bytes_value = -1;
-static int hf_ipp_operation_id = -1;
-static int hf_ipp_printer_state = -1;
-static int hf_ipp_uint32_value = -1;
 
 static gint ett_ipp = -1;
 static gint ett_ipp_as = -1;
@@ -211,11 +198,15 @@ dissect_ipp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         ti = proto_tree_add_item(tree, proto_ipp, tvb, offset, -1, ENC_NA);
         ipp_tree = proto_item_add_subtree(ti, ett_ipp);
 
-        proto_tree_add_item(ipp_tree, hf_ipp_version, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_text(ipp_tree, tvb, offset, 2, "Version: %u.%u",
+                            tvb_get_guint8(tvb, offset),
+                            tvb_get_guint8(tvb, offset + 1));
         offset += 2;
 
         if (is_request) {
-            proto_tree_add_item(ipp_tree, hf_ipp_operation_id, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_text(ipp_tree, tvb, offset, 2, "Operation-id: %s",
+                                val_to_str(tvb_get_ntohs(tvb, offset), operation_vals,
+                                           "Unknown (0x%04x)"));
         } else {
             status_code = tvb_get_ntohs(tvb, offset);
             switch (status_code & STATUS_TYPE_MASK) {
@@ -244,12 +235,14 @@ dissect_ipp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                 status_type = "Unknown";
                 break;
             }
-            proto_tree_add_uint_format_value(ipp_tree, hf_ipp_status_code, tvb, offset, 2, status_code,
-                                "%s (%s)", status_type, val_to_str(status_code, status_vals, "0x804x"));
+            proto_tree_add_text(ipp_tree, tvb, offset, 2, "Status-code: %s (%s)",
+                                status_type,
+                                val_to_str(status_code, status_vals, "0x804x"));
         }
         offset += 2;
 
-        proto_tree_add_item(ipp_tree, hf_ipp_request_id, tvb, offset, 4, ENC_BIG_ENDIAN);
+        proto_tree_add_text(ipp_tree, tvb, offset, 4, "Request ID: %u",
+                            tvb_get_ntohl(tvb, offset));
         offset += 4;
 
         offset = parse_attributes(tvb, offset, ipp_tree);
@@ -365,9 +358,9 @@ parse_attributes(tvbuff_t *tvb, int offset, proto_tree *tree)
 
             /*
              * Now create a new item for this tag.
-             * XXX - should use proto_tree_add_subtree
              */
-            tas = proto_tree_add_text(tree, tvb, offset, 1, "%s", tag_desc);
+            tas = proto_tree_add_text(tree, tvb, offset, 1,
+                                      "%s", tag_desc);
             offset += 1;
             if (tag == TAG_END_OF_ATTRIBUTES) {
                 /*
@@ -466,24 +459,24 @@ static proto_tree *
 add_integer_tree(proto_tree *tree, tvbuff_t *tvb, int offset,
                  int name_length, int value_length, guint8 tag)
 {
-    proto_tree *subtree;
+    proto_item *ti;
     guint8      bool_val;
 
     switch (tag) {
 
     case TAG_BOOLEAN:
         if (value_length != 1) {
-            subtree = proto_tree_add_subtree_format(tree, tvb, offset,
+            ti = proto_tree_add_text(tree, tvb, offset,
                                      1 + 2 + name_length + 2 + value_length,
-                                     ett_ipp_attr, NULL, "%s: Invalid boolean (length is %u, should be 1)",
+                                     "%s: Invalid boolean (length is %u, should be 1)",
                                      tvb_format_text(tvb, offset + 1 + 2, name_length),
                                      value_length);
         } else {
             bool_val = tvb_get_guint8(tvb,
                                       offset + 1 + 2 + name_length + 2);
-            subtree = proto_tree_add_subtree_format(tree, tvb, offset,
+            ti = proto_tree_add_text(tree, tvb, offset,
                                      1 + 2 + name_length + 2 + value_length,
-                                     ett_ipp_attr, NULL, "%s: %s",
+                                     "%s: %s",
                                      tvb_format_text(tvb, offset + 1 + 2, name_length),
                                      val_to_str(bool_val, bool_vals, "Unknown (0x%02x)"));
         }
@@ -492,9 +485,9 @@ add_integer_tree(proto_tree *tree, tvbuff_t *tvb, int offset,
     case TAG_INTEGER:
     case TAG_ENUM:
         if (value_length != 4) {
-            subtree = proto_tree_add_subtree_format(tree, tvb, offset,
+            ti = proto_tree_add_text(tree, tvb, offset,
                                      1 + 2 + name_length + 2 + value_length,
-                                     ett_ipp_attr, NULL, "%s: Invalid integer (length is %u, should be 4)",
+                                     "%s: Invalid integer (length is %u, should be 4)",
                                      tvb_format_text(tvb, offset + 1 + 2, name_length),
                                      value_length);
         } else {
@@ -508,37 +501,37 @@ add_integer_tree(proto_tree *tree, tvbuff_t *tvb, int offset,
              */
             name_val=tvb_get_ptr(tvb, offset + 1 + 2, name_length);
             if ((name_length > 5) && name_val && !tvb_memeql(tvb, offset + 1 + 2 + name_length - 5, "-time", 5)) {
-                subtree = proto_tree_add_subtree_format(tree, tvb, offset,
+                ti = proto_tree_add_text(tree, tvb, offset,
                                          1 + 2 + name_length + 2 + value_length,
-                                         ett_ipp_attr, NULL, "%s: %s",
+                                         "%s: %s",
                                          format_text(name_val, name_length),
-                                         abs_time_secs_to_str(wmem_packet_scope(), tvb_get_ntohl(tvb, offset + 1 + 2 + name_length + 2),
+                                         abs_time_secs_to_ep_str(tvb_get_ntohl(tvb, offset + 1 + 2 + name_length + 2),
                                                               ABSOLUTE_TIME_LOCAL,
                                                               TRUE));
 
             }
             else if ((name_length > 5) && name_val && !tvb_memeql(tvb, offset + 1 + 2, "printer-state", 13)) {
-                subtree = proto_tree_add_subtree_format(tree, tvb, offset,
+                ti = proto_tree_add_text(tree, tvb, offset,
                                          1 + 2 + name_length + 2 + value_length,
-                                         ett_ipp_attr, NULL, "%s: %s",
+                                         "%s: %s",
                                          format_text(name_val, name_length),
                                          val_to_str_const(tvb_get_ntohl(tvb, offset + 1 + 2 + name_length + 2),
                                                           printer_state_vals,
                                                           "Unknown Printer State"));
             }
             else if ((name_length > 5) && name_val && !tvb_memeql(tvb, offset + 1 + 2, "job-state", 9)) {
-                subtree = proto_tree_add_subtree_format(tree, tvb, offset,
+                ti = proto_tree_add_text(tree, tvb, offset,
                                          1 + 2 + name_length + 2 + value_length,
-                                         ett_ipp_attr, NULL, "%s: %s",
+                                         "%s: %s",
                                          format_text(name_val, name_length),
                                          val_to_str_const(tvb_get_ntohl(tvb, offset + 1 + 2 + name_length + 2),
                                                           job_state_vals,
                                                           "Unknown Job State"));
             }
             else {
-                subtree = proto_tree_add_subtree_format(tree, tvb, offset,
+                ti = proto_tree_add_text(tree, tvb, offset,
                                          1 + 2 + name_length + 2 + value_length,
-                                         ett_ipp_attr, NULL, "%s: %u",
+                                         "%s: %u",
                                          format_text(name_val, name_length),
                                          tvb_get_ntohl(tvb, offset + 1 + 2 + name_length + 2));
             }
@@ -546,21 +539,22 @@ add_integer_tree(proto_tree *tree, tvbuff_t *tvb, int offset,
         break;
 
     default:
-        subtree = proto_tree_add_subtree_format(tree, tvb, offset,
+        ti = proto_tree_add_text(tree, tvb, offset,
                                  1 + 2 + name_length + 2 + value_length,
-                                 ett_ipp_attr, NULL, "%s: Unknown integer type 0x%02x",
+                                 "%s: Unknown integer type 0x%02x",
                                  tvb_format_text(tvb, offset + 1 + 2, name_length),
                                  tag);
         break;
     }
-    return subtree;
+    return proto_item_add_subtree(ti, ett_ipp_attr);
 }
 
 static void
 add_integer_value(const gchar *tag_desc, proto_tree *tree, tvbuff_t *tvb,
                   int offset, int name_length, int value_length, guint8 tag)
 {
-    char *name_val = NULL;
+    guint8 bool_val;
+    char *name_val;
 
     offset = add_value_head(tag_desc, tree, tvb, offset, name_length,
                             value_length, &name_val);
@@ -569,7 +563,10 @@ add_integer_value(const gchar *tag_desc, proto_tree *tree, tvbuff_t *tvb,
 
     case TAG_BOOLEAN:
         if (value_length == 1) {
-            proto_tree_add_item(tree, hf_ipp_bool_value, tvb, offset, value_length, ENC_BIG_ENDIAN);
+            bool_val = tvb_get_guint8(tvb, offset);
+            proto_tree_add_text(tree, tvb, offset, value_length,
+                                "Value: %s",
+                                val_to_str(bool_val, bool_vals, "Unknown (0x%02x)"));
         }
         break;
 
@@ -591,13 +588,26 @@ add_integer_value(const gchar *tag_desc, proto_tree *tree, tvbuff_t *tvb,
                 proto_tree_add_time(tree, hf_ipp_timestamp, tvb, offset, 4, &ns);
             }
             else if ((name_length > 5) && name_val && !strcmp(name_val, "printer-state")) {
-                proto_tree_add_item(tree, hf_ipp_printer_state, tvb, offset, value_length, ENC_BIG_ENDIAN);
+                guint32 printer_state_reason;
+
+                printer_state_reason = tvb_get_ntohl(tvb, offset);
+                proto_tree_add_text(tree, tvb, offset, value_length,
+                                    "Value: %s (%u)",
+                                    val_to_str(printer_state_reason, printer_state_vals,
+                                               "Unknown Printer State (0x%02x)"), printer_state_reason);
             }
             else if ((name_length > 5) && name_val && !strcmp(name_val, "job-state")) {
-                proto_tree_add_item(tree, hf_ipp_job_state, tvb, offset, value_length, ENC_BIG_ENDIAN);
+                guint32 job_state_reason;
+
+                job_state_reason = tvb_get_ntohl(tvb, offset);
+                proto_tree_add_text(tree, tvb, offset, value_length,
+                                    "Value: %s (%u)",
+                                    val_to_str(job_state_reason, job_state_vals,
+                                               "Unknown Job State (0x%02x)"), job_state_reason);
             }
             else{
-                proto_tree_add_item(tree, hf_ipp_uint32_value, tvb, offset, value_length, ENC_BIG_ENDIAN);
+                proto_tree_add_text(tree, tvb, offset, value_length,
+                                    "Value: %u", tvb_get_ntohl(tvb, offset));
             }
         }
         break;
@@ -608,11 +618,14 @@ static proto_tree *
 add_octetstring_tree(proto_tree *tree, tvbuff_t *tvb, int offset,
                      int name_length, int value_length)
 {
-    return proto_tree_add_subtree_format(tree, tvb, offset,
+    proto_item *ti;
+
+    ti = proto_tree_add_text(tree, tvb, offset,
                              1 + 2 + name_length + 2 + value_length,
-                             ett_ipp_attr, NULL, "%s: %s",
+                             "%s: %s",
                              tvb_format_text(tvb, offset + 1 + 2, name_length),
-                             tvb_bytes_to_str(wmem_packet_scope(), tvb, offset + 1 + 2 + name_length + 2, value_length));
+                             tvb_bytes_to_ep_str(tvb, offset + 1 + 2 + name_length + 2, value_length));
+    return proto_item_add_subtree(ti, ett_ipp_attr);
 }
 
 static void
@@ -621,18 +634,22 @@ add_octetstring_value(const gchar *tag_desc, proto_tree *tree, tvbuff_t *tvb,
 {
     offset = add_value_head(tag_desc, tree, tvb, offset, name_length,
                             value_length, NULL);
-    proto_tree_add_item(tree, hf_ipp_bytes_value, tvb, offset, value_length, ENC_NA);
+    proto_tree_add_text(tree, tvb, offset, value_length,
+                        "Value: %s", tvb_bytes_to_ep_str(tvb, offset, value_length));
 }
 
 static proto_tree *
 add_charstring_tree(proto_tree *tree, tvbuff_t *tvb, int offset,
                     int name_length, int value_length)
 {
-    return proto_tree_add_subtree_format(tree, tvb, offset,
+    proto_item *ti;
+
+    ti = proto_tree_add_text(tree, tvb, offset,
                              1 + 2 + name_length + 2 + value_length,
-                             ett_ipp_attr, NULL, "%s: %s",
+                             "%s: %s",
                              tvb_format_text(tvb, offset + 1 + 2, name_length),
                              tvb_format_text(tvb, offset + 1 + 2 + name_length + 2, value_length));
+    return proto_item_add_subtree(ti, ett_ipp_attr);
 }
 
 static void
@@ -641,7 +658,8 @@ add_charstring_value(const gchar *tag_desc, proto_tree *tree, tvbuff_t *tvb,
 {
     offset = add_value_head(tag_desc, tree, tvb, offset, name_length,
                             value_length, NULL);
-    proto_tree_add_item(tree, hf_ipp_charstring_value, tvb, offset, value_length, ENC_NA|ENC_ASCII);
+    proto_tree_add_text(tree, tvb, offset, value_length,
+                        "Value: %s", tvb_format_text(tvb, offset, value_length));
 }
 
 /* If name_val is !NULL then return the pointer to an emem allocated string in
@@ -651,28 +669,25 @@ static int
 add_value_head(const gchar *tag_desc, proto_tree *tree, tvbuff_t *tvb,
                int offset, int name_length, int value_length, char **name_val)
 {
-    proto_tree_add_string(tree, hf_ipp_tag, tvb, offset, 1, tag_desc);
+    proto_tree_add_text(tree, tvb, offset, 1, "Tag: %s", tag_desc);
     offset += 1;
-    proto_tree_add_uint(tree, hf_ipp_name_length, tvb, offset, 2, name_length);
+    proto_tree_add_text(tree, tvb, offset, 2, "Name length: %u",
+                        name_length);
     offset += 2;
     if (name_length != 0) {
         guint8 *nv;
-        nv = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, name_length, ENC_ASCII);
-        proto_tree_add_string(tree, hf_ipp_name, tvb, offset, name_length, format_text(nv, name_length));
+        nv = tvb_get_string(wmem_packet_scope(), tvb, offset, name_length);
+        proto_tree_add_text(tree, tvb, offset, name_length,
+                            "Name: %s", format_text(nv, name_length));
         if (name_val) {
             *name_val=nv;
         }
     }
     offset += name_length;
-    proto_tree_add_uint(tree, hf_ipp_value_length, tvb, offset, 2, value_length);
+    proto_tree_add_text(tree, tvb, offset, 2, "Value length: %u",
+                        value_length);
     offset += 2;
     return offset;
-}
-
-static void
-ipp_fmt_version( gchar *result, guint32 revision )
-{
-   g_snprintf( result, ITEM_LABEL_LENGTH, "%u.%u", (guint8)(( revision & 0xFF00 ) >> 8), (guint8)(revision & 0xFF) );
 }
 
 void
@@ -682,22 +697,6 @@ proto_register_ipp(void)
         { &hf_ipp_timestamp,
           { "Time", "ipp.timestamp", FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL,
             NULL, 0, NULL, HFILL }},
-
-      /* Generated from convert_proto_tree_add_text.pl */
-      { &hf_ipp_version, { "Version", "ipp.version", FT_UINT16, BASE_CUSTOM, ipp_fmt_version, 0x0, NULL, HFILL }},
-      { &hf_ipp_operation_id, { "Operation-id", "ipp.operation_id", FT_UINT16, BASE_HEX, VALS(operation_vals), 0x0, NULL, HFILL }},
-      { &hf_ipp_status_code, { "Status-code", "ipp.status_code", FT_UINT16, BASE_HEX, VALS(status_vals), 0x0, NULL, HFILL }},
-      { &hf_ipp_request_id, { "Request ID", "ipp.request_id", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_ipp_bool_value, { "Value", "ipp.bool_value", FT_UINT8, BASE_HEX, VALS(bool_vals), 0x0, NULL, HFILL }},
-      { &hf_ipp_printer_state, { "Printer State", "ipp.printer_state", FT_UINT32, BASE_DEC, VALS(printer_state_vals), 0x0, NULL, HFILL }},
-      { &hf_ipp_job_state, { "Job State", "ipp.job_state", FT_UINT32, BASE_DEC, VALS(job_state_vals), 0x0, NULL, HFILL }},
-      { &hf_ipp_uint32_value, { "Value", "ipp.uint_value", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_ipp_bytes_value, { "Value", "ipp.bytes_value", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_ipp_charstring_value, { "Value", "ipp.charstring_value", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_ipp_tag, { "Tag", "ipp.tag", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_ipp_name_length, { "Name length", "ipp.name_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_ipp_name, { "Name", "ipp.name", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_ipp_value_length, { "Value length", "ipp.value_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
     };
     static gint *ett[] = {
         &ett_ipp,
@@ -705,8 +704,8 @@ proto_register_ipp(void)
         &ett_ipp_attr,
     };
 
-    proto_ipp = proto_register_protocol("Internet Printing Protocol", "IPP", "ipp");
-
+    proto_ipp = proto_register_protocol("Internet Printing Protocol",
+                                        "IPP", "ipp");
     proto_register_field_array(proto_ipp, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
 }
@@ -724,16 +723,3 @@ proto_reg_handoff_ipp(void)
     dissector_add_string("media_type", "application/ipp", ipp_handle);
     data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

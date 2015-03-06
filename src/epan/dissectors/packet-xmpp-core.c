@@ -24,15 +24,26 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
-#include <epan/conversation.h>
+#include <glib.h>
 
-#include "packet-xmpp.h"
-#include "packet-xmpp-core.h"
-#include "packet-xmpp-jingle.h"
-#include "packet-xmpp-other.h"
-#include "packet-xmpp-gtalk.h"
-#include "packet-xmpp-conference.h"
+#include <epan/packet.h>
+#include <epan/wmem/wmem.h>
+#include <epan/conversation.h>
+#include <epan/expert.h>
+
+#include <epan/dissectors/packet-xml.h>
+
+#include <packet-xmpp-utils.h>
+#include <packet-xmpp.h>
+#include <packet-xmpp-core.h>
+#include <packet-xmpp-jingle.h>
+#include <packet-xmpp-other.h>
+#include <packet-xmpp-gtalk.h>
+#include <packet-xmpp-conference.h>
+
+#include <epan/strutil.h>
+
+#include "epan/tvbparse.h"
 
 tvbparse_wanted_t *want_ignore;
 tvbparse_wanted_t *want_stream_end_tag;
@@ -663,6 +674,7 @@ xmpp_features(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, xmpp_element_
 static void
 xmpp_features_mechanisms(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, xmpp_element_t *packet)
 {
+    proto_item *mechanisms_item;
     proto_tree *mechanisms_tree;
 
     xmpp_attr_info attrs_info [] = {
@@ -673,7 +685,8 @@ xmpp_features_mechanisms(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, xm
         {NAME, "mechanism", xmpp_simple_cdata_elem, MANY},
     };
 
-    mechanisms_tree = proto_tree_add_subtree(tree, tvb, packet->offset, packet->length, ett_xmpp_features_mechanisms, NULL, "MECHANISMS");
+    mechanisms_item = proto_tree_add_text(tree, tvb, packet->offset, packet->length, "MECHANISMS");
+    mechanisms_tree = proto_item_add_subtree(mechanisms_item, ett_xmpp_features_mechanisms);
 
     xmpp_display_attrs(mechanisms_tree, packet, pinfo, tvb, attrs_info, array_length(attrs_info));
     xmpp_display_elems(mechanisms_tree, packet, pinfo, tvb, elems_info, array_length(elems_info));

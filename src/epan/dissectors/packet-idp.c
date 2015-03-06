@@ -23,6 +23,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "packet-idp.h"
 #include <epan/etypes.h>
@@ -78,8 +79,8 @@ static const value_string idp_socket_vals[] = {
 static void
 dissect_idp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	proto_tree	*idp_tree;
-	proto_item	*ti;
+	proto_tree	*idp_tree = NULL;
+	proto_item	*ti = NULL;
 	guint16		length;
 	guint8		type;
 	tvbuff_t	*next_tvb;
@@ -87,8 +88,10 @@ dissect_idp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "IDP");
 	col_clear(pinfo->cinfo, COL_INFO);
 
-	ti = proto_tree_add_item(tree, proto_idp, tvb, 0, IDP_HEADER_LEN, ENC_NA);
-	idp_tree = proto_item_add_subtree(ti, ett_idp);
+	if (tree) {
+		ti = proto_tree_add_item(tree, proto_idp, tvb, 0, IDP_HEADER_LEN, ENC_NA);
+		idp_tree = proto_item_add_subtree(ti, ett_idp);
+	}
 
 	proto_tree_add_item(idp_tree, hf_idp_checksum, tvb, 0, 2, ENC_BIG_ENDIAN);
 	length = tvb_get_ntohs(tvb, 2);
@@ -207,20 +210,7 @@ proto_reg_handoff_idp(void)
 
 	idp_handle = create_dissector_handle(dissect_idp, proto_idp);
 	dissector_add_uint("ethertype", ETHERTYPE_XNS_IDP, idp_handle);
-	dissector_add_uint("chdlc.protocol", ETHERTYPE_XNS_IDP, idp_handle);
+    dissector_add_uint("chdlc.protocol", ETHERTYPE_XNS_IDP, idp_handle);
 
 	data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

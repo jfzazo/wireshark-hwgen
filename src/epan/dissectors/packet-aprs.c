@@ -39,12 +39,16 @@
 
 #include "config.h"
 
+#include <string.h>
 #include <math.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
-#include <epan/to_str.h>
+#include <epan/wmem/wmem.h>
 
+#define AX25_ADDR_LEN		7  /* length of an AX.25 address */
 #define STRLEN	100
 
 void proto_register_aprs(void);
@@ -843,12 +847,17 @@ dissect_aprs_storm(	tvbuff_t   *tvb,
 			const storm_items_s *storm_items
 			)
 {
-	proto_tree  *storm_tree;
-	proto_tree *tc;
+	proto_tree  *storm_tree	  = NULL;
 
-	tc = proto_tree_add_item( parent_tree, hf_aprs_storm_idx, tvb, offset, -1, ENC_ASCII|ENC_NA );
-	storm_tree = proto_item_add_subtree( tc, ett_aprs_storm_idx );
+	if ( parent_tree )
+		{
+		proto_tree *tc;
+		int	    data_len;
 
+		data_len = tvb_reported_length_remaining( tvb, offset );
+		tc = proto_tree_add_item( parent_tree, hf_aprs_storm_idx, tvb, offset, data_len, ENC_ASCII|ENC_NA );
+		storm_tree = proto_item_add_subtree( tc, ett_aprs_storm_idx );
+		}
 	proto_tree_add_item( storm_tree, *storm_items->hf_aprs_storm_dir,  tvb, offset, 3, ENC_BIG_ENDIAN );
 	offset += 3;
 	offset += 1;
@@ -1145,7 +1154,7 @@ static int
 aprs_3rd_party( proto_tree *aprs_tree, tvbuff_t *tvb, int offset, int data_len )
 {
 	/* If the type of the hf[] entry pointed to by hfindex is FT_BYTES or FT_STRING */
-	/*  then  data_len == -1 is allowed and means "remainder of the tvbuff"         */
+        /*  then  data_len == -1 is allowed and means "remainder of the tvbuff"         */
 	if ( data_len == -1 )
 		{
 		data_len = tvb_reported_length_remaining( tvb, offset );
@@ -1165,7 +1174,7 @@ aprs_default_string( proto_tree *aprs_tree, tvbuff_t *tvb, int offset, int data_
 {
 	/* Assumption: hfindex points to an hf[] entry with type FT_STRING; should be validated ? */
 	/* If the type of the hf[] entry pointed to by hfindex is FT_STRING      */
-	/*  then  data_len == -1 is allowed and means "remainder of the tvbuff"  */
+        /*  then  data_len == -1 is allowed and means "remainder of the tvbuff"  */
 	if ( data_len == -1 )
 		{
 		data_len = tvb_reported_length_remaining( tvb, offset );
@@ -1183,7 +1192,7 @@ aprs_default_bytes( proto_tree *aprs_tree, tvbuff_t *tvb, int offset, int data_l
 {
 	/* Assumption: hfindex points to an hf[] entry with type FT_BYTES; should be validated ? */
 	/* If the type of the hf[] entry pointed to by hfindex is FT_BYTES      */
-	/*  then  data_len == -1 is allowed and means "remainder of the tvbuff" */
+        /*  then  data_len == -1 is allowed and means "remainder of the tvbuff" */
 	if ( data_len == -1 )
 		{
 		data_len = tvb_reported_length_remaining( tvb, offset );
@@ -1964,25 +1973,13 @@ proto_register_aprs( void )
 	proto_register_subtree_array( ett, array_length( ett ) );
 
 	/* Register preferences module */
-	aprs_module = prefs_register_protocol( proto_aprs, NULL);
+        aprs_module = prefs_register_protocol( proto_aprs, NULL);
 
 	/* Register any preference */
-	prefs_register_bool_preference(aprs_module, "showaprslax",
+        prefs_register_bool_preference(aprs_module, "showaprslax",
 		"Allow APRS violations.",
 		"Attempt to display common APRS protocol violations correctly",
 		&gPREF_APRS_LAX );
 
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

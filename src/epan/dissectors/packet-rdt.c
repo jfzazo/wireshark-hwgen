@@ -32,10 +32,14 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/conversation.h>
 #include <epan/prefs.h>
+#include <epan/strutil.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-rdt.h"
 
 static dissector_handle_t rdt_handle;
@@ -159,8 +163,6 @@ static gint    ett_rdt_tirq_flags               = -1;
 static gint    ett_rdt_tirp_flags               = -1;
 static gint    ett_rdt_tirp_buffer_info         = -1;
 static gint    ett_rdt_bw_probing_flags         = -1;
-
-static expert_field ei_rdt_packet_length = EI_INIT;
 
 /* Port preference settings */
 static gboolean global_rdt_register_udp_port = FALSE;
@@ -527,7 +529,7 @@ guint dissect_rdt_data_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     if (packet_length < (offset - start_offset) ||
         packet_length > tvb_length_remaining(tvb, start_offset))
     {
-        proto_tree_add_expert(tree, pinfo, &ei_rdt_packet_length, tvb, 0, 0);
+        proto_tree_add_text(tree, tvb, 0, 0, "Packet length invalid");
         packet_length = tvb_length_remaining(tvb, start_offset);
     }
 
@@ -608,7 +610,7 @@ guint dissect_rdt_asm_action_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tre
     if (packet_length < (offset - start_offset) ||
         packet_length > tvb_length_remaining(tvb, start_offset))
     {
-        proto_tree_add_expert(tree, pinfo, &ei_rdt_packet_length, tvb, 0, 0);
+        proto_tree_add_text(tree, tvb, 0, 0, "Packet length invalid");
         packet_length = tvb_length_remaining(tvb, start_offset);
     }
 
@@ -673,7 +675,7 @@ guint dissect_rdt_bandwidth_report_packet(tvbuff_t *tvb, packet_info *pinfo, pro
     if (packet_length < (offset - start_offset) ||
         packet_length > tvb_length_remaining(tvb, start_offset))
     {
-        proto_tree_add_expert(tree, pinfo, &ei_rdt_packet_length, tvb, 0, 0);
+        proto_tree_add_text(tree, tvb, 0, 0, "Packet length invalid");
         packet_length = tvb_length_remaining(tvb, start_offset);
     }
 
@@ -738,7 +740,7 @@ guint dissect_rdt_ack_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
     if (packet_length < (offset - start_offset) ||
         packet_length > tvb_length_remaining(tvb, start_offset))
     {
-        proto_tree_add_expert(tree, pinfo, &ei_rdt_packet_length, tvb, 0, 0);
+        proto_tree_add_text(tree, tvb, 0, 0, "Packet length invalid");
         packet_length = tvb_length_remaining(tvb, start_offset);
     }
 
@@ -932,7 +934,7 @@ guint dissect_rdt_report_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
     if (packet_length < (offset - start_offset) ||
         packet_length > tvb_length_remaining(tvb, start_offset))
     {
-        proto_tree_add_expert(tree, pinfo, &ei_rdt_packet_length, tvb, 0, 0);
+        proto_tree_add_text(tree, tvb, 0, 0, "Packet length invalid");
         packet_length = tvb_length_remaining(tvb, start_offset);
     }
 
@@ -995,7 +997,7 @@ guint dissect_rdt_latency_report_packet(tvbuff_t *tvb, packet_info *pinfo, proto
     if (packet_length < (offset - start_offset) ||
         packet_length > tvb_length_remaining(tvb, start_offset))
     {
-        proto_tree_add_expert(tree, pinfo, &ei_rdt_packet_length, tvb, 0, 0);
+        proto_tree_add_text(tree, tvb, 0, 0, "Packet length invalid");
         packet_length = tvb_length_remaining(tvb, start_offset);
     }
 
@@ -1194,7 +1196,7 @@ guint dissect_rdt_bw_probing_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tre
     if (packet_length < (offset - start_offset) ||
         packet_length > tvb_length_remaining(tvb, start_offset))
     {
-        proto_tree_add_expert(tree, pinfo, &ei_rdt_packet_length, tvb, 0, 0);
+        proto_tree_add_text(tree, tvb, 0, 0, "Packet length invalid");
         packet_length = tvb_length_remaining(tvb, start_offset);
     }
 
@@ -2149,19 +2151,12 @@ void proto_register_rdt(void)
         &ett_rdt_bw_probing_flags
     };
 
-    static ei_register_info ei[] = {
-        { &ei_rdt_packet_length, { "rdt.invalid_packet_length", PI_MALFORMED, PI_ERROR, "Packet length invalid", EXPFILL }},
-    };
-
     module_t *rdt_module;
-    expert_module_t* expert_rdt;
 
     /* Register protocol and fields */
     proto_rdt = proto_register_protocol("Real Data Transport", "RDT", "rdt");
     proto_register_field_array(proto_rdt, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-    expert_rdt = expert_register_protocol(proto_rdt);
-    expert_register_field_array(expert_rdt, ei, array_length(ei));
     register_dissector("rdt", dissect_rdt, proto_rdt);
 
     /* Preference settings */
@@ -2197,7 +2192,7 @@ void proto_reg_handoff_rdt(void)
         /* Register this dissector as one that can be selected by a
            UDP port number. */
         rdt_handle = find_dissector("rdt");
-        dissector_add_for_decode_as("udp.port", rdt_handle);
+        dissector_add_handle("udp.port", rdt_handle);
         rdt_prefs_initialized = TRUE;
     }
     else
@@ -2223,15 +2218,3 @@ void proto_reg_handoff_rdt(void)
     }
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

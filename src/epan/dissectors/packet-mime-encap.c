@@ -21,6 +21,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 #include <wiretap/wtap.h>
@@ -56,7 +58,7 @@ proto_register_mime_encap(void)
 	proto_mime_encap = proto_register_protocol("MIME file", "MIME_FILE", "mime_dlt");
 
 	register_dissector("mime_dlt", dissect_mime_encap, proto_mime_encap);
-	heur_subdissector_list = register_heur_dissector_list("wtap_file");
+	register_heur_dissector_list("wtap_file", &heur_subdissector_list);
 }
 
 void
@@ -68,16 +70,3 @@ proto_reg_handoff_mime_encap(void)
 	mime_encap_handle = find_dissector("mime_dlt");
 	dissector_add_uint("wtap_encap", WTAP_ENCAP_MIME, mime_encap_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

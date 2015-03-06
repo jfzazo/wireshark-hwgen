@@ -32,8 +32,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/conversation.h>
 #include <epan/xdlc.h>
+#include <epan/crc16-tvb.h>
 
 void proto_register_v5dl(void);
 
@@ -438,16 +442,3 @@ proto_reg_handoff_v5dl(void)
 {
 	v52_handle = find_dissector("v52");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

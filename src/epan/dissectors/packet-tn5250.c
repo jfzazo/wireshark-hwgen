@@ -31,8 +31,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
+#include <epan/address.h>
+#include <wmem/wmem.h>
 #include <epan/conversation.h>
 #include "packet-tn5250.h"
 
@@ -2896,8 +2898,6 @@ static gint ett_tn5250_qr_mask = -1;
 static gint ett_tn5250_wea_prim_attr = -1;
 static gint ett_cc = -1;
 
-static expert_field ei_tn5250_command_code = EI_INIT;
-
 static tn5250_conv_info_t *tn5250_info_items;
 
 static guint32 dissect_tn5250_orders_and_data(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset);
@@ -3027,7 +3027,7 @@ dissect_wcc(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
     { NULL, 0, 0, 0, 0 }
   };
 
-  tn5250_add_hf_items(tn5250_tree, tvb, offset, wcc_fields);
+ tn5250_add_hf_items(tn5250_tree, tvb, offset, wcc_fields);
 
   return 2;
 
@@ -3351,18 +3351,12 @@ dissect_create_window(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
     switch (minor_structure) {
       case CW_BORDER_PRESENTATION:
         offset += tn5250_add_hf_items(tn5250_tree, tvb, offset, cwbp_fields);
-        break;
       case CW_TITLE_FOOTER:
         length = tvb_get_guint8(tvb,offset);
         offset += tn5250_add_hf_items(tn5250_tree, tvb, offset, cw_tf_fields);
-        if (length < 6) {
-          /* XXX - expert info on the length field */
-          break;
-        }
         proto_tree_add_item(tn5250_tree, hf_tn5250_wdsf_cw_tf_text, tvb, offset,
                             (length - 6), ENC_EBCDIC|ENC_NA);
         offset += (guint32)((length - 6));
-        break;
       default:
         done = 1;
         break;
@@ -3378,7 +3372,6 @@ dissect_define_selection(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
   int start = offset;
   int length = 0;
   int done = 0, minor_structure = 0, digit_selection = 0;
-  int minor_structure_start;
 
   static const int *ds_flag1[] = {
     &hf_tn5250_wdsf_ds_flag1_mouse_characteristics, &hf_tn5250_wdsf_ds_flag1_reserved,
@@ -3558,11 +3551,6 @@ dissect_define_selection(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
       case DS_CHOICE_TEXT:
         length = tvb_get_guint8(tvb, offset);
         digit_selection = tvb_get_guint8(tvb, offset+2);
-        /*
-         * XXX - the document says the AID field is present only if
-         * the "AID if selected" flag bit is set.
-         */
-        minor_structure_start = offset;
         offset += tn5250_add_hf_items(tn5250_tree, tvb, offset, ds_ct_fields);
         if (digit_selection & DS_NUMERIC_SELECTION_SINGLE_DIGIT) {
           proto_tree_add_item(tn5250_tree, hf_tn5250_wdsf_ds_ct_numeric_onebyte,
@@ -3570,17 +3558,12 @@ dissect_define_selection(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
           offset++;
         } else if (digit_selection & DS_NUMERIC_SELECTION_DOUBLE_DIGIT) {
           proto_tree_add_item(tn5250_tree, hf_tn5250_wdsf_ds_ct_numeric_twobyte,
-                              tvb, offset, 2, ENC_BIG_ENDIAN);
-          offset+=2;
-        }
-        if (length < (offset - minor_structure_start)) {
-          /* XXX - expert info on the length field */
-          break;
+                              tvb, offset, 1, ENC_BIG_ENDIAN);
+          offset++;
         }
         proto_tree_add_item(tn5250_tree, hf_tn5250_wdsf_ds_ct_text, tvb, offset,
-                            (length - (offset - minor_structure_start)),
-                            ENC_EBCDIC|ENC_NA);
-        offset += (guint32)((length - (offset - minor_structure_start)));
+                            (length - (offset - start)), ENC_EBCDIC|ENC_NA);
+        offset += (guint32)((length - (offset - start)));
         break;
       case DS_MENU_BAR_SEPARATOR:
         offset += tn5250_add_hf_items(tn5250_tree, tvb, offset, ds_mbs_fields);
@@ -3734,7 +3717,6 @@ static guint32
 dissect_wdsf_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
 {
   int start = offset;
-  int minor_structure_start;
   int length = 0, type;
   int done = 0, ln_left = 0, i = 0;
 
@@ -3841,26 +3823,17 @@ dissect_wdsf_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offse
         break;
       case WRITE_DATA:
         offset += tn5250_add_hf_items(tn5250_tree, tvb, offset, wdf_fields);
-        if (length < 6) {
-          /* XXX - expert info on the length field */
-          break;
-        }
         proto_tree_add_item(tn5250_tree, hf_tn5250_field_data, tvb, offset,
                             (length - 6), ENC_EBCDIC|ENC_NA);
         offset += (guint32)((length - 6));
         break;
       case PROGRAMMABLE_MOUSE_BUTTONS:
-        minor_structure_start = start;
         proto_tree_add_item(tn5250_tree, hf_tn5250_reserved, tvb, offset,
                             1, ENC_BIG_ENDIAN);
         proto_tree_add_item(tn5250_tree, hf_tn5250_reserved, tvb, offset,
                             1, ENC_BIG_ENDIAN);
         offset +=2;
-        if (length < (offset - minor_structure_start)) {
-          /* XXX - expert info on length field */
-          break;
-        }
-        ln_left = length - (offset - minor_structure_start);
+        ln_left = length - (offset - start);
         for (i = 0; i < ln_left; i+=4) {
           offset += tn5250_add_hf_items(tn5250_tree, tvb, offset, pmb_fields);
         }
@@ -4210,11 +4183,6 @@ dissect_write_single_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb,
 
   offset += tn5250_add_hf_items(tn5250_tree, tvb, offset, standard_fields);
 
-  /*
-   * XXX - the documentation says "Unlike the WSF command (X'F3'),
-   * a WSSF command does not have to be the last command in the data stream.",
-   * so should we be looping here, or what?
-   */
   while (tvb_reported_length_remaining(tvb, offset) > 0 && !done) {
     switch (type) {
       case WSC_CUSTOMIZATION:
@@ -4613,14 +4581,9 @@ dissect_write_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offs
       case DEFINE_AUDIT_WINDOW__TABLE:
         proto_tree_add_item(tn5250_tree, hf_tn5250_dawt_id, tvb, offset,
                             1, ENC_BIG_ENDIAN);
-        offset += 1;
         while ((offset - start) < sf_length) {
           length = tvb_get_guint8(tvb,offset);
           offset += tn5250_add_hf_items(tn5250_tree, tvb, offset, dawt_fields);
-          if (length < 2) {
-            /* XXX - expert info on the length field */
-            break;
-          }
           proto_tree_add_item(tn5250_tree, hf_tn5250_dawt_message, tvb, offset,
                               (length - 2), ENC_EBCDIC|ENC_NA);
           offset += length;
@@ -4629,15 +4592,10 @@ dissect_write_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offs
       case DEFINE_COMMAND_KEY_FUNCTION:
         proto_tree_add_item(tn5250_tree, hf_tn5250_dckf_id, tvb, offset,
                             1, ENC_BIG_ENDIAN);
-        offset++;
         while ((offset - start) < sf_length) {
           length = tvb_get_guint8(tvb,offset);
           offset += tn5250_add_hf_items(tn5250_tree, tvb, offset,
                                         dckf_fields);
-          if (length < 2) {
-            /* XXX - expert info on the length field */
-            break;
-          }
           proto_tree_add_item(tn5250_tree, hf_tn5250_dckf_prompt_text, tvb,
                               offset, (length - 2), ENC_EBCDIC|ENC_NA);
           offset += length;
@@ -4667,10 +4625,6 @@ dissect_write_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offs
         used = tn5250_add_hf_items(tn5250_tree, tvb, offset,
                                    wts_line_data_fields);
         offset += used;
-        if (length < used) {
-          /* XXX - expert info on the length field */
-          break;
-        }
         proto_tree_add_item(tn5250_tree, hf_tn5250_wts_cld_li, tvb, offset,
                             (length - used), ENC_EBCDIC|ENC_NA);
         break;
@@ -4681,15 +4635,10 @@ dissect_write_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offs
       case DEFINE_OPERATOR_ERROR_MESSAGES:
         proto_tree_add_item(tn5250_tree, hf_tn5250_dorm_id, tvb, offset,
                             1, ENC_BIG_ENDIAN);
-        offset++;
         while ((offset - start) < sf_length) {
           length = tvb_get_guint8(tvb,offset);
           offset += tn5250_add_hf_items(tn5250_tree, tvb, offset,
                                         dorm_fields);
-          if (length < 2) {
-            /* XXX - expert info on the length field */
-            break;
-          }
           proto_tree_add_item(tn5250_tree, hf_tn5250_dorm_mt, tvb, offset,
                               (length - 2), ENC_EBCDIC|ENC_NA);
           offset += length;
@@ -4698,20 +4647,15 @@ dissect_write_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offs
       case DEFINE_PITCH_TABLE:
         proto_tree_add_item(tn5250_tree, hf_tn5250_dpt_id, tvb, offset,
                             1, ENC_BIG_ENDIAN);
-        offset++;
         while ((offset - start) < sf_length) {
+          length = tvb_get_guint8(tvb,offset);
           proto_tree_add_item(tn5250_tree, hf_tn5250_length, tvb, offset,
                               1, ENC_BIG_ENDIAN);
-          offset++;
-          /*
-           * XXX - the documentation cited above says this is a
-           * "4-byte EBCDIC code for the value of text pitch that is
-           * displayed on the status line".  Does that mean that
-           * each of these entries is 5 bytes long?
-           */
+          if (length==0)
+            break;
           proto_tree_add_item(tn5250_tree, hf_tn5250_dpt_ec, tvb, offset,
-                              4, ENC_EBCDIC|ENC_NA);
-          offset += 4;
+                              length, ENC_EBCDIC|ENC_NA);
+          offset += length;
         }
         break;
       case DEFINE_FAKE_DP_COMMAND_KEY_FUNCTION:
@@ -4931,12 +4875,12 @@ dissect_tn5250_data_until_next_command(proto_tree *tn5250_tree, tvbuff_t *tvb, g
 #endif
 
 static guint32
-dissect_outbound_stream(proto_tree *tn5250_tree, packet_info *pinfo, tvbuff_t *tvb, gint offset)
+dissect_outbound_stream(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
 {
   gint command_code;
   gint start = offset, length = 0;
   proto_tree   *cc_tree;
-  proto_item   *ti, *item;
+  proto_item   *ti;
 
   /*Escape*/
   ti = proto_tree_add_item(tn5250_tree, hf_tn5250_escape_code, tvb, offset, 1,
@@ -4946,24 +4890,32 @@ dissect_outbound_stream(proto_tree *tn5250_tree, packet_info *pinfo, tvbuff_t *t
 
   /* Command Code*/
   command_code = tvb_get_guint8(tvb, offset);
-  item = proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
-                          ENC_BIG_ENDIAN);
-  offset++;
-
   switch (command_code) {
     case CLEAR_UNIT:
     case CLEAR_FORMAT_TABLE:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       break;
     case CLEAR_UNIT_ALTERNATE:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       proto_tree_add_item(cc_tree, hf_tn5250_cua_parm, tvb, offset, 1, ENC_BIG_ENDIAN);
       offset++;
       break;
     case WRITE_TO_DISPLAY:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       /* WCC */
       offset += dissect_wcc(cc_tree, tvb, offset);
       offset += dissect_tn5250_orders_and_data(cc_tree, tvb, offset);
       break;
     case WRITE_ERROR_CODE:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code,
+                          tvb, offset, 1, ENC_BIG_ENDIAN);
+      offset++;
       /* Check for the optional TN5250_IC */
       offset += dissect_tn5250_orders_and_data(cc_tree, tvb, offset);
       /* Add Field Data */
@@ -4977,11 +4929,17 @@ dissect_outbound_stream(proto_tree *tn5250_tree, packet_info *pinfo, tvbuff_t *t
       offset++;
       break;
     case RESTORE_SCREEN:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       while (tvb_reported_length_remaining(tvb, offset) > 0) {
-        offset += dissect_outbound_stream(cc_tree, pinfo, tvb, offset);
+        offset += dissect_outbound_stream(cc_tree, tvb, offset);
       }
       break;
     case WRITE_ERROR_CODE_TO_WINDOW:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       proto_tree_add_item(cc_tree, hf_tn5250_wectw_start_column, tvb, offset,
                           1, ENC_BIG_ENDIAN);
       offset++;
@@ -4992,6 +4950,9 @@ dissect_outbound_stream(proto_tree *tn5250_tree, packet_info *pinfo, tvbuff_t *t
     case READ_INPUT_FIELDS:
     case READ_MDT_FIELDS:
     case READ_MDT_ALTERNATE:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       offset += dissect_wcc(cc_tree, tvb, offset);
       break;
     case READ_SCREEN:
@@ -5003,11 +4964,20 @@ dissect_outbound_stream(proto_tree *tn5250_tree, packet_info *pinfo, tvbuff_t *t
     case READ_IMMEDIATE:
     case READ_MODIFIED_IMMEDIATE_ALTERNATE:
     case SAVE_SCREEN:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       break;
     case SAVE_PARTIAL_SCREEN:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       offset += dissect_save_partial_screen(cc_tree, tvb, offset);
       break;
     case RESTORE_PARTIAL_SCREEN:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       length = tvb_get_ntohs(tvb, offset);
       proto_tree_add_item(cc_tree, hf_tn5250_length_twobyte, tvb, offset, 2,
                           ENC_BIG_ENDIAN);
@@ -5018,22 +4988,34 @@ dissect_outbound_stream(proto_tree *tn5250_tree, packet_info *pinfo, tvbuff_t *t
       offset++;
       break;
     case ROLL:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       offset += dissect_roll(cc_tree, tvb, offset);
       break;
     case WRITE_SINGLE_STRUCTURED_FIELD:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       offset += dissect_write_single_structured_field(cc_tree, tvb, offset);
       break;
     case WRITE_STRUCTURED_FIELD:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       offset += dissect_write_structured_field(cc_tree, tvb, offset);
       break;
     case COPY_TO_PRINTER:
+      proto_tree_add_item(cc_tree, hf_tn5250_command_code, tvb, offset, 1,
+                          ENC_BIG_ENDIAN);
+      offset++;
       proto_tree_add_item(cc_tree, hf_tn5250_ctp_lsid, tvb, offset, 1, ENC_BIG_ENDIAN);
       offset++;
       proto_tree_add_item(cc_tree, hf_tn5250_ctp_mlpp, tvb, offset, 1, ENC_BIG_ENDIAN);
       offset++;
       break;
     default:
-      expert_add_info(pinfo, item, &ei_tn5250_command_code);
+      proto_tree_add_text(cc_tree, tvb, offset, 1, "Bogus value: %u", command_code);
       offset ++;
       break;
   }
@@ -5042,7 +5024,7 @@ dissect_outbound_stream(proto_tree *tn5250_tree, packet_info *pinfo, tvbuff_t *t
 }
 
 static guint32
-dissect_inbound_stream(proto_tree *tn5250_tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, gint sna_flag)
+dissect_inbound_stream(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset, gint sna_flag)
 {
   gint start = offset, aid;
   guint32 commands;
@@ -5089,7 +5071,7 @@ dissect_inbound_stream(proto_tree *tn5250_tree, packet_info *pinfo, tvbuff_t *tv
     /* FIXME: need to know when escape/commands are expected. */
     /* Check the response data for commands */
     if (tvb_get_guint8(tvb,offset) == TN5250_ESCAPE) {
-      commands = dissect_outbound_stream(tn5250_tree, pinfo, tvb, offset);
+      commands = dissect_outbound_stream(tn5250_tree, tvb, offset);
       /* It if contained commands then we're done. Anything else is unexpected data */
       if (commands) {
         offset += commands;
@@ -5154,9 +5136,9 @@ dissect_tn5250(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     while (tvb_reported_length_remaining(tvb, offset) > 0) {
       if (pinfo->srcport == tn5250_info->outbound_port) {
-        offset += dissect_outbound_stream(tn5250_tree, pinfo, tvb, offset);
+        offset += dissect_outbound_stream(tn5250_tree, tvb, offset);
       } else {
-        offset += dissect_inbound_stream(tn5250_tree, pinfo, tvb, offset, sna_flag);
+        offset += dissect_inbound_stream(tn5250_tree, tvb, offset, sna_flag);
       }
     }
   }
@@ -5180,9 +5162,9 @@ add_tn5250_conversation(packet_info *pinfo, int tn5250e)
      * it to the list of information structures.
      */
     tn5250_info = wmem_new(wmem_file_scope(), tn5250_conv_info_t);
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &(tn5250_info->outbound_addr),&(pinfo->dst));
+    SE_COPY_ADDRESS(&(tn5250_info->outbound_addr),&(pinfo->dst));
     tn5250_info->outbound_port = pinfo->destport;
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &(tn5250_info->inbound_addr),&(pinfo->src));
+    SE_COPY_ADDRESS(&(tn5250_info->inbound_addr),&(pinfo->src));
     tn5250_info->inbound_port = pinfo->srcport;
     conversation_add_proto_data(conversation, proto_tn5250, tn5250_info);
     tn5250_info->next = tn5250_info_items;
@@ -7538,30 +7520,9 @@ proto_register_tn5250(void)
     &ett_cc,
   };
 
-  static ei_register_info ei[] = {
-    { &ei_tn5250_command_code, { "tn5250.command_code.bogus", PI_PROTOCOL, PI_WARN, "Bogus value", EXPFILL }},
-  };
-
-  expert_module_t* expert_tn5250;
-
   proto_tn5250 = proto_register_protocol("TN5250 Protocol", "TN5250", "tn5250");
   register_dissector("tn5250", dissect_tn5250, proto_tn5250);
   proto_register_field_array(proto_tn5250, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
-  expert_tn5250 = expert_register_protocol(proto_tn5250);
-  expert_register_field_array(expert_tn5250, ei, array_length(ei));
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

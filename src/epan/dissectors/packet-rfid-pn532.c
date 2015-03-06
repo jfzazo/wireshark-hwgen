@@ -29,9 +29,12 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-usb.h"
 
 static int proto_pn532 = -1;
@@ -1239,7 +1242,7 @@ dissect_pn532(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             break;
         case FELICA_212:
         case FELICA_424:
-            next_tvb = tvb_new_subset_length(tvb, offset, 5);
+            next_tvb = tvb_new_subset(tvb, offset, 5, 5);
             call_dissector(sub_handles[SUB_FELICA], next_tvb, pinfo, tree);
             offset += 5;
             break;
@@ -1893,13 +1896,13 @@ void proto_register_pn532(void)
          {"CIU TX Bit Phase", "pn532.ciu_tx_bit_phase", FT_UINT8, BASE_HEX,
           NULL, 0x00, NULL, HFILL}},
         {&hf_pn532_config_212_kbps,
-         {"212 kbps settings", "pn532.212_kbps", FT_UINT24, BASE_HEX,
+         {"212 kbps settings", "pn532.212_kbps", FT_UINT8, BASE_HEX,
           NULL, 0x00, NULL, HFILL}},
         {&hf_pn532_config_424_kbps,
-         {"424 kbps settings", "pn532.424_kbps", FT_UINT24, BASE_HEX,
+         {"424 kbps settings", "pn532.424_kbps", FT_UINT8, BASE_HEX,
           NULL, 0x00, NULL, HFILL}},
         {&hf_pn532_config_848_kbps,
-         {"848 kbps settings", "pn532.848_kbps", FT_UINT24, BASE_HEX,
+         {"848 kbps settings", "pn532.848_kbps", FT_UINT8, BASE_HEX,
           NULL, 0x00, NULL, HFILL}},
         {&hf_pn532_state,
          {"State", "pn532.state", FT_UINT8, BASE_HEX,

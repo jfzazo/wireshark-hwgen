@@ -161,7 +161,7 @@ mime_seek_read(wtap *wth, gint64 seek_off, struct wtap_pkthdr *phdr, Buffer *buf
 	return mime_read_file(wth, wth->random_fh, phdr, buf, err, err_info);
 }
 
-wtap_open_return_val
+int
 mime_file_open(wtap *wth, int *err, gchar **err_info)
 {
 	char magic_buf[128]; /* increase buffer size when needed */
@@ -180,10 +180,10 @@ mime_file_open(wtap *wth, int *err, gchar **err_info)
 
 	if (bytes_read < 0) {
 		*err = file_error(wth->fh, err_info);
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 	if (bytes_read == 0)
-		return WTAP_OPEN_NOT_MINE;
+		return 0;
 
 	found_file = FALSE;
 	for (i = 0; i < N_MAGIC_TYPES; i++) {
@@ -192,35 +192,22 @@ mime_file_open(wtap *wth, int *err, gchar **err_info)
 				found_file = TRUE;
 				/* file_ok = i; */
 			} else
-				return WTAP_OPEN_NOT_MINE;	/* many files matched, bad file */
+				return 0;	/* many files matched, bad file */
 		}
 	}
 
 	if (!found_file)
-		return WTAP_OPEN_NOT_MINE;
+		return 0;
 
 	if (file_seek(wth->fh, 0, SEEK_SET, err) == -1)
-		return WTAP_OPEN_ERROR;
+		return -1;
 
 	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_MIME;
 	wth->file_encap = WTAP_ENCAP_MIME;
-	wth->file_tsprec = WTAP_TSPREC_SEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_SEC;
 	wth->subtype_read = mime_read;
 	wth->subtype_seek_read = mime_seek_read;
 	wth->snapshot_length = 0;
 
-	return WTAP_OPEN_MINE;
+	return 1;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

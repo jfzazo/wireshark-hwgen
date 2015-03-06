@@ -24,6 +24,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 void proto_register_clique_rm(void);
@@ -134,9 +135,11 @@ dissect_sender_array(proto_tree *clique_rm_tree, int hf_header, gint ett_header,
 static void
 dissect_data_packet(proto_tree *clique_rm_tree, tvbuff_t *tvb, int offset)
 {
+  proto_item *ti;
   proto_tree *tree;
 
-  tree = proto_tree_add_subtree(clique_rm_tree, tvb, offset, -1, ett_clique_rm_data, NULL, "Data");
+  ti = proto_tree_add_text(clique_rm_tree, tvb, offset, -1, "Data");
+  tree =  proto_item_add_subtree(ti, ett_clique_rm_data);
 
   proto_tree_add_item(tree, hf_clique_rm_data_flags, tvb, offset, 1, ENC_BIG_ENDIAN);
   offset += 1;
@@ -149,13 +152,14 @@ dissect_data_packet(proto_tree *clique_rm_tree, tvbuff_t *tvb, int offset)
   offset += 4;
 
 
-  proto_tree_add_item(tree, hf_clique_rm_data_data, tvb, offset, -1, ENC_NA);
+  proto_tree_add_item(tree, hf_clique_rm_data_data, tvb, offset,
+      tvb_length_remaining(tvb, offset), ENC_NA);
 }
 
 static int
 dissect_depends(proto_tree *clique_rm_tree, tvbuff_t *tvb, int offset)
 {
-  proto_item *ti;
+  proto_item *ti, *depend_item;
   proto_tree *tree, *depend_tree;
   guint       ii, count;
   int         len;
@@ -171,8 +175,8 @@ dissect_depends(proto_tree *clique_rm_tree, tvbuff_t *tvb, int offset)
   tree = proto_item_add_subtree(ti, ett_clique_rm_depends);
   for (ii = 0; ii < count; ii++)
   {
-     depend_tree = proto_tree_add_subtree_format(tree, tvb, offset, 8,
-                    ett_clique_rm_depends_item, NULL, "Depend item %d", ii+1);
+     depend_item = proto_tree_add_text(tree, tvb, offset, 8, "Depend item %d", ii+1);
+     depend_tree = proto_item_add_subtree(depend_item, ett_clique_rm_depends_item);
 
      proto_tree_add_item(depend_tree, hf_clique_rm_depend_sender,
            tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -477,15 +481,3 @@ proto_reg_handoff_clique_rm(void)
   heur_dissector_add("udp", dissect_clique_rm, proto_clique_rm);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

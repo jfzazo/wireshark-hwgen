@@ -53,11 +53,13 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/conversation.h>
-#include "packet-ber.h"
-#include "packet-per.h"
+#include <epan/dissectors/packet-ber.h>
+#include <epan/dissectors/packet-per.h>
+
 #include "packet-atn-ulcs.h"
 
 #define ATN_CM_PROTO "ICAO Doc9705 CM"
@@ -110,7 +112,7 @@ static int hf_atn_cm_hours = -1;                  /* Timehours */
 static int hf_atn_cm_minutes = -1;                /* Timeminutes */
 
 /*--- End of included file: packet-atn-cm-hf.c ---*/
-#line 61 "../../asn1/atn-cm/packet-atn-cm-template.c"
+#line 63 "../../asn1/atn-cm/packet-atn-cm-template.c"
 
 
 /*--- Included file: packet-atn-cm-ett.c ---*/
@@ -132,7 +134,7 @@ static gint ett_atn_cm_ShortTsap = -1;
 static gint ett_atn_cm_Time = -1;
 
 /*--- End of included file: packet-atn-cm-ett.c ---*/
-#line 63 "../../asn1/atn-cm/packet-atn-cm-template.c"
+#line 65 "../../asn1/atn-cm/packet-atn-cm-template.c"
 static gint ett_atn_cm = -1;
 
 
@@ -616,26 +618,20 @@ dissect_atn_cm_CMGroundMessage(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *ac
 
 /*--- PDUs ---*/
 
-static int dissect_CMAircraftMessage_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CMAircraftMessage_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_atn_cm_CMAircraftMessage(tvb, offset, &asn1_ctx, tree, hf_atn_cm_CMAircraftMessage_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_atn_cm_CMAircraftMessage(tvb, 0, &asn1_ctx, tree, hf_atn_cm_CMAircraftMessage_PDU);
 }
-static int dissect_CMGroundMessage_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CMGroundMessage_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_atn_cm_CMGroundMessage(tvb, offset, &asn1_ctx, tree, hf_atn_cm_CMGroundMessage_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_atn_cm_CMGroundMessage(tvb, 0, &asn1_ctx, tree, hf_atn_cm_CMGroundMessage_PDU);
 }
 
 
 /*--- End of included file: packet-atn-cm-fn.c ---*/
-#line 66 "../../asn1/atn-cm/packet-atn-cm-template.c"
+#line 68 "../../asn1/atn-cm/packet-atn-cm-template.c"
 static int proto_atn_cm = -1;
 
 static int
@@ -646,10 +642,19 @@ dissect_atn_cm(
 		void *data _U_)
 {
 		int 	type;
+		proto_item *ti;
 		proto_tree *sub_tree;
 
-		sub_tree = proto_tree_add_subtree(
-			tree, tvb, 0, -1, ett_atn_cm, NULL, ATN_CM_PROTO);
+		ti = proto_tree_add_text(
+			tree,
+			tvb,
+			0,
+			tvb_reported_length_remaining(tvb, 0) ,
+			ATN_CM_PROTO);
+
+		sub_tree = proto_item_add_subtree(
+			ti,
+			ett_atn_cm);
 
 		/* ti = proto_tree_add_item(tree, proto_atn_cm, tvb, 0, 0 , ENC_NA); */
 		/* sub_tree = proto_item_add_subtree(ti, ett_atn_cm_pdu); */
@@ -662,13 +667,13 @@ dissect_atn_cm(
 						dissect_CMGroundMessage_PDU(
 							tvb,
 							pinfo,
-							sub_tree, NULL);
+							sub_tree);
 						break;
 				case dm:
 						dissect_CMAircraftMessage_PDU(
 							tvb,
 							pinfo,
-							sub_tree, NULL);
+							sub_tree);
 						break;
 				default:
 						break;
@@ -697,7 +702,7 @@ dissect_atn_cm_heur(
 								dissect_CMGroundMessage_PDU(
 									tvb,
 									pinfo,
-									NULL, NULL);
+									NULL);
 								/* no exception thrown: looks like it is a CM PDU */
 								is_atn_cm = TRUE; }
 						CATCH_ALL {
@@ -709,7 +714,7 @@ dissect_atn_cm_heur(
 								dissect_CMAircraftMessage_PDU(
 										tvb,
 										pinfo,
-										NULL, NULL);
+										NULL);
 								/* no exception thrown: looks like it is a CM PDU */
 								is_atn_cm = TRUE;}
 						CATCH_ALL {
@@ -935,7 +940,7 @@ void proto_register_atn_cm (void)
         "Timeminutes", HFILL }},
 
 /*--- End of included file: packet-atn-cm-hfarr.c ---*/
-#line 201 "../../asn1/atn-cm/packet-atn-cm-template.c"
+#line 212 "../../asn1/atn-cm/packet-atn-cm-template.c"
     };
 		static gint *ett[] = {
 
@@ -958,7 +963,7 @@ void proto_register_atn_cm (void)
     &ett_atn_cm_Time,
 
 /*--- End of included file: packet-atn-cm-ettarr.c ---*/
-#line 204 "../../asn1/atn-cm/packet-atn-cm-template.c"
+#line 215 "../../asn1/atn-cm/packet-atn-cm-template.c"
 			&ett_atn_cm
 		};
 

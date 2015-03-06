@@ -28,18 +28,23 @@
 #include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
+#include <epan/epan.h>
 #include <epan/value_string.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-gtp.h>
 
 #include "ui/simple_dialog.h"
+#include "../file.h"
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/service_response_time_table.h"
 #include "ui/gtk/tap_param_dlg.h"
+#include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkgtpstat(void);
 
@@ -204,7 +209,7 @@ gtk_gtpstat_init(const char *opt_arg, void *userdata _U_)
 }
 
 static tap_param gtp_stat_params[] = {
-	{ PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+	{ PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg gtp_stat_dlg = {

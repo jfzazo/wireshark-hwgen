@@ -21,6 +21,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "opcua_application_layer.h"
 #include "opcua_simpletypes.h"
@@ -35,10 +36,15 @@ void registerSecurityLayerTypes(int proto)
 {
     static hf_register_info hf[] =
     {
-        /* id                           full name                   abbreviation              type       display   strings bitmask blurb HFILL */
-        {&hf_opcua_security_tokenid,   {"Security Token Id",        "opcua.security.tokenid", FT_UINT32, BASE_DEC, NULL,   0x0,    NULL, HFILL}},
-        {&hf_opcua_security_seq,       {"Security Sequence Number", "opcua.security.seq",     FT_UINT32, BASE_DEC, NULL,   0x0,    NULL, HFILL}},
-        {&hf_opcua_security_rqid,      {"Security RequestId",       "opcua.security.rqid",    FT_UINT32, BASE_DEC, NULL,   0x0,    NULL, HFILL}}
+        { &hf_opcua_security_tokenid,
+        {  "Security Token Id",        "security.tokenid",   FT_UINT32, BASE_DEC,  NULL, 0x0,    NULL,    HFILL }
+        },
+        { &hf_opcua_security_seq,
+        {  "Security Sequence Number", "security.seq",       FT_UINT32, BASE_DEC,  NULL, 0x0,    NULL,    HFILL }
+        },
+        { &hf_opcua_security_rqid,
+        {  "Security RequestId",       "security.rqid",      FT_UINT32, BASE_DEC,  NULL, 0x0,    NULL,    HFILL }
+        }
     };
     proto_register_field_array(proto, hf, array_length(hf));
 }
@@ -53,15 +59,4 @@ void parseSecurityLayer(proto_tree *tree, tvbuff_t *tvb, gint *pOffset)
     proto_tree_add_item(tree, hf_opcua_security_rqid, tvb, *pOffset, 4, ENC_LITTLE_ENDIAN); *pOffset+=4;
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+

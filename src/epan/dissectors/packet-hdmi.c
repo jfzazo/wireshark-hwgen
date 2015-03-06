@@ -29,7 +29,11 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/ptvcursor.h>
+#include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 #include "packet-hdmi.h"
 
 void proto_register_hdmi(void);
@@ -51,7 +55,6 @@ static int hf_hdmi_edid_manf_serial = -1;
 static int hf_hdmi_edid_manf_week = -1;
 static int hf_hdmi_edid_mod_year = -1;
 static int hf_hdmi_edid_manf_year = -1;
-static int hf_hdmi_edid_version = -1;
 
 
 /* also called Source and Sink in the HDMI spec */
@@ -64,7 +67,7 @@ static int hf_hdmi_edid_version = -1;
 #define ADDR8_EDID_WRITE 0xA0  /* t->r */
 #define ADDR8_EDID_READ  0xA1  /* r->t */
 
-#define HDCP_ADDR8(x)   (x == ADDR8_HDCP_WRITE || x == ADDR8_HDCP_READ)
+#define HDCP_ADDR8(x)   (x==ADDR8_HDCP_WRITE || x==ADDR8_HDCP_READ)
 
 static const value_string hdmi_addr[] = {
     { ADDR8_HDCP_WRITE, "transmitter writes HDCP data for receiver" },
@@ -78,7 +81,7 @@ static const value_string hdmi_addr[] = {
 #define EDID_HDR_VALUE G_GUINT64_CONSTANT(0x00ffffffffffff00)
 
 /* grab 5 bits, from bit n to n+4, from a big-endian number x
-   map those bits to a capital letter such that A == 1, B == 2, ... */
+   map those bits to a capital letter such that A==1, B==2, ... */
 #define CAPITAL_LETTER(x, n) ('A'-1 + (((x) & (0x1F<<n)) >> n))
 
 
@@ -100,17 +103,20 @@ sub_check_hdmi(packet_info *pinfo _U_)
 static gint
 dissect_hdmi_edid(tvbuff_t *tvb, gint offset, packet_info *pinfo, proto_tree *tree)
 {
-    proto_item *yi;
+    proto_item *ti, *yi;
     proto_tree *edid_tree;
     guint64     edid_hdr;
     guint16     manf_id;
     gchar       manf_id_str[4]; /* 3 letters + 0-termination */
     guint8      week, year;
     int         year_hf;
+    guint8      edid_ver, edid_rev;
 
-    edid_tree = proto_tree_add_subtree(tree, tvb,
-            offset, -1, ett_hdmi_edid, NULL,
+
+    ti = proto_tree_add_text(tree, tvb,
+            offset, tvb_reported_length_remaining(tvb, offset),
             "Extended Display Identification Data (EDID)");
+    edid_tree = proto_item_add_subtree(ti, ett_hdmi_edid);
 
     edid_hdr = tvb_get_ntoh64(tvb, offset);
     if (edid_hdr != EDID_HDR_VALUE)
@@ -144,16 +150,21 @@ dissect_hdmi_edid(tvbuff_t *tvb, gint offset, packet_info *pinfo, proto_tree *tr
     week = tvb_get_guint8(tvb, offset);
     proto_tree_add_item(edid_tree, hf_hdmi_edid_manf_week,
             tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
+    offset++;
 
-    year_hf = week == 255 ? hf_hdmi_edid_mod_year : hf_hdmi_edid_manf_year;
+    year_hf = week==255 ? hf_hdmi_edid_mod_year : hf_hdmi_edid_manf_year;
     year = tvb_get_guint8(tvb, offset);
     yi = proto_tree_add_item(edid_tree, year_hf,
             tvb, offset, 1, ENC_LITTLE_ENDIAN);
     proto_item_append_text(yi, " (year %d)", 1990+year);
-    offset += 1;
+    offset++;
 
-    proto_tree_add_item(edid_tree, hf_hdmi_edid_version, tvb, offset, 2, ENC_BIG_ENDIAN);
+    edid_ver = tvb_get_guint8(tvb, offset);
+    edid_rev = tvb_get_guint8(tvb, offset+1);
+
+    /* XXX make this filterable */
+    proto_tree_add_text(edid_tree, tvb, offset, 2,
+            "EDID Version %d.%d", edid_ver, edid_rev);
 
     /* XXX dissect the parts following the EDID header */
 
@@ -178,7 +189,8 @@ dissect_hdmi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "HDMI");
     col_clear(pinfo->cinfo, COL_INFO);
 
-    pi = proto_tree_add_item(tree, proto_hdmi, tvb, 0, -1, ENC_NA);
+    pi = proto_tree_add_protocol_format(tree, proto_hdmi,
+            tvb, 0, tvb_reported_length(tvb), "HDMI");
     hdmi_tree = proto_item_add_subtree(pi, ett_hdmi);
 
     if (addr&0x01) {
@@ -198,32 +210,29 @@ dissect_hdmi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
         that are explicitly marked as little endian
        for the sake of simplicity, we use little endian everywhere */
     proto_tree_add_item(hdmi_tree, hf_hdmi_addr, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
+    offset++;
 
     if (HDCP_ADDR8(addr)) {
+        gint      hdcp_len;
         tvbuff_t *hdcp_tvb;
 
-        hdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        hdcp_len = tvb_reported_length_remaining(tvb, offset);
+        hdcp_tvb = tvb_new_subset(tvb, offset, hdcp_len, hdcp_len);
 
         return call_dissector(hdcp_handle, hdcp_tvb, pinfo, hdmi_tree);
     }
 
-    if (addr == ADDR8_EDID_WRITE) {
+    if (addr==ADDR8_EDID_WRITE) {
         col_append_sep_str(pinfo->cinfo, COL_INFO, NULL, "EDID request");
         proto_tree_add_item(hdmi_tree, hf_hdmi_edid_offset,
             tvb, offset, 1, ENC_LITTLE_ENDIAN);
-        offset += 1;
+        offset++;
         return offset;
     }
 
     return dissect_hdmi_edid(tvb, offset, pinfo, hdmi_tree);
 }
 
-static void
-hdmi_fmt_edid_version( gchar *result, guint32 revision )
-{
-   g_snprintf( result, ITEM_LABEL_LENGTH, "%d.%02d", (guint8)(( revision & 0xFF00 ) >> 8), (guint8)(revision & 0xFF) );
-}
 
 void
 proto_register_hdmi(void)
@@ -255,11 +264,7 @@ proto_register_hdmi(void)
                 FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL } },
         { &hf_hdmi_edid_manf_year,
             { "Year of manufacture", "hdmi.edid.manf_year",
-                FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL } },
-        { &hf_hdmi_edid_version,
-            { "EDID Version", "hdmi.edid.version",
-                FT_UINT16, BASE_CUSTOM, hdmi_fmt_edid_version, 0, NULL, HFILL } }
-
+                FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL } }
     };
 
     static gint *ett[] = {

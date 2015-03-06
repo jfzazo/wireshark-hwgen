@@ -25,6 +25,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/to_str.h>
 #include "packet-csn1.h"
@@ -494,7 +495,8 @@ csnStreamDissector(proto_tree *tree, csnStream_t* ar, const CSN_DESCR* pDescr, t
           proto_item   *ti;
           proto_tree   *test_tree;
 
-          test_tree = proto_tree_add_subtree_format(tree, tvb, bit_offset>>3, 1, ett_csn1, &ti, "%s[%d]",pDescr->sz, i++);
+          ti = proto_tree_add_text(tree, tvb, bit_offset>>3, 1,  "%s[%d]",pDescr->sz, i++);
+          test_tree = proto_item_add_subtree(ti, ett_csn1);
 
           csnStreamInit(&arT, bit_offset, remaining_bits_len);
           Status = csnStreamDissector(test_tree, &arT, (const CSN_DESCR*)pDescr->descr.ptr, tvb, pui8, ett_csn1);
@@ -558,7 +560,8 @@ csnStreamDissector(proto_tree *tree, csnStream_t* ar, const CSN_DESCR* pDescr, t
         proto_item   *ti;
         proto_tree   *test_tree;
 
-        test_tree = proto_tree_add_subtree_format(tree, tvb, bit_offset>>3, 1, ett_csn1, &ti, "%s", pDescr->sz);
+        ti = proto_tree_add_text(tree, tvb, bit_offset>>3, 1, "%s", pDescr->sz);
+        test_tree = proto_item_add_subtree(ti, ett_csn1);
 
         csnStreamInit(&arT, bit_offset, remaining_bits_len);
         Status = csnStreamDissector(test_tree, &arT, (const CSN_DESCR*)pDescr->descr.ptr, tvb, pvDATA(data, pDescr->offset), ett_csn1);
@@ -616,7 +619,8 @@ csnStreamDissector(proto_tree *tree, csnStream_t* ar, const CSN_DESCR* pDescr, t
             }
 
             if (pDescr->sz) {
-              test_tree = proto_tree_add_subtree(tree, tvb, bit_offset>>3, 1, ett_csn1, &ti, pDescr->sz);
+              ti = proto_tree_add_text(tree, tvb, bit_offset>>3, 1, "%s", pDescr->sz);
+              test_tree = proto_item_add_subtree(ti, ett_csn1);
             } else {
               test_tree = tree;
             }
@@ -667,10 +671,12 @@ csnStreamDissector(proto_tree *tree, csnStream_t* ar, const CSN_DESCR* pDescr, t
           bit_offset += length_len;
           remaining_bits_len -= length_len;
 
-          test_tree = proto_tree_add_subtree(tree, tvb, bit_offset>>3, ((bit_offset+length-1)>>3)-(bit_offset>>3) + 1, ett_csn1, &ti, pDescr->sz);
+          ti = proto_tree_add_text(tree, tvb, bit_offset>>3, ((bit_offset+length-1)>>3)-(bit_offset>>3) + 1, "%s", pDescr->sz);
         } else {
-          test_tree = proto_tree_add_subtree(tree, tvb, bit_offset>>3, 1, ett_csn1, &ti, pDescr->sz);
+          ti = proto_tree_add_text(tree, tvb, bit_offset>>3, 1, "%s", pDescr->sz);
         }
+
+        test_tree = proto_item_add_subtree(ti, ett_csn1);
 
         csnStreamInit(&arT, bit_offset, length > 0 ? length : remaining_bits_len);
         Status = serialize(test_tree, &arT, tvb, pvDATA(data, pDescr->offset), ett_csn1);
@@ -986,7 +992,8 @@ csnStreamDissector(proto_tree *tree, csnStream_t* ar, const CSN_DESCR* pDescr, t
               proto_item   *ti;
               proto_tree   *test_tree;
 
-              test_tree = proto_tree_add_subtree_format(tree, tvb, bit_offset>>3, 1, ett_csn1, &ti, "%s[%d]",pDescr->sz, i++);
+              ti = proto_tree_add_text(tree, tvb, bit_offset>>3, 1,  "%s[%d]",pDescr->sz, i++);
+              test_tree = proto_item_add_subtree(ti, ett_csn1);
 
               csnStreamInit(&arT, bit_offset, remaining_bits_len);
               Status = csnStreamDissector(test_tree, &arT, (const CSN_DESCR *)pDescr->descr.ptr, tvb, pui8, ett_csn1);
@@ -1038,7 +1045,8 @@ csnStreamDissector(proto_tree *tree, csnStream_t* ar, const CSN_DESCR* pDescr, t
             proto_item   *ti;
             proto_tree   *test_tree;
 
-            test_tree = proto_tree_add_subtree(tree, tvb, bit_offset>>3, 1, ett_csn1, &ti, pDescr->sz);
+            ti = proto_tree_add_text(tree, tvb, bit_offset>>3, 1,  "%s",pDescr->sz);
+            test_tree = proto_item_add_subtree(ti, ett_csn1);
 
             csnStreamInit(&arT, bit_offset, remaining_bits_len);
             Status = csnStreamDissector(test_tree, &arT, (const CSN_DESCR *)pDescr->descr.ptr, tvb, pvDATA(data, pDescr->offset), ett_csn1);
@@ -1293,7 +1301,8 @@ csnStreamDissector(proto_tree *tree, csnStream_t* ar, const CSN_DESCR* pDescr, t
 
          if (remaining_bits_len > 0)
          {
-            proto_tree *padding_tree = proto_tree_add_subtree(tree, tvb, bit_offset>>3, -1, ett_csn1, NULL, "Padding Bits");
+            proto_item *ti = proto_tree_add_text(tree, tvb, bit_offset>>3, -1,  "Padding Bits");
+            proto_tree *padding_tree = proto_item_add_subtree(ti, ett_csn1);
             while (remaining_bits_len > 0)
             {
               gint bits_to_handle = remaining_bits_len + (bit_offset%8);
@@ -1437,7 +1446,8 @@ csnStreamDissector(proto_tree *tree, csnStream_t* ar, const CSN_DESCR* pDescr, t
             proto_item   *ti;
             proto_tree   *test_tree;
 
-            test_tree = proto_tree_add_subtree(tree, tvb, bit_offset>>3, 1, ett_csn1, &ti, pDescr->sz);
+            ti = proto_tree_add_text(tree, tvb, bit_offset>>3, 1,  "%s",pDescr->sz);
+            test_tree = proto_item_add_subtree(ti, ett_csn1);
 
             csnStreamInit(&arT, bit_offset, remaining_bits_len);
             Status = csnStreamDissector(test_tree, &arT, (const CSN_DESCR *)pDescr->descr.ptr, tvb, pvDATA(data, pDescr->offset), ett_csn1);
@@ -1500,7 +1510,8 @@ csnStreamDissector(proto_tree *tree, csnStream_t* ar, const CSN_DESCR* pDescr, t
         { /* get data element */
           ElementCount++;
 
-          test_tree = proto_tree_add_subtree_format(tree, tvb, bit_offset>>3, 1, ett_csn1, &ti, "%s[%d]", pDescr->sz, ElementCount-1);
+          ti = proto_tree_add_text(tree, tvb, bit_offset>>3, 1,  "%s[%d]",pDescr->sz, ElementCount-1);
+          test_tree = proto_item_add_subtree(ti, ett_csn1);
 
           csnStreamInit(&arT, bit_offset, remaining_bits_len);
           Status = csnStreamDissector(test_tree, &arT, (const CSN_DESCR *)pDescr->descr.ptr, tvb, pvDATA(data, pDescr->offset), ett_csn1);
@@ -1612,15 +1623,4 @@ csnStreamDissector(proto_tree *tree, csnStream_t* ar, const CSN_DESCR* pDescr, t
   return ProcessError(tree, tvb, bit_offset,"csnStreamDissector", CSN_ERROR_NEED_MORE_BITS_TO_UNPACK, pDescr);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */
+

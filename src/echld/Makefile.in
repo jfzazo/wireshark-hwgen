@@ -193,7 +193,13 @@ LTLIBRARIES = $(lib_LTLIBRARIES)
 am__objects_1 = echld-util.lo dispatcher.lo child.lo parent.lo \
 	common.lo
 am__objects_2 =
-am_libechld_la_OBJECTS = $(am__objects_1) $(am__objects_2)
+am__objects_3 = capture_ifinfo.lo capture_opts.lo capture-pcap-util.lo \
+	capture-pcap-util-unix.lo capture_stop_conditions.lo \
+	capture_sync.lo cfile.lo cfutils.lo clopts_common.lo \
+	conditions.lo pcapio.lo ringbuffer.lo sync_pipe_write.lo \
+	version_info.lo ws80211_utils.lo
+am_libechld_la_OBJECTS = $(am__objects_1) $(am__objects_2) \
+	$(am__objects_3)
 libechld_la_OBJECTS = $(am_libechld_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -280,8 +286,8 @@ CCDEPMODE = @CCDEPMODE@
 CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
-CFLAGS_SSE42 = @CFLAGS_SSE42@
 CONFIG_ARGS = @CONFIG_ARGS@
+CONFIG_WITH_ARGS = @CONFIG_WITH_ARGS@
 COREFOUNDATION_FRAMEWORKS = @COREFOUNDATION_FRAMEWORKS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -307,7 +313,6 @@ ELINKS = @ELINKS@
 ENABLE_STATIC = @ENABLE_STATIC@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FLOORL_LO = @FLOORL_LO@
 FOP = @FOP@
 GEOIP_LIBS = @GEOIP_LIBS@
 GETOPT_LO = @GETOPT_LO@
@@ -380,7 +385,7 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
-LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDES = @LUA_INCLUDES@
 LUA_LIBS = @LUA_LIBS@
 LYNX = @LYNX@
 MAKEINFO = @MAKEINFO@
@@ -416,14 +421,14 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_LIBS = @PLUGIN_LIBS@
 POD2HTML = @POD2HTML@
 POD2MAN = @POD2MAN@
-POPCOUNT_LO = @POPCOUNT_LO@
 PORTAUDIO_INCLUDES = @PORTAUDIO_INCLUDES@
 PORTAUDIO_LIBS = @PORTAUDIO_LIBS@
 PYTHON = @PYTHON@
+PY_CFLAGS = @PY_CFLAGS@
+PY_LIBS = @PY_LIBS@
 QT_MIN_VERSION = @QT_MIN_VERSION@
 Qt_LIBS = @Qt_LIBS@
 RANLIB = @RANLIB@
-RCC = @RCC@
 RPMBUILD_WITH_ARGS = @RPMBUILD_WITH_ARGS@
 SBC_CFLAGS = @SBC_CFLAGS@
 SBC_LIBS = @SBC_LIBS@
@@ -434,6 +439,8 @@ SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+STRNCASECMP_LO = @STRNCASECMP_LO@
+STRPTIME_C = @STRPTIME_C@
 STRPTIME_LO = @STRPTIME_LO@
 SYSTEMCONFIGURATION_FRAMEWORKS = @SYSTEMCONFIGURATION_FRAMEWORKS@
 UIC = @UIC@
@@ -453,6 +460,7 @@ ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 ac_cv_wireshark_have_rpm = @ac_cv_wireshark_have_rpm@
+ac_ws_python_config = @ac_ws_python_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -482,8 +490,6 @@ echld_test_bin = @echld_test_bin@
 editcap_bin = @editcap_bin@
 editcap_man = @editcap_man@
 exec_prefix = @exec_prefix@
-extcapdir = @extcapdir@
-have_sw_vers = @have_sw_vers@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -504,10 +510,10 @@ mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 plugindir = @plugindir@
-plugins_dir = @plugins_dir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pythondir = @pythondir@
 randpkt_bin = @randpkt_bin@
 randpkt_man = @randpkt_man@
 rawshark_bin = @rawshark_bin@
@@ -554,7 +560,7 @@ am__v_SED_0 = @echo "  SED     " $@;
 INCLUDE_DIRS = $(subst -I,NEWLINE,$(filter -I%, $(CFLAGS) -I$(abs_top_srcdir) -I$(abs_srcdir)))
 ACLOCAL_AMFLAGS = `../aclocal-flags`
 
-# C source files that are part of the libechld source; this includes only
+# C source files that are part of the libwsutil source; this includes only
 # .c files, not YACC or Lex or... files (as Makefile.nmake maps this list
 # into a list of object files by replacing ".c" with ".obj") or files
 # generated from YACC or Lex files (as Automake doesn't want them in
@@ -573,6 +579,26 @@ LIBECHLD_INCLUDES = \
 	echld-util.h \
 	echld.h
 
+LIBECHLD_MORE_SRC = \
+	../capture_ifinfo.c \
+	../capture_opts.c	\
+	../capture-pcap-util.c \
+	../capture-pcap-util-unix.c \
+	../capture_stop_conditions.c	\
+	../capture_sync.c \
+	../cfile.c	\
+	../cfutils.c	\
+	../clopts_common.c	\
+	../conditions.c	\
+	../pcapio.c	\
+	../ringbuffer.c	\
+	../sync_pipe_write.c \
+	../version_info.c	\
+	../ws80211_utils.c
+
+OTHER = \
+	../dumpcap.c
+
 
 # Optional objects that I know how to build. These will be
 # linked into libechld.
@@ -583,16 +609,15 @@ AM_CFLAGS = -DWS_BUILD_DLL $(am__append_1)
 AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../wiretap
 libechld_la_SOURCES = \
 	$(LIBECHLD_SRC)		\
-	$(LIBECHLD_INCLUDES)
+	$(LIBECHLD_INCLUDES)	\
+	$(LIBECHLD_MORE_SRC)
 
 libechld_la_DEPENDENCIES = \
-	../caputils/libcaputils.a	\
 	../epan/libwireshark.la		\
 	../wiretap/libwiretap.la	\
 	../wsutil/libwsutil.la
 
 libechld_la_LIBADD = \
-	../caputils/libcaputils.a	\
 	../epan/libwireshark.la		\
 	../wsutil/libwsutil.la		\
 	../wiretap/libwiretap.la	\
@@ -691,35 +716,152 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture-pcap-util-unix.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture-pcap-util.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_ifinfo.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_opts.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_stop_conditions.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_sync.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cfile.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cfutils.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/child.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clopts_common.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/common.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/conditions.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dispatcher.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/echld-util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parent.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pcapio.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ringbuffer.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sync_pipe_write.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/version_info.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ws80211_utils.Plo@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
-@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+capture_ifinfo.lo: ../capture_ifinfo.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT capture_ifinfo.lo -MD -MP -MF $(DEPDIR)/capture_ifinfo.Tpo -c -o capture_ifinfo.lo `test -f '../capture_ifinfo.c' || echo '$(srcdir)/'`../capture_ifinfo.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/capture_ifinfo.Tpo $(DEPDIR)/capture_ifinfo.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../capture_ifinfo.c' object='capture_ifinfo.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o capture_ifinfo.lo `test -f '../capture_ifinfo.c' || echo '$(srcdir)/'`../capture_ifinfo.c
+
+capture_opts.lo: ../capture_opts.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT capture_opts.lo -MD -MP -MF $(DEPDIR)/capture_opts.Tpo -c -o capture_opts.lo `test -f '../capture_opts.c' || echo '$(srcdir)/'`../capture_opts.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/capture_opts.Tpo $(DEPDIR)/capture_opts.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../capture_opts.c' object='capture_opts.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o capture_opts.lo `test -f '../capture_opts.c' || echo '$(srcdir)/'`../capture_opts.c
+
+capture-pcap-util.lo: ../capture-pcap-util.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT capture-pcap-util.lo -MD -MP -MF $(DEPDIR)/capture-pcap-util.Tpo -c -o capture-pcap-util.lo `test -f '../capture-pcap-util.c' || echo '$(srcdir)/'`../capture-pcap-util.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/capture-pcap-util.Tpo $(DEPDIR)/capture-pcap-util.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../capture-pcap-util.c' object='capture-pcap-util.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o capture-pcap-util.lo `test -f '../capture-pcap-util.c' || echo '$(srcdir)/'`../capture-pcap-util.c
+
+capture-pcap-util-unix.lo: ../capture-pcap-util-unix.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT capture-pcap-util-unix.lo -MD -MP -MF $(DEPDIR)/capture-pcap-util-unix.Tpo -c -o capture-pcap-util-unix.lo `test -f '../capture-pcap-util-unix.c' || echo '$(srcdir)/'`../capture-pcap-util-unix.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/capture-pcap-util-unix.Tpo $(DEPDIR)/capture-pcap-util-unix.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../capture-pcap-util-unix.c' object='capture-pcap-util-unix.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o capture-pcap-util-unix.lo `test -f '../capture-pcap-util-unix.c' || echo '$(srcdir)/'`../capture-pcap-util-unix.c
+
+capture_stop_conditions.lo: ../capture_stop_conditions.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT capture_stop_conditions.lo -MD -MP -MF $(DEPDIR)/capture_stop_conditions.Tpo -c -o capture_stop_conditions.lo `test -f '../capture_stop_conditions.c' || echo '$(srcdir)/'`../capture_stop_conditions.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/capture_stop_conditions.Tpo $(DEPDIR)/capture_stop_conditions.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../capture_stop_conditions.c' object='capture_stop_conditions.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o capture_stop_conditions.lo `test -f '../capture_stop_conditions.c' || echo '$(srcdir)/'`../capture_stop_conditions.c
+
+capture_sync.lo: ../capture_sync.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT capture_sync.lo -MD -MP -MF $(DEPDIR)/capture_sync.Tpo -c -o capture_sync.lo `test -f '../capture_sync.c' || echo '$(srcdir)/'`../capture_sync.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/capture_sync.Tpo $(DEPDIR)/capture_sync.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../capture_sync.c' object='capture_sync.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o capture_sync.lo `test -f '../capture_sync.c' || echo '$(srcdir)/'`../capture_sync.c
+
+cfile.lo: ../cfile.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT cfile.lo -MD -MP -MF $(DEPDIR)/cfile.Tpo -c -o cfile.lo `test -f '../cfile.c' || echo '$(srcdir)/'`../cfile.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/cfile.Tpo $(DEPDIR)/cfile.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../cfile.c' object='cfile.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o cfile.lo `test -f '../cfile.c' || echo '$(srcdir)/'`../cfile.c
+
+cfutils.lo: ../cfutils.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT cfutils.lo -MD -MP -MF $(DEPDIR)/cfutils.Tpo -c -o cfutils.lo `test -f '../cfutils.c' || echo '$(srcdir)/'`../cfutils.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/cfutils.Tpo $(DEPDIR)/cfutils.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../cfutils.c' object='cfutils.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o cfutils.lo `test -f '../cfutils.c' || echo '$(srcdir)/'`../cfutils.c
+
+clopts_common.lo: ../clopts_common.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT clopts_common.lo -MD -MP -MF $(DEPDIR)/clopts_common.Tpo -c -o clopts_common.lo `test -f '../clopts_common.c' || echo '$(srcdir)/'`../clopts_common.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/clopts_common.Tpo $(DEPDIR)/clopts_common.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../clopts_common.c' object='clopts_common.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o clopts_common.lo `test -f '../clopts_common.c' || echo '$(srcdir)/'`../clopts_common.c
+
+conditions.lo: ../conditions.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT conditions.lo -MD -MP -MF $(DEPDIR)/conditions.Tpo -c -o conditions.lo `test -f '../conditions.c' || echo '$(srcdir)/'`../conditions.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/conditions.Tpo $(DEPDIR)/conditions.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../conditions.c' object='conditions.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o conditions.lo `test -f '../conditions.c' || echo '$(srcdir)/'`../conditions.c
+
+pcapio.lo: ../pcapio.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT pcapio.lo -MD -MP -MF $(DEPDIR)/pcapio.Tpo -c -o pcapio.lo `test -f '../pcapio.c' || echo '$(srcdir)/'`../pcapio.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/pcapio.Tpo $(DEPDIR)/pcapio.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../pcapio.c' object='pcapio.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o pcapio.lo `test -f '../pcapio.c' || echo '$(srcdir)/'`../pcapio.c
+
+ringbuffer.lo: ../ringbuffer.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ringbuffer.lo -MD -MP -MF $(DEPDIR)/ringbuffer.Tpo -c -o ringbuffer.lo `test -f '../ringbuffer.c' || echo '$(srcdir)/'`../ringbuffer.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/ringbuffer.Tpo $(DEPDIR)/ringbuffer.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../ringbuffer.c' object='ringbuffer.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ringbuffer.lo `test -f '../ringbuffer.c' || echo '$(srcdir)/'`../ringbuffer.c
+
+sync_pipe_write.lo: ../sync_pipe_write.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT sync_pipe_write.lo -MD -MP -MF $(DEPDIR)/sync_pipe_write.Tpo -c -o sync_pipe_write.lo `test -f '../sync_pipe_write.c' || echo '$(srcdir)/'`../sync_pipe_write.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sync_pipe_write.Tpo $(DEPDIR)/sync_pipe_write.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../sync_pipe_write.c' object='sync_pipe_write.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o sync_pipe_write.lo `test -f '../sync_pipe_write.c' || echo '$(srcdir)/'`../sync_pipe_write.c
+
+version_info.lo: ../version_info.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT version_info.lo -MD -MP -MF $(DEPDIR)/version_info.Tpo -c -o version_info.lo `test -f '../version_info.c' || echo '$(srcdir)/'`../version_info.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/version_info.Tpo $(DEPDIR)/version_info.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../version_info.c' object='version_info.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o version_info.lo `test -f '../version_info.c' || echo '$(srcdir)/'`../version_info.c
+
+ws80211_utils.lo: ../ws80211_utils.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ws80211_utils.lo -MD -MP -MF $(DEPDIR)/ws80211_utils.Tpo -c -o ws80211_utils.lo `test -f '../ws80211_utils.c' || echo '$(srcdir)/'`../ws80211_utils.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/ws80211_utils.Tpo $(DEPDIR)/ws80211_utils.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../ws80211_utils.c' object='ws80211_utils.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ws80211_utils.lo `test -f '../ws80211_utils.c' || echo '$(srcdir)/'`../ws80211_utils.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

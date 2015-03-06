@@ -25,9 +25,13 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/to_str.h>
+#include <epan/dissectors/packet-smb.h>
 
 #include "packet-smb-browse.h"
 #include "packet-dcerpc.h"
@@ -98,8 +102,6 @@ static int hf_backup_count = -1;
 static int hf_backup_token = -1;
 static int hf_backup_server = -1;
 static int hf_browser_to_promote = -1;
-static int hf_windows_version = -1;
-static int hf_mysterious_field = -1;
 
 static gint ett_browse = -1;
 static gint ett_browse_flags = -1;
@@ -108,16 +110,16 @@ static gint ett_browse_election_os = -1;
 static gint ett_browse_election_desire = -1;
 static gint ett_browse_reset_cmd_flags = -1;
 
-#define SERVER_WORKSTATION		 0
-#define SERVER_SERVER			 1
-#define SERVER_SQL_SERVER		 2
-#define SERVER_DOMAIN_CONTROLLER	 3
-#define SERVER_BACKUP_CONTROLLER	 4
-#define SERVER_TIME_SOURCE		 5
-#define SERVER_APPLE_SERVER		 6
-#define SERVER_NOVELL_SERVER		 7
-#define SERVER_DOMAIN_MEMBER_SERVER	 8
-#define SERVER_PRINT_QUEUE_SERVER	 9
+#define SERVER_WORKSTATION		0
+#define SERVER_SERVER			1
+#define SERVER_SQL_SERVER		2
+#define SERVER_DOMAIN_CONTROLLER	3
+#define SERVER_BACKUP_CONTROLLER	4
+#define SERVER_TIME_SOURCE		5
+#define SERVER_APPLE_SERVER		6
+#define SERVER_NOVELL_SERVER		7
+#define SERVER_DOMAIN_MEMBER_SERVER	8
+#define SERVER_PRINT_QUEUE_SERVER	9
 #define SERVER_DIALIN_SERVER		10
 #define SERVER_XENIX_SERVER		11
 #define SERVER_NT_WORKSTATION		12
@@ -180,13 +182,13 @@ static const value_string server_types[] = {
     windows_version = "Windows 2000";					\
 									\
   else									\
-    windows_version = "";
+    windows_version = NULL;
 
 static const value_string resetbrowserstate_command_names[] = {
-	{ 0x01, "Stop being a master browser and become a backup browser"},
-	{ 0x02, "Discard browse lists, stop being a master browser, and try again"},
-	{ 0x04, "Stop being a master browser for ever"},
-	{ 0, NULL}
+  { 0x01, "Stop being a master browser and become a backup browser"},
+  { 0x02, "Discard browse lists, stop being a master browser, and try again"},
+  { 0x04, "Stop being a master browser for ever"},
+  { 0, NULL}
 };
 
 static true_false_string tfs_demote_to_backup = {
@@ -337,10 +339,10 @@ static const true_false_string tfs_desire_nt = {
 	"NOT Windows NT Advanced Server"
 };
 
-#define BROWSE_HOST_ANNOUNCE			 1
-#define BROWSE_REQUEST_ANNOUNCE			 2
-#define BROWSE_ELECTION_REQUEST			 8
-#define BROWSE_BACKUP_LIST_REQUEST		 9
+#define BROWSE_HOST_ANNOUNCE			1
+#define BROWSE_REQUEST_ANNOUNCE			2
+#define BROWSE_ELECTION_REQUEST			8
+#define BROWSE_BACKUP_LIST_REQUEST		9
 #define BROWSE_BACKUP_LIST_RESPONSE		10
 #define BROWSE_BECOME_BACKUP			11
 #define BROWSE_DOMAIN_ANNOUNCEMENT		12
@@ -349,16 +351,16 @@ static const true_false_string tfs_desire_nt = {
 #define BROWSE_LOCAL_MASTER_ANNOUNCEMENT	15
 
 static const value_string commands[] = {
-	{BROWSE_HOST_ANNOUNCE,			"Host Announcement"},
-	{BROWSE_REQUEST_ANNOUNCE,		"Request Announcement"},
-	{BROWSE_ELECTION_REQUEST,		"Browser Election Request"},
-	{BROWSE_BACKUP_LIST_REQUEST,		"Get Backup List Request"},
-	{BROWSE_BACKUP_LIST_RESPONSE,		"Get Backup List Response"},
-	{BROWSE_BECOME_BACKUP,			"Become Backup Browser"},
-	{BROWSE_DOMAIN_ANNOUNCEMENT,		"Domain/Workgroup Announcement"},
-	{BROWSE_MASTER_ANNOUNCEMENT,		"Master Announcement"},
+	{BROWSE_HOST_ANNOUNCE,		"Host Announcement"},
+	{BROWSE_REQUEST_ANNOUNCE,	"Request Announcement"},
+	{BROWSE_ELECTION_REQUEST,	"Browser Election Request"},
+	{BROWSE_BACKUP_LIST_REQUEST,	"Get Backup List Request"},
+	{BROWSE_BACKUP_LIST_RESPONSE,	"Get Backup List Response"},
+	{BROWSE_BECOME_BACKUP,		"Become Backup Browser"},
+	{BROWSE_DOMAIN_ANNOUNCEMENT,	"Domain/Workgroup Announcement"},
+	{BROWSE_MASTER_ANNOUNCEMENT,	"Master Announcement"},
 	{BROWSE_RESETBROWSERSTATE_ANNOUNCEMENT, "Reset Browser State Announcement"},
-	{BROWSE_LOCAL_MASTER_ANNOUNCEMENT,	"Local Master Announcement"},
+	{BROWSE_LOCAL_MASTER_ANNOUNCEMENT,"Local Master Announcement"},
 	{0,				NULL}
 };
 
@@ -382,30 +384,53 @@ static const true_false_string tfs_os_nts = {
 static void
 dissect_election_criterion_os(tvbuff_t *tvb, proto_tree *parent_tree, int offset)
 {
-	static const int * flags[] = {
-		&hf_election_os_wfw,
-		&hf_election_os_ntw,
-		&hf_election_os_nts,
-		NULL
-	};
+	proto_tree *tree = NULL;
+	proto_item *item = NULL;
+	guint8 os;
 
-	proto_tree_add_bitmask(parent_tree, tvb, offset, hf_election_os, ett_browse_election_os, flags, ENC_NA);
+	os = tvb_get_guint8(tvb, offset);
+
+	if (parent_tree) {
+		item = proto_tree_add_uint(parent_tree, hf_election_os, tvb, offset, 1, os);
+	      	tree = proto_item_add_subtree(item, ett_browse_election_os);
+	}
+
+	proto_tree_add_boolean(tree, hf_election_os_wfw,
+		tvb, offset, 1, os);
+	proto_tree_add_boolean(tree, hf_election_os_ntw,
+		tvb, offset, 1, os);
+	proto_tree_add_boolean(tree, hf_election_os_nts,
+		tvb, offset, 1, os);
+
 }
 
 static void
 dissect_election_criterion_desire(tvbuff_t *tvb, proto_tree *parent_tree, int offset)
 {
-	static const int * flags[] = {
-		&hf_election_desire_flags_backup,
-		&hf_election_desire_flags_standby,
-		&hf_election_desire_flags_master,
-		&hf_election_desire_flags_domain_master,
-		&hf_election_desire_flags_wins,
-		&hf_election_desire_flags_nt,
-		NULL
-	};
+	proto_tree *tree = NULL;
+	proto_item *item = NULL;
+	guint8 desire;
 
-	proto_tree_add_bitmask(parent_tree, tvb, offset, hf_election_desire, ett_browse_election_desire, flags, ENC_NA);
+	desire = tvb_get_guint8(tvb, offset);
+
+	if (parent_tree) {
+		item = proto_tree_add_uint(parent_tree, hf_election_desire, tvb, offset, 1, desire);
+	      	tree = proto_item_add_subtree(item, ett_browse_election_desire);
+	}
+
+	proto_tree_add_boolean(tree, hf_election_desire_flags_backup,
+		tvb, offset, 1, desire);
+	proto_tree_add_boolean(tree, hf_election_desire_flags_standby,
+		tvb, offset, 1, desire);
+	proto_tree_add_boolean(tree, hf_election_desire_flags_master,
+		tvb, offset, 1, desire);
+	proto_tree_add_boolean(tree, hf_election_desire_flags_domain_master,
+		tvb, offset, 1, desire);
+	proto_tree_add_boolean(tree, hf_election_desire_flags_wins,
+		tvb, offset, 1, desire);
+	proto_tree_add_boolean(tree, hf_election_desire_flags_nt,
+		tvb, offset, 1, desire);
+
 }
 
 static void
@@ -557,9 +582,9 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 	guint32 periodicity;
 	guint8 *host_name;
 	gint namelen;
-	guint8 server_count;
+	guint8 server_count, reset_cmd;
 	guint8 os_major_ver, os_minor_ver;
-	const gchar *windows_version;
+	const gchar *windows_version = NULL;
 	int i;
 	guint32 uptime;
 
@@ -592,7 +617,7 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		proto_tree_add_uint_format_value(tree, hf_periodicity, tvb, offset, 4,
 		    periodicity,
 		    "%s",
-		    time_msecs_to_str(wmem_packet_scope(), periodicity));
+		    time_msecs_to_ep_str(periodicity));
 		offset += 4;
 
 		/* server name */
@@ -612,7 +637,9 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		os_minor_ver = tvb_get_guint8(tvb, offset+1);
 
 		SET_WINDOWS_VERSION_STRING(os_major_ver, os_minor_ver, windows_version);
-		proto_tree_add_string(tree, hf_windows_version, tvb, offset, 2, windows_version);
+
+		if(windows_version)
+		  proto_tree_add_text(tree, tvb, offset, 2, "Windows version: %s", windows_version);
 
 		/* OS major version */
 		proto_tree_add_item(tree, hf_os_major, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -635,7 +662,9 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 			 * version number, and signature constant,
 			 * however.
 			 */
-			proto_tree_add_item(tree, hf_mysterious_field, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+			proto_tree_add_text(tree, tvb, offset, 4,
+			    "Mysterious Field: 0x%08x",
+			    tvb_get_letohl(tvb, offset));
 			offset += 4;
 		} else {
 			/* browser protocol major version */
@@ -668,7 +697,7 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		offset += 1;
 
 		/* name of computer to which to send reply */
-		computer_name = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &namelen, ENC_ASCII);
+		computer_name = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &namelen);
 		proto_tree_add_string(tree, hf_response_computer_name,
 			tvb, offset, namelen, computer_name);
 		col_append_fstr(pinfo->cinfo, COL_INFO, " %s", computer_name);
@@ -689,7 +718,7 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		proto_tree_add_uint_format_value(tree, hf_server_uptime,
 		    tvb, offset, 4, uptime,
 		    "%s",
-		    time_msecs_to_str(wmem_packet_scope(), uptime));
+		    time_msecs_to_ep_str(uptime));
 		offset += 4;
 
 		/* next 4 bytes must be zero */
@@ -738,14 +767,21 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		break;
 
 	case BROWSE_RESETBROWSERSTATE_ANNOUNCEMENT: {
-		static const int * flags[] = {
-			&hf_mb_reset_demote,
-			&hf_mb_reset_flush,
-			&hf_mb_reset_stop,
-			NULL
-		};
+	        proto_tree *sub_tree;
+	        proto_item *reset_item;
 
-		proto_tree_add_bitmask(tree, tvb, offset, hf_mb_reset_command, ett_browse_reset_cmd_flags, flags, ENC_NA);
+		/* the subcommand follows ... one of three values */
+
+	        reset_cmd = tvb_get_guint8(tvb, offset);
+		reset_item = proto_tree_add_uint(tree, hf_mb_reset_command, tvb,
+						 offset, 1, reset_cmd);
+		sub_tree = proto_item_add_subtree(reset_item, ett_browse_reset_cmd_flags);
+		proto_tree_add_boolean(sub_tree, hf_mb_reset_demote, tvb,
+				       offset, 1, reset_cmd);
+		proto_tree_add_boolean(sub_tree, hf_mb_reset_flush, tvb,
+				       offset, 1, reset_cmd);
+		proto_tree_add_boolean(sub_tree, hf_mb_reset_stop, tvb,
+				       offset, 1, reset_cmd);
 		break;
 	}
 
@@ -785,7 +821,7 @@ dissect_mailslot_lanman(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 	guint32 periodicity;
 	const guint8 *host_name;
 	guint8 os_major_ver, os_minor_ver;
-	const gchar *windows_version;
+	const gchar *windows_version = NULL;
 	guint namelen;
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "BROWSER");
@@ -823,7 +859,9 @@ dissect_mailslot_lanman(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		os_minor_ver = tvb_get_guint8(tvb, offset+1);
 
 		SET_WINDOWS_VERSION_STRING(os_major_ver, os_minor_ver, windows_version);
-		proto_tree_add_string(tree, hf_windows_version, tvb, offset, 2, windows_version);
+
+		if(windows_version)
+		  proto_tree_add_text(tree, tvb, offset, 2, "Windows version: %s", windows_version);
 
 		/* OS major version */
 		proto_tree_add_item(tree, hf_os_major, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -838,7 +876,7 @@ dissect_mailslot_lanman(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		proto_tree_add_uint_format_value(tree, hf_periodicity, tvb, offset, 2,
 		    periodicity,
 		    "%s",
-		    time_msecs_to_str(wmem_packet_scope(), periodicity));
+		    time_msecs_to_ep_str(periodicity));
 		offset += 2;
 
 		/* server name */
@@ -1110,13 +1148,6 @@ proto_register_smb_browse(void)
 			{ "Browser to Promote", "browser.browser_to_promote", FT_STRINGZ, BASE_NONE,
 			NULL, 0, NULL, HFILL }},
 
-		{ &hf_windows_version,
-			{ "Windows version", "browser.windows_version", FT_STRING, BASE_NONE,
-			NULL, 0, NULL, HFILL }},
-
-		{ &hf_mysterious_field,
-			{ "Mysterious Field", "browser.mysterious_field", FT_UINT32, BASE_HEX,
-			NULL, 0, NULL, HFILL }},
 	};
 
 	static gint *ett[] = {
@@ -1139,16 +1170,3 @@ proto_register_smb_browse(void)
 	register_dissector("mailslot_lanman", dissect_mailslot_lanman,
 	    proto_smb_browse);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

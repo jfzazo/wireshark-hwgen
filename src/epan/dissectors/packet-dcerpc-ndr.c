@@ -23,7 +23,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include "packet-dcerpc.h"
 
 
@@ -574,16 +577,3 @@ dissect_ndr_ctx_hnd(tvbuff_t *tvb, gint offset, packet_info *pinfo _U_,
     }
     return offset + 20;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

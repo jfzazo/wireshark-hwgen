@@ -59,9 +59,9 @@ ExportDissectionDialog::ExportDissectionDialog(QWidget *parent, capture_file *ca
     QStringList name_filters;
     int last_row;
 
-    setWindowTitle(wsApp->windowTitleString(tr("Export Packet Dissections")));
+    setWindowTitle(tr("Wireshark: Export Packet Dissections"));
     setAcceptMode(QFileDialog::AcceptSave);
-    setLabelText(FileType, tr("Export As:"));
+    setLabelText(FileType, tr("Export as:"));
 
     // export_type_map_keys() sorts alphabetically. We don't want that.
     name_filters

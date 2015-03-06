@@ -25,14 +25,19 @@
 #include <gtk/gtk.h>
 
 #include <epan/epan_dissect.h>
+#include "wsutil/filesystem.h"
 #include <epan/to_str.h>
+#include <epan/strutil.h>
 
+#include "../globals.h"
 #include "ui/simple_dialog.h"
-#include <epan/stat_groups.h>
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_stat_menu.h"
+#include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/main.h"
+#include "ui/tap-sctp-analysis.h"
 #include "ui/gtk/sctp_stat_gtk.h"
 #include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/stock_icons.h"
@@ -262,27 +267,25 @@ update_analyse_dlg(struct sctp_analyse *u_data)
 		list = g_list_first(u_data->assoc->addr1);
 		while (list)
 		{
-			gchar	     *field;
+			gchar	      field[1][MAX_ADDRESS_LEN];
 			address	     *store;
 			GtkListStore *list_store;
 
 			store = (address *)(list->data);
 			if (store->type != AT_NONE) {
-				if ((store->type == AT_IPv4) || (store->type == AT_IPv6))
+				if (store->type == AT_IPv4)
 				{
-					field = (gchar*)address_to_str(NULL, store);
+					g_snprintf(field[0], 30, "%s", ip_to_str((const guint8 *)(store->data)));
 				}
-				else
+				else if (store->type == AT_IPv6)
 				{
-					field = NULL;
+					g_snprintf(field[0], 40, "%s", ip6_to_str((const struct e_in6_addr *)(store->data)));
 				}
-
 				list_store = GTK_LIST_STORE(
 					gtk_tree_view_get_model(GTK_TREE_VIEW(u_data->analyse_nb->page2->clist))); /* Get store */
 
 				gtk_list_store_insert_with_values( list_store , NULL, G_MAXINT,
-									 0, field, -1);
-				wmem_free(NULL, field);
+									 0, field[0], -1);
 			}
 			list = g_list_next(list);
 		}
@@ -346,27 +349,25 @@ update_analyse_dlg(struct sctp_analyse *u_data)
 		list = g_list_first(u_data->assoc->addr2);
 		while (list)
 		{
-			gchar	     *field;
+			gchar	      field[1][MAX_ADDRESS_LEN];
 			address	     *store;
 			GtkListStore *list_store;
 
 			store = (address *)(list->data);
 			if (store->type != AT_NONE) {
-				if ((store->type == AT_IPv4) || (store->type == AT_IPv6))
+				if (store->type == AT_IPv4)
 				{
-					field = (gchar*)address_to_str(NULL, store);
+					g_snprintf(field[0], 30, "%s", ip_to_str((const guint8 *)(store->data)));
 				}
-				else
+				else if (store->type == AT_IPv6)
 				{
-					field = NULL;
+					g_snprintf(field[0], 40, "%s", ip6_to_str((const struct e_in6_addr *)(store->data)));
 				}
-
 				list_store = GTK_LIST_STORE(
 					gtk_tree_view_get_model(GTK_TREE_VIEW(u_data->analyse_nb->page3->clist))); /* Get store */
 
 				gtk_list_store_insert_with_values( list_store , NULL, G_MAXINT,
-									 0, field, -1);
-				wmem_free(NULL, field);
+									 0, field[0], -1);
 			}
 			list = g_list_next(list);
 		}
@@ -461,96 +462,76 @@ sctp_set_filter(GtkButton *button _U_, struct sctp_analyse *u_data)
 		GString *gstring;
 		struct sockaddr_in *infosrc;
 		struct sockaddr_in *infodst;
-		address addr;
-		char    *addr_str;
 
 		srclist = g_list_first(selected_stream->addr1);
 		infosrc = (struct sockaddr_in *)(srclist->data);
-		SET_ADDRESS(&addr, AT_IPv4, 4, &(infosrc->sin_addr.s_addr));
-		addr_str = (char*)address_to_str(NULL, &addr);
 		gstring = g_string_new(g_strdup_printf(
 					       "((sctp.srcport==%u && sctp.dstport==%u && (ip.src==%s",
 					       selected_stream->port1,
 					       selected_stream->port2,
-					       addr_str));
+					       ip_to_str((const guint8 *)&(infosrc->sin_addr.s_addr))));
 		srclist = g_list_next(srclist);
-		wmem_free(NULL, addr_str);
 
 		while (srclist)
 		{
 			infosrc = (struct sockaddr_in *)(srclist->data);
-			SET_ADDRESS(&addr, AT_IPv4, 4, &(infosrc->sin_addr.s_addr));
-			addr_str = (char*)address_to_str(NULL, &addr);
-			str = g_strdup_printf("|| ip.src==%s", addr_str);
+			str = g_strdup_printf("|| ip.src==%s",
+					      ip_to_str((const guint8 *)&(infosrc->sin_addr.s_addr)));
 			g_string_append(gstring, str);
 			srclist = g_list_next(srclist);
-			wmem_free(NULL, addr_str);
 		}
 
 		dstlist = g_list_first(selected_stream->addr2);
 		infodst = (struct sockaddr_in *)(dstlist->data);
-		SET_ADDRESS(&addr, AT_IPv4, 4, &(infodst->sin_addr.s_addr));
-		addr_str = (char*)address_to_str(NULL, &addr);
-		str = g_strdup_printf(") && (ip.dst==%s", addr_str);
+		str = g_strdup_printf(") && (ip.dst==%s",
+				      ip_to_str((const guint8 *)&(infodst->sin_addr.s_addr)));
 		g_string_append(gstring, str);
 		dstlist = g_list_next(dstlist);
-		wmem_free(NULL, addr_str);
-
 		while (dstlist)
 		{
 			infodst = (struct sockaddr_in *)(dstlist->data);
-			SET_ADDRESS(&addr, AT_IPv4, 4, &(infodst->sin_addr.s_addr));
-			addr_str = (char*)address_to_str(NULL, &addr);
-			str = g_strdup_printf("|| ip.dst==%s", addr_str);
+			str = g_strdup_printf("|| ip.dst==%s",
+					      ip_to_str((const guint8 *)&(infodst->sin_addr.s_addr)));
 			g_string_append(gstring, str);
 			dstlist = g_list_next(dstlist);
-			wmem_free(NULL, addr_str);
 		}
 
 		srclist = g_list_first(selected_stream->addr1);
 		infosrc = (struct sockaddr_in *)(srclist->data);
-		SET_ADDRESS(&addr, AT_IPv4, 4, &(infosrc->sin_addr.s_addr));
-		addr_str = (char*)address_to_str(NULL, &addr);
 		str = g_strdup_printf(")) || (sctp.dstport==%u && sctp.srcport==%u && (ip.dst==%s",
 				      selected_stream->port1,
 				      selected_stream->port2,
-				      addr_str);
+				      ip_to_str((const guint8 *)&(infosrc->sin_addr.s_addr)));
 		g_string_append(gstring, str);
 		srclist = g_list_next(srclist);
-		wmem_free(NULL, addr_str);
 
 		while (srclist)
 		{
 			infosrc = (struct sockaddr_in *)(srclist->data);
-			SET_ADDRESS(&addr, AT_IPv4, 4, &(infosrc->sin_addr.s_addr));
-			addr_str = (char*)address_to_str(NULL, &addr);
-			str = g_strdup_printf("|| ip.dst==%s", addr_str);
+			str = g_strdup_printf("|| ip.dst==%s",
+					      ip_to_str((const guint8 *)&(infosrc->sin_addr.s_addr)));
 			g_string_append(gstring, str);
 			srclist = g_list_next(srclist);
-			wmem_free(NULL, addr_str);
 		}
 
 		dstlist = g_list_first(selected_stream->addr2);
 		infodst = (struct sockaddr_in *)(dstlist->data);
-		SET_ADDRESS(&addr, AT_IPv4, 4, &(infodst->sin_addr.s_addr));
-		addr_str = (char*)address_to_str(NULL, &addr);
-		str = g_strdup_printf(") && (ip.src==%s", addr_str);
+		str = g_strdup_printf(") && (ip.src==%s",
+				      ip_to_str((const guint8 *)&(infodst->sin_addr.s_addr)));
 		g_string_append(gstring, str);
 		dstlist = g_list_next(dstlist);
-		wmem_free(NULL, addr_str);
 		while (dstlist)
 		{
 			infodst = (struct sockaddr_in *)(dstlist->data);
-			SET_ADDRESS(&addr, AT_IPv4, 4, &(infodst->sin_addr.s_addr));
-			addr_str = (char*)address_to_str(NULL, &addr);
-			str = g_strdup_printf("|| ip.src==%s", addr_str);
+			str = g_strdup_printf("|| ip.src==%s",
+					      ip_to_str((const guint8 *)&(infodst->sin_addr.s_addr)));
 			g_string_append(gstring, str);
 			dstlist = g_list_next(dstlist);
-			wmem_free(NULL, addr_str);
 		}
 		str = g_strdup_printf(")))");
 		g_string_append(gstring, str);
-		filter_string = g_string_free(gstring, FALSE);
+		filter_string = gstring->str;
+		g_string_free(gstring, FALSE);
 	}
 
 	if (filter_string != NULL) {
@@ -974,7 +955,6 @@ sctp_analyse_cb(struct sctp_analyse *u_data, gboolean ext)
 {
 	GList	       *list;
 	dfilter_t      *sfcode;
-	gchar          *err_msg;
 	capture_file   *cf;
 	epan_dissect_t	edt;
 	gboolean	frame_found = FALSE;
@@ -982,9 +962,8 @@ sctp_analyse_cb(struct sctp_analyse *u_data, gboolean ext)
 	gchar		filter_text[256];
 
 	g_strlcpy(filter_text, "sctp", 250);
-	if (!dfilter_compile(filter_text, &sfcode, &err_msg)) {
-		simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", err_msg);
-		g_free(err_msg);
+	if (!dfilter_compile(filter_text, &sfcode)) {
+		simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", dfilter_error_msg);
 		return;
 	}
 

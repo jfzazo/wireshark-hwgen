@@ -55,7 +55,6 @@ ImportTextDialog::ImportTextDialog(QWidget *parent) :
     int i;
 
     ti_ui_->setupUi(this);
-    setWindowTitle(wsApp->windowTitleString(tr("Import From Hex Dump")));
     memset(&import_info_, 0, sizeof(import_info_));
 
     ok_button_ = ti_ui_->buttonBox->button(QDialogButtonBox::Ok);
@@ -278,7 +277,7 @@ void ImportTextDialog::on_textFileBrowseButton_clicked()
         break;
     }
 
-    QString file_name = QFileDialog::getOpenFileName(this, wsApp->windowTitleString(tr("Import Text File")), open_dir);
+    QString file_name = QFileDialog::getOpenFileName(this, tr("Wireshark: Import text file"), open_dir);
     ti_ui_->textFileLineEdit->setText(file_name);
 }
 

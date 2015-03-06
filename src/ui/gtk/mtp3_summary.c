@@ -32,11 +32,14 @@
 #include <gtk/gtk.h>
 
 #include "epan/packet_info.h"
+#include "epan/epan.h"
 #include "epan/value_string.h"
+#include <epan/tap.h>
 #include <epan/dissectors/packet-mtp3.h>
 
-#include <epan/stat_groups.h>
+#include "../stat_menu.h"
 #include "../globals.h"
+#include "../file.h"
 #include "../summary.h"
 
 #include "ui/gtk/gui_stat_menu.h"
@@ -230,8 +233,8 @@ mtp3_sum_draw(
 
         while (j < mtp3_num_used)
         {
-            num_msus += mtp3_stat[j].mtp3_si_code[i].num_msus;
-            num_bytes += mtp3_stat[j].mtp3_si_code[i].size;
+            num_msus += mtp3_stat[j].si_code[i].num_msus;
+            num_bytes += mtp3_stat[j].si_code[i].size;
 
             j++;
         }

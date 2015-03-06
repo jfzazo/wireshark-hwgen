@@ -28,6 +28,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
 
@@ -200,6 +202,7 @@ dissect_lon(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 	gint addr_a;
 
 	proto_tree *ti;
+	proto_item *pi;
 	proto_tree *lon_tree;
 	gint npdu, type;
 
@@ -249,44 +252,49 @@ dissect_lon(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 	switch(addr_fmt)
 	{
 	case 0: /* Broadcast */
-		ti = proto_tree_add_subtree(lon_tree, tvb, offset, 3, ett_address, NULL, "Address type 0 (broadcast)");
-		proto_tree_add_item(ti, hf_lon_addr_srcsub, tvb, offset, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(ti, hf_lon_addr_srcnode, tvb, offset+1, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(ti, hf_lon_addr_dstsub, tvb, offset+2, 1, ENC_BIG_ENDIAN);
+		pi = proto_tree_add_text(lon_tree, tvb, offset, 3, "Address type 0 (broadcast)");
+		ti = proto_item_add_subtree(pi, ett_address);
+		proto_tree_add_item(ti, hf_lon_addr_srcsub, tvb, offset, 1, ENC_NA);
+		proto_tree_add_item(ti, hf_lon_addr_srcnode, tvb, offset+1, 1, ENC_NA);
+		proto_tree_add_item(ti, hf_lon_addr_dstsub, tvb, offset+2, 1, ENC_NA);
 		offset += 3;
 		break;
 	case 1: /* Multicast */
-		ti = proto_tree_add_subtree(lon_tree, tvb, offset, 3, ett_address, NULL, "Address type 1 (multicast)");
-		proto_tree_add_item(ti, hf_lon_addr_srcsub, tvb, offset, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(ti, hf_lon_addr_srcnode, tvb, offset+1, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(ti, hf_lon_addr_dstgrp, tvb, offset+2, 1, ENC_BIG_ENDIAN);
+		pi = proto_tree_add_text(lon_tree, tvb, offset, 3, "Address type 1 (multicast)");
+		ti = proto_item_add_subtree(pi, ett_address);
+		proto_tree_add_item(ti, hf_lon_addr_srcsub, tvb, offset, 1, ENC_NA);
+		proto_tree_add_item(ti, hf_lon_addr_srcnode, tvb, offset+1, 1, ENC_NA);
+		proto_tree_add_item(ti, hf_lon_addr_dstgrp, tvb, offset+2, 1, ENC_NA);
 		offset += 3;
 		break;
 	case 2: /* Unicast/Multicast */
 		addr_a = tvb_get_guint8(tvb, offset+1) >> 7;
 		if (addr_a) { /* Type 2a */
-			ti = proto_tree_add_subtree(lon_tree, tvb, offset, 4, ett_address, NULL, "Address type 2a (unicast)");
-			proto_tree_add_item(ti, hf_lon_addr_srcsub, tvb, offset, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(ti, hf_lon_addr_srcnode, tvb, offset+1, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(ti, hf_lon_addr_dstsub, tvb, offset+2, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(ti, hf_lon_addr_dstnode, tvb, offset+3, 1, ENC_BIG_ENDIAN);
+			pi = proto_tree_add_text(lon_tree, tvb, offset, 4, "Address type 2a (unicast)");
+			ti = proto_item_add_subtree(pi, ett_address);
+			proto_tree_add_item(ti, hf_lon_addr_srcsub, tvb, offset, 1, ENC_NA);
+			proto_tree_add_item(ti, hf_lon_addr_srcnode, tvb, offset+1, 1, ENC_NA);
+			proto_tree_add_item(ti, hf_lon_addr_dstsub, tvb, offset+2, 1, ENC_NA);
+			proto_tree_add_item(ti, hf_lon_addr_dstnode, tvb, offset+3, 1, ENC_NA);
 			offset += 4;
 		} else { /* Type 2b */
-			ti = proto_tree_add_subtree(lon_tree, tvb, offset, 6, ett_address, NULL, "Address type 2b (multicast)");
-			proto_tree_add_item(ti, hf_lon_addr_srcsub, tvb, offset, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(ti, hf_lon_addr_srcnode, tvb, offset+1, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(ti, hf_lon_addr_dstgrp, tvb, offset+2, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(ti, hf_lon_addr_dstnode, tvb, offset+3, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(ti, hf_lon_addr_grp, tvb, offset+4, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(ti, hf_lon_addr_grpmem, tvb, offset+5, 1, ENC_BIG_ENDIAN);
+			pi = proto_tree_add_text(lon_tree, tvb, offset, 6, "Address type 2b (multicast)");
+			ti = proto_item_add_subtree(pi, ett_address);
+			proto_tree_add_item(ti, hf_lon_addr_srcsub, tvb, offset, 1, ENC_NA);
+			proto_tree_add_item(ti, hf_lon_addr_srcnode, tvb, offset+1, 1, ENC_NA);
+			proto_tree_add_item(ti, hf_lon_addr_dstgrp, tvb, offset+2, 1, ENC_NA);
+			proto_tree_add_item(ti, hf_lon_addr_dstnode, tvb, offset+3, 1, ENC_NA);
+			proto_tree_add_item(ti, hf_lon_addr_grp, tvb, offset+4, 1, ENC_NA);
+			proto_tree_add_item(ti, hf_lon_addr_grpmem, tvb, offset+5, 1, ENC_NA);
 			offset += 6;
 		}
 		break;
 	case 3: /* UID */
-		ti = proto_tree_add_subtree(lon_tree, tvb, offset, 9, ett_address, NULL, "Address type 3 (UID)");
-		proto_tree_add_item(ti, hf_lon_addr_srcsub, tvb, offset, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(ti, hf_lon_addr_srcnode, tvb, offset+1, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(ti, hf_lon_addr_dstsub, tvb, offset+2, 1, ENC_BIG_ENDIAN);
+		pi = proto_tree_add_text(lon_tree, tvb, offset, 9, "Address type 3 (UID)");
+		ti = proto_item_add_subtree(pi, ett_address);
+		proto_tree_add_item(ti, hf_lon_addr_srcsub, tvb, offset, 1, ENC_NA);
+		proto_tree_add_item(ti, hf_lon_addr_srcnode, tvb, offset+1, 1, ENC_NA);
+		proto_tree_add_item(ti, hf_lon_addr_dstsub, tvb, offset+2, 1, ENC_NA);
 		proto_tree_add_item(ti, hf_lon_addr_uid, tvb, offset+3, 6, ENC_NA);
 		offset += 9;
 		break;
@@ -296,7 +304,7 @@ dissect_lon(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 	switch(dom_len)
 	{
 	case 0: /* Domain-wide */
-		proto_tree_add_bytes_format(lon_tree, hf_lon_domain, tvb, offset, 0, NULL, "Domain wide addressing");
+		proto_tree_add_text(lon_tree, tvb, offset, 0, "Domain wide addressing");
 		break;
 	case 1:
 		proto_tree_add_item(lon_tree, hf_lon_domain, tvb, offset, 1, ENC_NA);
@@ -338,17 +346,17 @@ dissect_lon(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 			break;
 		case 4: /* REMINDER */
 			length = tvb_get_guint8(tvb, offset);
-			proto_tree_add_item(lon_tree, hf_lon_mlen, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_item(lon_tree, hf_lon_mlen, tvb, offset, 1, ENC_NA);
 			offset++;
-			proto_tree_add_item(lon_tree, hf_lon_mlist, tvb, offset, length, ENC_BIG_ENDIAN);
+			proto_tree_add_item(lon_tree, hf_lon_mlist, tvb, offset, length, ENC_NA);
 			offset += length;
 			break;
 		case 5: /* REM/MSG */
 			length = tvb_get_guint8(tvb, offset);
-			proto_tree_add_item(lon_tree, hf_lon_mlen, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_item(lon_tree, hf_lon_mlen, tvb, offset, 1, ENC_NA);
 			offset++;
 			if (length > 0)
-				proto_tree_add_item(lon_tree, hf_lon_mlist, tvb, offset, length, ENC_BIG_ENDIAN);
+				proto_tree_add_item(lon_tree, hf_lon_mlist, tvb, offset, length, ENC_NA);
 			offset += length;
 			offset += dissect_apdu(lon_tree, pinfo, tvb, offset);
 			break;
@@ -380,17 +388,17 @@ dissect_lon(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 			break;
 		case 4: /* REMINDER */
 			length = tvb_get_guint8(tvb, offset);
-			proto_tree_add_item(lon_tree, hf_lon_mlen, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_item(lon_tree, hf_lon_mlen, tvb, offset, 1, ENC_NA);
 			offset++;
-			proto_tree_add_item(lon_tree, hf_lon_mlist, tvb, offset, length, ENC_BIG_ENDIAN);
+			proto_tree_add_item(lon_tree, hf_lon_mlist, tvb, offset, length, ENC_NA);
 			offset += length;
 			break;
 		case 5: /* REM/MSG */
 			length = tvb_get_guint8(tvb, offset);
-			proto_tree_add_item(lon_tree, hf_lon_mlen, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_item(lon_tree, hf_lon_mlen, tvb, offset, 1, ENC_NA);
 			offset++;
 			if (length > 0)
-				proto_tree_add_item(lon_tree, hf_lon_mlist, tvb, offset, length, ENC_BIG_ENDIAN);
+				proto_tree_add_item(lon_tree, hf_lon_mlist, tvb, offset, length, ENC_NA);
 			offset += length;
 			offset += dissect_apdu(lon_tree, pinfo, tvb, offset);
 			break;
@@ -766,16 +774,3 @@ proto_reg_handoff_lon(void)
 
 	dissector_add_uint("cnip.protocol", 0, lon_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

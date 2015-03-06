@@ -39,7 +39,6 @@
 #define YYTEXT_POINTER 1
 
 #define HAVE_PLUGINS		1
-#define HAVE_EXTCAP		1
 
 /* #undef HAVE_SA_LEN */
 
@@ -85,9 +84,6 @@
  * noreturn tag.
  */
 #define WS_MSVC_NORETURN	__declspec(noreturn)
-
-/* Define if you have the floorl function. */
-#define HAVE_FLOORL 1
 
 /* Define if you have the gethostbyname2 function.  */
 /* #undef HAVE_GETHOSTBYNAME2 */
@@ -182,6 +178,9 @@
 #define ADNS_JGAA_WIN32 1
 #endif
 
+/* Define to use the Nettle library */
+@HAVE_NETTLE@
+
 /* Define to use the gnutls library */
 @HAVE_LIBGNUTLS@
 
@@ -196,6 +195,10 @@
 
 /* Define to use Lua */
 @HAVE_LUA@
+@HAVE_LUA@
+
+/* Define to use Python */
+@HAVE_PYTHON@
 
 /* Define to use Portaudio library */
 @HAVE_LIBPORTAUDIO@
@@ -220,10 +223,9 @@
 /* Define to have ntddndis.h */
 @HAVE_NTDDNDIS_H@
 
-/* Define if you have the strptime function. */
-/* #undef HAVE_STRPTIME 1 */
-
+/* #undef HAVE_INET_ATON_H */
 #define NEED_INET_V6DEFS_H  1
+#define NEED_STRPTIME_H     1
 
 #ifndef WIN32
 #define WIN32			1
@@ -237,10 +239,11 @@
 /* Visual C 9 (2008), Visual C 10 (2010) and Visual C 11 (2012) and Visual C 12 (2013) need these prototypes */
 /* XXX: Can we use MSC_VER >= 1500 ?? */
 #if _MSC_VER == 1500 || _MSC_VER == 1600 || _MSC_VER == 1700 || _MSC_VER == 1800
-#define NTDDI_VERSION NTDDI_WINXPSP3
-#define _WIN32_WINNT _WIN32_WINNT_WINXP
+#define NTDDI_VERSION NTDDI_WIN2K
+#define _WIN32_WINNT _WIN32_WINNT_WIN2K
 #endif
 
+#define strncasecmp		strnicmp
 #define popen			_popen
 #define pclose			_pclose
 
@@ -278,6 +281,3 @@
 #if !defined(QT_VERSION) || !defined(_SSIZE_T_DEFINED)
 typedef int ssize_t;
 #endif
-
-/* to use define _ws_mempbrk_sse42 if available (checked with cpuinfo)  */
-#define HAVE_SSE4_2 1

@@ -28,6 +28,7 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include <epan/conversation.h>
 
 #define GVCP_MIN_PACKET_SIZE     8
@@ -253,7 +254,6 @@ Link configurations
 #define GEV_LINKCONFIG_DYNAMICLAG (0x03)
 
 
-void proto_register_gvcp(void);
 void proto_reg_handoff_gvcp(void);
 
 /* Define the gvcp proto */
@@ -467,14 +467,6 @@ static int hf_gvcp_resendcmd_extended_first_packet_id_v2_0 = -1;
 static int hf_gvcp_resendcmd_extended_last_packet_id_v2_0 = -1;
 static int hf_gvcp_actioncmd_time_v2_0 = -1;
 static int hf_gvcp_eventcmd_block_id_64bit_v2_0 = -1;
-
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_gvcp_custom_register_value = -1;
-static int hf_gvcp_custom_read_register_addr = -1;
-static int hf_gvcp_readmemcmd_data_read = -1;
-static int hf_gvcp_custom_read_register_value = -1;
-static int hf_gvcp_manifest_table = -1;
-static int hf_gvcp_reserved_bit = -1;
 
 /*Define the tree for gvcp*/
 static int ett_gvcp = -1;
@@ -852,23 +844,23 @@ static int dissect_register(guint32 addr, proto_tree *branch, tvbuff_t *tvb, gin
 		break;
 
 	case GVCP_MANUFACTURER_NAME:
-		proto_tree_add_item(branch, hf_gvcp_reserved_bit, tvb, 0, length, ENC_NA); /*? */
+		proto_tree_add_text(branch, tvb, 0, length, "Reserved Bit"); /*? */
 		break;
 
 	case GVCP_MODEL_NAME:
-		proto_tree_add_item(branch, hf_gvcp_reserved_bit, tvb, 0, length, ENC_NA); /*? */
+		proto_tree_add_text(branch, tvb, 0, length, "Reserved Bit"); /*? */
 		break;
 
 	case GVCP_DEVICE_VERSION:
-		proto_tree_add_item(branch, hf_gvcp_reserved_bit, tvb, 0, length, ENC_NA); /*? */
+		proto_tree_add_text(branch, tvb, 0, length, "Reserved Bit"); /*? */
 		break;
 
 	case GVCP_MANUFACTURER_INFO:
-		proto_tree_add_item(branch, hf_gvcp_reserved_bit, tvb, 0, length, ENC_NA); /*? */
+		proto_tree_add_text(branch, tvb, 0, length, "Reserved Bit"); /*? */
 		break;
 
 	case GVCP_SERIAL_NUMBER:
-		proto_tree_add_item(branch, hf_gvcp_reserved_bit, tvb, 0, length, ENC_NA); /*? */
+		proto_tree_add_text(branch, tvb, 0, length, "Reserved Bit"); /*? */
 		break;
 
 	case GVCP_USER_DEFINED_NAME:
@@ -876,11 +868,11 @@ static int dissect_register(guint32 addr, proto_tree *branch, tvbuff_t *tvb, gin
 		break;
 
 	case GVCP_FIRST_URL:
-		proto_tree_add_item(branch, hf_gvcp_reserved_bit, tvb, 0, length, ENC_NA); /*? */
+		proto_tree_add_text(branch, tvb, 0, length, "Reserved Bit"); /*? */
 		break;
 
 	case GVCP_SECOND_URL:
-		proto_tree_add_item(branch, hf_gvcp_reserved_bit, tvb, 0, length, ENC_NA); /*? */
+		proto_tree_add_text(branch, tvb, 0, length, "Reserved Bit"); /*? */
 		break;
 
 	case GVCP_NUMBER_OF_NETWORK_INTERFACES:
@@ -1190,7 +1182,7 @@ static int dissect_register(guint32 addr, proto_tree *branch, tvbuff_t *tvb, gin
 		break;
 
 	case GVCP_MANIFEST_TABLE:
-		proto_tree_add_item(branch, hf_gvcp_manifest_table, tvb, 0, length, ENC_NA);
+		proto_tree_add_text(branch, tvb, 0, length, "Manifest Table");
 		break;
 
 	case GVCP_ACTION_GROUP_KEY(0):
@@ -1306,10 +1298,12 @@ static void dissect_forceip_cmd(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, p
 	const gint mask_offset = startoffset + 36;
 	const gint gateway_offset = startoffset + 52;
 
+	proto_item *item = NULL;
+
 	if (gvcp_telegram_tree != NULL)
 	{
-		gvcp_telegram_tree = proto_tree_add_subtree(gvcp_telegram_tree, tvb, startoffset, length,
-										ett_gvcp_payload_cmd, NULL, "FORCEIP_CMD Options");
+		item = proto_tree_add_text(gvcp_telegram_tree, tvb, startoffset, length, "FORCEIP_CMD Options");
+		gvcp_telegram_tree = proto_item_add_subtree(item, ett_gvcp_payload_cmd);
 
 		proto_tree_add_item(gvcp_telegram_tree, hf_gvcp_forceip_mac_address, tvb, mac_offset, 6, ENC_NA);
 		proto_tree_add_item(gvcp_telegram_tree, hf_gvcp_forceip_static_IP, tvb, ip_offset, 4, ENC_BIG_ENDIAN);
@@ -1329,6 +1323,7 @@ static void dissect_packetresend_cmd(proto_tree *gvcp_telegram_tree, tvbuff_t *t
 	guint64 block_id = 0;
 	guint32 first_packet = 0;
 	guint32 last_packet = 0;
+	proto_item *item = NULL;
 	gint offset;
 	offset = startoffset;
 
@@ -1365,8 +1360,8 @@ static void dissect_packetresend_cmd(proto_tree *gvcp_telegram_tree, tvbuff_t *t
 	if (gvcp_telegram_tree != NULL)
 	{
 		/* Command header/tree */
-		gvcp_telegram_tree = proto_tree_add_subtree(gvcp_telegram_tree, tvb, startoffset, length,
-												ett_gvcp_payload_cmd, NULL, "PACKETRESEND_CMD Values");
+		item = proto_tree_add_text(gvcp_telegram_tree, tvb, startoffset, length, "PACKETRESEND_CMD Values");
+		gvcp_telegram_tree = proto_item_add_subtree(item, ett_gvcp_payload_cmd);
 
 		/* Stream channel */
 		proto_tree_add_item(gvcp_telegram_tree, hf_gvcp_resendcmd_stream_channel_index, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -1430,8 +1425,8 @@ static void dissect_readreg_cmd(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, p
 	{
 		if (num_registers > 1)
 		{
-			gvcp_telegram_tree = proto_tree_add_subtree(gvcp_telegram_tree, tvb, startoffset, length,
-												ett_gvcp_payload_cmd, &item, "READREG_CMD Address List");
+			item = proto_tree_add_text(gvcp_telegram_tree, tvb, startoffset, length, "READREG_CMD Address List");
+			gvcp_telegram_tree = proto_item_add_subtree(item, ett_gvcp_payload_cmd);
 		}
 	}
 
@@ -1535,8 +1530,8 @@ static void dissect_writereg_cmd(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, 
 	{
 	if (num_registers > 1)
 	{
-		gvcp_telegram_tree = proto_tree_add_subtree(gvcp_telegram_tree, tvb, startoffset, length,
-								ett_gvcp_payload_cmd, &item, "WRITEREG_CMD Address List");
+		item = proto_tree_add_text(gvcp_telegram_tree, tvb, startoffset, length, "WRITEREG_CMD Address List");
+		gvcp_telegram_tree = proto_item_add_subtree(item, ett_gvcp_payload_cmd);
 	}
 
 	for (i = 0; i < num_registers; i++)
@@ -1564,7 +1559,7 @@ static void dissect_writereg_cmd(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, 
 
 				offset += 4;
 				temp_tree = proto_item_add_subtree(item, ett_gvcp_payload_cmd_subtree);
-				proto_tree_add_item(temp_tree, hf_gvcp_custom_register_value, tvb, offset, 4, ENC_BIG_ENDIAN);
+				proto_tree_add_text(temp_tree,tvb, offset, 4, "Value=0x%08X", value);
 			}
 			offset += 4;
 		}
@@ -1676,6 +1671,7 @@ static void dissect_event_cmd(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, pac
 	{
 		gint i;
 		gint event_count = 0;
+		proto_item *item = NULL;
 
 		/* Compute event count based on data length */
 		if (extendedblockids == 0)
@@ -1691,8 +1687,8 @@ static void dissect_event_cmd(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, pac
 
 		if (event_count > 1)
 		{
-			gvcp_telegram_tree = proto_tree_add_subtree(gvcp_telegram_tree, tvb, offset, length,
-												ett_gvcp_payload_cmd, NULL, "EVENT_CMD Event List");
+			item = proto_tree_add_text(gvcp_telegram_tree, tvb, offset, length, "EVENT_CMD Event List");
+			gvcp_telegram_tree = proto_item_add_subtree(item, ett_gvcp_payload_cmd);
 		}
 
 
@@ -1863,8 +1859,8 @@ static void dissect_discovery_ack(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb,
 
 	if (gvcp_telegram_tree != NULL)
 	{
-		gvcp_telegram_tree = proto_tree_add_subtree(gvcp_telegram_tree, tvb, offset, length,
-										ett_gvcp_payload_cmd, NULL, "DISCOVERY_ACK Payload");
+		item = proto_tree_add_text(gvcp_telegram_tree, tvb, offset, length, "DISCOVERY_ACK Payload");
+		gvcp_telegram_tree = proto_item_add_subtree(item, ett_gvcp_payload_cmd);
 
 		/* Version */
 		item = proto_tree_add_item(gvcp_telegram_tree, hf_gvcp_spec_version, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -1926,6 +1922,7 @@ static void dissect_discovery_ack(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb,
 static void dissect_readreg_ack(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, packet_info *pinfo, gint startoffset, gint length, gvcp_transaction_t *gvcp_trans)
 {
 	guint i;
+	proto_item *item = NULL;
 	gboolean is_custom_register = FALSE;
 	const gchar* address_string = NULL;
 	guint num_registers;
@@ -1964,8 +1961,8 @@ static void dissect_readreg_ack(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, p
 		/* Subtree initialization for Payload Data: READREG_ACK */
 		if (num_registers > 1)
 		{
-			gvcp_telegram_tree = proto_tree_add_subtree(gvcp_telegram_tree, tvb,  offset, length,
-												ett_gvcp_payload_ack, NULL, "Register Value List");
+			item = proto_tree_add_text(gvcp_telegram_tree, tvb,  offset, length, "Register Value List");
+			gvcp_telegram_tree = proto_item_add_subtree(item, ett_gvcp_payload_ack);
 		}
 
 		for (i = 0; i < num_registers; i++)
@@ -1984,13 +1981,13 @@ static void dissect_readreg_ack(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, p
 				}
 				else
 				{
-					proto_tree_add_uint_format_value(gvcp_telegram_tree, hf_gvcp_custom_read_register_addr, tvb, offset, 4, curr_register, "%s (0x%08X)", address_string, curr_register);
-					proto_tree_add_item(gvcp_telegram_tree, hf_gvcp_custom_read_register_value, tvb, offset, 4, ENC_BIG_ENDIAN);
+					proto_tree_add_text(gvcp_telegram_tree, tvb, offset, 4, "Custom Register Address: %s (0x%08X)", address_string, curr_register);
+					proto_tree_add_text(gvcp_telegram_tree, tvb, offset, 4, "Custom Register Value: 0x%08X", tvb_get_ntohl(tvb, offset));
 				}
 			}
 			else
 			{
-				proto_tree_add_item(gvcp_telegram_tree, hf_gvcp_custom_register_value, tvb, offset, 4, ENC_BIG_ENDIAN);
+				proto_tree_add_text(gvcp_telegram_tree,tvb, offset, 4, "Value=0x%08X", tvb_get_ntohl(tvb, offset));
 			}
 
 			offset += 4;
@@ -2075,7 +2072,7 @@ static void dissect_readmem_ack(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, p
 		else
 		{
 			/* Generic, unknown value */
-			proto_tree_add_item(gvcp_telegram_tree, hf_gvcp_readmemcmd_data_read, tvb, offset, byte_count, ENC_NA);
+			proto_tree_add_text(gvcp_telegram_tree, tvb, offset, byte_count, "%d bytes of data read.", byte_count);
 		}
 	}
 }
@@ -2099,7 +2096,7 @@ static void dissect_writemem_ack(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, 
 
 	if (gvcp_telegram_tree != NULL)
 	{
-		proto_item *item;
+		proto_item *item = NULL;
 
 		if (gvcp_trans && gvcp_trans->req_frame)
 		{
@@ -2107,8 +2104,8 @@ static void dissect_writemem_ack(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, 
 			PROTO_ITEM_SET_GENERATED(item);
 		}
 
-		gvcp_telegram_tree = proto_tree_add_subtree(gvcp_telegram_tree, tvb, startoffset, length,
-												ett_gvcp_payload_cmd, NULL, "Payload Data: WRITEMEM_ACK");
+		item = proto_tree_add_text(gvcp_telegram_tree, tvb, startoffset, length, "Payload Data: WRITEMEM_ACK");
+		gvcp_telegram_tree = proto_item_add_subtree(item, ett_gvcp_payload_cmd);
 		proto_tree_add_item(gvcp_telegram_tree, hf_gvcp_writememcmd_data_index, tvb, (startoffset +2), 2, ENC_BIG_ENDIAN);
 	}
 }
@@ -2122,8 +2119,10 @@ static void dissect_pending_ack(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb, p
 {
 	if (gvcp_telegram_tree != NULL)
 	{
-		gvcp_telegram_tree = proto_tree_add_subtree(gvcp_telegram_tree, tvb, startoffset, length,
-										ett_gvcp_payload_cmd, NULL, "Payload Data: PENDING_ACK");
+		proto_item *item = NULL;
+
+		item = proto_tree_add_text(gvcp_telegram_tree, tvb, startoffset, length, "Payload Data: PENDING_ACK");
+		gvcp_telegram_tree = proto_item_add_subtree(item, ett_gvcp_payload_cmd);
 		proto_tree_add_item(gvcp_telegram_tree, hf_gvcp_time_to_completion, tvb, (startoffset + 2), 2, ENC_BIG_ENDIAN);
 	}
 }
@@ -2191,8 +2190,8 @@ static int dissect_gvcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 		/* Add the Command name string to the Info column */
 		col_append_fstr(pinfo->cinfo, COL_INFO, "> %s ", command_string);
 
-		gvcp_tree = proto_tree_add_subtree_format(gvcp_tree, tvb, offset, 8,
-								ett_gvcp_cmd, NULL, "Command Header: %s", command_string);
+		item = proto_tree_add_text(gvcp_tree, tvb, offset, 8, "Command Header: %s", command_string);
+		gvcp_tree = proto_item_add_subtree(item, ett_gvcp_cmd);
 
 		/* Add the message key code: */
 		proto_tree_add_item(gvcp_tree, hf_gvcp_message_key_code, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -2233,8 +2232,8 @@ static int dissect_gvcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 		col_append_fstr(pinfo->cinfo, COL_INFO, "< %s %s",
 			ack_string, val_to_str(status, statusnames_short, "Unknown status (0x%04X)"));
 
-		gvcp_tree = proto_tree_add_subtree_format(gvcp_tree, tvb, offset+2, tvb_captured_length(tvb)-2,
-												ett_gvcp_ack, NULL, "Acknowledge Header: %s", ack_string);
+		item = proto_tree_add_text(gvcp_tree, tvb, offset+2, tvb_captured_length(tvb)-2, "Acknowledge Header: %s", ack_string);
+		gvcp_tree = proto_item_add_subtree(item, ett_gvcp_ack);
 
 		/* Add the status: */
 		proto_tree_add_item(gvcp_tree, hf_gvcp_status, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -3782,15 +3781,7 @@ void proto_register_gvcp(void)
 		{ "Request In", "gvcp.response_to",
 		FT_FRAMENUM, BASE_NONE, NULL, 0x0,
 		"This is a response to the GVCP request in this frame", HFILL
-		}},
-
-      /* Generated from convert_proto_tree_add_text.pl */
-      { &hf_gvcp_reserved_bit, { "Reserved Bit", "gvcp.reserved_bit", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_gvcp_manifest_table, { "Manifest Table", "gvcp.manifest_table", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_gvcp_custom_register_value, { "Value", "gvcp.bootstrap.custom.register.value", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_gvcp_custom_read_register_addr, { "Custom Register Address", "gvcp.bootstrap.custom.register.read", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_gvcp_custom_read_register_value, { "Custom Register Value", "gvcp.bootstrap.custom.register.read_value", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_gvcp_readmemcmd_data_read, { "Data read", "gvcp.cmd.readmem.data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+		}}
 	};
 
 	static gint *ett[] = {

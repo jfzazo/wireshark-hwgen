@@ -29,19 +29,23 @@
 #include <epan/packet_info.h>
 #include <epan/prefs.h>
 #include <epan/tap.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
 
+#include "../stat_menu.h"
 
 #include "ui/simple_dialog.h"
 
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/expert_comp_table.h"
+#include "ui/gtk/gui_stat_menu.h"
 #include "ui/gtk/help_dlg.h"
 #include "ui/gtk/expert_comp_dlg.h"
+#include "ui/gtk/stock_icons.h"
 #include "ui/gtk/main.h"
 #include "ui/gtk/expert_indicators.h"
 #include "ui/gtk/packet_panes.h"
+#include "ui/gtk/old-gtk-compat.h"
 #include "ui/gtk/edit_packet_comment_dlg.h"
 #include "ui/gtk/capture_comment_icons.h"
 #include "ui/gtk/gtkglobals.h"
@@ -809,8 +813,7 @@ expert_comp_init(const char *opt_arg _U_, void* userdata _U_)
     ss->warn_events = 0;
     ss->error_events = 0;
 
-    expert_comp_dlg_w = ss->win = dlg_window_new_with_geom("Expert Info",
-        NULL, GTK_WIN_POS_CENTER_ON_PARENT);  /* transient_for top_level */
+    expert_comp_dlg_w = ss->win=dlg_window_new("err");  /* transient_for top_level */
     gtk_window_set_destroy_with_parent (GTK_WINDOW(ss->win), TRUE);
     gtk_window_set_default_size(GTK_WINDOW(ss->win), 700, 300);
 
@@ -1002,20 +1005,10 @@ expert_comp_dlg_launch(void)
     }
 }
 
-static stat_tap_ui expert_comp_ui = {
-    REGISTER_STAT_GROUP_GENERIC,
-    NULL,
-    "expert_comp",
-    expert_comp_init,
-    -1,
-    0,
-    NULL
-};
-
 void
 register_tap_listener_expert_comp(void)
 {
-    register_stat_tap_ui(&expert_comp_ui, NULL);
+    register_stat_cmd_arg("expert_comp", expert_comp_init,NULL);
 }
 
 void

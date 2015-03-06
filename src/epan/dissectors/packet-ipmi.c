@@ -23,10 +23,14 @@
 
 #include "config.h"
 
+#include <string.h>
 
+#include <stdio.h>
 
 #include <epan/packet.h>
 #include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
+#include <epan/to_str.h>
 #include <epan/prefs.h>
 #include <epan/addr_resolv.h>
 
@@ -131,7 +135,7 @@ typedef struct {
 
 static dissector_handle_t data_dissector;
 
-gint proto_ipmi = -1;
+static gint proto_ipmi = -1;
 static gint proto_ipmb = -1;
 static gint proto_kcs = -1;
 static gint proto_tmode = -1;
@@ -165,8 +169,6 @@ static gint ett_header_byte_1 = -1;
 static gint ett_header_byte_4 = -1;
 static gint ett_data = -1;
 static gint ett_typelen = -1;
-
-static expert_field ei_impi_parser_not_implemented = EI_INIT;
 
 static struct ipmi_netfn_root ipmi_cmd_tab[IPMI_NETFN_MAX];
 
@@ -442,8 +444,7 @@ add_command_info(packet_info *pinfo, ipmi_cmd_t * cmd,
 	}
 }
 
-static int
-dissect_ipmi_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
+int dissect_ipmi_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		gint hf_parent_item, gint ett_tree, const ipmi_context_t * ctx)
 {
 	ipmi_packet_data_t * data;
@@ -540,7 +541,6 @@ dissect_ipmi_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		/* add parent node */
 		if (!data->curr_level) {
 			ti = proto_tree_add_item(tree, hf_parent_item, tvb, 0, -1, ENC_NA);
-			cmd_tree = proto_item_add_subtree(ti, ett_tree);
 		} else {
 			char str[ITEM_LABEL_LENGTH];
 
@@ -550,13 +550,12 @@ dissect_ipmi_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 			} else {
 				g_snprintf(str, ITEM_LABEL_LENGTH, "Req, %s", cmd->desc);
 			}
-			if (proto_registrar_get_ftype(hf_parent_item) == FT_STRING) {
-				ti = proto_tree_add_string(tree, hf_parent_item, tvb, 0, -1, str);
-				cmd_tree = proto_item_add_subtree(ti, ett_tree);
-			}
-			else
-				cmd_tree = proto_tree_add_subtree(tree, tvb, 0, -1, ett_tree, NULL, str);
+
+			ti = proto_tree_add_string(tree, hf_parent_item, tvb, 0, -1, str);
 		}
+
+		/* add message sub-tree */
+		cmd_tree = proto_item_add_subtree(ti, ett_tree);
 
 		if (data->curr_level < MAX_NEST_LEVEL) {
 			/* check if response */
@@ -630,10 +629,13 @@ dissect_ipmi_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		netfn_str = ipmi_getnetfnname(ctx->hdr.netfn, cmd_list);
 
 		/* Network function + target LUN */
-		tmp_tree = proto_tree_add_subtree_format(cmd_tree, tvb, offset, 1,
-				ett_header_byte_1, NULL, "Target LUN: 0x%02x, NetFN: %s %s (0x%02x)",
+		ti = proto_tree_add_text(cmd_tree, tvb, offset, 1,
+				"Target LUN: 0x%02x, NetFN: %s %s (0x%02x)",
 				ctx->hdr.rs_lun, netfn_str,
 				is_resp ? "Response" : "Request", ctx->hdr.netfn);
+
+		/* make a sub-tree */
+		tmp_tree = proto_item_add_subtree(ti, ett_header_byte_1);
 
 		/* add Net Fn */
 		proto_tree_add_uint_format(tmp_tree, hf_ipmi_header_netfn, tvb,
@@ -672,10 +674,13 @@ dissect_ipmi_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		/* check if request sequence is specified */
 		if (!(ctx->flags & IPMI_D_NO_SEQ)) {
 			/* Sequence number + source LUN */
-			tmp_tree = proto_tree_add_subtree_format(cmd_tree, tvb, offset, 1,
-					ett_header_byte_4, NULL, "%s: 0x%02x, SeqNo: 0x%02x",
+			ti = proto_tree_add_text(cmd_tree, tvb, offset, 1,
+					"%s: 0x%02x, SeqNo: 0x%02x",
 					(ctx->flags & IPMI_D_TMODE) ? "Bridged" : "Source LUN",
 							ctx->hdr.rq_lun, ctx->hdr.rq_seq);
+
+			/* create byte 4 sub-tree */
+			tmp_tree = proto_item_add_subtree(ti, ett_header_byte_4);
 
 			if (ctx->flags & IPMI_D_TMODE) {
 				proto_tree_add_item(tmp_tree, hf_ipmi_header_bridged,
@@ -726,8 +731,15 @@ dissect_ipmi_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		ipmi_cmd_handler_t hnd = is_resp ? cmd->parse_resp : cmd->parse_req;
 
 		if (hnd && tvb_captured_length(data_tvb)) {
-			/* create data field */
-			tmp_tree = proto_tree_add_subtree(cmd_tree, data_tvb, 0, -1, ett_data, NULL, "Data");
+			if (tree) {
+				/* create data field */
+				ti = proto_tree_add_text(cmd_tree, data_tvb, 0, -1, "Data");
+
+				/* create data sub-tree */
+				tmp_tree = proto_item_add_subtree(ti, ett_data);
+			} else {
+				tmp_tree = NULL;
+			}
 
 			/* save current command */
 			data->curr_hdr = &ctx->hdr;
@@ -1003,7 +1015,7 @@ static struct ipmi_parse_typelen ptl_unicode = {
 };
 
 void
-ipmi_add_typelen(proto_tree *tree, int hf_string, int hf_type, int hf_length, tvbuff_t *tvb,
+ipmi_add_typelen(proto_tree *tree, const char *desc, tvbuff_t *tvb,
 		guint offs, gboolean is_fru)
 {
 	static struct ipmi_parse_typelen *fru_eng[4] = {
@@ -1017,6 +1029,7 @@ ipmi_add_typelen(proto_tree *tree, int hf_string, int hf_type, int hf_length, tv
 	};
 	struct ipmi_parse_typelen *ptr;
 	proto_tree *s_tree;
+	proto_item *ti;
 	guint type, msk, clen, blen, len;
 	const char *unit;
 	char *str;
@@ -1041,15 +1054,16 @@ ipmi_add_typelen(proto_tree *tree, int hf_string, int hf_type, int hf_length, tv
 	ptr->parse(str, tvb, offs + 1, clen);
 	str[clen] = '\0';
 
-	s_tree = proto_tree_add_subtree_format(tree, tvb, offs, 1, ett_typelen, NULL,
-			"%s Type/Length byte: %s, %d %s", (proto_registrar_get_nth(hf_string))->name, ptr->desc, len, unit);
-	proto_tree_add_uint_format_value(s_tree, hf_type, tvb, offs, 1, type, "%s (0x%02x)",
-			ptr->desc, type);
-	proto_tree_add_uint_format_value(s_tree, hf_length, tvb, offs, 1, len, "%d %s",
-			len, unit);
+	ti = proto_tree_add_text(tree, tvb, offs, 1, "%s Type/Length byte: %s, %d %s",
+			desc, ptr->desc, len, unit);
+	s_tree = proto_item_add_subtree(ti, ett_typelen);
+	proto_tree_add_text(s_tree, tvb, offs, 1, "%sType: %s (0x%02x)",
+			ipmi_dcd8(typelen, 0xc0), ptr->desc, type);
+	proto_tree_add_text(s_tree, tvb, offs, 1, "%sLength: %d %s",
+			ipmi_dcd8(typelen, msk), len, unit);
 
-	proto_tree_add_string_format_value(tree, hf_string, tvb, offs + 1, blen, str,
-			"[%s] '%s'", ptr->desc, str);
+	proto_tree_add_text(tree, tvb, offs + 1, blen, "%s: [%s] '%s'",
+			desc, ptr->desc, str);
 }
 
 /* ----------------------------------------------------------------
@@ -1066,10 +1080,10 @@ ipmi_add_timestamp(proto_tree *tree, gint hf, tvbuff_t *tvb, guint offset)
 	} else if (ts <= 0x20000000) {
 		proto_tree_add_uint_format_value(tree, hf, tvb, offset, 4,
 				ts, "%s since SEL device's initialization",
-				time_secs_to_str_unsigned(wmem_packet_scope(), ts));
+				time_secs_to_ep_str_unsigned(ts));
 	} else {
 		proto_tree_add_uint_format_value(tree, hf, tvb, offset, 4,
-				ts, "%s", abs_time_secs_to_str(wmem_packet_scope(), ts, ABSOLUTE_TIME_UTC, TRUE));
+				ts, "%s", abs_time_secs_to_ep_str(ts, ABSOLUTE_TIME_UTC, TRUE));
 	}
 }
 
@@ -1208,7 +1222,18 @@ ipmi_getcmd(ipmi_netfn_t *nf, guint32 cmd)
 void
 ipmi_notimpl(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
-	proto_tree_add_expert(tree, pinfo, &ei_impi_parser_not_implemented, tvb, 0, -1);
+	if (tree) {
+		proto_tree_add_text(tree, tvb, 0, -1, "[PARSER NOT IMPLEMENTED]");
+	}
+}
+
+char *
+ipmi_dcd8(guint32 val, guint32 mask)
+{
+	static char buf[64];
+
+	decode_bitfield_value(buf, val, mask, 8);
+	return buf;
 }
 
 void
@@ -1269,17 +1294,15 @@ ipmi_fmt_channel(gchar *s, guint32 v)
 		{ 0x0f, "System Interface" },
 		{ 0, NULL }
 	};
-	gchar* tmp_str;
 
-	tmp_str = val_to_str_wmem(NULL, v, chan_vals, "Channel #%d");
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%s (0x%02x)", tmp_str, v);
-	wmem_free(NULL, tmp_str);
+	g_snprintf(s, ITEM_LABEL_LENGTH, "%s (0x%02x)",
+			val_to_str(v, chan_vals, "Channel #%d"), v);
 }
 
 void
 ipmi_fmt_udpport(gchar *s, guint32 v)
 {
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%s (%d)", udp_port_to_display(wmem_packet_scope(), v), v);
+	g_snprintf(s, ITEM_LABEL_LENGTH, "%s (%d)", ep_udp_port_to_display(v), v);
 }
 
 void
@@ -1747,13 +1770,7 @@ proto_register_ipmi(void)
 		{ "pps", "Pigeon Point Systems", IPMI_OEM_PPS },
 		{ NULL, NULL, 0 }
 	};
-
-	static ei_register_info ei[] = {
-		{ &ei_impi_parser_not_implemented, { "ipmi.parser_not_implemented", PI_UNDECODED, PI_WARN, "[PARSER NOT IMPLEMENTED]", EXPFILL }},
-	};
-
 	module_t *m;
-	expert_module_t* expert_ipmi;
 	guint32 i;
 
 	proto_ipmi = proto_register_protocol("Intelligent Platform Management Interface",
@@ -1773,9 +1790,6 @@ proto_register_ipmi(void)
 	proto_register_field_array(proto_ipmi, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
 
-	expert_ipmi = expert_register_protocol(proto_ipmi);
-	expert_register_field_array(expert_ipmi, ei, array_length(ei));
-
 	ipmi_netfn_setdesc(IPMI_CHASSIS_REQ, "Chassis", 0);
 	ipmi_netfn_setdesc(IPMI_BRIDGE_REQ, "Bridge", 0);
 	ipmi_netfn_setdesc(IPMI_SE_REQ, "Sensor/Event", 0);
@@ -1788,6 +1802,17 @@ proto_register_ipmi(void)
 	for (i = 0x30; i < 0x40; i += 2) {
 		ipmi_netfn_setdesc(i, "OEM", 0);
 	}
+
+	ipmi_register_chassis(proto_ipmi);
+	ipmi_register_bridge(proto_ipmi);
+	ipmi_register_se(proto_ipmi);
+	ipmi_register_app(proto_ipmi);
+	ipmi_register_update(proto_ipmi);
+	ipmi_register_storage(proto_ipmi);
+	ipmi_register_transport(proto_ipmi);
+	ipmi_register_picmg(proto_ipmi);
+	ipmi_register_pps(proto_ipmi);
+	ipmi_register_vita(proto_ipmi);
 
 	new_register_dissector("ipmi", dissect_ipmi, proto_ipmi);
 	new_register_dissector("ipmb", dissect_ipmi, proto_ipmb);
@@ -1813,16 +1838,3 @@ proto_register_ipmi(void)
 			"Selects which OEM format is used for commands that IPMI does not define",
 			&selected_oem, oemsel_vals, FALSE);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

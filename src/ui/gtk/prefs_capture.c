@@ -30,8 +30,8 @@
 #include <epan/prefs.h>
 
 #include "capture_opts.h"
-#include "caputils/capture_ifinfo.h"
-#include "ui/capture_ui_utils.h"
+#include "capture_ifinfo.h"
+#include "capture_ui_utils.h"
 #include "ui/capture_globals.h"
 #include "ui/iface_lists.h"
 #include "ui/simple_dialog.h"
@@ -1775,7 +1775,7 @@ ifopts_if_liststore_add(void)
 
 	if_list = capture_interface_list(&err, &err_str, main_window_update);  /* if_list = ptr to first element of list (or NULL) */
 	if (if_list == NULL) {
-		if (err != 0) {
+		if (err != NO_INTERFACES_FOUND) {
 			simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", err_str);
 		}
 		g_free(err_str);

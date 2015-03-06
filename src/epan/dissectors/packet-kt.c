@@ -29,6 +29,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+#include <time.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 

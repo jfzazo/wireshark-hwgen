@@ -22,6 +22,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <wsutil/pint.h>
 #include <epan/etypes.h>
@@ -32,7 +33,6 @@
 #include "packet-chdlc.h"
 #include "packet-ppp.h"
 #include "packet-ip.h"
-#include "packet-juniper.h"
 
 /*
  * See section 4.3.1 of RFC 1547, and
@@ -48,17 +48,14 @@ void proto_reg_handoff_slarp(void);
 static int proto_chdlc = -1;
 static int hf_chdlc_addr = -1;
 static int hf_chdlc_proto = -1;
-static int hf_chdlc_clns_padding = -1;
 
 static gint ett_chdlc = -1;
 
 static int proto_slarp = -1;
 static int hf_slarp_ptype = -1;
 static int hf_slarp_address = -1;
-static int hf_slarp_netmask = -1;
 static int hf_slarp_mysequence = -1;
 /* static int hf_slarp_yoursequence = -1; */
-
 
 static gint ett_slarp = -1;
 
@@ -130,10 +127,12 @@ chdlctype(guint16 chdlc_type, tvbuff_t *tvb, int offset_after_chdlctype,
           int chdlctype_id)
 {
   tvbuff_t *next_tvb;
-  int       padbyte;
+  int       padbyte = 0;
 
-  proto_tree_add_uint(fh_tree, chdlctype_id, tvb,
+  if (tree) {
+    proto_tree_add_uint(fh_tree, chdlctype_id, tvb,
                         offset_after_chdlctype - 2, 2, chdlc_type);
+  }
 
   padbyte = tvb_get_guint8(tvb, offset_after_chdlctype);
   if (chdlc_type == CHDLCTYPE_OSI &&
@@ -141,7 +140,8 @@ chdlctype(guint16 chdlc_type, tvbuff_t *tvb, int offset_after_chdlctype,
        padbyte == NLPID_ISO9542_ESIS ||
        padbyte == NLPID_ISO10589_ISIS)) {
     /* There is a Padding Byte for CLNS protocols over Cisco HDLC */
-    proto_tree_add_item(fh_tree, hf_chdlc_clns_padding, tvb, offset_after_chdlctype, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_text(fh_tree, tvb, offset_after_chdlctype, 1, "CLNS Padding: 0x%02x",
+        padbyte);
     next_tvb = tvb_new_subset_remaining(tvb, offset_after_chdlctype + 1);
   } else {
     next_tvb = tvb_new_subset_remaining(tvb, offset_after_chdlctype);
@@ -210,11 +210,7 @@ proto_register_chdlc(void)
     { &hf_chdlc_proto,
       { "Protocol", "chdlc.protocol", FT_UINT16, BASE_HEX,
         VALS(chdlc_vals), 0x0, NULL, HFILL }},
-    { &hf_chdlc_clns_padding,
-      { "CLNS Padding", "chdlc.clns_padding", FT_UINT8, BASE_HEX,
-        NULL, 0x0, NULL, HFILL }},
   };
-
   static gint *ett[] = {
     &ett_chdlc,
   };
@@ -253,7 +249,6 @@ proto_reg_handoff_chdlc(void)
   chdlc_handle = find_dissector("chdlc");
   dissector_add_uint("wtap_encap", WTAP_ENCAP_CHDLC, chdlc_handle);
   dissector_add_uint("wtap_encap", WTAP_ENCAP_CHDLC_WITH_PHDR, chdlc_handle);
-  dissector_add_uint("juniper.proto", JUNIPER_PROTO_CHDLC, chdlc_handle);
 }
 
 
@@ -301,7 +296,8 @@ dissect_slarp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     if (tree) {
       proto_tree_add_uint(slarp_tree, hf_slarp_ptype, tvb, 0, 4, code);
       proto_tree_add_item(slarp_tree, hf_slarp_address, tvb, 4, 4, ENC_BIG_ENDIAN);
-      proto_tree_add_item(slarp_tree, hf_slarp_netmask, tvb, 8, 4, ENC_BIG_ENDIAN);
+      proto_tree_add_text(slarp_tree, tvb, 8, 4,
+                          "Netmask: %s", tvb_ip_to_str(tvb, 8));
     }
     break;
 
@@ -344,9 +340,6 @@ proto_register_slarp(void)
         NULL, 0x0, NULL, HFILL }},
     /* XXX - need an FT_ for netmasks, which is like FT_IPV4 but doesn't
        get translated to a host name. */
-    { &hf_slarp_netmask,
-      { "Netmask", "slarp.netmask", FT_IPv4, BASE_NONE,
-        NULL, 0x0, NULL, HFILL }},
     { &hf_slarp_mysequence,
       { "Outgoing sequence number", "slarp.mysequence", FT_UINT32, BASE_DEC,
         NULL, 0x0, NULL, HFILL }},
@@ -373,16 +366,3 @@ proto_reg_handoff_slarp(void)
   slarp_handle = create_dissector_handle(dissect_slarp, proto_slarp);
   dissector_add_uint("chdlc.protocol", CISCO_SLARP, slarp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

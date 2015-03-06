@@ -25,15 +25,17 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/addr_resolv.h>
+#include <epan/strutil.h>
 
 void proto_register_redbackli(void);
 void proto_reg_handoff_redbackli(void);
 
 static int proto_redbackli = -1;
 
-static int hf_redbackli_avptype = -1;
-static int hf_redbackli_avplen = -1;
 static int hf_redbackli_seqno = -1;		/* Sequence No */
 static int hf_redbackli_liid = -1;		/* LI Id */
 static int hf_redbackli_sessid = -1;		/* Session Id */
@@ -70,14 +72,15 @@ static void
 redbackli_dissect_avp(guint8 avptype, guint8 avplen, tvbuff_t *tvb, gint offset, proto_tree *tree)
 {
 	const char	*avpname;
-	proto_tree	*st = NULL;
+	proto_tree	*ti, *st = NULL;
 
 	avpname = val_to_str_const(avptype, avp_names, "Unknown");
 
-	st = proto_tree_add_subtree_format(tree, tvb, offset, avplen+2, ett_redbackli, NULL, "%s AVP", avpname);
+	ti = proto_tree_add_text(tree, tvb, offset, avplen+2, "%s AVP", avpname);
+	st = proto_item_add_subtree(ti, ett_redbackli);
 
-	proto_tree_add_uint(st, hf_redbackli_avptype, tvb, offset, 1, avptype);
-	proto_tree_add_uint(st, hf_redbackli_avplen, tvb, offset+1, 1, avplen);
+	proto_tree_add_text(st, tvb, offset, 1, "AVP Type: %d", avptype);
+	proto_tree_add_text(st, tvb, offset+1, 1, "AVP Length: %d", avplen);
 
 	if (!avplen)
 		return;
@@ -132,15 +135,16 @@ redbackli_dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	guint8		avptype, avplen;
 	gint		len, offset = 0;
 	gboolean	eoh;
-	proto_item	*ti;
-	proto_tree	*redbackli_tree = NULL;
+	proto_tree	*ti, *redbackli_tree = NULL;
 	tvbuff_t	*next_tvb;
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "RBLI");
 
-	ti = proto_tree_add_item(tree, proto_redbackli,
+	if (tree) {
+		ti = proto_tree_add_item(tree, proto_redbackli,
 					 tvb, 0, -1, ENC_NA);
-	redbackli_tree = proto_item_add_subtree(ti, ett_redbackli);
+		redbackli_tree = proto_item_add_subtree(ti, ett_redbackli);
+	}
 
 	len = tvb_length(tvb);
 	offset = 0;
@@ -230,12 +234,6 @@ redbackli_dissect_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
 }
 void proto_register_redbackli(void) {
 	static hf_register_info hf[] = {
-		{ &hf_redbackli_avptype,
-			{ "AVP Type", "redbackli.avptype", FT_UINT8, BASE_DEC, NULL, 0x0,
-			NULL, HFILL }},
-		{ &hf_redbackli_avplen,
-			{ "AVP Length", "redbackli.avplen", FT_UINT8, BASE_DEC, NULL, 0x0,
-			NULL, HFILL }},
 		{ &hf_redbackli_seqno,
 			{ "Sequence No", "redbackli.seqno", FT_UINT32, BASE_DEC, NULL, 0x0,
 			NULL, HFILL }},
@@ -289,7 +287,7 @@ void proto_reg_handoff_redbackli(void) {
 	ip_handle = find_dissector("ip");
 
 	redbackli_handle = find_dissector("redbackli");
-	dissector_add_for_decode_as("udp.port", redbackli_handle);
+	dissector_add_handle("udp.port", redbackli_handle);  /* for 'decode-as' */
 
 	heur_dissector_add("udp", redbackli_dissect_heur, proto_redbackli);
 }

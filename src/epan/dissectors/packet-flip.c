@@ -24,7 +24,7 @@
 
 /*
  * FLIP (Flow Layer Internal Protocol) is a proprietary protocol
- * developed by Nokia Solutions and Networks (previous was 'Nokia Siemens Networks').
+ * developed by Nokia Siemens Networks.
  */
 
 /*
@@ -50,6 +50,8 @@
 #include <epan/in_cksum.h>
 
 #include <epan/prefs.h>
+#include <epan/emem.h>
+#include <epan/strutil.h>
 
 #include <epan/rtp_pt.h>
 
@@ -147,6 +149,7 @@ dissect_flip_chksum_hdr(tvbuff_t    *tvb,
                         guint16     computed_chksum,
                         gboolean    *ext_hdr_follows_ptr)
 {
+    proto_item *item;
     proto_tree *chksum_hdr_tree;
     guint32  dw;
     guint8   chksum_hdr_etype;
@@ -157,6 +160,7 @@ dissect_flip_chksum_hdr(tvbuff_t    *tvb,
     gint bytes_dissected;
     gint offset;
 
+    item            = NULL;
     chksum_hdr_tree = NULL;
 
     bytes_dissected = 0;
@@ -177,8 +181,9 @@ dissect_flip_chksum_hdr(tvbuff_t    *tvb,
     }
 
     if (tree) {
-        chksum_hdr_tree = proto_tree_add_subtree(tree, tvb, offset + 0, 4,
-                            ett_flip_chksum, NULL, "Checksum Header");
+        item = proto_tree_add_text(tree, tvb,
+                                   offset + 0, 4, "Checksum Header");
+        chksum_hdr_tree = proto_item_add_subtree(item, ett_flip_chksum);
 
         /* ETYPE: 8 bits */
         proto_tree_add_uint_format_value(chksum_hdr_tree, hf_flip_chksum_etype,
@@ -334,6 +339,7 @@ is_payload_rtcp(tvbuff_t *tvb)
 static int
 dissect_flip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
+    proto_item *item;
     proto_item *ti;
     proto_tree *flip_tree;
     proto_tree *basic_hdr_tree;
@@ -360,6 +366,7 @@ dissect_flip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     /* Error handling for basic header. */
     gboolean is_faulty_frame;
 
+    item             = NULL;
     ti               = NULL;
     flip_tree        = NULL;
     basic_hdr_tree   = NULL;
@@ -423,7 +430,7 @@ dissect_flip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     col_add_fstr(pinfo->cinfo, COL_INFO,
                  "FlowID %s", val_to_str(basic_hdr_flow_id, NULL, "0x%08x"));
 
-    flip_tvb = tvb_new_subset_length(tvb, 0, frame_len);
+    flip_tvb = tvb_new_subset(tvb, 0, frame_len, frame_len);
 
     /* We are asked for details. */
     if (tree) {
@@ -440,7 +447,8 @@ dissect_flip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
         flip_tree = proto_item_add_subtree(ti, ett_flip);
 
         /* basic header */
-        basic_hdr_tree = proto_tree_add_subtree(flip_tree, flip_tvb, 0, 8, ett_flip_basic, NULL, "Basic Header");
+        item = proto_tree_add_text(flip_tree, flip_tvb, 0, 8, "Basic Header");
+        basic_hdr_tree = proto_item_add_subtree(item, ett_flip_basic);
 
         /* Extension header follows? 1 bit. */
         proto_tree_add_uint_format_value(basic_hdr_tree,
@@ -520,16 +528,19 @@ dissect_flip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
             {
                 vec_t   vec[2];
 
-                SET_CKSUM_VEC_TVB(vec[0], flip_tvb, 0, bytes_dissected + 2);
-                SET_CKSUM_VEC_TVB(vec[1], flip_tvb, bytes_dissected + 4,
-                                  flip_len - (bytes_dissected + 4));
+                vec[0].ptr = tvb_get_ptr(flip_tvb, 0, bytes_dissected + 2);
+                vec[0].len = bytes_dissected + 2;
+                vec[1].ptr = tvb_get_ptr(flip_tvb, bytes_dissected + 4,
+                                         flip_len - (bytes_dissected + 4));
+                vec[1].len = flip_len - (bytes_dissected + 4);
                 computed_chksum = in_cksum(&vec[0], 2);
 
                 /* Checksums handled in network order. */
                 computed_chksum = g_htons(computed_chksum);
             }
 
-            chksum_tvb = tvb_new_subset_length(flip_tvb, offset,
+            chksum_tvb = tvb_new_subset(flip_tvb, offset,
+                                        FLIP_CHKSUM_HDR_LEN,
                                         FLIP_CHKSUM_HDR_LEN);
 
             /* Note that flip_tree is NULL if no details are requested. */
@@ -564,8 +575,8 @@ dissect_flip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 
         has_user_messed_up = FALSE;
 
-        payload_tvb = tvb_new_subset_length(flip_tvb, offset,
-                                     payload_len);
+        payload_tvb = tvb_new_subset(flip_tvb, offset,
+                                     payload_len, payload_len);
 
         /*
          * 1) no decoding -> data
@@ -783,15 +794,4 @@ proto_reg_handoff_flip(void)
 
 } /* proto_reg_handoff_flip() */
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+/* end of file packet-flip.c */

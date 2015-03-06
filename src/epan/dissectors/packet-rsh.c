@@ -28,9 +28,14 @@
 
 #include "config.h"
 
+#include <ctype.h>
+
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/conversation.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
 #include <wsutil/str_util.h>
 
 /* The rsh protocol uses TCP port 512 per its IANA assignment */
@@ -51,8 +56,6 @@ static int hf_rsh_stderr_port     = -1;
 static int hf_rsh_client_username = -1;
 static int hf_rsh_server_username = -1;
 static int hf_rsh_command         = -1;
-static int hf_rsh_client_server_data = -1;
-static int hf_rsh_server_client_data = -1;
 
 /* Initialize the subtree pointers */
 static gint ett_rsh = -1;
@@ -234,7 +237,7 @@ dissect_rsh(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     if(hash_info->state == WAIT_FOR_STDERR_PORT
             && tvb_length_remaining(tvb, offset)){
-        field_stringz = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &length, ENC_ASCII);
+        field_stringz = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &length);
 
         /* Check if this looks like the stderr_port field.
          * It is optional, so it may only be 1 character long
@@ -257,7 +260,7 @@ dissect_rsh(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     if(hash_info->state == WAIT_FOR_CLIENT_USERNAME
             && tvb_length_remaining(tvb, offset)){
-        field_stringz = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &length, ENC_ASCII);
+        field_stringz = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &length);
 
         /* Check if this looks like the username field */
         if(length != 1 && length <= RSH_CLIENT_USERNAME_LEN
@@ -285,7 +288,7 @@ dissect_rsh(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     if(hash_info->state == WAIT_FOR_SERVER_USERNAME
             && tvb_length_remaining(tvb, offset)){
-        field_stringz = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &length, ENC_ASCII);
+        field_stringz = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &length);
 
         /* Check if this looks like the password field */
         if(length != 1 && length <= RSH_SERVER_USERNAME_LEN
@@ -315,7 +318,7 @@ dissect_rsh(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     if(hash_info->state == WAIT_FOR_COMMAND
             && tvb_length_remaining(tvb, offset)){
-        field_stringz = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &length, ENC_ASCII);
+        field_stringz = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &length);
 
         /* Check if this looks like the command field */
         if(length != 1 && length <= RSH_COMMAND_LEN
@@ -341,13 +344,13 @@ dissect_rsh(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         if(pinfo->destport == RSH_PORT){
             /* Packet going to the server */
             /* offset = 0 since the whole packet is data */
-            proto_tree_add_item(rsh_tree, hf_rsh_client_server_data, tvb, 0, -1, ENC_NA);
+            proto_tree_add_text(rsh_tree, tvb, 0, -1, "Client -> Server Data");
 
             col_append_str(pinfo->cinfo, COL_INFO, "Client -> Server data");
         } else {
             /* This packet must be going back to the client */
             /* offset = 0 since the whole packet is data */
-            proto_tree_add_item(rsh_tree, hf_rsh_server_client_data, tvb, 0, -1, ENC_NA);
+            proto_tree_add_text(rsh_tree, tvb, 0, -1, "Server -> Client Data");
 
             col_append_str(pinfo->cinfo, COL_INFO, "Server -> Client Data");
         }
@@ -377,15 +380,7 @@ proto_register_rsh(void)
 
         { &hf_rsh_command, { "Command to execute", "rsh.command",
         FT_STRINGZ, BASE_NONE, NULL, 0,
-        "Command client is requesting the server to run", HFILL } },
-
-        { &hf_rsh_client_server_data, { "Client -> Server Data", "rsh.client_server_data",
-        FT_BYTES, BASE_NONE, NULL, 0,
-        NULL, HFILL } },
-
-        { &hf_rsh_server_client_data, { "Server -> Client Data", "rsh.server_client_data",
-        FT_BYTES, BASE_NONE, NULL, 0,
-        NULL, HFILL } },
+        "Command client is requesting the server to run", HFILL } }
 
     };
 

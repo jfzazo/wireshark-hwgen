@@ -23,7 +23,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/etypes.h>
 
 #include "packet-hpext.h"
 
@@ -43,7 +45,6 @@ static int hf_rmp_machtype = -1;
 static int hf_rmp_filename = -1;
 static int hf_rmp_offset = -1;
 static int hf_rmp_size = -1;
-static int hf_rmp_reserved = -1;
 
 static gint ett_rmp = -1;
 
@@ -135,7 +136,7 @@ dissect_rmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 					return;
 				len = tvb_get_guint8(tvb, 30);
 				proto_tree_add_item(rmp_tree,
-				    hf_rmp_filename, tvb, 30, 1, ENC_ASCII|ENC_BIG_ENDIAN);
+				    hf_rmp_filename, tvb, 30, 1, ENC_ASCII|ENC_NA);
 				if(tvb_offset_exists(tvb, len+31))
 					call_dissector(data_handle,
 					    tvb_new_subset_remaining(tvb, len+31),
@@ -153,7 +154,7 @@ dissect_rmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				    hf_rmp_version, tvb, 8, 2, ENC_BIG_ENDIAN);
 				len = tvb_get_guint8(tvb, 10);
 				proto_tree_add_item(rmp_tree,
-				    hf_rmp_filename, tvb, 10, 1, ENC_ASCII|ENC_BIG_ENDIAN);
+				    hf_rmp_filename, tvb, 10, 1, ENC_ASCII|ENC_NA);
 				if(tvb_offset_exists(tvb, len+11))
 					call_dissector(data_handle,
 					    tvb_new_subset_remaining(tvb, len+11),
@@ -189,8 +190,8 @@ dissect_rmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			case RMP_BOOT_DONE:
 				proto_tree_add_item(rmp_tree,
 				    hf_rmp_retcode, tvb, 1, 1, ENC_BIG_ENDIAN);
-				proto_tree_add_item(rmp_tree,
-				    hf_rmp_reserved, tvb, 2, 4, ENC_BIG_ENDIAN);
+				proto_tree_add_text(rmp_tree,
+				    tvb, 2, 4, "Reserved");
 				proto_tree_add_item(rmp_tree,
 				    hf_rmp_sessionid, tvb, 6, 2, ENC_BIG_ENDIAN);
 				if(tvb_offset_exists(tvb, 8))
@@ -236,11 +237,7 @@ proto_register_rmp(void)
 		{ &hf_rmp_size,
 		{ "Size", "rmp.size", FT_UINT16, BASE_DEC,
 			NULL, 0x0, NULL, HFILL }},
-		{ &hf_rmp_reserved,
-		{ "Reserved", "rmp.reserved", FT_UINT32, BASE_HEX,
-			NULL, 0x0, NULL, HFILL }},
 	};
-
 	static gint *ett[] = {
 		&ett_rmp,
 	};
@@ -264,16 +261,3 @@ proto_reg_handoff_rmp(void)
 	dissector_add_uint("hpext.dxsap", HPEXT_DXSAP, rmp_handle);
 	dissector_add_uint("hpext.dxsap", HPEXT_SXSAP, rmp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

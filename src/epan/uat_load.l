@@ -23,6 +23,8 @@
 	/*
 	 * uat_load.l
 	 *
+	 * $Id$
+	 *
 	 *  User Accessible Tables
 	 *  Mantain an array of user accessible data strucures
 	 *  One parser to fit them all
@@ -53,9 +55,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include <glib.h>
 
+#include <epan/emem.h>
 #include "uat-int.h"
 #include "uat_load_lex.h"
 #include <wsutil/file_util.h>
@@ -78,18 +82,15 @@ static gchar *parse_str;
 static guint parse_str_pos;
 
 #define ERROR(fmtd) do { \
-    char* fmt_str = g_strdup_printf fmtd; \
-    error = g_strdup_printf("%s:%d: %s",uat->filename,linenum,fmt_str); \
-    g_free(fmt_str); \
+    error = ep_strdup_printf("%s:%d: %s",uat->filename,linenum,ep_strdup_printf fmtd); \
     yyterminate(); \
 } while(0)
 
 #define SET_FIELD() \
-	{ gchar* errx; \
+	{ const gchar* errx; \
 	if (uat->fields[colnum].cb.chk) { \
 		if ( ! uat->fields[colnum].cb.chk(record, ptrx, len, uat->fields[colnum].cbdata.chk, uat->fields[colnum].fld_data, &errx) ) { \
-			error = g_strdup_printf("%s:%d: %s",uat->filename,linenum,errx); \
-			g_free(errx); \
+			error = ep_strdup_printf("%s:%d: %s",uat->filename,linenum,ep_strdup_printf("%s",errx)); \
 			valid_record = FALSE; \
 		}\
 	}\
@@ -239,7 +240,7 @@ comment #[^\n]*\n
 
 <END_OF_RECORD>{newline} {
 	void* rec;
-	char* err = NULL;
+	const char* err = NULL;
 
 	linenum++;
 
@@ -253,8 +254,12 @@ comment #[^\n]*\n
 		uat->update_cb(rec,&err);
 
 	if (err) {
-		error = err;
-		yyterminate();
+		char *tmp = ep_strdup(err);
+		/* XXX bit of a hack to remove emem from dissectors, this can
+		 * be removed as proper use of glib memory is propogated
+		 * through the rest of the UAT code */
+		g_free((char*)err);
+		ERROR(("%s",tmp));
 	}
 
 	valid_record = TRUE;
@@ -275,7 +280,7 @@ comment #[^\n]*\n
 <ERRORED>{newline} { linenum++; BEGIN START_OF_LINE; }
 <ERRORED>. ;
 
-{newline} { linenum++; ERROR(("incomplete record")); }
+{newline} { linenum++; ERROR(("incomplete record")); BEGIN START_OF_LINE; }
 . { ERROR(("unexpected input")); }
 
 %%
@@ -284,7 +289,7 @@ comment #[^\n]*\n
 
 
 gboolean
-uat_load(uat_t *uat_in, char **errx)
+uat_load(uat_t *uat_in, const char **errx)
 {
 	gchar *fname = uat_get_actual_filename(uat_in, FALSE);
 
@@ -302,7 +307,7 @@ uat_load(uat_t *uat_in, char **errx)
 
 
 	if (!(yyin = ws_fopen(fname,"r"))) {
-		*errx = g_strdup(g_strerror(errno));
+		*errx = g_strerror(errno);
 		g_free(fname);
 		return FALSE;
 	}
@@ -327,7 +332,7 @@ uat_load(uat_t *uat_in, char **errx)
 	UAT_UPDATE(uat);
 
 	if (error) {
-		*errx = error;
+		*errx = ep_strdup(error);
 		return FALSE;
 	}
 
@@ -366,7 +371,7 @@ uat_load_str(uat_t *uat_in, char *entry, char **err)
 	UAT_UPDATE(uat);
 
 	if (error) {
-		*err = error;
+		*err = ep_strdup(error);
 		return FALSE;
 	}
 

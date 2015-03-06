@@ -41,24 +41,28 @@
 #include "config.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <wsutil/filesystem.h>
 #include <epan/prefs.h>
 #include <epan/sminmpec.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
+#include <epan/conversation.h>
 #include <epan/tap.h>
 #include <epan/exported_pdu.h>
 #include <epan/diam_dict.h>
 #include <epan/sctpppids.h>
 #include <epan/show_exception.h>
 #include <epan/to_str.h>
-#include <wsutil/filesystem.h>
-#include <wsutil/report_err.h>
 #include "packet-tcp.h"
 #include "packet-diameter.h"
-#include "packet-e212.h"
-#include "packet-e164.h"
 
 void proto_register_diameter(void);
 void proto_reg_handoff_diameter(void);
@@ -121,7 +125,7 @@ typedef const char *(*diam_avp_dissector_t)(diam_ctx_t *, diam_avp_t *, tvbuff_t
 typedef struct _diam_vnd_t {
 	guint32  code;
 	GArray *vs_avps;
-	value_string_ext *vs_avps_ext;
+	const value_string_ext *vs_avps_ext;
 	GArray *vs_cmds;
 } diam_vnd_t;
 
@@ -324,14 +328,6 @@ static const char *avpflags_str[] = {
 	"VMP",
 };
 
-#define SUBSCRIPTION_ID_TYPE_E164	0
-#define SUBSCRIPTION_ID_TYPE_IMSI	1
-#define SUBSCRIPTION_ID_TYPE_SIP_URI	2
-#define SUBSCRIPTION_ID_TYPE_NAI	3
-#define SUBSCRIPTION_ID_TYPE_PRIVATE	4
-#define SUBSCRIPTION_ID_TYPE_UNKNOWN (guint32)-1
-static guint32 subscription_id_type;
-
 static void
 export_diameter_pdu(packet_info *pinfo, tvbuff_t *tvb)
 {
@@ -390,7 +386,7 @@ dissect_diameter_eap_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 	call_dissector(eap_handle, tvb, pinfo, tree);
 
 	col_set_writable(pinfo->cinfo, save_writable);
-	return tvb_reported_length(tvb);
+	return tvb_length(tvb);
 }
 
 /* http://www.3gpp2.org/public_html/X/VSA-VSE.cfm */
@@ -420,12 +416,14 @@ dissect_diameter_3gpp2_exp_res(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
 	return 4;
 }
 
+
 /* From RFC 3162 section 2.3 */
 static int
-dissect_diameter_base_framed_ipv6_prefix(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data)
+dissect_diameter_base_framed_ipv6_prefix(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
 {
 	diam_sub_dis_t *diam_sub_dis = (diam_sub_dis_t*)data;
 	guint8 prefix_len, prefix_len_bytes;
+	/*diam_sub_dis_t *diam_sub_dis_inf = (diam_sub_dis_t*)data;*/
 
 	proto_tree_add_item(tree, hf_framed_ipv6_prefix_reserved, tvb, 0, 1, ENC_BIG_ENDIAN);
 	proto_tree_add_item(tree, hf_framed_ipv6_prefix_length, tvb, 1, 1, ENC_BIG_ENDIAN);
@@ -438,86 +436,19 @@ dissect_diameter_base_framed_ipv6_prefix(tvbuff_t *tvb, packet_info *pinfo _U_, 
 	proto_tree_add_item(tree, hf_framed_ipv6_prefix_bytes, tvb, 2, prefix_len_bytes, ENC_NA);
 
 	/* If we have a fully IPv6 address, display it as such */
-	if (prefix_len_bytes == 16) {
+	if (prefix_len_bytes == 16){
 		proto_tree_add_item(tree, hf_framed_ipv6_prefix_ipv6, tvb, 2, prefix_len_bytes, ENC_NA);
-	} else {
+	}else{
 		struct e_in6_addr value;
-		address addr;
 
 		memset(&value.bytes, 0, sizeof(value));
 		tvb_memcpy(tvb, (guint8 *)&value.bytes, 2, prefix_len_bytes);
 		value.bytes[prefix_len_bytes] = value.bytes[prefix_len_bytes] & (0xff<<(prefix_len % 8));
 		proto_tree_add_ipv6(tree, hf_framed_ipv6_prefix_ipv6, tvb, 2, prefix_len_bytes, value.bytes);
-		SET_ADDRESS(&addr, AT_IPv6, 16, value.bytes);
-		diam_sub_dis->avp_str = wmem_strdup_printf(wmem_packet_scope(), "%s/%u", address_to_str(wmem_packet_scope(), &addr), prefix_len);
+		diam_sub_dis->avp_str = wmem_strdup_printf(wmem_packet_scope(), "%s/%u", ip6_to_str((const struct e_in6_addr *)&value),prefix_len);
 	}
 
 	return(prefix_len_bytes+2);
-}
-
-/* AVP Code: 1 User-Name */
-/* Do special decoding of the User-Name depending on the interface */
-static int
-dissect_diameter_user_name(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
-{
-	diam_sub_dis_t *diam_sub_dis = (diam_sub_dis_t*)data;
-	guint32 application_id = 0, str_len;
-
-	if (diam_sub_dis) {
-		application_id = diam_sub_dis->application_id;
-	}
-
-	switch (application_id) {
-	case DIAM_APPID_3GPP_S6A_S6D:
-	case DIAM_APPID_3GPP_SLH:
-	case DIAM_APPID_3GPP_S7A:
-		str_len = tvb_reported_length(tvb);
-		dissect_e212_utf8_imsi(tvb, pinfo, tree, 0, str_len);
-		return str_len;
-	}
-
-	return 0;
-}
-
-/* AVP Code: 443 Subscription-Id */
-static int
-dissect_diameter_subscription_id(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_)
-{
-	/* Just reset our global subscription-id-type variable */
-	subscription_id_type = SUBSCRIPTION_ID_TYPE_UNKNOWN;
-
-	return 0;
-}
-
-/* AVP Code: 450 Subscription-Id-Type */
-static int
-dissect_diameter_subscription_id_type(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_)
-{
-	/* Store the Type for use when we dissect Subscription-Id-Data */
-	subscription_id_type = tvb_get_ntohl(tvb, 0);
-
-	return 0;
-}
-
-/* AVP Code: 444 Subscription-Id-Data */
-static int
-dissect_diameter_subscription_id_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
-{
-	guint32 str_len;
-
-	switch (subscription_id_type) {
-	case SUBSCRIPTION_ID_TYPE_IMSI:
-		str_len = tvb_reported_length(tvb);
-		dissect_e212_utf8_imsi(tvb, pinfo, tree, 0, str_len);
-		return str_len;
-	case SUBSCRIPTION_ID_TYPE_E164:
-		str_len = tvb_reported_length(tvb);
-		dissect_e164_msisdn(tvb, tree, 0, str_len, E164_ENC_UTF8);
-		return str_len;
-		break;
-	}
-
-	return 0;
 }
 
 /* Call subdissectors for AVPs.
@@ -544,7 +475,7 @@ call_avp_subdissector(guint32 vendorid, guint32 code, tvbuff_t *subtvb, packet_i
 		}
 
 		/* Debug
-		proto_tree_add_subtree(avp_tree, subtvb, 0, -1, "AVP %u data, Vendor Id %u ",code,vendorid);
+		proto_tree_add_text(avp_tree, subtvb, 0, -1, "AVP %u data, Vendor Id %u ",code,vendorid);
 		*/
 	}
 	CATCH_NONFATAL_ERRORS {
@@ -686,7 +617,7 @@ dissect_diameter_avp(diam_ctx_t *c, tvbuff_t *tvb, int offset, diam_sub_dis_t *d
 		diam_sub_dis_inf->vendor_id = tvb_get_ntohl(tvb,offset);
 	}
 
-	subtvb = tvb_new_subset_length(tvb,offset,len-(8+(vendor_flag?4:0)));
+	subtvb = tvb_new_subset(tvb,offset,len-(8+(vendor_flag?4:0)),len-(8+(vendor_flag?4:0)));
 	offset += len-(8+(vendor_flag?4:0));
 
 	save_tree = c->tree;
@@ -745,11 +676,10 @@ address_rfc_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *dia
 {
 	char *label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
 	address_avp_t *t = (address_avp_t *)a->type_data;
-	gint len = tvb_reported_length(tvb);
-	proto_item *pi = proto_tree_add_item(c->tree, a->hf_value, tvb, 0, len, ENC_BIG_ENDIAN);
+	proto_item *pi = proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_length(tvb),ENC_BIG_ENDIAN);
 	proto_tree *pt = proto_item_add_subtree(pi,t->ett);
 	guint32 addr_type = tvb_get_ntohs(tvb,0);
-	len = len-2;
+	gint len = tvb_length_remaining(tvb,2);
 
 	proto_tree_add_item(pt,t->hf_address_type,tvb,0,2,ENC_NA);
 	switch (addr_type ) {
@@ -803,7 +733,7 @@ proto_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam_sub_
 static const char *
 time_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam_sub_dis_inf _U_)
 {
-	int len = tvb_reported_length(tvb);
+	int len = tvb_length(tvb);
 	char *label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
 	proto_item *pi;
 
@@ -824,9 +754,9 @@ address_v16_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *dia
 {
 	char *label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
 	address_avp_t *t = (address_avp_t *)a->type_data;
-	proto_item *pi = proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_reported_length(tvb),ENC_BIG_ENDIAN);
+	proto_item *pi = proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_length(tvb),ENC_BIG_ENDIAN);
 	proto_tree *pt = proto_item_add_subtree(pi,t->ett);
-	guint32 len = tvb_reported_length(tvb);
+	guint32 len = tvb_length(tvb);
 
 	switch (len) {
 		case 4:
@@ -852,7 +782,7 @@ static const char *
 simple_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam_sub_dis_inf _U_)
 {
 	char *label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
-	proto_item *pi = proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_reported_length(tvb),ENC_BIG_ENDIAN);
+	proto_item *pi = proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_length(tvb),ENC_BIG_ENDIAN);
 	proto_item_fill_label(PITEM_FINFO(pi), label);
 	label = strstr(label,": ")+2;
 	return label;
@@ -862,7 +792,7 @@ static const char *
 utf8_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam_sub_dis_inf _U_)
 {
 	char *label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
-	proto_item *pi = proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_reported_length(tvb),ENC_UTF_8|ENC_BIG_ENDIAN);
+	proto_item *pi = proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_length(tvb),ENC_UTF_8|ENC_BIG_ENDIAN);
 	proto_item_fill_label(PITEM_FINFO(pi), label);
 	label = strstr(label,": ")+2;
 	return label;
@@ -875,9 +805,9 @@ integer32_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam_
 	proto_item *pi;
 
 	/* Verify length before adding */
-	gint length = tvb_reported_length(tvb);
+	gint length = tvb_length_remaining(tvb,0);
 	if (length == 4) {
-		pi= proto_tree_add_item(c->tree, a->hf_value, tvb, 0, length, ENC_BIG_ENDIAN);
+		pi= proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_length_remaining(tvb,0),ENC_BIG_ENDIAN);
 		label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
 		proto_item_fill_label(PITEM_FINFO(pi), label);
 		label = strstr(label,": ")+2;
@@ -901,9 +831,9 @@ integer64_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam_
 	proto_item *pi;
 
 	/* Verify length before adding */
-	gint length = tvb_reported_length(tvb);
+	gint length = tvb_length_remaining(tvb,0);
 	if (length == 8) {
-		pi= proto_tree_add_item(c->tree, a->hf_value, tvb, 0, length, ENC_BIG_ENDIAN);
+		pi= proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_length_remaining(tvb,0),ENC_BIG_ENDIAN);
 		label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
 		proto_item_fill_label(PITEM_FINFO(pi), label);
 		label = strstr(label,": ")+2;
@@ -927,9 +857,9 @@ unsigned32_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam
 	proto_item *pi;
 
 	/* Verify length before adding */
-	gint length = tvb_reported_length(tvb);
+	gint length = tvb_length_remaining(tvb,0);
 	if (length == 4) {
-		pi= proto_tree_add_item(c->tree, a->hf_value, tvb, 0, length, ENC_BIG_ENDIAN);
+		pi= proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_length_remaining(tvb,0),ENC_BIG_ENDIAN);
 		label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
 		proto_item_fill_label(PITEM_FINFO(pi), label);
 		label = strstr(label,": ")+2;
@@ -953,9 +883,9 @@ unsigned64_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam
 	proto_item *pi;
 
 	/* Verify length before adding */
-	gint length = tvb_reported_length(tvb);
+	gint length = tvb_length_remaining(tvb,0);
 	if (length == 8) {
-		pi= proto_tree_add_item(c->tree, a->hf_value, tvb, 0, length, ENC_BIG_ENDIAN);
+		pi= proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_length_remaining(tvb,0),ENC_BIG_ENDIAN);
 		label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
 		proto_item_fill_label(PITEM_FINFO(pi), label);
 		label = strstr(label,": ")+2;
@@ -979,9 +909,9 @@ float32_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam_su
 	proto_item *pi;
 
 	/* Verify length before adding */
-	gint length = tvb_reported_length(tvb);
+	gint length = tvb_length_remaining(tvb,0);
 	if (length == 4) {
-		pi= proto_tree_add_item(c->tree,a->hf_value, tvb, 0, length, ENC_BIG_ENDIAN);
+		pi= proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_length_remaining(tvb,0),ENC_BIG_ENDIAN);
 		label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
 		proto_item_fill_label(PITEM_FINFO(pi), label);
 		label = strstr(label,": ")+2;
@@ -1005,9 +935,9 @@ float64_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam_su
 	proto_item *pi;
 
 	/* Verify length before adding */
-	gint length = tvb_reported_length(tvb);
+	gint length = tvb_length_remaining(tvb,0);
 	if (length == 8) {
-		pi= proto_tree_add_item(c->tree, a->hf_value, tvb, 0, length, ENC_BIG_ENDIAN);
+		pi= proto_tree_add_item(c->tree,a->hf_value,tvb,0,tvb_length_remaining(tvb,0),ENC_BIG_ENDIAN);
 		label = (char *)wmem_alloc(wmem_packet_scope(), ITEM_LABEL_LENGTH+1);
 		proto_item_fill_label(PITEM_FINFO(pi), label);
 		label = strstr(label,": ")+2;
@@ -1028,7 +958,7 @@ static const char *
 grouped_avp(diam_ctx_t *c, diam_avp_t *a, tvbuff_t *tvb, diam_sub_dis_t *diam_sub_dis_inf)
 {
 	int offset = 0;
-	int len = tvb_reported_length(tvb);
+	int len = tvb_length(tvb);
 	proto_item *pi = proto_tree_add_item(c->tree, a->hf_value, tvb , 0 , -1, ENC_BIG_ENDIAN);
 	proto_tree *pt = c->tree;
 
@@ -1298,12 +1228,11 @@ dissect_diameter_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 		export_diameter_pdu(pinfo,tvb);
 	}
 
-	return tvb_reported_length(tvb);
+	return tvb_length(tvb);
 }
 
 static guint
-get_diameter_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                     int offset, void *data _U_)
+get_diameter_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
 	/* Get the length of the Diameter packet. */
 	return tvb_get_ntoh24(tvb, offset + 1);
@@ -1316,7 +1245,7 @@ check_diameter(tvbuff_t *tvb)
 	guint8 flags;
 
 	/* Ensure we don't throw an exception trying to do these heuristics */
-	if (tvb_captured_length(tvb) < 5)
+	if (tvb_length(tvb) < 5)
 		return FALSE;
 
 	/* Check if the Diameter version is 1 */
@@ -1386,7 +1315,7 @@ dissect_diameter_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
 				 get_diameter_pdu_len, dissect_diameter_common, data);
 	}
 
-	return tvb_reported_length(tvb);
+	return tvb_length(tvb);
 }
 
 
@@ -1411,7 +1340,7 @@ alnumerize(char *name)
 
 static guint
 reginfo(int *hf_ptr, const char *name, const char *abbr, const char *desc,
-	enum ftenum ft, field_display_e base, value_string_ext *vs_ext,
+	enum ftenum ft, field_display_e base, const value_string_ext *vs_ext,
 	guint32 mask)
 {
 	hf_register_info hf;
@@ -1437,7 +1366,7 @@ reginfo(int *hf_ptr, const char *name, const char *abbr, const char *desc,
 
 static void
 basic_avp_reginfo(diam_avp_t *a, const char *name, enum ftenum ft,
-		  field_display_e base, value_string_ext *vs_ext)
+		  field_display_e base, const value_string_ext *vs_ext)
 {
 	hf_register_info hf;
 	gint *ettp = &(a->ett);
@@ -1568,7 +1497,7 @@ build_simple_avp(const avp_type_t *type, guint32 code, diam_vnd_t *vendor,
 		 const char *name, const value_string *vs, void *data _U_)
 {
 	diam_avp_t *a;
-	value_string_ext *vs_ext = NULL;
+	const value_string_ext *vs_ext = NULL;
 	field_display_e base;
 	guint i = 0;
 
@@ -1588,7 +1517,7 @@ build_simple_avp(const avp_type_t *type, guint32 code, diam_vnd_t *vendor,
 			break;
 
 		default:
-			report_failure("Diameter Dictionary: AVP '%s' has a list of values but isn't of a 32-bit or shorter integral type\n",
+			fprintf(stderr,"Diameter Dictionary: AVP '%s' has a list of values but isn't of a 32-bit or shorter integral type\n",
 				name);
 			return NULL;
 		}
@@ -1742,7 +1671,7 @@ dictionary_load(void)
 		/* try to get the parent type */
 
 		if (t->name == NULL) {
-			report_failure("Diameter Dictionary: Invalid Type (empty name): parent==%s\n",
+			fprintf(stderr,"Diameter Dictionary: Invalid Type (empty name): parent==%s\n",
 				t->parent ? t->parent : "(null)");
 			continue;
 		}
@@ -1763,31 +1692,18 @@ dictionary_load(void)
 
 	/* populate the applications */
 	if ((p = d->applications)) {
-		wmem_array_t *arr = wmem_array_new(wmem_epan_scope(), sizeof(value_string));
-		value_string term[1];
-
-		term[0].value =  0;
-		term[0].strptr = NULL;
+		GArray *arr = g_array_new(TRUE,TRUE,sizeof(value_string));
 
 		for (; p; p = p->next) {
 			value_string item[1];
 
 			item[0].value = p->code;
 			item[0].strptr = p->name;
-			if (!p->name) {
-				report_failure("Diameter Dictionary: Invalid Application (empty name): id=%d\n", p->code);
-				continue;
-			}
-
-			wmem_array_append_one(arr,item);
+			g_array_append_val(arr,item);
 		}
 
-		wmem_array_sort(arr, compare_avps);
-		wmem_array_append_one(arr,term);
-
-		/* TODO: Remove duplicates */
-
-		dictionary.applications = (value_string *)wmem_array_get_raw(arr);
+		dictionary.applications = (value_string *)arr->data;
+		g_array_free(arr,FALSE);
 	}
 
 	if ((v = d->vendors)) {
@@ -1798,7 +1714,7 @@ dictionary_load(void)
 			item[0].strptr = v->name;
 
 			if (v->name == NULL) {
-				report_failure("Diameter Dictionary: Invalid Vendor (empty name): code==%d\n", v->code);
+				fprintf(stderr,"Diameter Dictionary: Invalid Vendor (empty name): code==%d\n",v->code);
 				continue;
 			}
 
@@ -1823,7 +1739,7 @@ dictionary_load(void)
 	if ((c = d->cmds)) {
 		for (; c; c = c->next) {
 			if (c->vendor == NULL) {
-				report_failure("Diameter Dictionary: Invalid Vendor (empty name) for command %s\n",
+				fprintf(stderr,"Diameter Dictionary: Invalid Vendor (empty name) for command %s\n",
 					c->name ? c->name : "(null)");
 				continue;
 			}
@@ -1838,7 +1754,7 @@ dictionary_load(void)
 				/* Also add to all_cmds as used by RFC version */
 				g_array_append_val(all_cmds,item);
 			} else {
-				report_failure("Diameter Dictionary: No Vendor: %s\n",c->vendor);
+				fprintf(stderr,"Diameter Dictionary: No Vendor: %s\n",c->vendor);
 			}
 		}
 	}
@@ -1852,7 +1768,7 @@ dictionary_load(void)
 		void *avp_data = NULL;
 
 		if (a->name == NULL) {
-			report_failure("Diameter Dictionary: Invalid AVP (empty name)\n");
+			fprintf(stderr,"Diameter Dictionary: Invalid AVP (empty name)\n");
 			continue;
 		}
 
@@ -1865,7 +1781,7 @@ dictionary_load(void)
 
 			g_array_append_val(vnd->vs_avps,vndvs);
 		} else {
-			report_failure("Diameter Dictionary: No Vendor: %s\n",vend);
+			fprintf(stderr,"Diameter Dictionary: No Vendor: %s\n",vend);
 			vnd = &unknown_vendor;
 		}
 
@@ -2193,32 +2109,22 @@ proto_reg_handoff_diameter(void)
 		dissector_add_uint("sctp.ppi", DIAMETER_PROTOCOL_ID, diameter_sctp_handle);
 
 		/* Register special decoding for some AVPs */
-
-		/* AVP Code: 1 User-Name */
-		dissector_add_uint("diameter.base", 1, new_create_dissector_handle(dissect_diameter_user_name, proto_diameter));
-
 		/* AVP Code: 97 Framed-IPv6-Address */
-		dissector_add_uint("diameter.base", 97, new_create_dissector_handle(dissect_diameter_base_framed_ipv6_prefix, proto_diameter));
-
+		dissector_add_uint("diameter.base", 97,
+			new_create_dissector_handle(dissect_diameter_base_framed_ipv6_prefix, proto_diameter));
 		/* AVP Code: 266 Vendor-Id */
-		dissector_add_uint("diameter.base", 266, new_create_dissector_handle(dissect_diameter_vendor_id, proto_diameter));
-
-		/* AVP Code: 443 Subscription-Id */
-		dissector_add_uint("diameter.base", 443, new_create_dissector_handle(dissect_diameter_subscription_id, proto_diameter));
-
-		/* AVP Code: 450 Subscription-Id-Type */
-		dissector_add_uint("diameter.base", 450, new_create_dissector_handle(dissect_diameter_subscription_id_type, proto_diameter));
-
-		/* AVP Code: 444 Subscription-Id-Data */
-		dissector_add_uint("diameter.base", 444, new_create_dissector_handle(dissect_diameter_subscription_id_data, proto_diameter));
-
+		dissector_add_uint("diameter.base", 266,
+			new_create_dissector_handle(dissect_diameter_vendor_id, proto_diameter));
 		/* AVP Code: 462 EAP-Payload */
-		dissector_add_uint("diameter.base", 462, new_create_dissector_handle(dissect_diameter_eap_payload, proto_diameter));
+		dissector_add_uint("diameter.base", 462,
+			new_create_dissector_handle(dissect_diameter_eap_payload, proto_diameter));
 		/* AVP Code: 463 EAP-Reissued-Payload */
-		dissector_add_uint("diameter.base", 463, new_create_dissector_handle(dissect_diameter_eap_payload, proto_diameter));
+		dissector_add_uint("diameter.base", 463,
+			new_create_dissector_handle(dissect_diameter_eap_payload, proto_diameter));
 
-		/* Register dissector for Experimental result code, with 3GPP2's vendor Id */
-		dissector_add_uint("diameter.vnd_exp_res", VENDOR_THE3GPP2, new_create_dissector_handle(dissect_diameter_3gpp2_exp_res, proto_diameter));
+		/* Register dissector for Experimental result code, with 3GPP2:s vendor Id */
+		dissector_add_uint("diameter.vnd_exp_res", VENDOR_THE3GPP2,
+			new_create_dissector_handle(dissect_diameter_3gpp2_exp_res, proto_diameter));
 
 		Initialized=TRUE;
 	} else {

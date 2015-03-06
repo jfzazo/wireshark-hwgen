@@ -23,10 +23,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 
-#include "packet-tcp.h"
+#include <packet-tcp.h>
 
 void proto_register_lsc(void);
 void proto_reg_handoff_lsc(void);
@@ -281,7 +283,7 @@ dissect_lsc_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 
 /* Determine length of LSC message */
 static guint
-get_lsc_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_lsc_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   guint8 op_code;
   guint pdu_len;
@@ -419,9 +421,9 @@ proto_register_lsc(void)
 
   /* Register preferences */
   prefs_register_uint_preference(lsc_module, "port",
-                                 "LSC Port",
-                                 "Set the TCP or UDP port for Pegasus LSC messages",
-                                 10, &global_lsc_port);
+		            "LSC Port",
+		            "Set the TCP or UDP port for Pegasus LSC messages",
+		            10, &global_lsc_port);
 }
 
 void
@@ -435,8 +437,8 @@ proto_reg_handoff_lsc(void)
   if (!initialized) {
     lsc_udp_handle = new_create_dissector_handle(dissect_lsc_udp, proto_lsc);
     lsc_tcp_handle = new_create_dissector_handle(dissect_lsc_tcp, proto_lsc);
-    dissector_add_for_decode_as("udp.port", lsc_udp_handle);
-    dissector_add_for_decode_as("tcp.port", lsc_tcp_handle);
+    dissector_add_handle("udp.port", lsc_udp_handle);   /* for 'decode-as' */
+    dissector_add_handle("tcp.port", lsc_tcp_handle);   /* ...             */
     initialized = TRUE;
   } else {
     if (saved_lsc_port != 0) {
@@ -452,16 +454,3 @@ proto_reg_handoff_lsc(void)
   }
   saved_lsc_port = global_lsc_port;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

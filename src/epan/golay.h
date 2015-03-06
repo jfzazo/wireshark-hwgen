@@ -1,4 +1,5 @@
-/*
+/* $Id$
+ *
  * Provides routines for encoding and decoding the extended Golay
  * (24,12,8) code.
  *
@@ -51,16 +52,3 @@ WS_DLL_PUBLIC
 gint golay_decode(guint32 w);
 
 #endif
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

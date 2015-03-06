@@ -24,9 +24,11 @@
 
 #include "config.h"
 #include "wtap-int.h"
+#include <wsutil/buffer.h>
 #include "netscreen.h"
 #include "file_wrappers.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -163,27 +165,27 @@ static gboolean netscreen_check_file_type(wtap *wth, int *err, gchar **err_info)
 }
 
 
-wtap_open_return_val netscreen_open(wtap *wth, int *err, gchar **err_info)
+int netscreen_open(wtap *wth, int *err, gchar **err_info)
 {
 
 	/* Look for a NetScreen snoop header line */
 	if (!netscreen_check_file_type(wth, err, err_info)) {
 		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+			return -1;
+		return 0;
 	}
 
 	if (file_seek(wth->fh, 0L, SEEK_SET, err) == -1)	/* rewind */
-		return WTAP_OPEN_ERROR;
+		return -1;
 
 	wth->file_encap = WTAP_ENCAP_UNKNOWN;
 	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_NETSCREEN;
 	wth->snapshot_length = 0; /* not known */
 	wth->subtype_read = netscreen_read;
 	wth->subtype_seek_read = netscreen_seek_read;
-	wth->file_tsprec = WTAP_TSPREC_DSEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_DSEC;
 
-	return WTAP_OPEN_MINE;
+	return 1;
 }
 
 /* Find the next packet and parse it; called from wtap_read(). */
@@ -327,8 +329,8 @@ parse_netscreen_hex_dump(FILE_T fh, int pkt_len, const char *cap_int,
 	gchar	dststr[13];
 
 	/* Make sure we have enough room for the packet */
-	ws_buffer_assure_space(buf, NETSCREEN_MAX_PACKET_LEN);
-	pd = ws_buffer_start_ptr(buf);
+	buffer_assure_space(buf, NETSCREEN_MAX_PACKET_LEN);
+	pd = buffer_start_ptr(buf);
 
 	while(1) {
 
@@ -387,8 +389,8 @@ parse_netscreen_hex_dump(FILE_T fh, int pkt_len, const char *cap_int,
 		 */
 		if(offset > pkt_len) {
 			*err = WTAP_ERR_BAD_FILE;
-			*err_info = g_strdup("netscreen: too much hex-data");
-			return FALSE;
+                        *err_info = g_strdup("netscreen: too much hex-data");
+                        return FALSE;
 		}
 	}
 
@@ -396,23 +398,23 @@ parse_netscreen_hex_dump(FILE_T fh, int pkt_len, const char *cap_int,
 	 * Determine the encapsulation type, based on the
 	 * first 4 characters of the interface name
 	 *
-	 * XXX	convert this to a 'case' structure when adding more
-	 *	(non-ethernet) interfacetypes
+	 * XXX  convert this to a 'case' structure when adding more
+	 *      (non-ethernet) interfacetypes
 	 */
 	if (strncmp(cap_int, "adsl", 4) == 0) {
-		/* The ADSL interface can be bridged with or without
-		 * PPP encapsulation. Check whether the first six bytes
-		 * of the hex data are the same as the destination mac
-		 * address in the header. If they are, assume ethernet
-		 * LinkLayer or else PPP
-		 */
-		g_snprintf(dststr, 13, "%02x%02x%02x%02x%02x%02x",
-		   pd[0], pd[1], pd[2], pd[3], pd[4], pd[5]);
-		if (strncmp(dststr, cap_dst, 12) == 0)
-			phdr->pkt_encap = WTAP_ENCAP_ETHERNET;
-		else
-			phdr->pkt_encap = WTAP_ENCAP_PPP;
-		}
+                /* The ADSL interface can be bridged with or without
+                 * PPP encapsulation. Check whether the first six bytes
+                 * of the hex data are the same as the destination mac
+                 * address in the header. If they are, assume ethernet
+                 * LinkLayer or else PPP
+                 */
+                g_snprintf(dststr, 13, "%02x%02x%02x%02x%02x%02x",
+                   pd[0], pd[1], pd[2], pd[3], pd[4], pd[5]);
+                if (strncmp(dststr, cap_dst, 12) == 0)
+		        phdr->pkt_encap = WTAP_ENCAP_ETHERNET;
+                else
+		        phdr->pkt_encap = WTAP_ENCAP_PPP;
+                }
 	else if (strncmp(cap_int, "seri", 4) == 0)
 		phdr->pkt_encap = WTAP_ENCAP_PPP;
 	else
@@ -474,16 +476,3 @@ parse_single_hex_dump_line(char* rec, guint8 *buf, guint byte_offset)
 
 	return num_items_scanned;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

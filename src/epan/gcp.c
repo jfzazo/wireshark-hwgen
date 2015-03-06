@@ -29,6 +29,8 @@
 
 #include "config.h"
 
+#include <epan/emem.h>
+
 #include "gcp.h"
 
 static wmem_tree_t* msgs = NULL;
@@ -37,35 +39,35 @@ static wmem_tree_t* ctxs_by_trx = NULL;
 static wmem_tree_t* ctxs = NULL;
 
 const value_string gcp_cmd_type[] = {
-    { GCP_CMD_NONE,               "NoCommand"},
-    { GCP_CMD_ADD_REQ,            "addReq"},
-    { GCP_CMD_MOVE_REQ,           "moveReq"},
-    { GCP_CMD_MOD_REQ,            "modReq"},
-    { GCP_CMD_SUB_REQ,            "subtractReq"},
-    { GCP_CMD_AUDITCAP_REQ,       "auditCapRequest"},
-    { GCP_CMD_AUDITVAL_REQ,       "auditValueRequest"},
-    { GCP_CMD_NOTIFY_REQ,         "notifyReq"},
-    { GCP_CMD_SVCCHG_REQ,         "serviceChangeReq"},
-    { GCP_CMD_TOPOLOGY_REQ,       "topologyReq"},
+    { GCP_CMD_NONE, "NoCommand"},
+    { GCP_CMD_ADD_REQ, "addReq"},
+    { GCP_CMD_MOVE_REQ, "moveReq"},
+    { GCP_CMD_MOD_REQ, "modReq"},
+    { GCP_CMD_SUB_REQ, "subtractReq"},
+    { GCP_CMD_AUDITCAP_REQ, "auditCapRequest"},
+    { GCP_CMD_AUDITVAL_REQ, "auditValueRequest"},
+    { GCP_CMD_NOTIFY_REQ, "notifyReq"},
+    { GCP_CMD_SVCCHG_REQ, "serviceChangeReq"},
+    { GCP_CMD_TOPOLOGY_REQ, "topologyReq"},
     { GCP_CMD_CTX_ATTR_AUDIT_REQ, "ctxAttrAuditReq"},
-    { GCP_CMD_ADD_REPLY,          "addReply"},
-    { GCP_CMD_MOVE_REPLY,         "moveReply"},
-    { GCP_CMD_MOD_REPLY,          "modReply"},
-    { GCP_CMD_SUB_REPLY,          "subtractReply"},
-    { GCP_CMD_AUDITCAP_REPLY,     "auditCapReply"},
-    { GCP_CMD_AUDITVAL_REPLY,     "auditValReply"},
-    { GCP_CMD_NOTIFY_REPLY,       "notifyReply"},
-    { GCP_CMD_SVCCHG_REPLY,       "serviceChangeReply"},
-    { GCP_CMD_TOPOLOGY_REPLY,     "topologyReply"},
+    { GCP_CMD_ADD_REPLY, "addReply"},
+    { GCP_CMD_MOVE_REPLY, "moveReply"},
+    { GCP_CMD_MOD_REPLY, "modReply"},
+    { GCP_CMD_SUB_REPLY, "subtractReply"},
+    { GCP_CMD_AUDITCAP_REPLY, "auditCapReply"},
+    { GCP_CMD_AUDITVAL_REPLY, "auditValReply"},
+    { GCP_CMD_NOTIFY_REPLY, "notifyReply"},
+    { GCP_CMD_SVCCHG_REPLY, "serviceChangeReply"},
+    { GCP_CMD_TOPOLOGY_REPLY, "topologyReply"},
     { 0, NULL }
 };
 
 const value_string gcp_term_types[] = {
-    { GCP_TERM_TYPE_AAL1,        "aal1" },
-    { GCP_TERM_TYPE_AAL2,        "aal2" },
+    { GCP_TERM_TYPE_AAL1, "aal1" },
+    { GCP_TERM_TYPE_AAL2, "aal2" },
     { GCP_TERM_TYPE_AAL1_STRUCT, "aal1struct" },
-    { GCP_TERM_TYPE_IP_RTP,      "ipRtp" },
-    { GCP_TERM_TYPE_TDM,         "tdm" },
+    { GCP_TERM_TYPE_IP_RTP, "ipRtp" },
+    { GCP_TERM_TYPE_TDM, "tdm" },
     { 0, NULL }
 };
 
@@ -93,24 +95,24 @@ gcp_msg_t* gcp_msg(packet_info* pinfo, int o, gboolean keep_persistent_data) {
     address* hi_addr;
 
     if (keep_persistent_data) {
-        wmem_tree_key_t key[3];
+		wmem_tree_key_t key[3];
 
-        key[0].length = 1;
-        key[0].key = &(framenum);
-        key[1].length = 1;
-        key[1].key = &offset;
-        key[2].length = 0;
-        key[2].key =NULL;
+		key[0].length = 1;
+		key[0].key = &(framenum);
+		key[1].length = 1;
+		key[1].key = &offset;
+		key[2].length = 0;
+		key[2].key =NULL;
 
         if (( m = (gcp_msg_t *)wmem_tree_lookup32_array(msgs,key) )) {
-            m->committed = TRUE;
+            m->commited = TRUE;
             return m;
         } else {
             m = wmem_new(wmem_file_scope(), gcp_msg_t);
             m->framenum = framenum;
             m->time = pinfo->fd->abs_ts;
             m->trxs = NULL;
-            m->committed = FALSE;
+            m->commited = FALSE;
 
             wmem_tree_insert32_array(msgs,key,m);
         }
@@ -118,7 +120,7 @@ gcp_msg_t* gcp_msg(packet_info* pinfo, int o, gboolean keep_persistent_data) {
         m = wmem_new0(wmem_packet_scope(), gcp_msg_t);
         m->framenum = framenum;
         m->trxs = NULL;
-        m->committed = FALSE;
+        m->commited = FALSE;
     }
 
     if (CMP_ADDRESS(src, dst) < 0)  {
@@ -144,8 +146,8 @@ gcp_msg_t* gcp_msg(packet_info* pinfo, int o, gboolean keep_persistent_data) {
             break;
         default:
             /* XXX: heuristic and error prone */
-            m->hi_addr = g_str_hash(address_to_str(wmem_packet_scope(), hi_addr));
-            m->lo_addr = g_str_hash(address_to_str(wmem_packet_scope(), lo_addr));
+            m->hi_addr = g_str_hash(ep_address_to_str(hi_addr));
+            m->lo_addr = g_str_hash(ep_address_to_str(lo_addr));
         break;
     }
 
@@ -159,7 +161,7 @@ gcp_trx_t* gcp_trx(gcp_msg_t* m ,guint32 t_id , gcp_trx_type_t type, gboolean ke
     if ( !m ) return NULL;
 
     if (keep_persistent_data) {
-        if (m->committed) {
+        if (m->commited) {
 
             for ( trxmsg = m->trxs; trxmsg; trxmsg = trxmsg->next) {
                 if (trxmsg->trx && trxmsg->trx->id == t_id) {
@@ -260,7 +262,7 @@ gcp_ctx_t* gcp_ctx(gcp_msg_t* m, gcp_trx_t* t, guint32 c_id, gboolean persistent
         trx_key[3].length = 0;
         trx_key[3].key = NULL;
 
-        if (m->committed) {
+        if (m->commited) {
             if (( context = (gcp_ctx_t *)wmem_tree_lookup32_array(ctxs_by_trx,trx_key) )) {
                 return context;
             } if ((context_p = (gcp_ctx_t **)wmem_tree_lookup32_array(ctxs,ctx_key))) {
@@ -349,7 +351,7 @@ gcp_cmd_t* gcp_cmd(gcp_msg_t* m, gcp_trx_t* t, gcp_ctx_t* c, gcp_cmd_type_t type
     if ( !m || !t || !c ) return NULL;
 
     if (persistent) {
-        if (m->committed) {
+        if (m->commited) {
             DISSECTOR_ASSERT(t->cmds != NULL);
 
             for (cmdctx = t->cmds; cmdctx; cmdctx = cmdctx->next) {
@@ -421,7 +423,7 @@ gcp_term_t* gcp_cmd_add_term(gcp_msg_t* m, gcp_trx_t* tr, gcp_cmd_t* c, gcp_term
     }
 
     if (persistent) {
-        if ( c->msg->committed ) {
+        if ( c->msg->commited ) {
             if (wildcard == GCP_WILDCARD_ALL) {
                 for (ct = c->ctx->terms.next; ct; ct = ct->next) {
                     /* XXX not handling more wilcards in one msg */
@@ -716,7 +718,8 @@ void gcp_analyze_msg(proto_tree* gcp_tree, packet_info* pinfo, tvbuff_t* gcp_tvb
         PROTO_ITEM_SET_GENERATED(ctx_item);
 
         if (ctx->cmds) {
-            proto_tree* history_tree = proto_tree_add_subtree(ctx_tree,gcp_tvb,0,0,ids->ett.ctx_cmds,NULL,"[ Command History ]");
+            proto_item* history_item = proto_tree_add_text(ctx_tree,gcp_tvb,0,0,"[ Command History ]");
+            proto_tree* history_tree = proto_item_add_subtree(history_item,ids->ett.ctx_cmds);
 
             for (c = ctx->cmds; c; c = c->next) {
                 proto_item* cmd_item = proto_tree_add_uint(history_tree,ids->hf.ctx_cmd,gcp_tvb,0,0,c->cmd->msg->framenum);
@@ -729,7 +732,8 @@ void gcp_analyze_msg(proto_tree* gcp_tree, packet_info* pinfo, tvbuff_t* gcp_tvb
         }
 
         if (( ctx_term = ctx->terms.next )) {
-            proto_tree* terms_tree = proto_tree_add_subtree(ctx_tree,gcp_tvb,0,0,ids->ett.ctx_terms,NULL,"[ Terminations Used ]");
+            proto_item* terms_item = proto_tree_add_text(ctx_tree,gcp_tvb,0,0,"[ Terminations Used ]");
+            proto_tree* terms_tree = proto_item_add_subtree(terms_item,ids->ett.ctx_terms);
 
             for (; ctx_term; ctx_term = ctx_term->next ) {
                 if ( ctx_term->term && ctx_term->term->str) {
@@ -764,16 +768,3 @@ void gcp_analyze_msg(proto_tree* gcp_tree, packet_info* pinfo, tvbuff_t* gcp_tvb
         }
     }
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

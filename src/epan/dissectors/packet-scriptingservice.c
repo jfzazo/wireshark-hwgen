@@ -177,10 +177,15 @@ dissect_ssprotocol(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *tree, 
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "SSP");
 
-  /* create the ssprotocol protocol tree */
-  ssprotocol_item = proto_tree_add_item(tree, proto_ssprotocol, message_tvb, 0, -1, ENC_NA);
-  ssprotocol_tree = proto_item_add_subtree(ssprotocol_item, ett_ssprotocol);
-
+  /* In the interest of speed, if "tree" is NULL, don't do any work not
+     necessary to generate protocol tree items. */
+  if (tree) {
+    /* create the ssprotocol protocol tree */
+    ssprotocol_item = proto_tree_add_item(tree, proto_ssprotocol, message_tvb, 0, -1, ENC_NA);
+    ssprotocol_tree = proto_item_add_subtree(ssprotocol_item, ett_ssprotocol);
+  } else {
+    ssprotocol_tree = NULL;
+  };
   /* dissect the message */
   return dissect_ssprotocol_message(message_tvb, pinfo, ssprotocol_tree);
 }
@@ -227,16 +232,3 @@ proto_reg_handoff_ssprotocol(void)
   dissector_add_uint("sctp.ppi", SSPROTOCOL_PAYLOAD_PROTOCOL_ID_LEGACY, ssprotocol_handle);
   dissector_add_uint("sctp.ppi", SSP_PAYLOAD_PROTOCOL_ID, ssprotocol_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

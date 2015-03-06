@@ -31,8 +31,8 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/prefs.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
@@ -246,11 +246,6 @@ static gint ett_disp_T_signedShadowError = -1;
 
 /*--- End of included file: packet-disp-ett.c ---*/
 #line 70 "../../asn1/disp/packet-disp-template.c"
-
-static expert_field ei_disp_unsupported_opcode = EI_INIT;
-static expert_field ei_disp_unsupported_errcode = EI_INIT;
-static expert_field ei_disp_unsupported_pdu = EI_INIT;
-static expert_field ei_disp_zero_pdu = EI_INIT;
 
 
 /*--- Included file: packet-disp-fn.c ---*/
@@ -660,7 +655,7 @@ static const value_string disp_StandardUpdate_vals[] = {
 
 static int
 dissect_disp_StandardUpdate(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 63 "../../asn1/disp/disp.cnf"
+#line 64 "../../asn1/disp/disp.cnf"
   guint32 update;
 
     offset = dissect_ber_integer(implicit_tag, actx, tree, tvb, offset, hf_index,
@@ -850,7 +845,7 @@ static const ber_choice_t CoordinateShadowUpdateResult_choice[] = {
 
 static int
 dissect_disp_CoordinateShadowUpdateResult(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 73 "../../asn1/disp/disp.cnf"
+#line 74 "../../asn1/disp/disp.cnf"
   guint32 update;
 
     offset = dissect_ber_choice(actx, tree, tvb, offset,
@@ -875,7 +870,7 @@ static const value_string disp_T_standard_vals[] = {
 
 static int
 dissect_disp_T_standard(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 43 "../../asn1/disp/disp.cnf"
+#line 44 "../../asn1/disp/disp.cnf"
   guint32 update;
 
     offset = dissect_ber_integer(implicit_tag, actx, tree, tvb, offset, hf_index,
@@ -975,7 +970,7 @@ static const ber_choice_t RequestShadowUpdateResult_choice[] = {
 
 static int
 dissect_disp_RequestShadowUpdateResult(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 83 "../../asn1/disp/disp.cnf"
+#line 84 "../../asn1/disp/disp.cnf"
   guint32 update;
 
     offset = dissect_ber_choice(actx, tree, tvb, offset,
@@ -1277,7 +1272,7 @@ static const ber_choice_t RefreshInformation_choice[] = {
 
 static int
 dissect_disp_RefreshInformation(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 53 "../../asn1/disp/disp.cnf"
+#line 54 "../../asn1/disp/disp.cnf"
   guint32 update;
 
     offset = dissect_ber_choice(actx, tree, tvb, offset,
@@ -1357,7 +1352,7 @@ static const ber_choice_t UpdateShadowResult_choice[] = {
 
 static int
 dissect_disp_UpdateShadowResult(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 93 "../../asn1/disp/disp.cnf"
+#line 94 "../../asn1/disp/disp.cnf"
   guint32 update;
 
     offset = dissect_ber_choice(actx, tree, tvb, offset,
@@ -1391,7 +1386,7 @@ static const value_string disp_ShadowProblem_vals[] = {
 
 static int
 dissect_disp_ShadowProblem(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 103 "../../asn1/disp/disp.cnf"
+#line 104 "../../asn1/disp/disp.cnf"
   guint32 problem;
 
     offset = dissect_ber_integer(implicit_tag, actx, tree, tvb, offset, hf_index,
@@ -1458,31 +1453,25 @@ dissect_disp_ShadowError(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offse
 
 /*--- PDUs ---*/
 
-static int dissect_EstablishParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_EstablishParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_disp_EstablishParameter(FALSE, tvb, offset, &asn1_ctx, tree, hf_disp_EstablishParameter_PDU);
-  return offset;
+  dissect_disp_EstablishParameter(FALSE, tvb, 0, &asn1_ctx, tree, hf_disp_EstablishParameter_PDU);
 }
-static int dissect_ModificationParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ModificationParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_disp_ModificationParameter(FALSE, tvb, offset, &asn1_ctx, tree, hf_disp_ModificationParameter_PDU);
-  return offset;
+  dissect_disp_ModificationParameter(FALSE, tvb, 0, &asn1_ctx, tree, hf_disp_ModificationParameter_PDU);
 }
-static int dissect_ShadowingAgreementInfo_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ShadowingAgreementInfo_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_disp_ShadowingAgreementInfo(FALSE, tvb, offset, &asn1_ctx, tree, hf_disp_ShadowingAgreementInfo_PDU);
-  return offset;
+  dissect_disp_ShadowingAgreementInfo(FALSE, tvb, 0, &asn1_ctx, tree, hf_disp_ShadowingAgreementInfo_PDU);
 }
 
 
 /*--- End of included file: packet-disp-fn.c ---*/
-#line 77 "../../asn1/disp/packet-disp-template.c"
+#line 72 "../../asn1/disp/packet-disp-template.c"
 
 /*
 * Dissect DISP PDUs inside a ROS PDUs
@@ -1542,8 +1531,8 @@ dissect_disp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 	    disp_op_name = "Coordinate-Shadow-Update-Argument";
 	    break;
 	  default:
-	    proto_tree_add_expert_format(tree, pinfo, &ei_disp_unsupported_opcode, tvb, offset, -1,
-	        "Unsupported DISP opcode (%d)", session->ros_op & ROS_OP_OPCODE_MASK);
+	    proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DISP opcode (%d)",
+				session->ros_op & ROS_OP_OPCODE_MASK);
 	    break;
 	  }
 	  break;
@@ -1562,8 +1551,8 @@ dissect_disp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 	    disp_op_name = "Coordinate-Shadow-Update-Result";
 	    break;
 	  default:
-	    proto_tree_add_expert_format(tree, pinfo, &ei_disp_unsupported_opcode, tvb, offset, -1,
-	        "Unsupported DISP opcode (%d)", session->ros_op & ROS_OP_OPCODE_MASK);
+	    proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DISP opcode (%d)",
+				session->ros_op & ROS_OP_OPCODE_MASK);
 	    break;
 	  }
 	  break;
@@ -1574,14 +1563,14 @@ dissect_disp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 	    disp_op_name = "Shadow-Error";
 	    break;
 	  default:
-	    proto_tree_add_expert_format(tree, pinfo, &ei_disp_unsupported_errcode, tvb, offset, -1,
-	            "Unsupported DISP errcode (%d)", session->ros_op & ROS_OP_OPCODE_MASK);
+	    proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DISP errcode (%d)",
+				session->ros_op & ROS_OP_OPCODE_MASK);
 	    break;
 	  }
 	  break;
 	default:
-	  proto_tree_add_expert(tree, pinfo, &ei_disp_unsupported_pdu, tvb, offset, -1);
-	  return tvb_captured_length(tvb);
+	  proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DISP PDU");
+	  return tvb_length(tvb);
 	}
 
 	if(disp_dissector) {
@@ -1591,13 +1580,13 @@ dissect_disp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 	    old_offset=offset;
 	    offset=(*disp_dissector)(FALSE, tvb, offset, &asn1_ctx, tree, -1);
 	    if(offset == old_offset){
-	      proto_tree_add_expert(tree, pinfo, &ei_disp_zero_pdu, tvb, offset, -1);
+	      proto_tree_add_text(tree, tvb, offset, -1,"Internal error, zero-byte DISP PDU");
 	      break;
 	    }
 	  }
 	}
 
-	return tvb_captured_length(tvb);
+	return tvb_length(tvb);
 }
 
 
@@ -2040,7 +2029,7 @@ void proto_register_disp(void) {
         "ShadowErrorData", HFILL }},
 
 /*--- End of included file: packet-disp-hfarr.c ---*/
-#line 202 "../../asn1/disp/packet-disp-template.c"
+#line 197 "../../asn1/disp/packet-disp-template.c"
   };
 
   /* List of subtrees */
@@ -2105,18 +2094,9 @@ void proto_register_disp(void) {
     &ett_disp_T_signedShadowError,
 
 /*--- End of included file: packet-disp-ettarr.c ---*/
-#line 208 "../../asn1/disp/packet-disp-template.c"
+#line 203 "../../asn1/disp/packet-disp-template.c"
   };
-
-  static ei_register_info ei[] = {
-    { &ei_disp_unsupported_opcode, { "disp.unsupported_opcode", PI_UNDECODED, PI_WARN, "Unsupported DISP opcode", EXPFILL }},
-    { &ei_disp_unsupported_errcode, { "disp.unsupported_errcode", PI_UNDECODED, PI_WARN, "Unsupported DISP errcode", EXPFILL }},
-    { &ei_disp_unsupported_pdu, { "disp.unsupported_pdu", PI_UNDECODED, PI_WARN, "Unsupported DISP PDU", EXPFILL }},
-    { &ei_disp_zero_pdu, { "disp.zero_pdu", PI_PROTOCOL, PI_ERROR, "Internal error, zero-byte DISP PDU", EXPFILL }},
-  };
-
   module_t *disp_module;
-  expert_module_t* expert_disp;
 
   /* Register protocol */
   proto_disp = proto_register_protocol(PNAME, PSNAME, PFNAME);
@@ -2125,8 +2105,6 @@ void proto_register_disp(void) {
   /* Register fields and subtrees */
   proto_register_field_array(proto_disp, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
-  expert_disp = expert_register_protocol(proto_disp);
-  expert_register_field_array(expert_disp, ei, array_length(ei));
 
   /* Register our configuration options for DISP, particularly our port */
 
@@ -2147,15 +2125,15 @@ void proto_reg_handoff_disp(void) {
 
 /*--- Included file: packet-disp-dis-tab.c ---*/
 #line 1 "../../asn1/disp/packet-disp-dis-tab.c"
-  dissector_add_string("dop.oid", "agreement.2.5.19.1", new_create_dissector_handle(dissect_ShadowingAgreementInfo_PDU, proto_disp));
-  dissector_add_string("dop.oid", "establish.rolea.2.5.19.1", new_create_dissector_handle(dissect_EstablishParameter_PDU, proto_disp));
-  dissector_add_string("dop.oid", "establish.roleb.2.5.19.1", new_create_dissector_handle(dissect_EstablishParameter_PDU, proto_disp));
-  dissector_add_string("dop.oid", "modify.rolea.2.5.19.1", new_create_dissector_handle(dissect_ModificationParameter_PDU, proto_disp));
-  dissector_add_string("dop.oid", "modify.roleb.2.5.19.1", new_create_dissector_handle(dissect_ModificationParameter_PDU, proto_disp));
+  dissector_add_string("dop.oid", "agreement.2.5.19.1", create_dissector_handle(dissect_ShadowingAgreementInfo_PDU, proto_disp));
+  dissector_add_string("dop.oid", "establish.rolea.2.5.19.1", create_dissector_handle(dissect_EstablishParameter_PDU, proto_disp));
+  dissector_add_string("dop.oid", "establish.roleb.2.5.19.1", create_dissector_handle(dissect_EstablishParameter_PDU, proto_disp));
+  dissector_add_string("dop.oid", "modify.rolea.2.5.19.1", create_dissector_handle(dissect_ModificationParameter_PDU, proto_disp));
+  dissector_add_string("dop.oid", "modify.roleb.2.5.19.1", create_dissector_handle(dissect_ModificationParameter_PDU, proto_disp));
 
 
 /*--- End of included file: packet-disp-dis-tab.c ---*/
-#line 247 "../../asn1/disp/packet-disp-template.c"
+#line 231 "../../asn1/disp/packet-disp-template.c"
 
   /* APPLICATION CONTEXT */
 

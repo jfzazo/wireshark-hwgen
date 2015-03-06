@@ -21,8 +21,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef __SIMPLE_DIALOG_UI_H__
-#define __SIMPLE_DIALOG_UI_H__
+#ifndef __DIALOG_H__
+#define __DIALOG_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,13 +65,13 @@ typedef enum {
 #define ESD_BTN_QUIT_DONT_SAVE 0x80
 
 /** Standard button combination "Ok" + "Cancel". */
-#define ESD_BTNS_OK_CANCEL      (ESD_BTN_OK|ESD_BTN_CANCEL)
+#define ESD_BTNS_OK_CANCEL	(ESD_BTN_OK|ESD_BTN_CANCEL)
 /** Standard button combination "Yes" + "No". */
-#define ESD_BTNS_YES_NO         (ESD_BTN_YES|ESD_BTN_NO)
+#define ESD_BTNS_YES_NO		(ESD_BTN_YES|ESD_BTN_NO)
 /** Standard button combination "Yes" + "No" + "Cancel". */
-#define ESD_BTNS_YES_NO_CANCEL  (ESD_BTN_YES|ESD_BTN_NO|ESD_BTN_CANCEL)
+#define ESD_BTNS_YES_NO_CANCEL	(ESD_BTN_YES|ESD_BTN_NO|ESD_BTN_CANCEL)
 /** Standard button combination "No" + "Cancel" + "Save". */
-#define ESD_BTNS_SAVE_DONTSAVE  (ESD_BTN_SAVE|ESD_BTN_DONT_SAVE)
+#define ESD_BTNS_SAVE_DONTSAVE (ESD_BTN_SAVE|ESD_BTN_DONT_SAVE)
 #define ESD_BTNS_SAVE_DONTSAVE_CANCEL (ESD_BTN_DONT_SAVE|ESD_BTN_CANCEL|ESD_BTN_SAVE)
 /** Standard button combination "Quit without saving" + "Cancel" + "Save". */
 #define ESD_BTNS_SAVE_QUIT_DONTSAVE_CANCEL (ESD_BTN_QUIT_DONT_SAVE|ESD_BTN_CANCEL|ESD_BTN_SAVE)
@@ -89,6 +89,48 @@ typedef enum {
 extern gpointer simple_dialog(ESD_TYPE_E type, gint btn_mask,
     const gchar *msg_format, ...)
     G_GNUC_PRINTF(3, 4);
+
+/** Create and show a simple dialog using a va_list.
+ *
+ * @param type type of dialog
+ * @param btn_mask the buttons to display
+ * @param msg_format printf like message format
+ * @param ap parameters
+ * @return the newly created dialog
+ */
+extern gpointer vsimple_dialog(ESD_TYPE_E type, gint btn_mask,
+   const gchar *msg_format, va_list ap);
+
+/** Callback function type for simple_dialog_set_cb() */
+typedef void (* simple_dialog_cb_t) (gpointer dialog, gint btn, gpointer data);
+
+/** Set the callback function for the dialog, called when a button was pressed.
+ *
+ * @param dialog the dialog from simple_dialog()
+ * @param callback_fct the callback function to set
+ * @param data data to be passed to the callback function
+ */
+extern void simple_dialog_set_cb(gpointer dialog, simple_dialog_cb_t callback_fct, gpointer data);
+
+/** Close the dialog, useful for "no button" dialogs.
+ *
+ * @param dialog the dialog to close from simple_dialog()
+ */
+extern void simple_dialog_close(gpointer dialog);
+
+/** Add a check button to the dialog (e.g. "Don't show this message again")
+ *
+ * @param dialog the dialog from simple_dialog()
+ * @param text the text to display
+ */
+extern void simple_dialog_check_set(gpointer dialog, const gchar *text);
+
+/** Get the check buttons state.
+ *
+ * @param dialog the dialog from simple_dialog()
+ * @return current button state (TRUE is checked)
+ */
+extern gboolean simple_dialog_check_get(gpointer dialog);
 
 /** Surround the primary dialog message text by
  *  simple_dialog_primary_start() and simple_dialog_primary_end().
@@ -109,13 +151,26 @@ extern const char *simple_dialog_primary_end(void);
  */
 extern char *simple_dialog_format_message(const char *msg);
 
+/**
+ * Display all queued messages.
+ * If a routine is called to display a dialog before there are any windows
+ * open, information to use to display the dialog is queued up.  This
+ * routine should be called once there are windows open, so that the queued
+ * up dialogs are displayed on top of those windows.
+ */
+extern void display_queued_messages(void);
+
 /*
  * Alert box, with optional "don't show this message again" variable
  * and checkbox, and optional secondary text.
  */
 extern void simple_message_box(ESD_TYPE_E type, gboolean *notagain,
                                const char *secondary_msg,
-                               const char *msg_format, ...) G_GNUC_PRINTF(4, 5);
+                               const char *msg_format, ...)
+#if __GNUC__ >= 2
+    __attribute__((format(printf, 4, 5)))
+#endif
+;
 
 /*
  * Error alert box, taking a format and a va_list argument.
@@ -131,7 +186,7 @@ extern void simple_error_message_box(const char *msg_format, ...);
 }
 #endif /* __cplusplus */
 
-#endif /* __SIMPLE_DIALOG_UI_H__ */
+#endif /* __DIALOG_H__ */
 
 /*
  * Editor modelines

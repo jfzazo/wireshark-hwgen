@@ -96,11 +96,15 @@
 
 #include "config.h"
 
+#include <stdio.h>
+#include <glib.h>
+#include <string.h>
 
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 #include <wsutil/pint.h>
 #include <epan/circuit.h>
+#include <epan/wmem/wmem.h>
 #include <epan/etypes.h>
 #include <epan/nlpid.h>
 #include <epan/expert.h>
@@ -199,10 +203,10 @@ static dissector_handle_t fr_uncompressed_handle;
 
 static const value_string cmd_string[] = {
 	{0, "Compressed Data"},
-	{1, "Uncompressed Data"},
-	{15, "Extended"},
+        {1, "Uncompressed Data"},
+        {15, "Extended"},
 	{ 0,       NULL }
-};
+        };
 
 static const value_string ext_cmd_string[] = {
 	{0, "Per Packet Compression"},
@@ -212,12 +216,12 @@ static const value_string ext_cmd_string[] = {
 	{0x0a, "Init Ack"},
 
 	{ 0,       NULL }
-};
+        };
 
 
 
-static tvbuff_t *wcp_uncompress( tvbuff_t *src_tvb, int offset, packet_info *pinfo, proto_tree *tree, circuit_type ctype, guint32 circuit_id);
-static wcp_window_t *get_wcp_window_ptr(packet_info *pinfo, circuit_type ctype, guint32 circuit_id);
+static tvbuff_t *wcp_uncompress( tvbuff_t *src_tvb, int offset, packet_info *pinfo, proto_tree *tree);
+static wcp_window_t *get_wcp_window_ptr( packet_info *pinfo);
 
 static void
 dissect_wcp_con_req(tvbuff_t *tvb, int offset, proto_tree *tree) {
@@ -273,14 +277,14 @@ dissect_wcp_reset( tvbuff_t *tvb, int offset, proto_tree *tree){
 }
 
 
-static void wcp_save_data( tvbuff_t *tvb, packet_info *pinfo, circuit_type ctype, guint32 circuit_id){
+static void wcp_save_data( tvbuff_t *tvb, packet_info *pinfo){
 
 	wcp_window_t *buf_ptr = 0;
 	size_t len;
 
 	/* discard first 2 bytes, header and last byte (check byte) */
 	len = tvb_reported_length( tvb)-3;
-	buf_ptr = get_wcp_window_ptr(pinfo, ctype, circuit_id);
+	buf_ptr = get_wcp_window_ptr( pinfo);
 
 	if (( buf_ptr->buf_cur + len) <= (buf_ptr->buffer + MAX_WIN_BUF_LEN)){
 		tvb_memcpy( tvb, buf_ptr->buf_cur, 2, len);
@@ -370,13 +374,13 @@ static void dissect_wcp( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
 	if ( cmd == 1) {		/* uncompressed data */
 		if ( !pinfo->fd->flags.visited){	/* if first pass */
-			wcp_save_data( tvb, pinfo, pinfo->ctype, pinfo->circuit_id);
+			wcp_save_data( tvb, pinfo);
 		}
 		next_tvb = tvb_new_subset_remaining(tvb, wcp_header_len);
 	}
 	else {		/* cmd == 0 || (cmd == 0xf && ext_cmd == 0) */
 
-		next_tvb = wcp_uncompress( tvb, wcp_header_len, pinfo, wcp_tree, pinfo->ctype, pinfo->circuit_id);
+		next_tvb = wcp_uncompress( tvb, wcp_header_len, pinfo, wcp_tree);
 
 		if ( !next_tvb){
 			return;
@@ -425,7 +429,7 @@ decompressed_entry(guint8 *dst, guint16 data_offset,
 
 
 static
-wcp_window_t *get_wcp_window_ptr(packet_info *pinfo, circuit_type ctype, guint32 circuit_id){
+wcp_window_t *get_wcp_window_ptr( packet_info *pinfo){
 
 /* find the circuit for this DLCI, create one if needed */
 /* and return the wcp_window data structure pointer */
@@ -434,11 +438,11 @@ wcp_window_t *get_wcp_window_ptr(packet_info *pinfo, circuit_type ctype, guint32
 	circuit_t *circuit;
 	wcp_circuit_data_t *wcp_circuit_data;
 
-	circuit = find_circuit( ctype, circuit_id,
-		pinfo->fd->num);
+	circuit = find_circuit( pinfo->ctype, pinfo->circuit_id,
+	    pinfo->fd->num);
 	if ( !circuit){
-		circuit = circuit_new( ctype, circuit_id,
-			pinfo->fd->num);
+		circuit = circuit_new( pinfo->ctype, pinfo->circuit_id,
+		    pinfo->fd->num);
 	}
 	wcp_circuit_data = (wcp_circuit_data_t *)circuit_get_proto_data(circuit, proto_wcp);
 	if ( !wcp_circuit_data){
@@ -454,7 +458,7 @@ wcp_window_t *get_wcp_window_ptr(packet_info *pinfo, circuit_type ctype, guint32
 }
 
 
-static tvbuff_t *wcp_uncompress( tvbuff_t *src_tvb, int offset, packet_info *pinfo, proto_tree *tree, circuit_type ctype, guint32 circuit_id) {
+static tvbuff_t *wcp_uncompress( tvbuff_t *src_tvb, int offset, packet_info *pinfo, proto_tree *tree) {
 
 /* do the packet data uncompression and load it into the dst buffer */
 
@@ -471,7 +475,7 @@ static tvbuff_t *wcp_uncompress( tvbuff_t *src_tvb, int offset, packet_info *pin
 	wcp_window_t *buf_ptr = 0;
 	wcp_pdata_t *pdata_ptr;
 
-	buf_ptr = get_wcp_window_ptr(pinfo, ctype, circuit_id);
+	buf_ptr = get_wcp_window_ptr( pinfo);
 
 	buf_start = buf_ptr->buffer;
 	buf_end = buf_start + MAX_WIN_BUF_LEN;
@@ -653,137 +657,124 @@ static tvbuff_t *wcp_uncompress( tvbuff_t *src_tvb, int offset, packet_info *pin
 void
 proto_register_wcp(void)
 {
-	static hf_register_info hf[] = {
-		{ &hf_wcp_cmd,
-		  { "Command", "wcp.cmd", FT_UINT8, BASE_HEX, VALS(cmd_string), WCP_CMD,
-		    "Compression Command", HFILL }},
-		{ &hf_wcp_ext_cmd,
-		  { "Extended Command", "wcp.ext_cmd", FT_UINT8, BASE_HEX, VALS(ext_cmd_string), WCP_EXT_CMD,
-		    "Extended Compression Command", HFILL }},
-		{ &hf_wcp_seq,
-		  { "SEQ", "wcp.seq", FT_UINT16, BASE_HEX, NULL, WCP_SEQ,
-		    "Sequence Number", HFILL }},
-		{ &hf_wcp_chksum,
-		  { "Checksum", "wcp.checksum", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Packet Checksum", HFILL }},
-		{ &hf_wcp_tid,
-		  { "TID", "wcp.tid", FT_UINT16, BASE_DEC, NULL, 0,
-		    NULL, HFILL }},
-		{ &hf_wcp_rev,
-		  { "Revision", "wcp.rev", FT_UINT8, BASE_DEC, NULL, 0,
-		    NULL, HFILL }},
-		{ &hf_wcp_init,
-		  { "Initiator", "wcp.init", FT_UINT8, BASE_DEC, NULL, 0,
-		    NULL, HFILL }},
-		{ &hf_wcp_seq_size,
-		  { "Seq Size", "wcp.seq_size", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Sequence Size", HFILL }},
-		{ &hf_wcp_alg_cnt,
-		  { "Alg Count", "wcp.alg_cnt", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Algorithm Count", HFILL }},
-		{ &hf_wcp_alg_a,
-		  { "Alg 1", "wcp.alg1", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Algorithm #1", HFILL }},
-		{ &hf_wcp_alg_b,
-		  { "Alg 2", "wcp.alg2", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Algorithm #2", HFILL }},
-		{ &hf_wcp_alg_c,
-		  { "Alg 3", "wcp.alg3", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Algorithm #3", HFILL }},
-		{ &hf_wcp_alg_d,
-		  { "Alg 4", "wcp.alg4", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Algorithm #4", HFILL }},
-		{ &hf_wcp_alg,
-		  { "Alg", "wcp.alg", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Algorithm", HFILL }},
+    static hf_register_info hf[] = {
+	{ &hf_wcp_cmd,
+	  { "Command", "wcp.cmd", FT_UINT8, BASE_HEX, VALS(cmd_string), WCP_CMD,
+	    "Compression Command", HFILL }},
+	{ &hf_wcp_ext_cmd,
+	  { "Extended Command", "wcp.ext_cmd", FT_UINT8, BASE_HEX, VALS(ext_cmd_string), WCP_EXT_CMD,
+	    "Extended Compression Command", HFILL }},
+	{ &hf_wcp_seq,
+	  { "SEQ", "wcp.seq", FT_UINT16, BASE_HEX, NULL, WCP_SEQ,
+	    "Sequence Number", HFILL }},
+	{ &hf_wcp_chksum,
+	  { "Checksum", "wcp.checksum", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Packet Checksum", HFILL }},
+	{ &hf_wcp_tid,
+	  { "TID", "wcp.tid", FT_UINT16, BASE_DEC, NULL, 0,
+	    NULL, HFILL }},
+	{ &hf_wcp_rev,
+	  { "Revision", "wcp.rev", FT_UINT8, BASE_DEC, NULL, 0,
+	    NULL, HFILL }},
+	{ &hf_wcp_init,
+	  { "Initiator", "wcp.init", FT_UINT8, BASE_DEC, NULL, 0,
+	    NULL, HFILL }},
+	{ &hf_wcp_seq_size,
+	  { "Seq Size", "wcp.seq_size", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Sequence Size", HFILL }},
+	{ &hf_wcp_alg_cnt,
+	  { "Alg Count", "wcp.alg_cnt", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Algorithm Count", HFILL }},
+	{ &hf_wcp_alg_a,
+	  { "Alg 1", "wcp.alg1", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Algorithm #1", HFILL }},
+	{ &hf_wcp_alg_b,
+	  { "Alg 2", "wcp.alg2", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Algorithm #2", HFILL }},
+	{ &hf_wcp_alg_c,
+	  { "Alg 3", "wcp.alg3", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Algorithm #3", HFILL }},
+	{ &hf_wcp_alg_d,
+	  { "Alg 4", "wcp.alg4", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Algorithm #4", HFILL }},
+	{ &hf_wcp_alg,
+	  { "Alg", "wcp.alg", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Algorithm", HFILL }},
 #if 0
-		{ &hf_wcp_rexmit,
-		  { "Rexmit", "wcp.rexmit", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Retransmit", HFILL }},
+	{ &hf_wcp_rexmit,
+	  { "Rexmit", "wcp.rexmit", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Retransmit", HFILL }},
 #endif
-		{ &hf_wcp_hist_size,
-		  { "History", "wcp.hist", FT_UINT8, BASE_DEC, NULL, 0,
-		    "History Size", HFILL }},
-		{ &hf_wcp_ppc,
-		  { "PerPackComp", "wcp.ppc", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Per Packet Compression", HFILL }},
-		{ &hf_wcp_pib,
-		  { "PIB", "wcp.pib", FT_UINT8, BASE_DEC, NULL, 0,
-		    NULL, HFILL }},
-		{ &hf_wcp_compressed_data,
-		  { "Compressed Data", "wcp.compressed_data", FT_NONE, BASE_NONE, NULL, 0,
-		    "Raw compressed data", HFILL }},
-		{ &hf_wcp_comp_bits,
-		  { "Compress Flag", "wcp.flag", FT_UINT8, BASE_HEX, NULL, 0,
-		    "Compressed byte flag", HFILL }},
+	{ &hf_wcp_hist_size,
+	  { "History", "wcp.hist", FT_UINT8, BASE_DEC, NULL, 0,
+	    "History Size", HFILL }},
+	{ &hf_wcp_ppc,
+	  { "PerPackComp", "wcp.ppc", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Per Packet Compression", HFILL }},
+	{ &hf_wcp_pib,
+	  { "PIB", "wcp.pib", FT_UINT8, BASE_DEC, NULL, 0,
+	    NULL, HFILL }},
+	{ &hf_wcp_compressed_data,
+	  { "Compressed Data", "wcp.compressed_data", FT_NONE, BASE_NONE, NULL, 0,
+	    "Raw compressed data", HFILL }},
+	{ &hf_wcp_comp_bits,
+	  { "Compress Flag", "wcp.flag", FT_UINT8, BASE_HEX, NULL, 0,
+	    "Compressed byte flag", HFILL }},
 #if 0
-		{ &hf_wcp_comp_marker,
-		  { "Compress Marker", "wcp.mark", FT_UINT8, BASE_DEC, NULL, 0,
-		    "Compressed marker", HFILL }},
+	{ &hf_wcp_comp_marker,
+	  { "Compress Marker", "wcp.mark", FT_UINT8, BASE_DEC, NULL, 0,
+	    "Compressed marker", HFILL }},
 #endif
-		{ &hf_wcp_offset,
-		  { "Source offset", "wcp.off", FT_UINT16, BASE_HEX, NULL, WCP_OFFSET_MASK,
-		    "Data source offset", HFILL }},
-		{ &hf_wcp_short_len,
-		  { "Compress Length", "wcp.short_len", FT_UINT8, BASE_HEX, NULL, 0xf0,
-		    "Compressed length", HFILL }},
-		{ &hf_wcp_long_len,
-		  { "Compress Length", "wcp.long_len", FT_UINT8, BASE_HEX, NULL, 0,
-		    "Compressed length", HFILL }},
-		{ &hf_wcp_long_run,
-		  { "Long Compression", "wcp.long_comp", FT_BYTES, BASE_NONE, NULL, 0,
-		    "Long Compression type", HFILL }},
-		{ &hf_wcp_short_run,
-		  { "Short Compression", "wcp.short_comp", FT_BYTES, BASE_NONE, NULL, 0,
-		    "Short Compression type", HFILL }},
+	{ &hf_wcp_offset,
+	  { "Source offset", "wcp.off", FT_UINT16, BASE_HEX, NULL, WCP_OFFSET_MASK,
+	    "Data source offset", HFILL }},
+	{ &hf_wcp_short_len,
+	  { "Compress Length", "wcp.short_len", FT_UINT8, BASE_HEX, NULL, 0xf0,
+	    "Compressed length", HFILL }},
+	{ &hf_wcp_long_len,
+	  { "Compress Length", "wcp.long_len", FT_UINT8, BASE_HEX, NULL, 0,
+	    "Compressed length", HFILL }},
+	{ &hf_wcp_long_run,
+	  { "Long Compression", "wcp.long_comp", FT_BYTES, BASE_NONE, NULL, 0,
+	    "Long Compression type", HFILL }},
+	{ &hf_wcp_short_run,
+	  { "Short Compression", "wcp.short_comp", FT_BYTES, BASE_NONE, NULL, 0,
+	    "Short Compression type", HFILL }},
 
-	};
+   };
 
 
-	static gint *ett[] = {
-		&ett_wcp,
-		&ett_wcp_comp_data,
-		&ett_wcp_field,
-	};
+    static gint *ett[] = {
+        &ett_wcp,
+        &ett_wcp_comp_data,
+	&ett_wcp_field,
+    };
 
-	static ei_register_info ei[] = {
-		{ &ei_wcp_compressed_data_exceeds, { "wcp.compressed_data.exceeds", PI_MALFORMED, PI_ERROR, "Compressed data exceeds maximum buffer length", EXPFILL }},
-		{ &ei_wcp_uncompressed_data_exceeds, { "wcp.uncompressed_data.exceeds", PI_MALFORMED, PI_ERROR, "Uncompressed data exceeds maximum buffer length", EXPFILL }},
-	};
+    static ei_register_info ei[] = {
+        { &ei_wcp_compressed_data_exceeds, { "wcp.compressed_data.exceeds", PI_MALFORMED, PI_ERROR, "Compressed data exceeds maximum buffer length", EXPFILL }},
+        { &ei_wcp_uncompressed_data_exceeds, { "wcp.uncompressed_data.exceeds", PI_MALFORMED, PI_ERROR, "Uncompressed data exceeds maximum buffer length", EXPFILL }},
+    };
 
-	expert_module_t* expert_wcp;
+    expert_module_t* expert_wcp;
 
-	proto_wcp = proto_register_protocol ("Wellfleet Compression", "WCP", "wcp");
-	proto_register_field_array (proto_wcp, hf, array_length(hf));
-	proto_register_subtree_array(ett, array_length(ett));
-	expert_wcp = expert_register_protocol(proto_wcp);
-	expert_register_field_array(expert_wcp, ei, array_length(ei));
+    proto_wcp = proto_register_protocol ("Wellfleet Compression", "WCP", "wcp");
+    proto_register_field_array (proto_wcp, hf, array_length(hf));
+    proto_register_subtree_array(ett, array_length(ett));
+    expert_wcp = expert_register_protocol(proto_wcp);
+    expert_register_field_array(expert_wcp, ei, array_length(ei));
 }
 
 
 void
 proto_reg_handoff_wcp(void) {
-	dissector_handle_t wcp_handle;
+    dissector_handle_t wcp_handle;
 
-	/*
-	 * Get handle for the Frame Relay (uncompressed) dissector.
-	 */
-	fr_uncompressed_handle = find_dissector("fr_uncompressed");
+    /*
+     * Get handle for the Frame Relay (uncompressed) dissector.
+     */
+    fr_uncompressed_handle = find_dissector("fr_uncompressed");
 
-	wcp_handle = create_dissector_handle(dissect_wcp, proto_wcp);
-	dissector_add_uint("fr.nlpid", NLPID_COMPRESSED, wcp_handle);
-	dissector_add_uint("ethertype",  ETHERTYPE_WCP, wcp_handle);
+    wcp_handle = create_dissector_handle(dissect_wcp, proto_wcp);
+    dissector_add_uint("fr.nlpid", NLPID_COMPRESSED, wcp_handle);
+    dissector_add_uint("ethertype",  ETHERTYPE_WCP, wcp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

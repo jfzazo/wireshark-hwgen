@@ -30,11 +30,15 @@
 
 #include "config.h"
 
+#include <glib.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 
+#include "wtap.h"
 #include "wtap-int.h"
+#include <wsutil/buffer.h>
 #include "file_wrappers.h"
 #include "commview.h"
 
@@ -44,7 +48,7 @@ typedef struct commview_header {
 	guint8		version;
 	guint16		year;
 	guint8		month;
-	guint8		day;
+	guint8  	day;
 	guint8		hours;
 	guint8		minutes;
 	guint8		seconds;
@@ -56,8 +60,8 @@ typedef struct commview_header {
 	guint8		channel;
 	guint8		direction;	/* Or for WiFi, high order byte of
 					 * packet rate. */
-	gint8		signal_level_dbm;
-	gint8		noise_level;	/* In dBm (WiFi only) */
+	guint8		signal_level_dbm;
+	guint8		noise_level;	/* In dBm (WiFi only) */
 } commview_header_t;
 
 #define COMMVIEW_HEADER_SIZE 24
@@ -82,16 +86,16 @@ static gboolean commview_seek_read(wtap *wth, gint64 seek_off,
 static gboolean commview_read_header(commview_header_t *cv_hdr, FILE_T fh,
 				     int *err, gchar **err_info);
 static gboolean commview_dump(wtap_dumper *wdh,	const struct wtap_pkthdr *phdr,
-			      const guint8 *pd, int *err, gchar **err_info);
+			      const guint8 *pd, int *err);
 
-wtap_open_return_val commview_open(wtap *wth, int *err, gchar **err_info)
+int commview_open(wtap *wth, int *err, gchar **err_info)
 {
 	commview_header_t cv_hdr;
 
 	if(!commview_read_header(&cv_hdr, wth->fh, err, err_info)) {
 		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+			return -1;
+		return 0;
 	}
 
 	/* If any of these fields do not match what we expect, bail out. */
@@ -107,11 +111,11 @@ wtap_open_return_val commview_open(wtap *wth, int *err, gchar **err_info)
 	   ((cv_hdr.flags & FLAGS_MEDIUM) != MEDIUM_ETHERNET &&
 	    (cv_hdr.flags & FLAGS_MEDIUM) != MEDIUM_WIFI &&
 	    (cv_hdr.flags & FLAGS_MEDIUM) != MEDIUM_TOKEN_RING))
-		return WTAP_OPEN_NOT_MINE; /* Not our kind of file */
+		return 0; /* Not our kind of file */
 
 	/* No file header. Reset the fh to 0 so we can read the first packet */
 	if (file_seek(wth->fh, 0, SEEK_SET, err) == -1)
-		return WTAP_OPEN_ERROR;
+		return -1;
 
 	/* Set up the pointers to the handlers for this file type */
 	wth->subtype_read = commview_read;
@@ -119,9 +123,9 @@ wtap_open_return_val commview_open(wtap *wth, int *err, gchar **err_info)
 
 	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_COMMVIEW;
 	wth->file_encap = WTAP_ENCAP_PER_PACKET;
-	wth->file_tsprec = WTAP_TSPREC_USEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_USEC;
 
-	return WTAP_OPEN_MINE; /* Our kind of file */
+	return 1; /* Our kind of file */
 }
 
 static int
@@ -143,36 +147,11 @@ commview_read_packet(FILE_T fh, struct wtap_pkthdr *phdr, Buffer *buf,
 
 	case MEDIUM_WIFI :
 		phdr->pkt_encap = WTAP_ENCAP_IEEE_802_11_WITH_RADIO;
-		phdr->pseudo_header.ieee_802_11.presence_flags =
-		    PHDR_802_11_HAS_CHANNEL |
-		    PHDR_802_11_HAS_DATA_RATE |
-		    PHDR_802_11_HAS_SIGNAL_PERCENT;
 		phdr->pseudo_header.ieee_802_11.fcs_len = -1; /* Unknown */
 		phdr->pseudo_header.ieee_802_11.channel = cv_hdr.channel;
 		phdr->pseudo_header.ieee_802_11.data_rate =
 		    cv_hdr.rate | (cv_hdr.direction << 8);
-		phdr->pseudo_header.ieee_802_11.signal_percent = cv_hdr.signal_level_percent;
-
-		/*
-		 * XXX - these are positive in captures I've seen; does
-		 * that mean that they are the negative of the actual
-		 * dBm value?  (80 dBm is a bit more power than most
-		 * countries' regulatory agencies are likely to allow
-		 * any individual to have in their home. :-))
-		 *
-		 * XXX - sometimes these are 0; assume that means that no
-		 * value is provided.
-		 */
-		if (cv_hdr.signal_level_dbm != 0) {
-			phdr->pseudo_header.ieee_802_11.signal_dbm = -cv_hdr.signal_level_dbm;
-			phdr->pseudo_header.ieee_802_11.presence_flags |=
-			    PHDR_802_11_HAS_SIGNAL_DBM;
-		}
-		if (cv_hdr.noise_level != 0) {
-			phdr->pseudo_header.ieee_802_11.noise_dbm = -cv_hdr.noise_level;
-			phdr->pseudo_header.ieee_802_11.presence_flags |=
-			    PHDR_802_11_HAS_NOISE_DBM;
-		}
+		phdr->pseudo_header.ieee_802_11.signal_level = cv_hdr.signal_level_percent;
 		break;
 
 	case MEDIUM_TOKEN_RING :
@@ -229,42 +208,24 @@ static gboolean
 commview_read_header(commview_header_t *cv_hdr, FILE_T fh, int *err,
     gchar **err_info)
 {
-	if (!wtap_read_bytes_or_eof(fh, &cv_hdr->data_len, 2, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->source_data_len, 2, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->version, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->year, 2, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->month, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->day, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->hours, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->minutes, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->seconds, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->usecs, 4, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->flags, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->signal_level_percent, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->rate, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->band, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->channel, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->direction, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->signal_level_dbm, 1, err, err_info))
-		return FALSE;
-	if (!wtap_read_bytes(fh, &cv_hdr->noise_level, 1, err, err_info))
-		return FALSE;
+	wtap_file_read_expected_bytes(&cv_hdr->data_len, 2, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->source_data_len, 2, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->version, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->year, 2, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->month, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->day, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->hours, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->minutes, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->seconds, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->usecs, 4, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->flags, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->signal_level_percent, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->rate, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->band, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->channel, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->direction, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->signal_level_dbm, 1, fh, err, err_info);
+	wtap_file_read_expected_bytes(&cv_hdr->noise_level, 1, fh, err, err_info);
 
 	/* Convert multi-byte values from little endian to host endian format */
 	cv_hdr->data_len = GUINT16_FROM_LE(cv_hdr->data_len);
@@ -289,7 +250,7 @@ int commview_dump_can_write_encap(int encap)
 		return 0;
 
 	default:
-		return WTAP_ERR_UNWRITABLE_ENCAP;
+		return WTAP_ERR_UNSUPPORTED_ENCAP;
 	}
 }
 
@@ -310,14 +271,14 @@ gboolean commview_dump_open(wtap_dumper *wdh, int *err _U_)
  * Returns TRUE on success, FALSE on failure. */
 static gboolean commview_dump(wtap_dumper *wdh,
 			      const struct wtap_pkthdr *phdr,
-			      const guint8 *pd, int *err, gchar **err_info _U_)
+			      const guint8 *pd, int *err)
 {
 	commview_header_t cv_hdr;
 	struct tm *tm;
 
 	/* We can only write packet records. */
 	if (phdr->rec_type != REC_TYPE_PACKET) {
-		*err = WTAP_ERR_UNWRITABLE_REC_TYPE;
+		*err = WTAP_ERR_REC_TYPE_UNSUPPORTED;
 		return FALSE;
 	}
 
@@ -357,30 +318,10 @@ static gboolean commview_dump(wtap_dumper *wdh,
 	case WTAP_ENCAP_IEEE_802_11_WITH_RADIO :
 		cv_hdr.flags |=  MEDIUM_WIFI;
 
-		cv_hdr.channel =
-		    (phdr->pseudo_header.ieee_802_11.presence_flags & PHDR_802_11_HAS_CHANNEL) ?
-		     phdr->pseudo_header.ieee_802_11.channel :
-		     0;
-		cv_hdr.rate =
-		    (phdr->pseudo_header.ieee_802_11.presence_flags & PHDR_802_11_HAS_DATA_RATE) ?
-		     (guint8)(phdr->pseudo_header.ieee_802_11.data_rate & 0xFF) :
-		     0;
-		cv_hdr.direction =
-		    (phdr->pseudo_header.ieee_802_11.presence_flags & PHDR_802_11_HAS_DATA_RATE) ?
-		     (guint8)((phdr->pseudo_header.ieee_802_11.data_rate >> 8) & 0xFF) :
-		     0;
-		cv_hdr.signal_level_percent =
-		    (phdr->pseudo_header.ieee_802_11.presence_flags & PHDR_802_11_HAS_SIGNAL_PERCENT) ?
-		     phdr->pseudo_header.ieee_802_11.signal_percent :
-		     0;
-		cv_hdr.signal_level_dbm =
-		    (phdr->pseudo_header.ieee_802_11.presence_flags & PHDR_802_11_HAS_SIGNAL_DBM) ?
-		     -phdr->pseudo_header.ieee_802_11.signal_dbm :
-		     0;
-		cv_hdr.noise_level =
-		    (phdr->pseudo_header.ieee_802_11.presence_flags & PHDR_802_11_HAS_NOISE_DBM) ?
-		     -phdr->pseudo_header.ieee_802_11.noise_dbm :
-		     0;
+		cv_hdr.channel = phdr->pseudo_header.ieee_802_11.channel;
+		cv_hdr.rate = (guint8)(phdr->pseudo_header.ieee_802_11.data_rate & 0xFF);
+		cv_hdr.direction = (guint8)((phdr->pseudo_header.ieee_802_11.data_rate >> 8) & 0xFF);
+		cv_hdr.signal_level_percent = phdr->pseudo_header.ieee_802_11.signal_level;
 		break;
 
 	case WTAP_ENCAP_TOKEN_RING :
@@ -388,7 +329,7 @@ static gboolean commview_dump(wtap_dumper *wdh,
 		break;
 
 	default :
-		*err = WTAP_ERR_UNWRITABLE_ENCAP;
+		*err = WTAP_ERR_UNSUPPORTED_ENCAP;
 		return FALSE;
 	}
 
@@ -436,16 +377,3 @@ static gboolean commview_dump(wtap_dumper *wdh,
 
 	return TRUE;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

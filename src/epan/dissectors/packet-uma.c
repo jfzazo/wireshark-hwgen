@@ -53,11 +53,15 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/conversation.h>
 #include <epan/prefs.h>
 #include <epan/asn1.h>
 #include "packet-bssap.h"
 #include "packet-gsm_a_common.h"
+#include "packet-gsm_map.h"
 #include "packet-rtp.h"
 #include "packet-rtcp.h"
 #include "packet-e212.h"
@@ -870,8 +874,9 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 	address		src_addr;
 
 	ie_value = tvb_get_guint8(tvb,offset);
-	urr_ie_tree = proto_tree_add_subtree(tree,tvb,offset,-1, ett_urr_ie, &urr_ie_item,
+	urr_ie_item = proto_tree_add_text(tree,tvb,offset,-1,"%s",
 		val_to_str_ext(ie_value, &uma_urr_IE_type_vals_ext, "Unknown IE (%u)"));
+	urr_ie_tree = proto_item_add_subtree(urr_ie_item, ett_urr_ie);
 
 	proto_tree_add_item(urr_ie_tree, hf_uma_urr_IE, tvb, offset, 1, ENC_BIG_ENDIAN);
 	offset++;
@@ -949,7 +954,7 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 		 * The Location Estimate field is composed of 1 or more octets with an internal structure
 		 * according to section 7 in [23.032].
 		 */
-		new_tvb = tvb_new_subset_length(tvb, ie_offset, ie_len );
+		new_tvb = tvb_new_subset(tvb, ie_offset,ie_len, ie_len );
 		dissect_geographical_description(new_tvb, pinfo, urr_ie_tree);
 		break;
 	case 9:
@@ -969,7 +974,7 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 		break;
 	case 10:		/* UNC SGW Fully Qualified Domain/Host Name */
 		if ( ie_len > 0){
-			string = (gchar*)tvb_get_string_enc(wmem_packet_scope(), tvb, ie_offset, ie_len, ENC_ASCII);
+			string = (gchar*)tvb_get_string(wmem_packet_scope(), tvb, ie_offset, ie_len);
 			proto_tree_add_string(urr_ie_tree, hf_uma_urr_FQDN, tvb, ie_offset, ie_len, string);
 		}else{
 			proto_tree_add_text(urr_ie_tree,tvb,offset,1,"FQDN not present");
@@ -1066,7 +1071,7 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 		 */
 		proto_tree_add_item(urr_ie_tree, hf_uma_urr_L3_protocol_discriminator, tvb, ie_offset, 1, ENC_BIG_ENDIAN);
 		proto_tree_add_item(urr_ie_tree, hf_uma_urr_L3_Message, tvb, ie_offset, ie_len, ENC_NA);
-		l3_tvb = tvb_new_subset_length(tvb, ie_offset, ie_len );
+		l3_tvb = tvb_new_subset(tvb, ie_offset,ie_len, ie_len );
 		if  (!dissector_try_uint(bssap_pdu_type_table,BSSAP_PDU_TYPE_DTAP, l3_tvb, pinfo, urr_ie_tree))
 		   		call_dissector(data_handle, l3_tvb, pinfo, urr_ie_tree);
 		break;
@@ -1110,7 +1115,7 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 		proto_tree_add_item(urr_ie_tree, hf_uma_urr_L3_protocol_discriminator, tvb, ie_offset, 1, ENC_BIG_ENDIAN);
 		proto_tree_add_item(urr_ie_tree, hf_uma_urr_L3_Message, tvb, ie_offset, ie_len, ENC_NA);
 		/* XXX the dissector to call should depend on the RAT type ??? */
-		l3_tvb = tvb_new_subset_length(tvb, ie_offset, ie_len );
+		l3_tvb = tvb_new_subset(tvb, ie_offset,ie_len, ie_len );
 		if  (!dissector_try_uint(bssap_pdu_type_table,BSSAP_PDU_TYPE_DTAP, l3_tvb, pinfo, urr_ie_tree))
 		   		call_dissector(data_handle, l3_tvb, pinfo, urr_ie_tree);
 		break;
@@ -1238,7 +1243,7 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 		 * The rest of the IE is coded as in [TS 48.018], not including IEI and length, if present
 		 */
 		proto_tree_add_item(urr_ie_tree, hf_uma_urr_LLC_PDU, tvb, ie_offset, ie_len, ENC_NA);
-		llc_tvb = tvb_new_subset_length(tvb, ie_offset, ie_len );
+		llc_tvb = tvb_new_subset(tvb, ie_offset,ie_len, ie_len );
 		  if (llc_handle) {
 			col_append_str(pinfo->cinfo, COL_PROTOCOL, "/");
 			col_set_fence(pinfo->cinfo, COL_PROTOCOL);
@@ -1302,7 +1307,7 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 		 * The rest of the IE is the INTER RAT HANDOVER INFO coded as in
 		 * [TS 25.331], not including IEI and length, if present
 		 */
-		new_tvb = tvb_new_subset_length(tvb, ie_offset, ie_len );
+		new_tvb = tvb_new_subset(tvb, ie_offset,ie_len, ie_len );
 		dissect_rrc_InterRATHandoverInfo_PDU(new_tvb, pinfo, urr_ie_tree, NULL);
 		break;
 	case 65:
@@ -1319,7 +1324,7 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 		octet = tvb_get_guint8(tvb,ie_offset);
 		ie_offset++;
 		if ( octet == 0 ){
-			ie_offset = dissect_e212_mcc_mnc(tvb, pinfo, urr_ie_tree, ie_offset, E212_NONE, TRUE);
+			ie_offset = dissect_e212_mcc_mnc(tvb, pinfo, urr_ie_tree, ie_offset, TRUE);
 			proto_tree_add_item(urr_ie_tree, hf_uma_urr_lac, tvb, ie_offset, 2, ENC_BIG_ENDIAN);
 			/*ie_offset = ie_offset + 2;*/
 			/* The octets 9-12 are coded as shown in 3GPP TS 25.331, Table 'Cell identity'.
@@ -1435,7 +1440,7 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 	case 98:
 		/* UNC Fully Qualified Domain/Host Name */
 		if ( ie_len > 0){
-			string = (gchar*)tvb_get_string_enc(wmem_packet_scope(), tvb, ie_offset, ie_len, ENC_ASCII);
+			string = (gchar*)tvb_get_string(wmem_packet_scope(), tvb, ie_offset, ie_len);
 			proto_tree_add_string(urr_ie_tree, hf_uma_unc_FQDN, tvb, ie_offset, ie_len, string);
 		}else{
 			proto_tree_add_text(urr_ie_tree,tvb,offset,1,"UNC FQDN not present");
@@ -1636,7 +1641,7 @@ dissect_uma(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 	proto_tree_add_item(uma_tree, hf_uma_skip_ind, tvb, offset, 1, ENC_BIG_ENDIAN);
 	if ((octet & 0xf0) != 0 ){
 		proto_tree_add_text(uma_tree, tvb,offset,-1,"Skip this message");
-		return tvb_reported_length(tvb);
+		return tvb_length(tvb);
 	}
 
 	proto_tree_add_item(uma_tree, hf_uma_pd, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -1671,11 +1676,11 @@ dissect_uma(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 		break;
 	}
 
-	return tvb_reported_length(tvb);
+	return tvb_length(tvb);
 }
 
 static guint
-get_uma_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_uma_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
 	/* PDU length = Message length + length of length indicator */
 	return tvb_get_ntohs(tvb,offset)+2;
@@ -1686,7 +1691,7 @@ dissect_uma_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
 	tcp_dissect_pdus(tvb, pinfo, tree, uma_desegment, UMA_HEADER_SIZE,
 	    get_uma_pdu_len, dissect_uma, data);
-	return tvb_reported_length(tvb);
+	return tvb_length(tvb);
 }
 
 static int
@@ -1712,7 +1717,7 @@ dissect_uma_urlc_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
 	proto_tree_add_item(uma_tree, hf_uma_urlc_msg_type, tvb, offset, 1, ENC_BIG_ENDIAN);
 	col_add_fstr(pinfo->cinfo, COL_INFO, "%s ",val_to_str_ext(octet, &uma_urlc_msg_type_vals_ext, "Unknown URLC (%u)"));
 	col_set_fence(pinfo->cinfo,COL_INFO);
-	msg_len = tvb_reported_length_remaining(tvb,offset) - 1;
+	msg_len = tvb_length_remaining(tvb,offset) - 1;
 
 	switch  ( octet ){
 
@@ -1731,7 +1736,7 @@ dissect_uma_urlc_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
 		return offset;
 	default:
 		proto_tree_add_text(uma_tree, tvb,offset,-1,"Wrong message type %u",octet);
-		return tvb_reported_length(tvb);
+		return tvb_length(tvb);
 
 	}
 
@@ -1751,7 +1756,7 @@ proto_reg_handoff_uma(void)
 	if (!Initialized) {
 		uma_tcp_handle = find_dissector("umatcp");
 		uma_udp_handle = find_dissector("umaudp");
-		dissector_add_for_decode_as("udp.port", uma_udp_handle);
+		dissector_add_handle("udp.port", uma_udp_handle);  /* for "decode-as" */
 		data_handle = find_dissector("data");
 		rtcp_handle = find_dissector("rtcp");
 		llc_handle = find_dissector("llcgprs");
@@ -2303,16 +2308,3 @@ proto_register_uma(void)
 				  &global_uma_tcp_port_range, MAX_UDP_PORT);
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

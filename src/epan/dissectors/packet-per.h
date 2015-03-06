@@ -26,6 +26,11 @@
 
 #include "ws_symbol_export.h"
 
+#define PER_NOT_DECODED_YET(x) \
+proto_tree_add_text(tree, tvb, 0, 0, "something unknown here [%s]",x); \
+	col_append_fstr(actx->pinfo->cinfo, COL_INFO, "[UNKNOWN PER: %s]", x); \
+tvb_get_guint8(tvb, 9999);
+
 typedef int (*per_type_fn)(tvbuff_t*, int, asn1_ctx_t*, proto_tree*, int);
 
 /* in all functions here, offset is guint32 and is
@@ -58,8 +63,6 @@ typedef struct _per_sequence_t {
 	int optional;
 	per_type_fn func;
 } per_sequence_t;
-
-WS_DLL_PUBLIC void dissect_per_not_decoded_yet(proto_tree* tree, packet_info* pinfo, tvbuff_t *tvb, const char* reason);
 
 WS_DLL_PUBLIC guint32 dissect_per_null(tvbuff_t *tvb, guint32 offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index);
 
@@ -130,8 +133,5 @@ extern guint32 dissect_per_size_constrained_type(tvbuff_t *tvb, guint32 offset, 
 extern gboolean get_size_constraint_from_stack(asn1_ctx_t *actx, const gchar *name, int *pmin_len, int *pmax_len, gboolean *phas_extension);
 
 extern guint32 dissect_per_length_determinant(tvbuff_t *tvb, guint32 offset, asn1_ctx_t *actx _U_, proto_tree *tree, int hf_index, guint32 *length);
-
-WS_DLL_PUBLIC int call_per_oid_callback(const char *oid, tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, asn1_ctx_t *actx, int hf_index);
-WS_DLL_PUBLIC void new_register_per_oid_dissector(const char *oid, new_dissector_t dissector, int proto, const char *name);
 
 #endif  /* __PACKET_PER_H__ */

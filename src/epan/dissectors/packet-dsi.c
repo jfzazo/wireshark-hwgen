@@ -25,6 +25,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 
@@ -158,10 +160,12 @@ static gint
 dissect_dsi_open_session(tvbuff_t *tvb, proto_tree *dsi_tree, gint offset, gint dsi_length)
 {
 	proto_tree      *tree;
+	proto_item	*ti;
 	guint8		type;
 	guint8		len;
 
-	tree = proto_tree_add_subtree(dsi_tree, tvb, offset, -1, ett_dsi_open, NULL, "Open Session");
+	ti = proto_tree_add_text(dsi_tree, tvb, offset, -1, "Open Session");
+	tree = proto_item_add_subtree(ti, ett_dsi_open);
 
 	while( dsi_length >2 ) {
 
@@ -203,7 +207,8 @@ dissect_dsi_attention(tvbuff_t *tvb, proto_tree *dsi_tree, gint offset)
 		return offset;
 
 	flag = tvb_get_ntohs(tvb, offset);
-	tree = proto_tree_add_subtree(dsi_tree, tvb, offset, -1, ett_dsi_attn, NULL, "Attention");
+	ti = proto_tree_add_text(dsi_tree, tvb, offset, -1, "Attention");
+	tree = proto_item_add_subtree(ti, ett_dsi_attn);
 
 	ti = proto_tree_add_item(tree, hf_dsi_attn_flag, tvb, offset, 2, ENC_BIG_ENDIAN);
 	tree = proto_item_add_subtree(ti, ett_dsi_attn_flag);
@@ -224,7 +229,7 @@ static int
 dissect_dsi_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
 	proto_tree      *dsi_tree;
-	proto_item	*dsi_ti;
+	proto_item	*ti;
 	guint8		dsi_flags,dsi_command;
 	guint16		dsi_requestid;
 	gint32		dsi_code;
@@ -250,8 +255,8 @@ dissect_dsi_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 				   "Unknown function (0x%02x)"),
 			dsi_requestid);
 
-	dsi_ti = proto_tree_add_item(tree, proto_dsi, tvb, 0, -1, ENC_NA);
-	dsi_tree = proto_item_add_subtree(dsi_ti, ett_dsi);
+	ti = proto_tree_add_item(tree, proto_dsi, tvb, 0, -1, ENC_NA);
+	dsi_tree = proto_item_add_subtree(ti, ett_dsi);
 
 	if (tree) {
 		proto_tree_add_uint(dsi_tree, hf_dsi_flags, tvb,
@@ -308,7 +313,7 @@ dissect_dsi_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			aspinfo.command = dsi_command;
 			aspinfo.seq = dsi_requestid;
 			aspinfo.code = dsi_code;
-			proto_item_set_len(dsi_ti, DSI_BLOCKSIZ);
+			proto_item_set_len(dsi_tree, DSI_BLOCKSIZ);
 
 			new_tvb = tvb_new_subset_remaining(tvb, DSI_BLOCKSIZ);
 			call_dissector_with_data(afp_handle, new_tvb, pinfo, tree, &aspinfo);
@@ -325,7 +330,7 @@ dissect_dsi_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 }
 
 static guint
-get_dsi_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_dsi_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
 	guint32 plen;
 	guint8	dsi_flags,dsi_command;
@@ -486,16 +491,3 @@ proto_reg_handoff_dsi(void)
 	afp_handle = find_dissector("afp");
 	afp_server_status_handle = find_dissector("afp_server_status");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

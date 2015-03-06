@@ -1,5 +1,4 @@
-/* packet-rlc.c
- * Routines for UMTS RLC (Radio Link Control) v9.3.0 disassembly
+/* Routines for UMTS RLC (Radio Link Control) v9.3.0 disassembly
  * http://www.3gpp.org/ftp/Specs/archive/25_series/25.322/
  *
  * Wireshark - Network traffic analyzer
@@ -23,8 +22,13 @@
 
 #include "config.h"
 
+#include <string.h>
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include <epan/conversation.h>
+#include <epan/asn1.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
 #include <wiretap/wtap.h>
@@ -33,8 +37,10 @@
  * Optional include, for KASUMI support,
  * see header file for more information.
  * */
+#include <epan/crypt/kasumi.h>
 
 #include "packet-umts_fp.h"
+#include "packet-umts_mac.h"
 #include "packet-rlc.h"
 #include "packet-rrc.h"
 
@@ -1429,7 +1435,7 @@ rlc_decipher_tvb(tvbuff_t *tvb, packet_info *pinfo, guint32 counter, guint8 rbid
     /*Location for decrypted data*/
     out = g_malloc( tvb_length(tvb) );
 
-    /*Build data input but don't send the header*/
+    /*Build data input but dont send the header*/
     for(i = 0; i< tvb_length(tvb)-header_size; i++ ){
         out[i+header_size] = tvb_get_guint8(tvb, header_size+i);
     }
@@ -1507,7 +1513,7 @@ rlc_decipher(tvbuff_t *tvb, packet_info * pinfo, proto_tree * tree, fp_info * fp
     /*Ciphering info singled in RRC by securitymodecommands */
     c_inf =  (rrc_ciphering_info *)g_tree_lookup(rrc_ciph_inf, GINT_TO_POINTER((gint)fpinf->com_context_id));
 
-    /*TODO: This doesn't really work for all packets..*/
+    /*TODO: This doesnt really work for all packets..*/
     /*Check if we have ciphering info and that this frame is ciphered*/
     if(c_inf!=NULL && ( (c_inf->setup_frame > 0 && c_inf->setup_frame < pinfo->fd->num && c_inf->seq_no[rlcinf->rbid[pos]][indx] == -1)  ||
                      (c_inf->setup_frame < pinfo->fd->num && c_inf->seq_no[rlcinf->rbid[pos]][indx] >= 0  && c_inf->seq_no[rlcinf->rbid[pos]][indx] <= seq) )){
@@ -1546,7 +1552,7 @@ rlc_decipher(tvbuff_t *tvb, packet_info * pinfo, proto_tree * tree, fp_info * fp
         /*Update the maximal COUNTER value seen so far*/
         max_counter = MAX(max_counter,((ps_counter[rlcinf->rbid[pos]][indx]) | seq) >> hfn_shift);
 
-    /*XXX: Since RBID in umts isn't configured properly..*/
+    /*XXX:Since RBID in umts isnt configured properly..*/
         if(rlcinf->rbid[pos] == 9 ){
             if(tree){
                 guint32 frame_num[3];
@@ -2000,9 +2006,10 @@ dissect_rlc_status(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guin
                 proto_tree_add_bits_ret_val(sufi_tree, hf_rlc_sufi_fsn, tvb, bit_offset, 12, &sn, ENC_BIG_ENDIAN);
                 bit_offset += 12;
                 proto_tree_add_item(sufi_tree, hf_rlc_sufi_bitmap, tvb, bit_offset/8, (gint)len, ENC_NA);
-                bitmap_tree = proto_tree_add_subtree(sufi_tree, tvb, bit_offset/8, (gint)len, ett_rlc_bitmap, &ti, "Decoded bitmap:");
+                ti = proto_tree_add_text(sufi_tree, tvb, bit_offset/8, (gint)len, "Decoded bitmap:");
                 col_append_str(pinfo->cinfo, COL_INFO, " BITMAP=(");
 
+                bitmap_tree = proto_item_add_subtree(ti, ett_rlc_bitmap);
                 buff = (gchar *)wmem_alloc(wmem_packet_scope(), BUFF_SIZE);
                 for (i=0; i<len; i++) {
                     bits = tvb_get_bits8(tvb, bit_offset, 8);
@@ -2040,7 +2047,8 @@ dissect_rlc_status(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guin
                 if (len && (((cw[len-1] & 0x01) == 0) || (cw[len-1] == 0x01))) {
                     expert_add_info(pinfo, tree, &ei_rlc_sufi_cw);
                 } else {
-                    rlist_tree = proto_tree_add_subtree(sufi_tree, tvb, previous_bit_offset/8, (bit_offset-previous_bit_offset)/8, ett_rlc_rlist, NULL, "Decoded list:");
+                    ti = proto_tree_add_text(sufi_tree, tvb, previous_bit_offset/8, (bit_offset-previous_bit_offset)/8, "Decoded list:");
+                    rlist_tree = proto_item_add_subtree(ti, ett_rlc_rlist);
                     proto_tree_add_text(rlist_tree, tvb, (previous_bit_offset+4)/8, 12/8,
                                         "Sequence Number = %u (AMD PDU not correctly received)",(unsigned)sn);
                     col_append_fstr(pinfo->cinfo, COL_INFO, " RLIST=(%u", (unsigned)sn);

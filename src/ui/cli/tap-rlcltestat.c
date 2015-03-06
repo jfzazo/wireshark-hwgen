@@ -28,8 +28,9 @@
 #include <string.h>
 
 #include <epan/packet.h>
+#include <epan/packet_info.h>
 #include <epan/tap.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/dissectors/packet-rlc-lte.h>
 
 void register_tap_listener_rlc_lte_stat(void);
@@ -92,7 +93,7 @@ typedef struct rlc_lte_common_stats {
 
 /* One row/UE in the UE table */
 typedef struct rlc_lte_ep {
-    struct rlc_lte_ep *next;
+    struct rlc_lte_ep* next;
     struct rlc_lte_row_data stats;
 } rlc_lte_ep_t;
 
@@ -112,8 +113,8 @@ typedef struct rlc_lte_stat_t {
 static void
 rlc_lte_stat_reset(void *phs)
 {
-    rlc_lte_stat_t *rlc_lte_stat = (rlc_lte_stat_t *)phs;
-    rlc_lte_ep_t *list = rlc_lte_stat->ep_list;
+    rlc_lte_stat_t* rlc_lte_stat = (rlc_lte_stat_t *)phs;
+    rlc_lte_ep_t* list = rlc_lte_stat->ep_list;
 
     rlc_lte_stat->total_frames = 0;
     memset(&rlc_lte_stat->common_stats, 0, sizeof(rlc_lte_common_stats));
@@ -127,15 +128,15 @@ rlc_lte_stat_reset(void *phs)
 
 
 /* Allocate a rlc_lte_ep_t struct to store info for new UE */
-static rlc_lte_ep_t *alloc_rlc_lte_ep(const struct rlc_lte_tap_info *si, packet_info *pinfo _U_)
+static rlc_lte_ep_t* alloc_rlc_lte_ep(const struct rlc_lte_tap_info *si, packet_info *pinfo _U_)
 {
-    rlc_lte_ep_t *ep;
+    rlc_lte_ep_t* ep;
 
     if (!si) {
         return NULL;
     }
 
-    if (!(ep = g_new(rlc_lte_ep_t, 1))) {
+    if (!(ep = g_new(rlc_lte_ep_t,1))) {
         return NULL;
     }
 
@@ -309,7 +310,7 @@ rlc_lte_stat_draw(void *phs)
 
     /* Look up the statistics struct */
     rlc_lte_stat_t *hs = (rlc_lte_stat_t *)phs;
-    rlc_lte_ep_t *list = hs->ep_list, *tmp = 0;
+    rlc_lte_ep_t* list = hs->ep_list, *tmp = 0;
 
     /* Common channel data */
     printf("Common Data:\n");
@@ -378,7 +379,7 @@ static void rlc_lte_stat_init(const char *opt_arg, void *userdata _U_)
     }
 
     /* Create top-level struct */
-    hs = g_new0(rlc_lte_stat_t, 1);
+    hs = g_new0(rlc_lte_stat_t,1);
     hs->ep_list = NULL;
 
 
@@ -401,31 +402,9 @@ static void rlc_lte_stat_init(const char *opt_arg, void *userdata _U_)
 
 
 /* Register this tap listener (need void on own so line register function found) */
-static stat_tap_ui rlc_lte_stat_ui = {
-    REGISTER_STAT_GROUP_GENERIC,
-    NULL,
-    "rlc-lte,stat",
-    rlc_lte_stat_init,
-    -1,
-    0,
-    NULL
-};
-
 void
 register_tap_listener_rlc_lte_stat(void)
 {
-    register_stat_tap_ui(&rlc_lte_stat_ui, NULL);
+    register_stat_cmd_arg("rlc-lte,stat", rlc_lte_stat_init, NULL);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

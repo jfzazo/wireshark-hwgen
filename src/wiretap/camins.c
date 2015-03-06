@@ -60,8 +60,11 @@
 #include "config.h"
 
 #include <string.h>
+#include <glib.h>
+#include <wtap.h>
 #include <wtap-int.h>
 #include <file_wrappers.h>
+#include <wsutil/buffer.h>
 
 #include "camins.h"
 
@@ -104,6 +107,26 @@ typedef enum {
 #define DVB_CI_PSEUDO_HDR_HOST_TO_CAM 0xFE
 
 
+/* read a block of data from the camins file and handle the errors */
+static gboolean
+read_block(FILE_T fh, guint8 *buf, guint16 buf_len, int *err, gchar **err_info)
+{
+    int bytes_read;
+
+    bytes_read = file_read((void *)buf, buf_len, fh);
+    if (bytes_read != buf_len) {
+        *err = file_error(fh, err_info);
+        /* bytes_read==0 is end of file */
+        if (bytes_read>0 && *err == 0) {
+            *err = WTAP_ERR_SHORT_READ;
+        }
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+
 /* find the transaction type for the data bytes of the next packet
     and the number of data bytes in that packet
    the fd is moved such that it can be used in a subsequent call
@@ -123,7 +146,7 @@ find_next_pkt_dat_type_len(FILE_T fh,
     RESET_STAT_VALS;
 
     do {
-        if (!wtap_read_bytes_or_eof(fh, block, sizeof(block), err, err_info)) {
+        if (read_block(fh, block, sizeof(block), err, err_info) == FALSE) {
             RESET_STAT_VALS;
             return FALSE;
         }
@@ -189,7 +212,7 @@ read_packet_data(FILE_T fh, guint8 dat_trans_type, guint8 *buf, guint16 dat_len,
 
     p = buf;
     while (bytes_count < dat_len) {
-        if (!wtap_read_bytes_or_eof(fh, block, sizeof(block), err, err_info))
+        if (read_block(fh, block, sizeof(block), err, err_info) == FALSE)
             break;
 
         if (block[1] == dat_trans_type) {
@@ -245,8 +268,8 @@ camins_read_packet(FILE_T fh, struct wtap_pkthdr *phdr, Buffer *buf,
     if (!find_next_pkt_dat_type_len(fh, &dat_trans_type, &dat_len, err, err_info))
         return FALSE;
 
-    ws_buffer_assure_space(buf, DVB_CI_PSEUDO_HDR_LEN+dat_len);
-    p = ws_buffer_start_ptr(buf);
+    buffer_assure_space(buf, DVB_CI_PSEUDO_HDR_LEN+dat_len);
+    p = buffer_start_ptr(buf);
     /* NULL check for p is done in create_pseudo_hdr() */
     offset = create_pseudo_hdr(p, dat_trans_type, dat_len);
     if (offset<0) {
@@ -296,20 +319,19 @@ camins_seek_read(wtap *wth, gint64 seek_off,
 
 
 
-wtap_open_return_val camins_open(wtap *wth, int *err, gchar **err_info _U_)
+int camins_open(wtap *wth, int *err, gchar **err_info _U_)
 {
     guint8  found_start_blocks = 0;
     guint8  count = 0;
     guint8  block[2];
+    int     bytes_read;
 
     /* all CAM Inspector files I've looked at have at least two blocks of
        0x00 0xE1 within the first 20 bytes */
     do {
-        if (!wtap_read_bytes(wth->fh, block, sizeof(block), err, err_info)) {
-            if (*err == WTAP_ERR_SHORT_READ)
-                break;
-            return WTAP_OPEN_ERROR;
-        }
+        bytes_read = file_read(block, sizeof(block), wth->fh);
+        if (bytes_read != sizeof(block))
+            break;
 
         if (block[0]==0x00 && block[1] == 0xE1)
             found_start_blocks++;
@@ -318,15 +340,15 @@ wtap_open_return_val camins_open(wtap *wth, int *err, gchar **err_info _U_)
     } while (count<20);
 
     if (found_start_blocks < 2)
-        return WTAP_OPEN_NOT_MINE;   /* no CAM Inspector file */
+        return 0;   /* no CAM Inspector file */
 
     /* rewind the fh so we re-read from the beginning */
     if (-1 == file_seek(wth->fh, 0, SEEK_SET, err))
-        return WTAP_OPEN_ERROR;
+        return -1;
 
    wth->file_encap = WTAP_ENCAP_DVBCI;
    wth->snapshot_length = 0;
-   wth->file_tsprec = WTAP_TSPREC_MSEC;
+   wth->tsprecision = WTAP_FILE_TSPREC_MSEC;
 
    wth->priv = NULL;
 
@@ -335,7 +357,7 @@ wtap_open_return_val camins_open(wtap *wth, int *err, gchar **err_info _U_)
    wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_CAMINS;
 
    *err = 0;
-   return WTAP_OPEN_MINE;
+   return 1;
 }
 
 

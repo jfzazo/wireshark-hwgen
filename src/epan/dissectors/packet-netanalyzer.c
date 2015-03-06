@@ -56,9 +56,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <wiretap/wtap.h>
+#include <epan/wmem/wmem.h>
+#include <expert.h>
 
 void proto_register_netanalyzer(void);
 void proto_reg_handoff_netanalyzer(void);
@@ -67,13 +70,21 @@ void proto_reg_handoff_netanalyzer(void);
 #define INFO_TYPE_OFFSET    18
 
 #define MSK_RX_ERR             0x01
+#define TXT_RX_ERR             "MII RX_ER error"
 #define MSK_ALIGN_ERR          0x02
+#define TXT_ALIGN_ERR          "Alignment error"
 #define MSK_FCS_ERROR          0x04
+#define TXT_FCS_ERROR          "FCS error"
 #define MSK_TOO_LONG           0x08
+#define TXT_TOO_LONG           "Frame too long"
 #define MSK_SFD_ERROR          0x10
+#define TXT_SFD_ERROR          "No valid SFD found"
 #define MSK_SHORT_FRAME        0x20
+#define TXT_SHORT_FRAME        "Frame smaller 64 bytes"
 #define MSK_SHORT_PREAMBLE     0x40
+#define TXT_SHORT_PREAMBLE     "Preamble shorter than 7 bytes"
 #define MSK_LONG_PREAMBLE      0x80
+#define TXT_LONG_PREAMBLE      "Preamble longer than 7 bytes"
 
 static const char *msk_strings[] = {
   "MII RX_ER error",                /* 0x01 */
@@ -135,8 +146,6 @@ static gint  ett_netanalyzer_transparent             = -1;
 static expert_field ei_netanalyzer_header_version_wrong = EI_INIT;
 static expert_field ei_netanalyzer_gpio_def_none = EI_INIT;
 static expert_field ei_netanalyzer_header_version_none = EI_INIT;
-static expert_field ei_netanalyzer_transparent_frame = EI_INIT;
-static expert_field ei_netanalyzer_alignment_error = EI_INIT;
 
 /* common routine for Ethernet and transparent mode */
 static int
@@ -192,8 +201,8 @@ dissect_netanalyzer_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       packet_status = tvb_get_guint8(tvb, 0);
       if (packet_status == 0)
       {
-        ti_status = proto_tree_add_uint_format_value(netanalyzer_header_tree, hf_netanalyzer_status, tvb, 0, 1,
-                                               packet_status, "No Error");
+        ti_status = proto_tree_add_uint_format(netanalyzer_header_tree, hf_netanalyzer_status, tvb, 0, 1,
+                                               packet_status, "Status: No Error");
         proto_item_append_text(ti, "No Error)");
       }
       else
@@ -201,8 +210,8 @@ dissect_netanalyzer_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         wmem_strbuf_t      *strbuf;
         gboolean            first = TRUE;
 
-        ti_status = proto_tree_add_uint_format_value(netanalyzer_header_tree, hf_netanalyzer_status, tvb, 0, 1,
-                                               packet_status, "Error present (expand tree for details)");
+        ti_status = proto_tree_add_uint_format(netanalyzer_header_tree, hf_netanalyzer_status, tvb, 0, 1,
+                                               packet_status, "Status: Error present (expand tree for details)");
         strbuf = wmem_strbuf_new_label(wmem_epan_scope());
         for (idx = 0; idx < 8; idx++)
         {
@@ -235,12 +244,12 @@ dissect_netanalyzer_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       /* decode transparent mode */
       if (tvb_get_guint8(tvb, 1) & MSK_TRANSPARENT_MODE)
       {
-        proto_tree_add_expert(netanalyzer_header_tree, pinfo, &ei_netanalyzer_transparent_frame, tvb, 0, 4);
+        proto_tree_add_text(netanalyzer_header_tree, tvb, 0, 4, "This frame was captured in transparent mode");
         proto_item_append_text(ti, ", Transparent Mode");
 
         if (packet_status & MSK_ALIGN_ERR)
         {
-          proto_tree_add_expert(netanalyzer_header_tree, pinfo, &ei_netanalyzer_alignment_error, tvb, tvb_length(tvb)-1, 1);
+          proto_tree_add_text(netanalyzer_header_tree, tvb, tvb_length(tvb)-1, 1, "Displayed frame data contains additional nibble due to alignment error (upper nibble is not valid)");
         }
       }
     }
@@ -301,6 +310,7 @@ static void
 dissect_netanalyzer(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
   tvbuff_t                *next_tvb;
+  proto_item              *ti = NULL;
 
   if (tvb_length(tvb) >= 4)
   {
@@ -315,8 +325,8 @@ dissect_netanalyzer(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   else
   {
     /* something is wrong */
-    proto_tree_add_expert_format(tree, pinfo, &ei_netanalyzer_header_version_none, tvb, 4, -1,
-        "netANALYZER - No netANALYZER header found");
+    ti = proto_tree_add_text(tree, tvb, 4, tvb_length(tvb)-4, "netANALYZER");
+    expert_add_info(pinfo, ti, &ei_netanalyzer_header_version_none);
   }
 }
 
@@ -325,6 +335,7 @@ dissect_netanalyzer(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 static void
 dissect_netanalyzer_transparent(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
+  proto_item              *ti = NULL;
   proto_tree              *transparent_payload_tree = NULL;
   tvbuff_t                *next_tvb;
 
@@ -337,8 +348,8 @@ dissect_netanalyzer_transparent(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
        * as normally the transparent mode is used for low level analysis
        * where dissecting the frame's content wouldn't make much sense
        * use data dissector instead */
-      transparent_payload_tree = proto_tree_add_subtree(tree, tvb, 4, tvb_length(tvb)-4,
-                                    ett_netanalyzer_transparent, NULL, "Raw packet data");
+      ti = proto_tree_add_text(tree, tvb, 4, tvb_length(tvb)-4, "Raw packet data");
+      transparent_payload_tree = proto_item_add_subtree(ti, ett_netanalyzer_transparent);
       next_tvb = tvb_new_subset_remaining(tvb, 4);
       call_dissector(data_dissector_handle, next_tvb, pinfo, transparent_payload_tree);
 
@@ -349,107 +360,105 @@ dissect_netanalyzer_transparent(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
   else
   {
     /* something is wrong */
-    proto_tree_add_expert_format(tree, pinfo, &ei_netanalyzer_header_version_none, tvb, 4, -1,
-        "netANALYZER transparent mode - No netANALYZER header found");
+    ti = proto_tree_add_text(tree, tvb, 4, tvb_length(tvb)-4, "netANALYZER transparent mode");
+    expert_add_info(pinfo, ti, &ei_netanalyzer_header_version_none);
   }
 }
 
 
 void proto_register_netanalyzer(void)
 {
-  static hf_register_info hf[] = {
-    { &hf_netanalyzer_gpio_number,
-      { "Event on", "netanalyzer.gpio_event.gpio_number",
-        FT_UINT8, BASE_HEX, VALS(gpio_number), 0x0,
-        "Event on GPIO number", HFILL }
-    },
-    { &hf_netanalyzer_gpio_edge,
-      { "Event type", "netanalyzer.gpio_event.gpio_edge",
-        FT_UINT8, BASE_HEX, VALS(gpio_edge_vals), 0x0,
-        "Edge of GPIO event", HFILL }
-    },
-    { &hf_netanalyzer_port,
-      { "Reception Port", "netanalyzer.port",
-        FT_UINT8, BASE_DEC, NULL, 0x0,
-        "netANALYZER reception port", HFILL }
-    },
-    { &hf_netanalyzer_length,
-      { "Ethernet frame length", "netanalyzer.framelen",
-        FT_UINT16, BASE_DEC, NULL, 0x0,
-        "Actual Ethernet frame length", HFILL }
-    },
-    { &hf_netanalyzer_status,
-      { "Status", "netanalyzer.packetstatus",
-        FT_UINT8, BASE_HEX, NULL, MSK_PACKET_STATUS,
-        "Status of Ethernet frame", HFILL }
-    },
-    { &hf_netanalyzer_status_rx_err,
-      { "MII RX_ER error", "netanalyzer.packetstatus.rx_er",
-        FT_BOOLEAN, 8, NULL, MSK_RX_ERR,
-        "RX_ER detected in frame", HFILL }
-    },
-    { &hf_netanalyzer_status_align_err,
-      { "Alignment error", "netanalyzer.packetstatus.alignment_error",
-        FT_BOOLEAN, 8, NULL, MSK_ALIGN_ERR,
-        NULL, HFILL }
-    },
-    { &hf_netanalyzer_status_fcs,
-      { "FCS error", "netanalyzer.packetstatus.fcs_error",
-        FT_BOOLEAN, 8, NULL, MSK_FCS_ERROR,
-        NULL, HFILL }
-    },
-    { &hf_netanalyzer_status_too_long,
-      { "Frame too long", "netanalyzer.packetstatus.too_long",
-        FT_BOOLEAN, 8, NULL, MSK_TOO_LONG,
-        "Frame too long (capture truncated)", HFILL }
-    },
-    { &hf_netanalyzer_status_sfd_error,
-      { "No valid SFD found", "netanalyzer.packetstatus.sfd_error",
-        FT_BOOLEAN, 8, NULL, MSK_SFD_ERROR,
-        "SDF error detected in frame", HFILL }
-    },
-    { &hf_netanalyzer_status_short_frame,
-      { "Frame smaller 64 bytes", "netanalyzer.packetstatus.short_frame",
-        FT_BOOLEAN, 8, NULL, MSK_SHORT_FRAME,
-        NULL, HFILL }
-    },
-    { &hf_netanalyzer_status_short_preamble,
-      { "Preamble shorter than 7 bytes", "netanalyzer.packetstatus.short_preamble",
-        FT_BOOLEAN, 8, NULL, MSK_SHORT_PREAMBLE,
-        NULL, HFILL }
-    },
-    { &hf_netanalyzer_status_long_preamble,
-      { "Preamble longer than 7 bytes", "netanalyzer.packetstatus.long_preamble",
-        FT_BOOLEAN, 8, NULL, MSK_LONG_PREAMBLE,
-        NULL, HFILL }
-    },
-  };
+    static hf_register_info hf[] = {
+        { &hf_netanalyzer_gpio_number,
+          { "Event on", "netanalyzer.gpio_event.gpio_number",
+            FT_UINT8, BASE_HEX, VALS(gpio_number), 0x0,
+            "Event on GPIO number", HFILL }
+        },
+        { &hf_netanalyzer_gpio_edge,
+          { "Event type", "netanalyzer.gpio_event.gpio_edge",
+            FT_UINT8, BASE_HEX, VALS(gpio_edge_vals), 0x0,
+            "Edge of GPIO event", HFILL }
+        },
+        { &hf_netanalyzer_port,
+          { "Reception Port", "netanalyzer.port",
+            FT_UINT8, BASE_DEC, NULL, 0x0,
+            "netANALYZER reception port", HFILL }
+        },
+        { &hf_netanalyzer_length,
+          { "Ethernet frame length", "netanalyzer.framelen",
+            FT_UINT16, BASE_DEC, NULL, 0x0,
+            "Actual Ethernet frame length", HFILL }
+        },
+        { &hf_netanalyzer_status,
+          { "Frame Status", "netanalyzer.packetstatus",
+            FT_UINT8, BASE_HEX, NULL, MSK_PACKET_STATUS,
+            "Status of Ethernet frame", HFILL }
+        },
+        { &hf_netanalyzer_status_rx_err,
+          { TXT_RX_ERR, "netanalyzer.packetstatus.rx_er",
+            FT_BOOLEAN, 8, NULL, MSK_RX_ERR,
+            "RX_ER detected in frame", HFILL }
+        },
+        { &hf_netanalyzer_status_align_err,
+          { TXT_ALIGN_ERR, "netanalyzer.packetstatus.alignment_error",
+            FT_BOOLEAN, 8, NULL, MSK_ALIGN_ERR,
+            "Alignment error detected in frame", HFILL }
+        },
+        { &hf_netanalyzer_status_fcs,
+          { TXT_FCS_ERROR, "netanalyzer.packetstatus.fcs_error",
+            FT_BOOLEAN, 8, NULL, MSK_FCS_ERROR,
+            "FCS error detected in frame", HFILL }
+        },
+        { &hf_netanalyzer_status_too_long,
+          { TXT_TOO_LONG, "netanalyzer.packetstatus.too_long",
+            FT_BOOLEAN, 8, NULL, MSK_TOO_LONG,
+            "Frame too long (capture truncated)", HFILL }
+        },
+        { &hf_netanalyzer_status_sfd_error,
+          { TXT_SFD_ERROR, "netanalyzer.packetstatus.sfd_error",
+            FT_BOOLEAN, 8, NULL, MSK_SFD_ERROR,
+            "SDF error detected in frame", HFILL }
+        },
+        { &hf_netanalyzer_status_short_frame,
+          { TXT_SHORT_FRAME, "netanalyzer.packetstatus.short_frame",
+            FT_BOOLEAN, 8, NULL, MSK_SHORT_FRAME,
+            "Frame too short", HFILL }
+        },
+        { &hf_netanalyzer_status_short_preamble,
+          { TXT_SHORT_PREAMBLE, "netanalyzer.packetstatus.short_preamble",
+            FT_BOOLEAN, 8, NULL, MSK_SHORT_PREAMBLE,
+            "Preamble shorter than 7 bytes", HFILL }
+        },
+        { &hf_netanalyzer_status_long_preamble,
+          { TXT_LONG_PREAMBLE, "netanalyzer.packetstatus.long_preamble",
+            FT_BOOLEAN, 8, NULL, MSK_LONG_PREAMBLE,
+            "Preamble longer than 7 bytes", HFILL }
+        },
+    };
 
-  static gint *ett[] = {
-    &ett_netanalyzer,
-    &ett_netanalyzer_status,
-    &ett_netanalyzer_transparent,
-  };
+    static gint *ett[] = {
+        &ett_netanalyzer,
+        &ett_netanalyzer_status,
+        &ett_netanalyzer_transparent,
+    };
 
-  static ei_register_info ei[] = {
-    { &ei_netanalyzer_header_version_wrong, { "netanalyzer.header_version.wrong", PI_PROTOCOL, PI_ERROR, "Wrong netANALYZER header version", EXPFILL }},
-    { &ei_netanalyzer_gpio_def_none, { "netanalyzer.gpio_def_none", PI_MALFORMED, PI_ERROR, "No valid netANALYZER GPIO definition found", EXPFILL }},
-    { &ei_netanalyzer_header_version_none, { "netanalyzer.header_version.none", PI_MALFORMED, PI_ERROR, "No netANALYZER header found", EXPFILL }},
-    { &ei_netanalyzer_transparent_frame, { "netanalyzer.transparent_frame", PI_PROTOCOL, PI_NOTE, "This frame was captured in transparent mode", EXPFILL }},
-    { &ei_netanalyzer_alignment_error, { "netanalyzer.alignment_error", PI_PROTOCOL, PI_WARN, "Displayed frame data contains additional nibble due to alignment error (upper nibble is not valid)", EXPFILL }},
-  };
+    static ei_register_info ei[] = {
+        { &ei_netanalyzer_header_version_wrong, { "netanalyzer.header_version.wrong", PI_PROTOCOL, PI_ERROR, "Wrong netANALYZER header version", EXPFILL }},
+        { &ei_netanalyzer_gpio_def_none, { "netanalyzer.gpio_def_none", PI_MALFORMED, PI_ERROR, "No valid netANALYZER GPIO definition found", EXPFILL }},
+        { &ei_netanalyzer_header_version_none, { "netanalyzer.header_version.none", PI_MALFORMED, PI_ERROR, "No netANALYZER header found", EXPFILL }},
+    };
 
-  expert_module_t* expert_netanalyzer;
+    expert_module_t* expert_netanalyzer;
 
-  proto_netanalyzer = proto_register_protocol (
-    "netANALYZER",            /* name */
-    "netANALYZER",            /* short name */
-    "netanalyzer" );          /* abbrev */
+    proto_netanalyzer = proto_register_protocol (
+                          "netANALYZER",            /* name */
+                          "netANALYZER",            /* short name */
+                          "netanalyzer" );          /* abbrev */
 
-  proto_register_field_array(proto_netanalyzer, hf, array_length(hf));
-  proto_register_subtree_array(ett, array_length(ett));
-  expert_netanalyzer = expert_register_protocol(proto_netanalyzer);
-  expert_register_field_array(expert_netanalyzer, ei, array_length(ei));
+    proto_register_field_array(proto_netanalyzer, hf, array_length(hf));
+    proto_register_subtree_array(ett, array_length(ett));
+    expert_netanalyzer = expert_register_protocol(proto_netanalyzer);
+    expert_register_field_array(expert_netanalyzer, ei, array_length(ei));
 
 }
 
@@ -467,16 +476,3 @@ void proto_reg_handoff_netanalyzer(void)
   dissector_add_uint("wtap_encap", WTAP_ENCAP_NETANALYZER,             netana_handle);
   dissector_add_uint("wtap_encap", WTAP_ENCAP_NETANALYZER_TRANSPARENT, netana_handle_transparent);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

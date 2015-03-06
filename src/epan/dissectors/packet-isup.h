@@ -31,11 +31,10 @@
 
 typedef struct _isup_tap_rec_t {
     guint8      message_type;
-    /* added for VoIP calls analysis, see ui/voip_calls.c*/
+    /* added for VoIP calls analysis, see gtk/voip_calls.c*/
     gchar           *called_number;
     gchar           *calling_number;
     guint8          cause_value;
-    guint32         circuit_id;
 } isup_tap_rec_t;
 
 
@@ -179,15 +178,15 @@ void dissect_isup_cause_indicators_parameter(tvbuff_t *parameter_tvb, proto_tree
 WS_DLL_PUBLIC
 void dissect_isup_redirection_information_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tree, proto_item *parameter_item);
 WS_DLL_PUBLIC
-void dissect_isup_original_called_number_parameter(tvbuff_t *parameter_tvb, packet_info *pinfo, proto_tree *parameter_tree, proto_item *parameter_item);
+void dissect_isup_original_called_number_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tree, proto_item *parameter_item);
 WS_DLL_PUBLIC
 void dissect_isup_redirecting_number_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tree, proto_item *parameter_item);
 
 void dissect_isup_location_number_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tree, proto_item *parameter_item);
 
-void dissect_isup_generic_number_parameter(tvbuff_t *parameter_tvb, packet_info *pinfo, proto_tree *parameter_tree, proto_item *parameter_item);
+void dissect_isup_generic_number_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tree, proto_item *parameter_item);
 
-void dissect_japan_isup_additonal_user_cat(tvbuff_t *parameter_tvb, packet_info *pinfo, proto_tree *parameter_tree, proto_item *parameter_item);
+void dissect_japan_isup_additonal_user_cat(tvbuff_t *parameter_tvb, proto_tree *parameter_tree, proto_item *parameter_item);
 extern int dissect_codec_mode(proto_tree *tree, tvbuff_t *tvb, int offset, int len);
 
 #endif  /* PACKET_ISUP_H */

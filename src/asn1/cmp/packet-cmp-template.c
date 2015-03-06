@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include <epan/oids.h>
@@ -132,7 +133,8 @@ static int dissect_cmp_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pa
 		proto_tree_add_item(tree, hf_cmp_tcptrans_type, tvb, offset++, 1, ENC_BIG_ENDIAN);
 	} else {
 		/* post RFC2510 TCP transport - the former "type" field is now "version" */
-		tcptrans_tree = proto_tree_add_subtree(tree, tvb, offset, 7, ett_cmp, NULL, "TCP transport");
+		ti = proto_tree_add_text(tree, tvb, offset, 7, "TCP transport");
+		tcptrans_tree = proto_item_add_subtree(ti, ett_cmp);
 		pdu_type=tvb_get_guint8(tvb, 6);
 		proto_tree_add_item(tcptrans_tree, hf_cmp_tcptrans_len, tvb, offset, 4, ENC_BIG_ENDIAN);
 		offset += 4;
@@ -190,8 +192,7 @@ static int dissect_cmp_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pa
 	return offset;
 }
 
-static guint get_cmp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                             int offset, void *data _U_)
+static guint get_cmp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
 	guint32 plen;
 
@@ -258,7 +259,7 @@ dissect_cmp_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void
 	tcp_dissect_pdus(tvb, pinfo, parent_tree, cmp_desegment, offset, get_cmp_pdu_len,
 			dissect_cmp_tcp_pdu, data);
 
-	return tvb_captured_length(tvb);
+	return tvb_length(tvb);
 }
 
 

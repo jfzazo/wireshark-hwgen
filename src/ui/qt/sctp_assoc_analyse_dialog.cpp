@@ -23,12 +23,11 @@
 
 #include "sctp_assoc_analyse_dialog.h"
 #include "ui_sctp_assoc_analyse_dialog.h"
-
-#include "qt_ui_utils.h"
 #include "sctp_graph_dialog.h"
 #include "sctp_graph_arwnd_dialog.h"
 #include "sctp_graph_byte_dialog.h"
 #include "sctp_chunk_statistics_dialog.h"
+
 
 SCTPAssocAnalyseDialog::SCTPAssocAnalyseDialog(QWidget *parent, sctp_assoc_info_t *assoc, capture_file *cf, SCTPAllAssocsDialog* caller) :
     QDialog(parent),
@@ -47,10 +46,6 @@ SCTPAssocAnalyseDialog::SCTPAssocAnalyseDialog(QWidget *parent, sctp_assoc_info_
         cf_retap_packets(cap_file_);
         selected_assoc = findAssocForPacket(cap_file_);
     }
-    Qt::WindowFlags flags = Qt::Window | Qt::WindowSystemMenuHint
-            | Qt::WindowMinimizeButtonHint
-            | Qt::WindowCloseButtonHint;
-    this->setWindowFlags(flags);
     this->setWindowTitle(QString(tr("SCTP Analyse Association: %1 Port1 %2 Port2 %3")).arg(cf_get_display_name(cap_file_)).arg(selected_assoc->port1).arg(selected_assoc->port2));
     fillTabs();
 }
@@ -131,8 +126,10 @@ void SCTPAssocAnalyseDialog::fillTabs()
 
             store = (address *)(list->data);
             if (store->type != AT_NONE) {
-                if ((store->type == AT_IPv4) || (store->type == AT_IPv6)) {
-                    ui->listWidgetEP1->addItem(address_to_qstring(store));
+                if (store->type == AT_IPv4) {
+                    ui->listWidgetEP1->addItem(QString("%1").arg(ip_to_str((const guint8 *)(store->data))));
+                } else if (store->type == AT_IPv6) {
+                    ui->listWidgetEP1->addItem(QString("%1").arg(ip6_to_str((const struct e_in6_addr *)(store->data))));
                 }
             }
             list = g_list_next(list);
@@ -183,8 +180,10 @@ void SCTPAssocAnalyseDialog::fillTabs()
 
             store = (address *)(list->data);
             if (store->type != AT_NONE) {
-                if ((store->type == AT_IPv4) || (store->type == AT_IPv6)) {
-                    ui->listWidgetEP2->addItem(address_to_qstring(store));
+                if (store->type == AT_IPv4) {
+                    ui->listWidgetEP2->addItem(QString("%1").arg(ip_to_str((const guint8 *)(store->data))));
+                } else if (store->type == AT_IPv6) {
+                    ui->listWidgetEP2->addItem(QString("%1").arg(ip6_to_str((const struct e_in6_addr *)(store->data))));
                 }
             }
             list = g_list_next(list);

@@ -23,7 +23,7 @@
  *
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,16 +34,8 @@
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_GETOPT_H
-#include <getopt.h>
-#endif
-
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
-#endif
-
-#ifdef HAVE_LIBZ
-#include <zlib.h>      /* to get the libz version number */
 #endif
 
 #include <string.h>
@@ -53,14 +45,12 @@
 #include <wsutil/wsgetopt.h>
 #endif
 
-#include <wsutil/clopts_common.h>
 #include <wsutil/strnatcmp.h>
 #include <wsutil/file_util.h>
-#include <wsutil/cmdarg_err.h>
-#include <wsutil/crash_info.h>
-#include <wsutil/ws_version_info.h>
 
 #include <wiretap/merge.h>
+
+#include "version.h"
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
@@ -70,12 +60,67 @@
 #include <wsutil/unicode-utils.h>
 #endif /* _WIN32 */
 
+static int
+get_natural_int(const char *string, const char *name)
+{
+  long  number;
+  char *p;
+
+  number = strtol(string, &p, 10);
+  if (p == string || *p != '\0') {
+    fprintf(stderr, "mergecap: The specified %s \"%s\" isn't a decimal number\n",
+            name, string);
+    exit(1);
+  }
+  if (number < 0) {
+    fprintf(stderr, "mergecap: The specified %s is a negative number\n", name);
+    exit(1);
+  }
+  if (number > INT_MAX) {
+    fprintf(stderr, "mergecap: The specified %s is too large (greater than %d)\n",
+            name, INT_MAX);
+    exit(1);
+  }
+  return (int)number;
+}
+
+static int
+get_positive_int(const char *string, const char *name)
+{
+  int number;
+
+  number = get_natural_int(string, name);
+
+  if (number == 0) {
+    fprintf(stderr, "mergecap: The specified %s is zero\n", name);
+    exit(1);
+  }
+
+  return number;
+}
+
 /*
  * Show the usage
  */
 static void
-print_usage(FILE *output)
+usage(gboolean is_error)
 {
+  FILE *output;
+
+  if (!is_error) {
+    output = stdout;
+  }
+  else {
+    output = stderr;
+  }
+
+  fprintf(output, "Mergecap %s"
+#ifdef GITVERSION
+          " (" GITVERSION " from " GITBRANCH ")"
+#endif
+          "\n", VERSION);
+  fprintf(output, "Merge two or more capture files into one.\n");
+  fprintf(output, "See http://www.wireshark.org for more information.\n");
   fprintf(output, "\n");
   fprintf(output, "Usage: mergecap [options] -w <outfile>|- <infile> [<infile> ...]\n");
   fprintf(output, "\n");
@@ -95,27 +140,6 @@ print_usage(FILE *output)
   fprintf(output, "  -v                verbose output.\n");
 }
 
-/*
- * Report an error in command-line arguments.
- */
-static void
-mergecap_cmdarg_err(const char *fmt, va_list ap)
-{
-  fprintf(stderr, "mergecap: ");
-  vfprintf(stderr, fmt, ap);
-  fprintf(stderr, "\n");
-}
-
-/*
- * Report additional information for an error in command-line arguments.
- */
-static void
-mergecap_cmdarg_err_cont(const char *fmt, va_list ap)
-{
-  vfprintf(stderr, fmt, ap);
-  fprintf(stderr, "\n");
-}
-
 struct string_elem {
   const char *sstr;     /* The short string */
   const char *lstr;     /* The long string */
@@ -131,8 +155,8 @@ string_compare(gconstpointer a, gconstpointer b)
 static gint
 string_nat_compare(gconstpointer a, gconstpointer b)
 {
-  return ws_ascii_strnatcmp(((const struct string_elem *)a)->sstr,
-                            ((const struct string_elem *)b)->sstr);
+  return strnatcmp(((const struct string_elem *)a)->sstr,
+                   ((const struct string_elem *)b)->sstr);
 }
 
 static void
@@ -183,43 +207,10 @@ list_encap_types(void) {
   g_free(encaps);
 }
 
-static void
-get_mergecap_compiled_info(GString *str)
-{
-  /* LIBZ */
-  g_string_append(str, ", ");
-#ifdef HAVE_LIBZ
-  g_string_append(str, "with libz ");
-#ifdef ZLIB_VERSION
-  g_string_append(str, ZLIB_VERSION);
-#else /* ZLIB_VERSION */
-  g_string_append(str, "(version unknown)");
-#endif /* ZLIB_VERSION */
-#else /* HAVE_LIBZ */
-  g_string_append(str, "without libz");
-#endif /* HAVE_LIBZ */
-}
-
-static void
-get_mergecap_runtime_info(GString *str)
-{
-  /* zlib */
-#if defined(HAVE_LIBZ) && !defined(_WIN32)
-  g_string_append_printf(str, ", with libz %s", zlibVersion());
-#endif
-}
-
 int
 main(int argc, char *argv[])
 {
-  GString            *comp_info_str;
-  GString            *runtime_info_str;
   int                 opt;
-  static const struct option long_options[] = {
-      {(char *)"help", no_argument, NULL, 'h'},
-      {(char *)"version", no_argument, NULL, 'V'},
-      {0, 0, 0, 0 }
-  };
   gboolean            do_append          = FALSE;
   gboolean            verbose            = FALSE;
   int                 in_file_count      = 0;
@@ -236,35 +227,19 @@ main(int argc, char *argv[])
   struct wtap_pkthdr *phdr, snap_phdr;
   wtap_dumper        *pdh;
   int                 open_err, read_err = 0, write_err, close_err;
-  gchar              *err_info, *write_err_info = NULL;
+  gchar              *err_info;
   int                 err_fileno;
   char               *out_filename       = NULL;
   gboolean            got_read_error     = FALSE, got_write_error = FALSE;
   int                 count;
-
-  cmdarg_err_init(mergecap_cmdarg_err, mergecap_cmdarg_err_cont);
 
 #ifdef _WIN32
   arg_list_utf_16to8(argc, argv);
   create_app_running_mutex();
 #endif /* _WIN32 */
 
-  /* Get the compile-time version information string */
-  comp_info_str = get_compiled_version_info(NULL, get_mergecap_compiled_info);
-
-  /* Get the run-time version information string */
-  runtime_info_str = get_runtime_version_info(get_mergecap_runtime_info);
-
-  /* Add it to the information to be reported on a crash. */
-  ws_add_crash_info("Mergecap (Wireshark) %s\n"
-       "\n"
-       "%s"
-       "\n"
-       "%s",
-    get_ws_vcs_version_info(), comp_info_str->str, runtime_info_str->str);
-
   /* Process the options first */
-  while ((opt = getopt_long(argc, argv, "aF:hs:T:vVw:", long_options, NULL)) != -1) {
+  while ((opt = getopt(argc, argv, "aF:hs:T:vw:")) != -1) {
 
     switch (opt) {
     case 'a':
@@ -282,11 +257,7 @@ main(int argc, char *argv[])
       break;
 
     case 'h':
-      printf("Mergecap (Wireshark) %s\n"
-             "Merge two or more capture files into one.\n"
-             "See http://www.wireshark.org for more information.\n",
-             get_ws_vcs_version_info());
-      print_usage(stdout);
+      usage(FALSE);
       exit(0);
       break;
 
@@ -308,13 +279,6 @@ main(int argc, char *argv[])
       verbose = TRUE;
       break;
 
-    case 'V':
-      show_version("Mergecap (Wireshark)", comp_info_str, runtime_info_str);
-      g_string_free(comp_info_str, TRUE);
-      g_string_free(runtime_info_str, TRUE);
-      exit(0);
-      break;
-
     case 'w':
       out_filename = optarg;
       break;
@@ -328,7 +292,7 @@ main(int argc, char *argv[])
         list_encap_types();
         break;
       default:
-        print_usage(stderr);
+        usage(TRUE);
       }
       exit(1);
       break;
@@ -354,9 +318,14 @@ main(int argc, char *argv[])
                            &open_err, &err_info, &err_fileno)) {
     fprintf(stderr, "mergecap: Can't open %s: %s\n", argv[optind + err_fileno],
             wtap_strerror(open_err));
-    if (err_info != NULL) {
+    switch (open_err) {
+
+    case WTAP_ERR_UNSUPPORTED:
+    case WTAP_ERR_UNSUPPORTED_ENCAP:
+    case WTAP_ERR_BAD_FILE:
       fprintf(stderr, "(%s)\n", err_info);
       g_free(err_info);
+      break;
     }
     return 2;
   }
@@ -442,7 +411,7 @@ main(int argc, char *argv[])
     shb_hdr->opt_comment   = comment_gstr->str; /* NULL if not available */
     shb_hdr->shb_hardware  = NULL;              /* NULL if not available, UTF-8 string containing the description of the hardware used to create this section. */
     shb_hdr->shb_os        = NULL;              /* NULL if not available, UTF-8 string containing the name of the operating system used to create this section. */
-    shb_hdr->shb_user_appl = g_strdup("mergecap"); /* NULL if not available, UTF-8 string containing the name of the application used to create this section. */
+    shb_hdr->shb_user_appl = "mergecap";        /* NULL if not available, UTF-8 string containing the name of the application used to create this section. */
 
     pdh = wtap_dump_fdopen_ng(out_fd, file_type, frame_type, snaplen,
                               FALSE /* compressed */, shb_hdr, NULL /* wtapng_iface_descriptions_t *idb_inf */, &open_err);
@@ -490,7 +459,7 @@ main(int argc, char *argv[])
       phdr = &snap_phdr;
     }
 
-    if (!wtap_dump(pdh, phdr, wtap_buf_ptr(in_file->wth), &write_err, &write_err_info)) {
+    if (!wtap_dump(pdh, phdr, wtap_buf_ptr(in_file->wth), &write_err)) {
       got_write_error = TRUE;
       break;
     }
@@ -518,9 +487,14 @@ main(int argc, char *argv[])
       if (in_files[i].state == GOT_ERROR) {
         fprintf(stderr, "mergecap: Error reading %s: %s\n",
                 in_files[i].filename, wtap_strerror(read_err));
-        if (err_info != NULL) {
+        switch (read_err) {
+
+        case WTAP_ERR_UNSUPPORTED:
+        case WTAP_ERR_UNSUPPORTED_ENCAP:
+        case WTAP_ERR_BAD_FILE:
           fprintf(stderr, "(%s)\n", err_info);
           g_free(err_info);
+          break;
         }
       }
     }
@@ -529,7 +503,7 @@ main(int argc, char *argv[])
   if (got_write_error) {
     switch (write_err) {
 
-    case WTAP_ERR_UNWRITABLE_ENCAP:
+    case WTAP_ERR_UNSUPPORTED_ENCAP:
       /*
        * This is a problem with the particular frame we're writing and
        * the file type and subtype we're wwriting; note that, and
@@ -546,33 +520,9 @@ main(int argc, char *argv[])
        * the file type and subtype we're wwriting; note that, and
        * report the frame number and file type/subtype.
        */
-      fprintf(stderr, "mergecap: Frame %u of \"%s\" is too large for a \"%s\" file.\n",
+      fprintf(stderr, "mergecap: Frame %u of \"%s\" is too large for a \"%s\" file\n.",
               in_file ? in_file->packet_num : 0, in_file ? in_file->filename : "UNKNOWN",
               wtap_file_type_subtype_string(file_type));
-      break;
-
-    case WTAP_ERR_UNWRITABLE_REC_TYPE:
-      /*
-       * This is a problem with the particular record we're writing and
-       * the file type and subtype we're wwriting; note that, and
-       * report the record number and file type/subtype.
-       */
-      fprintf(stderr, "mergecap: Record %u of \"%s\" has a record type that can't be saved in a \"%s\" file.\n",
-              in_file ? in_file->packet_num : 0, in_file ? in_file->filename : "UNKNOWN",
-              wtap_file_type_subtype_string(file_type));
-      break;
-
-    case WTAP_ERR_UNWRITABLE_REC_DATA:
-      /*
-       * This is a problem with the particular record we're writing and
-       * the file type and subtype we're wwriting; note that, and
-       * report the record number and file type/subtype.
-       */
-      fprintf(stderr, "mergecap: Record %u of \"%s\" has data that can't be saved in a \"%s\" file.\n(%s)\n",
-              in_file ? in_file->packet_num : 0, in_file ? in_file->filename : "UNKNOWN",
-              wtap_file_type_subtype_string(file_type),
-              write_err_info != NULL ? write_err_info : "no information supplied");
-      g_free(write_err_info);
       break;
 
     default:

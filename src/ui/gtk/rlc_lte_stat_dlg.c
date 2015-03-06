@@ -35,11 +35,12 @@
 #include "ui/gtk/gtkglobals.h"
 
 #include <epan/packet.h>
+#include <epan/packet_info.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-rlc-lte.h>
 
 #include "ui/simple_dialog.h"
-#include <epan/stat_groups.h>
+#include "../stat_menu.h"
 
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/gui_stat_menu.h"
@@ -48,6 +49,7 @@
 #include "ui/gtk/help_dlg.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_rlc_lte_stat(void);
 
@@ -1314,7 +1316,7 @@ static void gtk_rlc_lte_stat_init(const char *opt_arg, void *userdata _U_)
     g_snprintf(title, sizeof(title), "Wireshark: LTE RLC Statistics: %s",
                display_name);
     g_free(display_name);
-    hs->dlg_w = window_new_with_geom(GTK_WINDOW_TOPLEVEL, title, "LTE RLC Statistics", GTK_WIN_POS_CENTER_ON_PARENT);
+    hs->dlg_w = window_new_with_geom(GTK_WINDOW_TOPLEVEL, title, "LTE RLC Statistics");
 
     /* Window size */
     gtk_window_set_default_size(GTK_WINDOW(hs->dlg_w), 600, 300);
@@ -1647,7 +1649,7 @@ static void gtk_rlc_lte_stat_init(const char *opt_arg, void *userdata _U_)
 
 
 static tap_param rlc_lte_stat_params[] = {
-    { PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+    { PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg rlc_lte_stat_dlg = {

@@ -38,9 +38,13 @@
 
 #include "config.h"
 
-#include <math.h>
+#include <glib.h>
 
 #include <epan/packet.h>
+#include <epan/params.h>
+#include <epan/strutil.h>
+
+#include <math.h>
 
 #include "packet-rmt-common.h"
 
@@ -86,12 +90,6 @@ static int hf_send_rate = -1;
 static int hf_cenc = -1;
 static int hf_flute_version = -1;
 static int hf_fdt_instance_id = -1;
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_cc_rate = -1;
-static int hf_cc_rtt = -1;
-static int hf_cc_flags = -1;
-static int hf_cc_loss = -1;
-static int hf_cc_sequence = -1;
 
 static int ett_main = -1;
 static int ett_fsize = -1;
@@ -212,11 +210,16 @@ int lct_ext_decode(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, guint of
                 break;
 
             case 3: /* EXT_CC RATE */
-                proto_tree_add_item(ext_tree, hf_cc_sequence, tvb, offset+2, 2, ENC_BIG_ENDIAN);
-                proto_tree_add_item(ext_tree, hf_cc_flags, tvb, offset+4, 1, ENC_BIG_ENDIAN);
-                proto_tree_add_item(ext_tree, hf_cc_rtt, tvb, offset+5, 1, ENC_BIG_ENDIAN);
-                proto_tree_add_double(ext_tree, hf_cc_loss, tvb, offset+6, 2, tvb_get_ntohs(tvb, offset+6)/65535.0);
-                proto_tree_add_item(ext_tree, hf_cc_rate, tvb, offset+8, 2, ENC_BIG_ENDIAN);
+                proto_tree_add_text(ext_tree, tvb, offset+2, 2,
+                                    "CC Sequence: %u", tvb_get_ntohs(tvb, offset+2));
+                proto_tree_add_text(ext_tree, tvb, offset+4, 1,
+                                    "CC Flags: 0x%x", tvb_get_guint8(tvb, offset+4));
+                proto_tree_add_text(ext_tree, tvb, offset+5, 1,
+                                    "CC RTT: %u", tvb_get_guint8(tvb, offset+5));
+                proto_tree_add_text(ext_tree, tvb, offset+6, 2,
+                                    "CC Loss: %g", tvb_get_ntohs(tvb, offset+6)/65535.0);
+                proto_tree_add_text(ext_tree, tvb, offset+8, 2,
+                                    "CC Rate: %u", tvb_get_ntohs(tvb, offset+8));
                 break;
 
             case 64: /* EXT_FTI */
@@ -455,7 +458,7 @@ dissect_lct(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         if (toi_size <= 8)
             col_append_sep_fstr(pinfo->cinfo, COL_INFO, " ", "TOI: %" G_GINT64_MODIFIER "u", toi);
         else
-            col_append_sep_fstr(pinfo->cinfo, COL_INFO, " ", "TOI: 0x%s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, toi_size));
+            col_append_sep_fstr(pinfo->cinfo, COL_INFO, " ", "TOI: 0x%s", tvb_bytes_to_ep_str(tvb, offset, toi_size));
         offset += toi_size;
     }
 
@@ -653,31 +656,6 @@ proto_register_rmt_lct(void)
         { &hf_fdt_instance_id,
           { "FDT Instance ID", "rmt-lct.fdt_instance_id",
             FT_UINT32, BASE_DEC, NULL, 0x000FFFFF,
-            NULL, HFILL }
-        },
-        { &hf_cc_sequence,
-          { "CC Sequence", "rmt-lct.cc_sequence",
-            FT_UINT16, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }
-        },
-        { &hf_cc_flags,
-          { "CC Flags", "rmt-lct.cc_flags",
-            FT_UINT8, BASE_HEX, NULL, 0x0,
-            NULL, HFILL }
-        },
-        { &hf_cc_rtt,
-          { "CC RTT", "rmt-lct.cc_rtt",
-            FT_UINT8, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }
-        },
-        { &hf_cc_loss,
-          { "CC Loss", "rmt-lct.cc_loss",
-            FT_DOUBLE, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }
-        },
-        { &hf_cc_rate,
-          { "CC Rate", "rmt-lct.cc_rate",
-            FT_UINT16, BASE_DEC, NULL, 0x0,
             NULL, HFILL }
         },
     };

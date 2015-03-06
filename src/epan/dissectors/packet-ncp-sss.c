@@ -24,7 +24,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/strutil.h>
 #include "packet-ncp-int.h"
 #include "packet-ncp-sss.h"
 
@@ -506,7 +508,8 @@ dissect_sss_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ncp_tree, ncp
 
     switch (subfunc) {
     case 1:
-        atree = proto_tree_add_subtree_format(ncp_tree, tvb, foffset, -1, ett_sss, NULL, "Packet Type: %s", val_to_str(subfunc, sss_func_enum, "Unknown (%d)"));
+        aitem = proto_tree_add_text(ncp_tree, tvb, foffset, tvb_length_remaining(tvb, foffset), "Packet Type: %s", val_to_str(subfunc, sss_func_enum, "Unknown (%d)"));
+        atree = proto_item_add_subtree(aitem, ett_sss);
         proto_tree_add_item(atree, hf_ping_version, tvb, foffset, 4, ENC_LITTLE_ENDIAN);
         foffset += 4;
         proto_tree_add_item(atree, hf_flags, tvb, foffset, 4, ENC_LITTLE_ENDIAN);
@@ -591,6 +594,7 @@ dissect_sss_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ncp_tree, ncp
             }
         } else {
             col_set_str(pinfo->cinfo, COL_INFO, "C SecretStore - fragment");
+            proto_tree_add_text(ncp_tree, tvb, foffset, 4, "Fragment");
 
             /* Fragments don't really carry a subverb so store 0xff as the subverb number */
             if (request_value) {
@@ -598,7 +602,7 @@ dissect_sss_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ncp_tree, ncp
             }
             if (tvb_length_remaining(tvb, foffset) > 8) {
                 foffset += 4;
-                proto_tree_add_item(ncp_tree, hf_enc_data, tvb, foffset, -1, ENC_NA);
+                proto_tree_add_item(ncp_tree, hf_enc_data, tvb, foffset, tvb_length_remaining(tvb, foffset), ENC_NA);
             }
         }
         break;
@@ -623,6 +627,7 @@ dissect_sss_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ncp_tree, guint
     const gchar         *str;
 
     proto_tree          *atree;
+    proto_item          *aitem;
     proto_item          *expert_item;
 
     foffset = 8;
@@ -630,7 +635,8 @@ dissect_sss_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ncp_tree, guint
     if (tvb_length_remaining(tvb, foffset)<4) {
         return;
     }
-    atree = proto_tree_add_subtree_format(ncp_tree, tvb, foffset, -1, ett_sss, NULL, "Function: %s", val_to_str_const(subfunc, sss_func_enum, "Unknown"));
+    aitem = proto_tree_add_text(ncp_tree, tvb, foffset, -1, "Function: %s", val_to_str_const(subfunc, sss_func_enum, "Unknown"));
+    atree = proto_item_add_subtree(aitem, ett_sss);
     switch (subfunc) {
     case 1:
         proto_tree_add_item(atree, hf_flags, tvb, foffset, 4, ENC_LITTLE_ENDIAN);
@@ -643,7 +649,7 @@ dissect_sss_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ncp_tree, guint
             subverb = request_value->req_nds_flags;
             str = try_val_to_str(subverb, sss_verb_enum);
             if (str) {
-                proto_tree_add_uint(atree, hf_verb, tvb, foffset, -1, subverb);
+                proto_tree_add_text(atree, tvb, foffset, tvb_length_remaining(tvb, foffset), "Verb: %s", str);
             }
         }
         proto_tree_add_item(atree, hf_length, tvb, foffset, 4, ENC_LITTLE_ENDIAN);
@@ -662,7 +668,7 @@ dissect_sss_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ncp_tree, guint
                 col_add_fstr(pinfo->cinfo, COL_INFO, "R Error - %s", val_to_str(return_code, sss_errors_enum, "Unknown (%d)"));
                 /*foffset+=4;*/
             } else {
-                proto_tree_add_uint_format_value(atree, hf_return_code, tvb, foffset, 4, 0, "Success (0x00000000)");
+                proto_tree_add_text(atree, tvb, foffset, 4, "Return Code: Success (0x00000000)");
                 if (tvb_length_remaining(tvb, foffset) > 8) {
                     foffset += 4;
                     if (request_value && subverb == 6) {
@@ -686,7 +692,7 @@ dissect_sss_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ncp_tree, guint
                 }
             }
         } else {
-            proto_tree_add_uint_format_value(atree, hf_return_code, tvb, foffset, 4, 0, "Success (0x00000000)");
+            proto_tree_add_text(atree, tvb, foffset, 4, "Return Code: Success (0x00000000)");
             if (tvb_length_remaining(tvb, foffset) > 8) {
                 foffset += 4;
                 proto_tree_add_item(atree, hf_enc_data, tvb, foffset, tvb_length_remaining(tvb, foffset), ENC_NA);

@@ -41,11 +41,15 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
+
+#include <string.h>
 
 #include "packet-ber.h"
 #include "packet-acse.h"
@@ -185,8 +189,7 @@ static int hf_acse_ACSE_requirements_higher_level_association = -1;
 static int hf_acse_ACSE_requirements_nested_association = -1;
 
 /*--- End of included file: packet-acse-hf.c ---*/
-#line 68 "../../asn1/acse/packet-acse-template.c"
-static gint hf_acse_user_data = -1;
+#line 72 "../../asn1/acse/packet-acse-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_acse = -1;
@@ -230,11 +233,9 @@ static gint ett_acse_Authentication_value_other = -1;
 static gint ett_acse_Authentication_value = -1;
 
 /*--- End of included file: packet-acse-ett.c ---*/
-#line 73 "../../asn1/acse/packet-acse-template.c"
+#line 76 "../../asn1/acse/packet-acse-template.c"
 
 static expert_field ei_acse_dissector_not_available = EI_INIT;
-static expert_field ei_acse_malformed = EI_INIT;
-static expert_field ei_acse_invalid_oid = EI_INIT;
 
 /* indirect_reference, used to pick up the signalling so we know what
    kind of data is transferred in SES_DATA_TRANSFER_PDUs */
@@ -1697,7 +1698,7 @@ dissect_acse_AE_title(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _
 
 
 /*--- End of included file: packet-acse-fn.c ---*/
-#line 150 "../../asn1/acse/packet-acse-template.c"
+#line 151 "../../asn1/acse/packet-acse-template.c"
 
 
 /*
@@ -1722,8 +1723,9 @@ dissect_acse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 	/* first, try to check length   */
 	/* do we have at least 2 bytes  */
 	if (!tvb_bytes_exist(tvb, 0, 2)){
-		proto_tree_add_item(parent_tree, hf_acse_user_data, tvb, offset,
-			tvb_reported_length_remaining(tvb,offset), ENC_NA);
+		proto_tree_add_text(parent_tree, tvb, offset,
+			tvb_reported_length_remaining(tvb,offset),
+			"User data");
 		return 0;  /* no, it isn't a ACSE PDU */
 	}
 
@@ -1756,7 +1758,7 @@ dissect_acse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 		oid=find_oid_by_pres_ctx_id(pinfo, indir_ref);
 		if(oid){
 			if(strcmp(oid, ACSE_APDU_OID) == 0){
-				proto_tree_add_expert_format(parent_tree, pinfo, &ei_acse_invalid_oid, tvb, offset, -1,
+				proto_tree_add_text(parent_tree, tvb, offset, -1,
 				    "Invalid OID: %s", ACSE_APDU_OID);
 				THROW(ReportedBoundsError);
 			}
@@ -1797,13 +1799,13 @@ dissect_acse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 		int old_offset=offset;
 		offset = dissect_acse_ACSE_apdu(FALSE, tvb, offset, &asn1_ctx, tree, -1);
 		if(offset == old_offset ){
-			proto_tree_add_expert(tree, pinfo, &ei_acse_malformed, tvb, offset, -1);
+			proto_tree_add_text(tree, tvb, offset, -1,"Malformed packet");
 			break;
 		}
 	}
 
 	top_tree = NULL;
-	return tvb_captured_length(tvb);
+	return tvb_length(tvb);
 }
 
 /*--- proto_register_acse ----------------------------------------------*/
@@ -1811,10 +1813,6 @@ void proto_register_acse(void) {
 
   /* List of fields */
   static hf_register_info hf[] = {
-    { &hf_acse_user_data,
-      { "User data", "acse.user_data",
-        FT_BYTES, BASE_NONE, NULL, 0,
-        NULL, HFILL }},
 
 /*--- Included file: packet-acse-hfarr.c ---*/
 #line 1 "../../asn1/acse/packet-acse-hfarr.c"
@@ -2248,7 +2246,7 @@ void proto_register_acse(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-acse-hfarr.c ---*/
-#line 268 "../../asn1/acse/packet-acse-template.c"
+#line 266 "../../asn1/acse/packet-acse-template.c"
   };
 
   /* List of subtrees */
@@ -2294,13 +2292,11 @@ void proto_register_acse(void) {
     &ett_acse_Authentication_value,
 
 /*--- End of included file: packet-acse-ettarr.c ---*/
-#line 274 "../../asn1/acse/packet-acse-template.c"
+#line 272 "../../asn1/acse/packet-acse-template.c"
   };
 
   static ei_register_info ei[] = {
      { &ei_acse_dissector_not_available, { "acse.dissector_not_available", PI_UNDECODED, PI_WARN, "Dissector is not available", EXPFILL }},
-     { &ei_acse_malformed, { "acse.malformed", PI_MALFORMED, PI_ERROR, "Malformed packet", EXPFILL }},
-     { &ei_acse_invalid_oid, { "acse.invalid_oid", PI_UNDECODED, PI_WARN, "Invalid OID", EXPFILL }},
   };
 
   expert_module_t* expert_acse;

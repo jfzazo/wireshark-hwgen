@@ -27,8 +27,12 @@
 #include <windows.h>
 #endif
 
-#include <epan/packet.h>
+#include <glib.h>
+
+#include <wsutil/md5.h>
+
 #include <epan/epan.h>
+#include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/show_exception.h>
 #include <epan/timestamp.h>
@@ -36,7 +40,6 @@
 #include <epan/to_str.h>
 #include <epan/tap.h>
 #include <epan/expert.h>
-#include <wsutil/md5.h>
 
 #include "color.h"
 #include "color_filters.h"
@@ -85,9 +88,8 @@ call_file_record_end_routine(gpointer routine, gpointer dummy _U_)
 	(*func)();
 }
 
-/* XXX - "packet comment" is passed into dissector as data, but currently doesn't have a use */
-static int
-dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* data _U_)
+static void
+dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 {
 	proto_item  *volatile ti = NULL;
 	guint	     cap_len = 0, frame_len = 0;
@@ -99,7 +101,7 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 
 	pinfo->current_proto = "File";
 
-	/* if FILE is not referenced from any filters we don't need to worry about
+	/* if FILE is not referenced from any filters we dont need to worry about
 	   generating any tree items.  */
 	if(!proto_field_is_referenced(tree, proto_file)) {
 		tree=NULL;
@@ -185,7 +187,7 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 		/* Ignored package, stop handling here */
 		col_set_str(pinfo->cinfo, COL_INFO, "<Ignored>");
 		proto_tree_add_text (tree, tvb, 0, -1, "This record is marked as ignored");
-		return tvb_captured_length(tvb);
+		return;
 	}
 
 	/* Portable Exception Handling to trap Wireshark specific exceptions like BoundsError exceptions */
@@ -194,11 +196,11 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 		/* Win32: Visual-C Structured Exception Handling (SEH) to trap hardware exceptions
 		   like memory access violations.
 		   (a running debugger will be called before the except part below) */
-		/* Note: A Windows "exceptional exception" may leave the kazlib's (Portable Exception Handling)
-		   stack in an inconsistent state thus causing a crash at some point in the
-		   handling of the exception.
-		   See: https://www.wireshark.org/lists/wireshark-dev/200704/msg00243.html
-		*/
+                /* Note: A Windows "exceptional exception" may leave the kazlib's (Portable Exception Handling)
+                   stack in an inconsistent state thus causing a crash at some point in the
+                   handling of the exception.
+                   See: https://www.wireshark.org/lists/wireshark-dev/200704/msg00243.html
+                */
 		__try {
 #endif
 			if (!dissector_try_uint(file_encap_dissector_table, pinfo->fd->lnk_t,
@@ -239,7 +241,7 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 	}
 	ENDTRY;
 
-	if(proto_field_is_referenced(tree, hf_file_protocols)) {
+    if(proto_field_is_referenced(tree, hf_file_protocols)) {
 		wmem_strbuf_t *val = wmem_strbuf_new(wmem_packet_scope(), "");
 		wmem_list_frame_t *frame;
 		/* skip the first entry, it's always the "frame" protocol */
@@ -265,11 +267,11 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 			/* Win32: Visual-C Structured Exception Handling (SEH)
 			   to trap hardware exceptions like memory access violations */
 			/* (a running debugger will be called before the except part below) */
-			/* Note: A Windows "exceptional exception" may leave the kazlib's (Portable Exception Handling)
-			   stack in an inconsistent state thus causing a crash at some point in the
-			   handling of the exception.
-			   See: https://www.wireshark.org/lists/wireshark-dev/200704/msg00243.html
-			*/
+                        /* Note: A Windows "exceptional exception" may leave the kazlib's (Portable Exception Handling)
+                           stack in an inconsistent state thus causing a crash at some point in the
+                           handling of the exception.
+                           See: https://www.wireshark.org/lists/wireshark-dev/200704/msg00243.html
+                        */
 			__try {
 #endif
 				call_all_postdissectors(tvb, pinfo, parent_tree);
@@ -312,8 +314,6 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 		g_slist_free(pinfo->frame_end_routines);
 		pinfo->frame_end_routines = NULL;
 	}
-
-	return tvb_captured_length(tvb);
 }
 
 void
@@ -331,7 +331,7 @@ proto_register_file(void)
 		    NULL, HFILL }},
 #if 0
 		{ &hf_frame_file_off,
-		  { "File Offset", "file.offset",
+		  { "File Offset", "file.file_off",
 		    FT_INT64, BASE_DEC, NULL, 0x0,
 		    NULL, HFILL }},
 #endif
@@ -385,7 +385,7 @@ proto_register_file(void)
 	proto_file = proto_register_protocol("File", "File", "file");
 	proto_register_field_array(proto_file, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	new_register_dissector("file",dissect_file_record,proto_file);
+	register_dissector("file",dissect_file_record,proto_file);
 
 	/* You can't disable dissection of "Frame", as that would be
 	   tantamount to not doing any dissection whatsoever. */

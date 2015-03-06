@@ -1914,15 +1914,10 @@ class EthCtx:
         first_decl = True
         for k in self.conform.get_order('SYNTAX'):
             reg = self.conform.use_item('SYNTAX', k)
-            if reg['pdu'] not in self.field: continue
-            f = self.field[reg['pdu']]['ethname']
-            pdu = self.eth_hf[f]['pdu']
-            new_prefix = ''
-            if (pdu['new']): new_prefix = 'new_'
             if first_decl:
                 fx.write('  /*--- Syntax registrations ---*/\n')
                 first_decl = False
-            fx.write('  %sregister_ber_syntax_dissector(%s, proto_%s, dissect_%s_PDU);\n' % (new_prefix, k, self.eproto, reg['pdu']));
+            fx.write('  register_ber_syntax_dissector(%s, proto_%s, dissect_%s_PDU);\n' % (k, self.eproto, reg['pdu']));
             fempty=False
         self.output.file_close(fx, discard=fempty)
 
@@ -2425,8 +2420,7 @@ class EthCnf:
                                             'OMIT_ASSIGNMENT', 'NO_OMIT_ASSGN',
                                             'VIRTUAL_ASSGN', 'SET_TYPE', 'ASSIGN_VALUE_TO_TYPE',
                                             'TYPE_RENAME', 'FIELD_RENAME', 'TF_RENAME', 'IMPORT_TAG',
-                                            'TYPE_ATTR', 'ETYPE_ATTR', 'FIELD_ATTR', 'EFIELD_ATTR',
-                                            'SYNTAX', 'SYNTAX_NEW'):
+                                            'TYPE_ATTR', 'ETYPE_ATTR', 'FIELD_ATTR', 'EFIELD_ATTR', 'SYNTAX'):
                     ctx = result.group('name')
                 elif result.group('name') in ('OMIT_ALL_ASSIGNMENTS', 'OMIT_ASSIGNMENTS_EXCEPT',
                                               'OMIT_ALL_TYPE_ASSIGNMENTS', 'OMIT_TYPE_ASSIGNMENTS_EXCEPT',
@@ -2636,14 +2630,12 @@ class EthCnf:
                 self.add_pdu(par[0:2], is_new, fn, lineno)
                 if (len(par)>=3):
                     self.add_register(par[0], par[2:5], fn, lineno)
-            elif ctx in ('SYNTAX', 'SYNTAX_NEW'):
+            elif ctx in ('SYNTAX'):
                 if empty.match(line): continue
                 par = get_par(line, 1, 2, fn=fn, lineno=lineno)
                 if not par: continue
                 if not self.check_item('PDU', par[0]):
-                    is_new = False
-                    if (ctx == 'SYNTAX_NEW'): is_new = True
-                    self.add_pdu(par[0:1], is_new, fn, lineno)
+                    self.add_pdu(par[0:1], False, fn, lineno)
                 self.add_syntax(par, fn, lineno)
             elif ctx in ('REGISTER', 'REGISTER_NEW'):
                 if empty.match(line): continue
@@ -3636,12 +3628,6 @@ class Constraint (Node):
                 self.constr_num = constr_cnt
             return 'CONSTR%03d%s' % (self.constr_num, ext)
 
-    def Needs64b(self, ectx):
-        (minv, maxv, ext) = self.GetValue(ectx)
-        if (str(minv).isdigit() or ((str(minv)[0] == "-") and str(minv)[1:].isdigit())) \
-        and str(maxv).isdigit() and (abs(int(maxv) - int(minv)) >= 2**32):
-            return True
-        return False
 
 class Module (Node):
     def to_python (self, ctx):
@@ -5390,12 +5376,7 @@ class IntegerType (Type):
     def eth_ftype(self, ectx):
         if self.HasConstraint():
             if not self.constr.IsNegativ():
-                if self.constr.Needs64b(ectx):
-                    return ('FT_UINT64', 'BASE_DEC')
-                else:
-                    return ('FT_UINT32', 'BASE_DEC')
-            if self.constr.Needs64b(ectx):
-                return ('FT_INT64', 'BASE_DEC')
+                return ('FT_UINT32', 'BASE_DEC')
         return ('FT_INT32', 'BASE_DEC')
 
     def eth_strings(self):
@@ -5439,9 +5420,6 @@ class IntegerType (Type):
         pars = Type.eth_type_default_pars(self, ectx, tname)
         if self.HasValueConstraint():
             (pars['MIN_VAL'], pars['MAX_VAL'], pars['EXT']) = self.eth_get_value_constr(ectx)
-            if (pars['FN_VARIANT'] == '') and self.constr.Needs64b(ectx):
-                if ectx.Ber(): pars['FN_VARIANT'] = '64'
-                else: pars['FN_VARIANT'] = '_64b'
         return pars
 
     def eth_type_default_body(self, ectx, tname):

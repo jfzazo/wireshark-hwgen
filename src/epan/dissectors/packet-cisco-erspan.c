@@ -57,10 +57,11 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/greproto.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
-#include "packet-gre.h"
 
 void proto_register_erspan(void);
 void proto_reg_handoff_erspan(void);
@@ -130,8 +131,8 @@ dissect_erspan(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	guint32 offset = 0;
 	guint16 version;
 
-	col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTO_SHORT_NAME);
-	col_set_str(pinfo->cinfo, COL_INFO, PROTO_SHORT_NAME ":");
+        col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTO_SHORT_NAME);
+        col_set_str(pinfo->cinfo, COL_INFO, PROTO_SHORT_NAME ":");
 
 
 	if (tree) {
@@ -205,8 +206,8 @@ dissect_erspan(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			offset += 12;
 	}
 
-	eth_tvb = tvb_new_subset_remaining(tvb, offset);
-	call_dissector(ethnofcs_handle, eth_tvb, pinfo, tree);
+        eth_tvb = tvb_new_subset_remaining(tvb, offset);
+        call_dissector(ethnofcs_handle, eth_tvb, pinfo, tree);
 }
 
 void
@@ -304,23 +305,11 @@ proto_reg_handoff_erspan(void)
 {
 	dissector_handle_t erspan_handle;
 
-	ethnofcs_handle = find_dissector("eth_withoutfcs");
+        ethnofcs_handle = find_dissector("eth_withoutfcs");
 
 	erspan_handle = create_dissector_handle(dissect_erspan, proto_erspan);
-	dissector_add_uint("gre.proto", GRE_ERSPAN_88BE, erspan_handle);
-	dissector_add_uint("gre.proto", GRE_ERSPAN_22EB, erspan_handle);
+        dissector_add_uint("gre.proto", GRE_ERSPAN_88BE, erspan_handle);
+        dissector_add_uint("gre.proto", GRE_ERSPAN_22EB, erspan_handle);
 
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

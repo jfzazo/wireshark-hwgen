@@ -22,7 +22,7 @@
 #ifndef PROTO_TREE_H
 #define PROTO_TREE_H
 
-#include <config.h>
+#include "config.h"
 
 #include <epan/proto.h>
 
@@ -44,9 +44,8 @@ protected:
      void contextMenuEvent(QContextMenuEvent *event);
 
 private:
-    QMenu ctx_menu_;
-    QAction *decode_as_;
-    QFont mono_font_;
+     QMenu ctx_menu_;
+     QAction *decode_as_;
 
 signals:
     void protoItemSelected(QString &);
@@ -55,7 +54,6 @@ signals:
     void relatedFrame(int);
 
 public slots:
-    void setMonospaceFont(const QFont &mono_font);
     void updateSelectionStatus(QTreeWidgetItem*);
     void expand(const QModelIndex & index);
     void collapse(const QModelIndex & index);

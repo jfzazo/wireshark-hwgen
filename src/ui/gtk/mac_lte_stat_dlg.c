@@ -30,18 +30,21 @@
 #include "ui/gtk/gtkglobals.h"
 
 #include <epan/packet.h>
+#include <epan/packet_info.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-mac-lte.h>
 
 #include "ui/simple_dialog.h"
-#include <epan/stat_groups.h>
+#include "../stat_menu.h"
 
 #include "ui/gtk/dlg_utils.h"
+#include "ui/gtk/gui_stat_menu.h"
 #include "ui/gtk/tap_param_dlg.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/help_dlg.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_mac_lte_stat(void);
 
@@ -1065,7 +1068,7 @@ static void gtk_mac_lte_stat_init(const char *opt_arg, void *userdata _U_)
     g_free(display_name);
 
     /* Create top-level window */
-    hs->mac_lte_stat_dlg_w = window_new_with_geom(GTK_WINDOW_TOPLEVEL, title, "LTE MAC Statistics", GTK_WIN_POS_CENTER_ON_PARENT);
+    hs->mac_lte_stat_dlg_w = window_new_with_geom(GTK_WINDOW_TOPLEVEL, title, "LTE MAC Statistics");
 
     /* Window size */
     gtk_window_set_default_size(GTK_WINDOW(hs->mac_lte_stat_dlg_w), 750, 300);
@@ -1402,7 +1405,7 @@ static void gtk_mac_lte_stat_init(const char *opt_arg, void *userdata _U_)
 
 
 static tap_param mac_lte_stat_params[] = {
-    { PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+    { PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg mac_lte_stat_dlg = {

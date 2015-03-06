@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <string.h>
 
@@ -108,16 +108,3 @@ sync_pipe_errmsg_to_parent(int pipe_fd, const char *error_msg,
     pipe_write_block(pipe_fd, SP_ERROR_MSG, error_msg);
     pipe_write_block(pipe_fd, SP_ERROR_MSG, secondary_error_msg);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

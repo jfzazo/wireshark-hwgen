@@ -33,6 +33,7 @@
  *        Future work should include splitting this into 2 so that the PTP layer may be used again for PTP/USB.
  */
 #include "config.h"
+#include <glib.h>
 #include <epan/packet.h>
 #include "packet-ptpip.h"
 
@@ -575,7 +576,7 @@ void dissect_ptpIP_init_command_request(tvbuff_t *tvb, packet_info *pinfo, proto
     dissect_ptpIP_unicode_name(tvb, pinfo, tree, offset);
 
     /* grabbing protocol version
-     * Note: [3] does not list this in the packet field. . [1] 2.3.1 states it's the last 4
+     * Note: [3] does not list this in the packet field. . [1] 2.3.1 states its the last 4
      * bytes of the packet.
     */
     dissect_ptpIP_protocol_version(tvb, tree, offset);
@@ -898,7 +899,7 @@ void dissect_ptpIP_guid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gui
 {
     guint8 *guid;
 
-    guid = tvb_bytes_to_str(wmem_packet_scope(), tvb, *offset, PTPIP_GUID_SIZE);
+    guid = tvb_bytes_to_ep_str(tvb, *offset, PTPIP_GUID_SIZE);
     proto_tree_add_item(tree, hf_ptpIP_guid, tvb, *offset, PTPIP_GUID_SIZE, ENC_NA);
     *offset += PTPIP_GUID_SIZE;
     col_append_fstr(

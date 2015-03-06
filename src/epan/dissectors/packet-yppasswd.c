@@ -22,6 +22,8 @@
 
 #include "config.h"
 
+
+
 #include "packet-rpc.h"
 #include "packet-yppasswd.h"
 
@@ -168,15 +170,3 @@ proto_reg_handoff_yppasswd(void)
 	rpc_init_proc_table(YPPASSWD_PROGRAM, 1, yppasswd1_proc, hf_yppasswd_procedure_v1);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

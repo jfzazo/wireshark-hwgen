@@ -123,20 +123,6 @@ tt.literal, code.literal {
   padding: 0.5em 1em;
 }
 
-.guibutton, .guimenu, .guisubmenu, .guimenuitem {
-  font-weight: bold;
-}
-
-.keycap, .guimenu, .guisubmenu, .guimenuitem {
-  border: 0.5px solid silver;
-  padding-left: 0.25em;
-  padding-right: 0.25em;
-}
-
-.keycap {
-  border-radius: 0.25em;
-}
-
 div.sidebar {
   background: #ffffee;
   margin: 1.0em 10% 0.5em 0;
@@ -276,6 +262,10 @@ div.table thead > tr > th, div.informaltable thead > tr > th {
   vertical-align: bottom;
 }
 
+div.mediaobject img {
+    border: 1px solid silver;
+    margin-bottom: 0.8em;
+}
 div.figure p.title,
 div.table p.title
 {

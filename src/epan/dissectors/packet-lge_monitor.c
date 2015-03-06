@@ -25,6 +25,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 
@@ -37,11 +39,10 @@ static int proto_lge_monitor		= -1;
 static int hf_lge_monitor_dir = -1;
 static int hf_lge_monitor_prot = -1;
 static int hf_lge_monitor_length = -1;
-static int hf_lge_monitor_data = -1;
 
 /* Initialize the subtree pointers */
 static int ett_lge_monitor = -1;
-static int ett_lge_header = -1;
+
 
 static guint LGEMonitorUDPPort = 0;
 static dissector_handle_t mtp3_handle, m3ua_handle, sccp_handle, sctp_handle;
@@ -69,7 +70,6 @@ dissect_lge_monitor(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	int offset = 0;
 	guint32 lge_monitor_proto_id;
 	tvbuff_t* next_tvb = NULL;
-	proto_tree* header_tree;
 
 /* Set up structures needed to add the protocol subtree and manage it */
 	proto_item *ti;
@@ -81,14 +81,14 @@ dissect_lge_monitor(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	ti = proto_tree_add_item(tree, proto_lge_monitor, tvb, 0, LGEMON_PROTO_HEADER_LENGTH, ENC_NA);
 	lge_monitor_tree = proto_item_add_subtree(ti, ett_lge_monitor);
 
-	header_tree = proto_tree_add_subtree(lge_monitor_tree, tvb, offset, LGEMON_PROTO_HEADER_LENGTH, ett_lge_header, NULL, "LGE Monitor PDU");
-	proto_tree_add_item(header_tree, hf_lge_monitor_dir, tvb, offset, 4, ENC_BIG_ENDIAN);
-	offset += 4;
+	proto_tree_add_text(lge_monitor_tree, tvb, offset, LGEMON_PROTO_HEADER_LENGTH, "LGE Monitor PDU");
+	proto_tree_add_item(lge_monitor_tree, hf_lge_monitor_dir, tvb, offset, 4, ENC_BIG_ENDIAN);
+	offset = offset +4;
 	lge_monitor_proto_id = tvb_get_ntohl(tvb,offset);
-	proto_tree_add_item(header_tree, hf_lge_monitor_prot, tvb, offset, 4, ENC_BIG_ENDIAN);
-	offset += 4;
-	proto_tree_add_item(header_tree, hf_lge_monitor_length, tvb, offset, 4, ENC_BIG_ENDIAN);
-	offset += 4;
+	proto_tree_add_item(lge_monitor_tree, hf_lge_monitor_prot, tvb, offset, 4, ENC_BIG_ENDIAN);
+	offset = offset +4;
+	proto_tree_add_item(lge_monitor_tree, hf_lge_monitor_length, tvb, offset, 4, ENC_BIG_ENDIAN);
+	offset = offset +4;
 
 	next_tvb = tvb_new_subset_remaining(tvb, offset);
 
@@ -106,7 +106,7 @@ dissect_lge_monitor(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		call_dissector(m3ua_handle, next_tvb, pinfo, tree);
 		return;
 	default:
-		proto_tree_add_item(lge_monitor_tree, hf_lge_monitor_data, tvb, offset, -1, ENC_NA);
+		proto_tree_add_text(lge_monitor_tree, tvb, offset, -1, "LGE Monitor data");
 		break;
 	}
 	return;
@@ -122,7 +122,7 @@ proto_reg_handoff_lge_monitor(void)
 
 	if (!lge_monitor_prefs_initialized) {
 		lge_monitor_handle = create_dissector_handle(dissect_lge_monitor, proto_lge_monitor);
-		dissector_add_for_decode_as("udp.port", lge_monitor_handle);
+		dissector_add_handle("udp.port", lge_monitor_handle);  /* for 'decode-as' */
 		mtp3_handle  = find_dissector("mtp3");
 		m3ua_handle  = find_dissector("m3ua");
 		sccp_handle  = find_dissector("sccp");
@@ -164,17 +164,11 @@ proto_register_lge_monitor(void)
 			FT_UINT32, BASE_DEC, NULL, 0x0,
 			NULL, HFILL }
 		},
-		{ &hf_lge_monitor_data,
-			{ "LGE Monitor data",           "lge_monitor.monitor_data",
-			FT_BYTES, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }
-		},
 	};
 
 /* Setup protocol subtree array */
 	static gint *ett[] = {
 		&ett_lge_monitor,
-		&ett_lge_header
 	};
 
 /* Register the protocol name and description */
@@ -196,15 +190,4 @@ proto_register_lge_monitor(void)
 
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */
+

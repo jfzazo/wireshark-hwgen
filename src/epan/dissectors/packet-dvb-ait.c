@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include "packet-mpeg-sect.h"
@@ -198,7 +199,7 @@ dissect_dvb_ait_app_name_desc_body(tvbuff_t *tvb, guint offset,
         len = tvb_get_guint8(tvb, offset);
           /* FT_UINT_STRING with 1 leading len byte */
           proto_tree_add_item(tree, hf_dvb_ait_descr_app_name_name,
-              tvb, offset, 1, ENC_ASCII|ENC_BIG_ENDIAN);
+              tvb, offset, 1, ENC_ASCII|ENC_NA);
           offset += 1+len;
     }
 
@@ -250,7 +251,7 @@ dissect_dvb_ait_trpt_proto_desc_body(tvbuff_t *tvb, guint offset,
             url_base_len = tvb_get_guint8(tvb, offset);
             /* FT_UINT_STRING with one leading length byte */
             proto_tree_add_item(tree, hf_dvb_ait_descr_trpt_sel_url_base,
-                tvb, offset, 1, ENC_ASCII|ENC_BIG_ENDIAN);
+                tvb, offset, 1, ENC_ASCII|ENC_NA);
             offset += 1+url_base_len;
 
             url_ext_cnt = tvb_get_guint8(tvb, offset);
@@ -261,7 +262,7 @@ dissect_dvb_ait_trpt_proto_desc_body(tvbuff_t *tvb, guint offset,
             for (i=0; i<url_ext_cnt; i++) {
                 url_ext_len = tvb_get_guint8(tvb, offset);
                 proto_tree_add_item(tree, hf_dvb_ait_descr_trpt_sel_url_ext,
-                        tvb, offset, 1, ENC_ASCII|ENC_BIG_ENDIAN);
+                        tvb, offset, 1, ENC_ASCII|ENC_NA);
                 offset += 1+url_ext_len;
             }
         }
@@ -283,7 +284,8 @@ dissect_dvb_ait_descriptor(tvbuff_t *tvb, guint offset,
     gint        ret;
     guint       offset_start;
     guint8      tag, len;
-    proto_tree *descr_tree;
+    proto_item *descr_tree_ti = NULL;
+    proto_tree *descr_tree = NULL;
 
     tag = tvb_get_guint8(tvb, offset);
     len = tvb_get_guint8(tvb, offset+1);
@@ -295,8 +297,9 @@ dissect_dvb_ait_descriptor(tvbuff_t *tvb, guint offset,
     if (try_val_to_str(tag, ait_descr_tag)) {
 
         offset_start = offset;
-        descr_tree = proto_tree_add_subtree_format(tree, tvb, offset_start, len+2,
-                ett_dvb_ait_descr, NULL, "Descriptor Tag=0x%02x", tag);
+        descr_tree_ti = proto_tree_add_text(tree, tvb, offset_start, len+2,
+                "Descriptor Tag=0x%02x", tag);
+        descr_tree = proto_item_add_subtree(descr_tree_ti, ett_dvb_ait_descr);
 
         proto_tree_add_item(descr_tree, hf_dvb_ait_descr_tag,
                 tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -410,8 +413,9 @@ dissect_dvb_ait(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data 
         offset_app_start = offset;
         org_id = tvb_get_ntohl(tvb, offset);
         app_id = tvb_get_ntohs(tvb, offset+4);
-        ait_app_tree = proto_tree_add_subtree_format(ait_tree, tvb, offset, -1,
-                ett_dvb_ait_app, &app_tree_ti, "Application: Org 0x%x, App 0x%x", org_id, app_id);
+        app_tree_ti = proto_tree_add_text(ait_tree, tvb, offset, -1,
+                "Application: Org 0x%x, App 0x%x", org_id, app_id);
+        ait_app_tree = proto_item_add_subtree(app_tree_ti, ett_dvb_ait_app);
 
         proto_tree_add_item(ait_app_tree, hf_dvb_ait_org_id,
             tvb, offset, 4, ENC_BIG_ENDIAN);

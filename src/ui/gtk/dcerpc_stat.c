@@ -29,16 +29,19 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/epan.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-dcerpc.h>
 
+#include "../stat_menu.h"
 
 #include "ui/simple_dialog.h"
 
@@ -52,6 +55,7 @@
 #include "ui/gtk/main.h"
 #include "ui/gtk/filter_autocomplete.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkdcerpcstat(void);
 
@@ -710,18 +714,8 @@ void gtk_dcerpcstat_cb(GtkAction *action _U_, gpointer user_data _U_)
 	window_present(dlg);
 }
 
-static stat_tap_ui dcerpcstat_ui = {
-	REGISTER_STAT_GROUP_GENERIC,
-	NULL,
-	"dcerpc,srt",
-	gtk_dcerpcstat_init,
-	-1,
-	0,
-	NULL
-};
-
 void
 register_tap_listener_gtkdcerpcstat(void)
 {
-	register_stat_tap_ui(&dcerpcstat_ui, NULL);
+	register_stat_cmd_arg("dcerpc,srt,", gtk_dcerpcstat_init,NULL);
 }

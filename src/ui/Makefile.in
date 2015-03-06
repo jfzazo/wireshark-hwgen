@@ -172,21 +172,17 @@ am__v_AR_0 = @echo "  AR      " $@;
 am__v_AR_1 = 
 libui_a_AR = $(AR) $(ARFLAGS)
 libui_a_LIBADD =
-am__objects_1 = libui_a-alert_box.$(OBJEXT) libui_a-capture.$(OBJEXT) \
-	libui_a-capture_ui_utils.$(OBJEXT) libui_a-console.$(OBJEXT) \
+am__objects_1 = libui_a-alert_box.$(OBJEXT) \
 	libui_a-decode_as_utils.$(OBJEXT) \
 	libui_a-export_object.$(OBJEXT) \
 	libui_a-export_object_dicom.$(OBJEXT) \
 	libui_a-export_object_http.$(OBJEXT) \
-	libui_a-export_object_smb.$(OBJEXT) \
-	libui_a-export_object_tftp.$(OBJEXT) libui_a-filters.$(OBJEXT) \
-	libui_a-follow.$(OBJEXT) libui_a-iface_lists.$(OBJEXT) \
-	libui_a-io_graph_item.$(OBJEXT) libui_a-language.$(OBJEXT) \
+	libui_a-export_object_smb.$(OBJEXT) libui_a-follow.$(OBJEXT) \
+	libui_a-iface_lists.$(OBJEXT) libui_a-io_graph_item.$(OBJEXT) \
 	libui_a-help_url.$(OBJEXT) libui_a-packet_list_utils.$(OBJEXT) \
 	libui_a-persfilepath_opt.$(OBJEXT) \
 	libui_a-preference_utils.$(OBJEXT) libui_a-profile.$(OBJEXT) \
-	libui_a-proto_hier_stats.$(OBJEXT) libui_a-recent.$(OBJEXT) \
-	libui_a-rtp_stream.$(OBJEXT) libui_a-software_update.$(OBJEXT) \
+	libui_a-recent.$(OBJEXT) libui_a-software_update.$(OBJEXT) \
 	libui_a-ssl_key_export.$(OBJEXT) \
 	libui_a-tap_export_pdu.$(OBJEXT) \
 	libui_a-tap-megaco-common.$(OBJEXT) \
@@ -194,9 +190,7 @@ am__objects_1 = libui_a-alert_box.$(OBJEXT) libui_a-capture.$(OBJEXT) \
 	libui_a-tap-sctp-analysis.$(OBJEXT) \
 	libui_a-tap-sequence-analysis.$(OBJEXT) \
 	libui_a-tap-tcp-stream.$(OBJEXT) libui_a-text_import.$(OBJEXT) \
-	libui_a-time_shift.$(OBJEXT) \
-	libui_a-traffic_table_ui.$(OBJEXT) libui_a-util.$(OBJEXT) \
-	libui_a-voip_calls.$(OBJEXT)
+	libui_a-time_shift.$(OBJEXT) libui_a-util.$(OBJEXT)
 am__objects_2 =
 am_libui_a_OBJECTS = $(am__objects_1) $(am__objects_2) \
 	$(am__objects_2) $(am__objects_2)
@@ -289,8 +283,8 @@ CCDEPMODE = @CCDEPMODE@
 CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
-CFLAGS_SSE42 = @CFLAGS_SSE42@
 CONFIG_ARGS = @CONFIG_ARGS@
+CONFIG_WITH_ARGS = @CONFIG_WITH_ARGS@
 COREFOUNDATION_FRAMEWORKS = @COREFOUNDATION_FRAMEWORKS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -316,7 +310,6 @@ ELINKS = @ELINKS@
 ENABLE_STATIC = @ENABLE_STATIC@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FLOORL_LO = @FLOORL_LO@
 FOP = @FOP@
 GEOIP_LIBS = @GEOIP_LIBS@
 GETOPT_LO = @GETOPT_LO@
@@ -389,7 +382,7 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
-LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDES = @LUA_INCLUDES@
 LUA_LIBS = @LUA_LIBS@
 LYNX = @LYNX@
 MAKEINFO = @MAKEINFO@
@@ -425,14 +418,14 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_LIBS = @PLUGIN_LIBS@
 POD2HTML = @POD2HTML@
 POD2MAN = @POD2MAN@
-POPCOUNT_LO = @POPCOUNT_LO@
 PORTAUDIO_INCLUDES = @PORTAUDIO_INCLUDES@
 PORTAUDIO_LIBS = @PORTAUDIO_LIBS@
 PYTHON = @PYTHON@
+PY_CFLAGS = @PY_CFLAGS@
+PY_LIBS = @PY_LIBS@
 QT_MIN_VERSION = @QT_MIN_VERSION@
 Qt_LIBS = @Qt_LIBS@
 RANLIB = @RANLIB@
-RCC = @RCC@
 RPMBUILD_WITH_ARGS = @RPMBUILD_WITH_ARGS@
 SBC_CFLAGS = @SBC_CFLAGS@
 SBC_LIBS = @SBC_LIBS@
@@ -443,6 +436,8 @@ SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+STRNCASECMP_LO = @STRNCASECMP_LO@
+STRPTIME_C = @STRPTIME_C@
 STRPTIME_LO = @STRPTIME_LO@
 SYSTEMCONFIGURATION_FRAMEWORKS = @SYSTEMCONFIGURATION_FRAMEWORKS@
 UIC = @UIC@
@@ -462,6 +457,7 @@ ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 ac_cv_wireshark_have_rpm = @ac_cv_wireshark_have_rpm@
+ac_ws_python_config = @ac_ws_python_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -491,8 +487,6 @@ echld_test_bin = @echld_test_bin@
 editcap_bin = @editcap_bin@
 editcap_man = @editcap_man@
 exec_prefix = @exec_prefix@
-extcapdir = @extcapdir@
-have_sw_vers = @have_sw_vers@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -513,10 +507,10 @@ mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 plugindir = @plugindir@
-plugins_dir = @plugins_dir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pythondir = @pythondir@
 randpkt_bin = @randpkt_bin@
 randpkt_man = @randpkt_man@
 rawshark_bin = @rawshark_bin@
@@ -570,28 +564,20 @@ GENERATOR_FILES = \
 
 WIRESHARK_UI_SRC = \
 	alert_box.c		\
-	capture.c		\
-	capture_ui_utils.c	\
-	console.c		\
 	decode_as_utils.c	\
 	export_object.c		\
 	export_object_dicom.c	\
 	export_object_http.c	\
 	export_object_smb.c	\
-	export_object_tftp.c	\
-	filters.c		\
 	follow.c		\
 	iface_lists.c		\
 	io_graph_item.c		\
-	language.c		\
 	help_url.c		\
 	packet_list_utils.c	\
 	persfilepath_opt.c	\
 	preference_utils.c	\
 	profile.c		\
-	proto_hier_stats.c	\
 	recent.c		\
-	rtp_stream.c		\
 	software_update.c	\
 	ssl_key_export.c	\
 	tap_export_pdu.c	\
@@ -602,33 +588,25 @@ WIRESHARK_UI_SRC = \
 	tap-tcp-stream.c	\
 	text_import.c		\
 	time_shift.c		\
-	traffic_table_ui.c	\
-	util.c			\
-	voip_calls.c
+	util.c
 
 noinst_HEADERS = \
 	alert_box.h		\
-	capture.h		\
 	capture_globals.h	\
-	capture_ui_utils.h	\
-	console.h		\
 	decode_as_utils.h	\
 	export_object.h		\
 	last_open_dir.h		\
 	file_dialog.h		\
-	filters.h		\
 	follow.h		\
 	help_url.h		\
 	packet_list_utils.h	\
 	iface_lists.h		\
 	io_graph_item.h		\
-	language.h		\
 	main_statusbar.h	\
 	persfilepath_opt.h	\
 	preference_utils.h	\
 	profile.h		\
 	progress_dlg.h		\
-	proto_hier_stats.h	\
 	recent.h		\
 	recent_utils.h		\
 	rtp_analysis.h		\
@@ -645,11 +623,9 @@ noinst_HEADERS = \
 	text_import.h		\
 	text_import_scanner.h	\
 	time_shift.h		\
-	traffic_table_ui.h	\
 	ui_util.h		\
 	utf8_entities.h		\
-	util.h			\
-	voip_calls.h
+	util.h
 
 AUTOMAKE_OPTIONS = -Wno-portability
 AM_V_AWK = $(am__v_AWK_@AM_V@)
@@ -762,28 +738,20 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-alert_box.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-capture.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-capture_ui_utils.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-console.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-decode_as_utils.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-export_object.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-export_object_dicom.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-export_object_http.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-export_object_smb.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-export_object_tftp.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-filters.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-follow.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-help_url.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-iface_lists.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-io_graph_item.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-language.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-packet_list_utils.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-persfilepath_opt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-preference_utils.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-profile.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-proto_hier_stats.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-recent.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-rtp_stream.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-software_update.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-ssl_key_export.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-tap-megaco-common.Po@am__quote@
@@ -794,31 +762,26 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-tap_export_pdu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-text_import.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-time_shift.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-traffic_table_ui.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-util.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libui_a-voip_calls.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/text_import_scanner.Po@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
-@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
@@ -836,48 +799,6 @@ libui_a-alert_box.obj: alert_box.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='alert_box.c' object='libui_a-alert_box.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-alert_box.obj `if test -f 'alert_box.c'; then $(CYGPATH_W) 'alert_box.c'; else $(CYGPATH_W) '$(srcdir)/alert_box.c'; fi`
-
-libui_a-capture.o: capture.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-capture.o -MD -MP -MF $(DEPDIR)/libui_a-capture.Tpo -c -o libui_a-capture.o `test -f 'capture.c' || echo '$(srcdir)/'`capture.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-capture.Tpo $(DEPDIR)/libui_a-capture.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='capture.c' object='libui_a-capture.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-capture.o `test -f 'capture.c' || echo '$(srcdir)/'`capture.c
-
-libui_a-capture.obj: capture.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-capture.obj -MD -MP -MF $(DEPDIR)/libui_a-capture.Tpo -c -o libui_a-capture.obj `if test -f 'capture.c'; then $(CYGPATH_W) 'capture.c'; else $(CYGPATH_W) '$(srcdir)/capture.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-capture.Tpo $(DEPDIR)/libui_a-capture.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='capture.c' object='libui_a-capture.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-capture.obj `if test -f 'capture.c'; then $(CYGPATH_W) 'capture.c'; else $(CYGPATH_W) '$(srcdir)/capture.c'; fi`
-
-libui_a-capture_ui_utils.o: capture_ui_utils.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-capture_ui_utils.o -MD -MP -MF $(DEPDIR)/libui_a-capture_ui_utils.Tpo -c -o libui_a-capture_ui_utils.o `test -f 'capture_ui_utils.c' || echo '$(srcdir)/'`capture_ui_utils.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-capture_ui_utils.Tpo $(DEPDIR)/libui_a-capture_ui_utils.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='capture_ui_utils.c' object='libui_a-capture_ui_utils.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-capture_ui_utils.o `test -f 'capture_ui_utils.c' || echo '$(srcdir)/'`capture_ui_utils.c
-
-libui_a-capture_ui_utils.obj: capture_ui_utils.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-capture_ui_utils.obj -MD -MP -MF $(DEPDIR)/libui_a-capture_ui_utils.Tpo -c -o libui_a-capture_ui_utils.obj `if test -f 'capture_ui_utils.c'; then $(CYGPATH_W) 'capture_ui_utils.c'; else $(CYGPATH_W) '$(srcdir)/capture_ui_utils.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-capture_ui_utils.Tpo $(DEPDIR)/libui_a-capture_ui_utils.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='capture_ui_utils.c' object='libui_a-capture_ui_utils.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-capture_ui_utils.obj `if test -f 'capture_ui_utils.c'; then $(CYGPATH_W) 'capture_ui_utils.c'; else $(CYGPATH_W) '$(srcdir)/capture_ui_utils.c'; fi`
-
-libui_a-console.o: console.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-console.o -MD -MP -MF $(DEPDIR)/libui_a-console.Tpo -c -o libui_a-console.o `test -f 'console.c' || echo '$(srcdir)/'`console.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-console.Tpo $(DEPDIR)/libui_a-console.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='console.c' object='libui_a-console.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-console.o `test -f 'console.c' || echo '$(srcdir)/'`console.c
-
-libui_a-console.obj: console.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-console.obj -MD -MP -MF $(DEPDIR)/libui_a-console.Tpo -c -o libui_a-console.obj `if test -f 'console.c'; then $(CYGPATH_W) 'console.c'; else $(CYGPATH_W) '$(srcdir)/console.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-console.Tpo $(DEPDIR)/libui_a-console.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='console.c' object='libui_a-console.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-console.obj `if test -f 'console.c'; then $(CYGPATH_W) 'console.c'; else $(CYGPATH_W) '$(srcdir)/console.c'; fi`
 
 libui_a-decode_as_utils.o: decode_as_utils.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-decode_as_utils.o -MD -MP -MF $(DEPDIR)/libui_a-decode_as_utils.Tpo -c -o libui_a-decode_as_utils.o `test -f 'decode_as_utils.c' || echo '$(srcdir)/'`decode_as_utils.c
@@ -949,34 +870,6 @@ libui_a-export_object_smb.obj: export_object_smb.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-export_object_smb.obj `if test -f 'export_object_smb.c'; then $(CYGPATH_W) 'export_object_smb.c'; else $(CYGPATH_W) '$(srcdir)/export_object_smb.c'; fi`
 
-libui_a-export_object_tftp.o: export_object_tftp.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-export_object_tftp.o -MD -MP -MF $(DEPDIR)/libui_a-export_object_tftp.Tpo -c -o libui_a-export_object_tftp.o `test -f 'export_object_tftp.c' || echo '$(srcdir)/'`export_object_tftp.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-export_object_tftp.Tpo $(DEPDIR)/libui_a-export_object_tftp.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='export_object_tftp.c' object='libui_a-export_object_tftp.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-export_object_tftp.o `test -f 'export_object_tftp.c' || echo '$(srcdir)/'`export_object_tftp.c
-
-libui_a-export_object_tftp.obj: export_object_tftp.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-export_object_tftp.obj -MD -MP -MF $(DEPDIR)/libui_a-export_object_tftp.Tpo -c -o libui_a-export_object_tftp.obj `if test -f 'export_object_tftp.c'; then $(CYGPATH_W) 'export_object_tftp.c'; else $(CYGPATH_W) '$(srcdir)/export_object_tftp.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-export_object_tftp.Tpo $(DEPDIR)/libui_a-export_object_tftp.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='export_object_tftp.c' object='libui_a-export_object_tftp.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-export_object_tftp.obj `if test -f 'export_object_tftp.c'; then $(CYGPATH_W) 'export_object_tftp.c'; else $(CYGPATH_W) '$(srcdir)/export_object_tftp.c'; fi`
-
-libui_a-filters.o: filters.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-filters.o -MD -MP -MF $(DEPDIR)/libui_a-filters.Tpo -c -o libui_a-filters.o `test -f 'filters.c' || echo '$(srcdir)/'`filters.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-filters.Tpo $(DEPDIR)/libui_a-filters.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='filters.c' object='libui_a-filters.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-filters.o `test -f 'filters.c' || echo '$(srcdir)/'`filters.c
-
-libui_a-filters.obj: filters.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-filters.obj -MD -MP -MF $(DEPDIR)/libui_a-filters.Tpo -c -o libui_a-filters.obj `if test -f 'filters.c'; then $(CYGPATH_W) 'filters.c'; else $(CYGPATH_W) '$(srcdir)/filters.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-filters.Tpo $(DEPDIR)/libui_a-filters.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='filters.c' object='libui_a-filters.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-filters.obj `if test -f 'filters.c'; then $(CYGPATH_W) 'filters.c'; else $(CYGPATH_W) '$(srcdir)/filters.c'; fi`
-
 libui_a-follow.o: follow.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-follow.o -MD -MP -MF $(DEPDIR)/libui_a-follow.Tpo -c -o libui_a-follow.o `test -f 'follow.c' || echo '$(srcdir)/'`follow.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-follow.Tpo $(DEPDIR)/libui_a-follow.Po
@@ -1018,20 +911,6 @@ libui_a-io_graph_item.obj: io_graph_item.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='io_graph_item.c' object='libui_a-io_graph_item.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-io_graph_item.obj `if test -f 'io_graph_item.c'; then $(CYGPATH_W) 'io_graph_item.c'; else $(CYGPATH_W) '$(srcdir)/io_graph_item.c'; fi`
-
-libui_a-language.o: language.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-language.o -MD -MP -MF $(DEPDIR)/libui_a-language.Tpo -c -o libui_a-language.o `test -f 'language.c' || echo '$(srcdir)/'`language.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-language.Tpo $(DEPDIR)/libui_a-language.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='language.c' object='libui_a-language.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-language.o `test -f 'language.c' || echo '$(srcdir)/'`language.c
-
-libui_a-language.obj: language.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-language.obj -MD -MP -MF $(DEPDIR)/libui_a-language.Tpo -c -o libui_a-language.obj `if test -f 'language.c'; then $(CYGPATH_W) 'language.c'; else $(CYGPATH_W) '$(srcdir)/language.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-language.Tpo $(DEPDIR)/libui_a-language.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='language.c' object='libui_a-language.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-language.obj `if test -f 'language.c'; then $(CYGPATH_W) 'language.c'; else $(CYGPATH_W) '$(srcdir)/language.c'; fi`
 
 libui_a-help_url.o: help_url.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-help_url.o -MD -MP -MF $(DEPDIR)/libui_a-help_url.Tpo -c -o libui_a-help_url.o `test -f 'help_url.c' || echo '$(srcdir)/'`help_url.c
@@ -1103,20 +982,6 @@ libui_a-profile.obj: profile.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-profile.obj `if test -f 'profile.c'; then $(CYGPATH_W) 'profile.c'; else $(CYGPATH_W) '$(srcdir)/profile.c'; fi`
 
-libui_a-proto_hier_stats.o: proto_hier_stats.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-proto_hier_stats.o -MD -MP -MF $(DEPDIR)/libui_a-proto_hier_stats.Tpo -c -o libui_a-proto_hier_stats.o `test -f 'proto_hier_stats.c' || echo '$(srcdir)/'`proto_hier_stats.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-proto_hier_stats.Tpo $(DEPDIR)/libui_a-proto_hier_stats.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='proto_hier_stats.c' object='libui_a-proto_hier_stats.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-proto_hier_stats.o `test -f 'proto_hier_stats.c' || echo '$(srcdir)/'`proto_hier_stats.c
-
-libui_a-proto_hier_stats.obj: proto_hier_stats.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-proto_hier_stats.obj -MD -MP -MF $(DEPDIR)/libui_a-proto_hier_stats.Tpo -c -o libui_a-proto_hier_stats.obj `if test -f 'proto_hier_stats.c'; then $(CYGPATH_W) 'proto_hier_stats.c'; else $(CYGPATH_W) '$(srcdir)/proto_hier_stats.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-proto_hier_stats.Tpo $(DEPDIR)/libui_a-proto_hier_stats.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='proto_hier_stats.c' object='libui_a-proto_hier_stats.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-proto_hier_stats.obj `if test -f 'proto_hier_stats.c'; then $(CYGPATH_W) 'proto_hier_stats.c'; else $(CYGPATH_W) '$(srcdir)/proto_hier_stats.c'; fi`
-
 libui_a-recent.o: recent.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-recent.o -MD -MP -MF $(DEPDIR)/libui_a-recent.Tpo -c -o libui_a-recent.o `test -f 'recent.c' || echo '$(srcdir)/'`recent.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-recent.Tpo $(DEPDIR)/libui_a-recent.Po
@@ -1130,20 +995,6 @@ libui_a-recent.obj: recent.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='recent.c' object='libui_a-recent.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-recent.obj `if test -f 'recent.c'; then $(CYGPATH_W) 'recent.c'; else $(CYGPATH_W) '$(srcdir)/recent.c'; fi`
-
-libui_a-rtp_stream.o: rtp_stream.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-rtp_stream.o -MD -MP -MF $(DEPDIR)/libui_a-rtp_stream.Tpo -c -o libui_a-rtp_stream.o `test -f 'rtp_stream.c' || echo '$(srcdir)/'`rtp_stream.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-rtp_stream.Tpo $(DEPDIR)/libui_a-rtp_stream.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtp_stream.c' object='libui_a-rtp_stream.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-rtp_stream.o `test -f 'rtp_stream.c' || echo '$(srcdir)/'`rtp_stream.c
-
-libui_a-rtp_stream.obj: rtp_stream.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-rtp_stream.obj -MD -MP -MF $(DEPDIR)/libui_a-rtp_stream.Tpo -c -o libui_a-rtp_stream.obj `if test -f 'rtp_stream.c'; then $(CYGPATH_W) 'rtp_stream.c'; else $(CYGPATH_W) '$(srcdir)/rtp_stream.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-rtp_stream.Tpo $(DEPDIR)/libui_a-rtp_stream.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtp_stream.c' object='libui_a-rtp_stream.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-rtp_stream.obj `if test -f 'rtp_stream.c'; then $(CYGPATH_W) 'rtp_stream.c'; else $(CYGPATH_W) '$(srcdir)/rtp_stream.c'; fi`
 
 libui_a-software_update.o: software_update.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-software_update.o -MD -MP -MF $(DEPDIR)/libui_a-software_update.Tpo -c -o libui_a-software_update.o `test -f 'software_update.c' || echo '$(srcdir)/'`software_update.c
@@ -1285,20 +1136,6 @@ libui_a-time_shift.obj: time_shift.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-time_shift.obj `if test -f 'time_shift.c'; then $(CYGPATH_W) 'time_shift.c'; else $(CYGPATH_W) '$(srcdir)/time_shift.c'; fi`
 
-libui_a-traffic_table_ui.o: traffic_table_ui.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-traffic_table_ui.o -MD -MP -MF $(DEPDIR)/libui_a-traffic_table_ui.Tpo -c -o libui_a-traffic_table_ui.o `test -f 'traffic_table_ui.c' || echo '$(srcdir)/'`traffic_table_ui.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-traffic_table_ui.Tpo $(DEPDIR)/libui_a-traffic_table_ui.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='traffic_table_ui.c' object='libui_a-traffic_table_ui.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-traffic_table_ui.o `test -f 'traffic_table_ui.c' || echo '$(srcdir)/'`traffic_table_ui.c
-
-libui_a-traffic_table_ui.obj: traffic_table_ui.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-traffic_table_ui.obj -MD -MP -MF $(DEPDIR)/libui_a-traffic_table_ui.Tpo -c -o libui_a-traffic_table_ui.obj `if test -f 'traffic_table_ui.c'; then $(CYGPATH_W) 'traffic_table_ui.c'; else $(CYGPATH_W) '$(srcdir)/traffic_table_ui.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-traffic_table_ui.Tpo $(DEPDIR)/libui_a-traffic_table_ui.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='traffic_table_ui.c' object='libui_a-traffic_table_ui.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-traffic_table_ui.obj `if test -f 'traffic_table_ui.c'; then $(CYGPATH_W) 'traffic_table_ui.c'; else $(CYGPATH_W) '$(srcdir)/traffic_table_ui.c'; fi`
-
 libui_a-util.o: util.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-util.o -MD -MP -MF $(DEPDIR)/libui_a-util.Tpo -c -o libui_a-util.o `test -f 'util.c' || echo '$(srcdir)/'`util.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-util.Tpo $(DEPDIR)/libui_a-util.Po
@@ -1312,20 +1149,6 @@ libui_a-util.obj: util.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='util.c' object='libui_a-util.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-util.obj `if test -f 'util.c'; then $(CYGPATH_W) 'util.c'; else $(CYGPATH_W) '$(srcdir)/util.c'; fi`
-
-libui_a-voip_calls.o: voip_calls.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-voip_calls.o -MD -MP -MF $(DEPDIR)/libui_a-voip_calls.Tpo -c -o libui_a-voip_calls.o `test -f 'voip_calls.c' || echo '$(srcdir)/'`voip_calls.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-voip_calls.Tpo $(DEPDIR)/libui_a-voip_calls.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='voip_calls.c' object='libui_a-voip_calls.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-voip_calls.o `test -f 'voip_calls.c' || echo '$(srcdir)/'`voip_calls.c
-
-libui_a-voip_calls.obj: voip_calls.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -MT libui_a-voip_calls.obj -MD -MP -MF $(DEPDIR)/libui_a-voip_calls.Tpo -c -o libui_a-voip_calls.obj `if test -f 'voip_calls.c'; then $(CYGPATH_W) 'voip_calls.c'; else $(CYGPATH_W) '$(srcdir)/voip_calls.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libui_a-voip_calls.Tpo $(DEPDIR)/libui_a-voip_calls.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='voip_calls.c' object='libui_a-voip_calls.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libui_a_CFLAGS) $(CFLAGS) -c -o libui_a-voip_calls.obj `if test -f 'voip_calls.c'; then $(CYGPATH_W) 'voip_calls.c'; else $(CYGPATH_W) '$(srcdir)/voip_calls.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

@@ -29,9 +29,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
+#include <epan/wmem/wmem.h>
 #include <epan/packet.h>
 #include <epan/tvbparse.h>
-#include <epan/jsmn/jsmn.h>
 
 #include <wsutil/str_util.h>
 #include <wsutil/unicode-utils.h>
@@ -40,8 +42,6 @@ void proto_register_json(void);
 void proto_reg_handoff_json(void);
 
 static dissector_handle_t json_handle;
-
-static int proto_json = -1;
 
 static gint ett_json = -1;
 static gint ett_json_array = -1;
@@ -129,7 +129,13 @@ dissect_json(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 			/*
 			 * No information from dissector data
 			 */
-			data_name = NULL;
+			data_name = (char *)(pinfo->private_data);
+			if (! (data_name && data_name[0])) {
+				/*
+				 * No information from "private_data"
+				 */
+				data_name = NULL;
+			}
 		}
 	}
 
@@ -157,17 +163,21 @@ dissect_json(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 	proto_item_set_len(ti, offset);
 
 	/* if we have some unparsed data, pass to data-text-lines dissector (?) */
-	if (tvb_reported_length_remaining(tvb, offset) > 0) {
+	if (tvb_length_remaining(tvb, offset) > 0) {
+		int datalen, reported_datalen;
 		tvbuff_t *next_tvb;
 
-		next_tvb = tvb_new_subset_remaining(tvb, offset);
+		datalen = tvb_length_remaining(tvb, offset);
+		reported_datalen = tvb_reported_length_remaining(tvb, offset);
 
-		call_dissector_with_data(text_lines_handle, next_tvb, pinfo, tree, data);
+		next_tvb = tvb_new_subset(tvb, offset, datalen, reported_datalen);
+
+		call_dissector(text_lines_handle, next_tvb, pinfo, tree);
 	} else if (data_name) {
 		col_append_sep_fstr(pinfo->cinfo, COL_INFO, " ", "(%s)", data_name);
 	}
 
-	return tvb_captured_length(tvb);
+	return tvb_length(tvb);
 }
 
 static void before_object(void *tvbparse_data, const void *wanted_data _U_, tvbparse_elem_t *tok) {
@@ -211,7 +221,7 @@ static void after_member(void *tvbparse_data, const void *wanted_data _U_, tvbpa
 		tvbparse_elem_t *key_tok = tok->sub;
 
 		if (key_tok && key_tok->id == JSON_TOKEN_STRING) {
-			char *key = tvb_get_string_enc(wmem_packet_scope(), key_tok->tvb, key_tok->offset, key_tok->len, ENC_ASCII);
+			char *key = tvb_get_string(wmem_packet_scope(), key_tok->tvb, key_tok->offset, key_tok->len);
 
 			proto_item_append_text(tree, " Key: %s", key);
 		}
@@ -567,27 +577,6 @@ static void init_json_parser(void) {
 	/* XXX, heur? */
 }
 
-/* This function leverages the libjsmn to undestand if the payload is json or not
-*/
-static gboolean
-dissect_json_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
-{
-	/* We expect no more than 1024 tokens */
-	const guint max_tokens = 1024;
-	guint len = tvb_captured_length(tvb);
-	guint8* buf = tvb_get_string_enc(wmem_packet_scope(), tvb, 0, len, ENC_ASCII);
-
-	jsmn_parser p;
-
-	jsmntok_t* t = (jsmntok_t*)wmem_alloc_array(wmem_packet_scope(), jsmntok_t, max_tokens);
-
-	jsmn_init(&p);
-	if (jsmn_parse(&p, buf, len, t, max_tokens) < 0) {
-		return FALSE;
-	}
-	return (dissect_json(tvb, pinfo, tree, data) != 0);
-}
-
 void
 proto_register_json(void)
 {
@@ -612,6 +601,8 @@ proto_register_json(void)
 	};
 #endif
 
+	int proto_json;
+
 	proto_json = proto_register_protocol("JavaScript Object Notation", "JSON", "json");
 	hfi_json = proto_registrar_get_nth(proto_json);
 
@@ -626,9 +617,6 @@ proto_register_json(void)
 void
 proto_reg_handoff_json(void)
 {
-	heur_dissector_add("hpfeeds", dissect_json_heur, proto_json);
-	heur_dissector_add("db-lsp", dissect_json_heur, proto_json);
-
 	dissector_add_string("media_type", "application/json", json_handle); /* RFC 4627 */
 	dissector_add_string("media_type", "application/json-rpc", json_handle); /* JSON-RPC over HTTP */
 	dissector_add_string("media_type", "application/jsonrequest", json_handle); /* JSON-RPC over HTTP */
@@ -636,15 +624,3 @@ proto_reg_handoff_json(void)
 	text_lines_handle = find_dissector("data-text-lines");
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

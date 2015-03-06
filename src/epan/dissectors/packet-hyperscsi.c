@@ -23,6 +23,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 void proto_register_hyperscsi(void);
@@ -84,15 +86,17 @@ dissect_hyperscsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   guint16    hs_fragno;
   gint       offset = 0;
   proto_tree *hs_hdr_tree, *hs_pdu_tree;
-  proto_tree *hs_tree;
+  proto_tree *hs_tree = NULL;
   proto_item *ti;
   guint8     hs_cmd, hs_ver;
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "HyperSCSI");
   col_clear(pinfo->cinfo, COL_INFO);
 
-  ti = proto_tree_add_item(tree, proto_hyperscsi, tvb, offset, -1, ENC_NA);
-  hs_tree = proto_item_add_subtree(ti, ett_hyperscsi);
+  if (tree) {
+    ti = proto_tree_add_item(tree, proto_hyperscsi, tvb, offset, -1, ENC_NA);
+    hs_tree = proto_item_add_subtree(ti, ett_hyperscsi);
+  }
 
   hs_hdr1 = tvb_get_guint8(tvb, offset);
   offset++;
@@ -110,7 +114,8 @@ dissect_hyperscsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
    */
 
   if (tree) {
-    hs_hdr_tree = proto_tree_add_subtree(hs_tree, tvb, 0, 3, ett_hs_hdr, NULL, "HyperSCSI Header");
+    ti = proto_tree_add_text(hs_tree, tvb, 0, 3, "HyperSCSI Header");
+    hs_hdr_tree = proto_item_add_subtree(ti, ett_hs_hdr);
 
     /*
      * Now, add the header items
@@ -137,7 +142,8 @@ dissect_hyperscsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                    val_to_str(hs_cmd, hscsi_opcodes, "Unknown HyperSCSI Request or Response (%u)"));
 
   if (tree) {
-    hs_pdu_tree = proto_tree_add_subtree(hs_tree, tvb, 3, -1, ett_hs_pdu, NULL, "HyperSCSI PDU");
+    ti = proto_tree_add_text(hs_tree, tvb, 3, -1, "HyperSCSI PDU");
+    hs_pdu_tree = proto_item_add_subtree(ti, ett_hs_pdu);
 
     proto_tree_add_uint(hs_pdu_tree, hf_hs_ver, tvb, 3, 1, hs_ver);
 
@@ -153,26 +159,26 @@ proto_register_hyperscsi(void)
   static hf_register_info hf[] = {
     { &hf_hs_res,
       { "Reserved", "hyperscsi.reserved", FT_UINT8, BASE_DEC, NULL, 0x0,
-        NULL, HFILL}},
+	NULL, HFILL}},
 
     { &hf_hs_tagno,
       { "Tag No", "hyperscsi.tagno", FT_UINT16, BASE_DEC, NULL, 0x0,
-        NULL, HFILL }},
+	NULL, HFILL }},
 
     { &hf_hs_lastfrag,
       { "Last Fragment", "hyperscsi.lastfrag", FT_BOOLEAN, 8, TFS(&tfs_lastfrag), 0x04, NULL, HFILL}},
 
     { &hf_hs_fragno,
       { "Fragment No", "hyperscsi.fragno", FT_UINT16, BASE_DEC, NULL, 0x0,
-        NULL, HFILL}},
+	NULL, HFILL}},
 
     { &hf_hs_ver,
       { "HyperSCSI Version", "hyperscsi.version", FT_UINT8, BASE_DEC, NULL,
-        0x0, NULL, HFILL}},
+	0x0, NULL, HFILL}},
 
     { &hf_hs_cmd,
       { "HyperSCSI Command", "hyperscsi.cmd", FT_UINT8, BASE_DEC, VALS(hscsi_opcodes), 0x0,
-        NULL, HFILL}},
+	NULL, HFILL}},
   };
 
   static gint *ett[] = {
@@ -200,16 +206,3 @@ proto_reg_handoff_hyperscsi(void)
   dissector_add_uint("ethertype", ETHERTYPE_HYPERSCSI, hs_handle);
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

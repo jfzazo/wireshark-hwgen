@@ -21,11 +21,14 @@
  */
 
 #include "config.h"
+#include <stdio.h>
 #include <string.h>
 #include <math.h>
 
 #include "epan/packet_info.h"
 #include "epan/tap.h"
+#include "epan/address.h"
+#include "epan/strutil.h"
 #include "epan/value_string.h"
 #include "ui/tap-sctp-analysis.h"
 
@@ -396,8 +399,8 @@ packet(void *tapdata _U_, packet_info *pinfo , epan_dissect_t *edt _U_ , const v
 		tmp_info.initiate_tag = 0;
 	}
 
-	tmp_info.direction = sctp_info->direction;
-	tmp_info.assoc_id = sctp_info->assoc_index;
+    tmp_info.direction = sctp_info->direction;
+    tmp_info.assoc_id = sctp_info->assoc_index;
 	info = find_assoc(&tmp_info);
 	if (!info)
 	{
@@ -739,25 +742,14 @@ packet(void *tapdata _U_, packet_info *pinfo , epan_dissect_t *edt _U_ , const v
 			}
 			else
 			{
-				gchar* tmp_str;
 				error = (sctp_error_info_t *)g_malloc(sizeof(sctp_error_info_t));
 				error->frame_number = pinfo->fd->num;
 				error->chunk_info[0] = '\0';
 				if ((tvb_get_guint8(sctp_info->tvb[0],0)) == SCTP_INIT_CHUNK_ID)
-				{
-					tmp_str = val_to_str_wmem(NULL, tvb_get_guint8(sctp_info->tvb[0],0),chunk_type_values,"Reserved (%d)");
-					g_strlcpy(error->chunk_info, tmp_str, 200);
-					wmem_free(NULL, tmp_str);
-				}
+					g_strlcpy(error->chunk_info, val_to_str(tvb_get_guint8(sctp_info->tvb[0],0),chunk_type_values,"Reserved"), 200);
 				else
-				{
 					for (chunk_number = 0; chunk_number < sctp_info->number_of_tvbs; chunk_number++)
-					{
-						tmp_str = val_to_str_wmem(NULL, tvb_get_guint8(sctp_info->tvb[chunk_number],0),chunk_type_values,"Reserved (%d)");
-						g_strlcat(error->chunk_info, tmp_str, 200);
-						wmem_free(NULL, tmp_str);
-					}
-				}
+						g_strlcat(error->chunk_info, val_to_str(tvb_get_guint8(sctp_info->tvb[chunk_number],0),chunk_type_values,"Reserved"), 200);
 				error->info_text = "INFOS";
 				info->error_info_list = g_list_append(info->error_info_list, error);
 			}
@@ -1212,16 +1204,3 @@ register_tap_listener_sctp_stat(void)
 		sctp_tapinfo_struct.is_registered=TRUE;
 	}
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -120,7 +120,7 @@ void proto_register_pw_padding(void)
 	static gint *ett_array[] = {
 		&ett
 	};
-	proto_pw_padding = proto_register_protocol("Pseudowire Padding","PW Padding","pw.padding");
+	proto_pw_padding = proto_register_protocol("Pseudowire Padding","PW Padding","pwpadding");
 	proto_register_field_array(proto_pw_padding, hfpadding, array_length(hfpadding));
 	proto_register_subtree_array(ett_array, array_length(ett_array));
 	register_dissector("pw_padding", dissect_pw_padding, proto_pw_padding);
@@ -133,16 +133,3 @@ void proto_reg_handoff_pw_padding(void)
 	dh_data = find_dissector("data");
 	return;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

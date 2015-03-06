@@ -36,18 +36,22 @@
 #include <string.h>
 
 #include <epan/packet_info.h>
+#include <epan/epan.h>
 #include <epan/value_string.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-ansi_map.h>
 
+#include "../stat_menu.h"
 
 #include "ui/simple_dialog.h"
 
 #include "ui/gtk/gui_stat_menu.h"
 #include "ui/gtk/dlg_utils.h"
+#include "ui/gtk/filter_dlg.h"
 #include "ui/gtk/gui_utils.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkansi_map_stat(void);
 
@@ -346,15 +350,6 @@ ansi_map_stat_gtk_init(
     ansi_map_stat_gtk_cb(NULL, NULL);
 }
 
-static stat_tap_ui ansi_map_ui = {
-    REGISTER_STAT_GROUP_GENERIC,
-    NULL,
-    "ansi_map",
-    ansi_map_stat_gtk_init,
-    -1,
-    0,
-    NULL
-};
 
 void
 register_tap_listener_gtkansi_map_stat(void)
@@ -377,5 +372,5 @@ register_tap_listener_gtkansi_map_stat(void)
 
         exit(1);
     }
-    register_stat_tap_ui(&ansi_map_ui, NULL);
+    register_stat_cmd_arg("ansi_map", ansi_map_stat_gtk_init,NULL);
 }

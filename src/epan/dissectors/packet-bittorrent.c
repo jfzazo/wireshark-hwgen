@@ -25,8 +25,10 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
 #include <epan/prefs.h>
+#include <epan/conversation.h>
+#include <epan/packet.h>
 #include <epan/strutil.h>
 
 #include "packet-tcp.h"
@@ -153,8 +155,6 @@ static gint hf_azureus_jpc_port         = -1;
 static gint hf_azureus_jpc_session      = -1;
 static gint hf_bittorrent_port          = -1;
 static gint hf_bittorrent_extended      = -1;
-static gint hf_bittorrent_continuous_data = -1;
-static gint hf_bittorrent_version       = -1;
 
 static gint ett_bittorrent              = -1;
 static gint ett_bittorrent_msg          = -1;
@@ -257,8 +257,7 @@ static struct client_information peer_id[] = {
 };
 
 static guint
-get_bittorrent_pdu_length(packet_info *pinfo _U_, tvbuff_t *tvb,
-                          int offset, void *data _U_)
+get_bittorrent_pdu_length(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
    guint8  type;
    guint32 length;
@@ -363,7 +362,7 @@ dissect_bittorrent_message (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       }
 #endif
       if (msgtype == NULL) {
-         proto_tree_add_item(tree, hf_bittorrent_continuous_data, tvb, offset, -1, ENC_NA);
+         proto_tree_add_text(tree, tvb, offset, -1, "Continuation data");
          col_set_str(pinfo->cinfo, COL_INFO, "Continuation data");
          return;
       }
@@ -471,7 +470,7 @@ dissect_bittorrent_message (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
    case AZUREUS_MESSAGE_HANDSHAKE:
    case AZUREUS_MESSAGE_PEER_EXCHANGE:
-      subtvb = tvb_new_subset_length(tvb, offset, length);
+      subtvb = tvb_new_subset(tvb, offset, length, length);
       call_dissector(bencode_handle, subtvb, pinfo, mtree);
       break;
 
@@ -513,10 +512,11 @@ dissect_bittorrent_welcome (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
       for(i = 0; peer_id[i].name != NULL; ++i)
       {
          if(tvb_memeql(tvb, offset, peer_id[i].id, (int)strlen(peer_id[i].id)) == 0) {
-            version = tvb_get_string_enc(wmem_packet_scope(), tvb, offset + (int)strlen(peer_id[i].id),
-                                     peer_id[i].ver_len, ENC_ASCII);
-            proto_tree_add_string_format(tree, hf_bittorrent_version, tvb, offset, 20, version, "Client is %s v%s",
-                                peer_id[i].name, format_text((guchar*)version, peer_id[i].ver_len));
+            version = tvb_get_string(wmem_packet_scope(), tvb, offset + (int)strlen(peer_id[i].id),
+                                     peer_id[i].ver_len);
+            proto_tree_add_text(tree, tvb, offset, 20, "Client is %s v%s",
+                                peer_id[i].name,
+                                format_text((guchar*)version, peer_id[i].ver_len));
             break;
          }
       }
@@ -655,13 +655,7 @@ proto_register_bittorrent(void)
       },
       { &hf_bittorrent_extended,
         { "Extended Message", "bittorrent.extended", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }
-      },
-      { &hf_bittorrent_continuous_data,
-        { "Extended Message", "bittorrent.continuous_data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }
-      },
-      { &hf_bittorrent_version,
-        { "Client version", "bittorrent.version", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
-      },
+      }
    };
 
    static gint *ett[] = {

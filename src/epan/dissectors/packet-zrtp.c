@@ -26,8 +26,11 @@
 
 #include "config.h"
 
+#include <string.h>
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/crc32-tvb.h>
+#include <epan/strutil.h>
+#include <epan/wmem/wmem.h>
 #include <wsutil/crc32.h>
 #include "packet-rtp.h"
 #include "packet-rtcp.h"
@@ -417,7 +420,7 @@ dissect_zrtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   }
 
   sent_crc = tvb_get_ntohl(tvb, msg_offset+checksum_offset);
-  calc_crc = ~crc32c_tvb_offset_calculate(tvb, 0, msg_offset+checksum_offset, CRC32C_PRELOAD);
+  calc_crc = ~crc32c_calculate(tvb_get_ptr(tvb, 0, msg_offset+checksum_offset), msg_offset+checksum_offset, CRC32C_PRELOAD);
 
   if (sent_crc == calc_crc) {
     ti = proto_tree_add_uint_format_value(zrtp_tree, hf_zrtp_checksum, tvb, msg_offset+checksum_offset, 4, sent_crc,
@@ -1167,18 +1170,5 @@ proto_reg_handoff_zrtp(void)
   dissector_handle_t zrtp_handle;
 
   zrtp_handle = find_dissector("zrtp");
-  dissector_add_for_decode_as("udp.port", zrtp_handle);
+  dissector_add_handle("udp.port", zrtp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

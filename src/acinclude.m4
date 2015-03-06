@@ -170,10 +170,6 @@ yes
 #endif],
 				[v6type=$i; v6lib=v6;
 				v6libdir=/usr/local/v6/lib;
-				#
-				# XXX - this doesn't define INET6;
-				# is that a mistake?
-				#
 				CPPFLAGS="-I/usr/local/v6/include $CPPFLAGS"])
 			;;
 		toshiba)
@@ -184,7 +180,7 @@ yes
 #endif],
 				[v6type=$i; v6lib=inet6;
 				v6libdir=/usr/local/v6/lib;
-				AC_DEFINE(INET6, 1, [Define if the platform supports IPv6])])
+				CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
 		kame)
 			AC_EGREP_CPP(yes, [
@@ -194,7 +190,7 @@ yes
 #endif],
 				[v6type=$i; v6lib=inet6;
 				v6libdir=/usr/local/v6/lib;
-				AC_DEFINE(INET6, 1, [Define if the platform supports IPv6])])
+				CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
 		inria)
 			AC_EGREP_CPP(yes, [
@@ -202,8 +198,7 @@ yes
 #ifdef IPV6_INRIA_VERSION
 yes
 #endif],
-				[v6type=$i;
-				AC_DEFINE(INET6, 1, [Define if the platform supports IPv6])])
+				[v6type=$i; CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
 		zeta)
 			AC_EGREP_CPP(yes, [
@@ -213,14 +208,14 @@ yes
 #endif],
 				[v6type=$i; v6lib=inet6;
 				v6libdir=/usr/local/v6/lib;
-				AC_DEFINE(INET6, 1, [Define if the platform supports IPv6])])
+				CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
 		linux)
 			if test -d /usr/inet6; then
 				v6type=$i
 				v6lib=inet6
 				v6libdir=/usr/inet6
-				AC_DEFINE(INET6, 1, [Define if the platform supports IPv6])
+				CPPFLAGS="-DINET6 $CPPFLAGS"
 			fi
 			;;
 		linux-glibc)
@@ -231,20 +226,13 @@ yes
 yes
 #endif
 #endif],
-			[v6type=$i; v6lib=inet6;
-			AC_DEFINE(INET6, 1, [Define if the platform supports IPv6])])
+			[v6type=$i; v6lib=inet6; CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
 		solaris)
-			#
-			# There's nothing we can check for in the header
-			# file, so we just check for SunOS (pre-SunOS 5
-			# versions didn't include IPv6 support, so we
-			# just check the OS, not the version).
-			#
 			if test "`uname -s`" = "SunOS"; then
 				v6type=$i
 				v6lib=inet6
-				AC_DEFINE(INET6, 1, [Define if the platform supports IPv6])
+				[CPPFLAGS="-DINET6 $CPPFLAGS"]
 			fi
 			;;
 		esac
@@ -627,7 +615,7 @@ install a newer version of the header file.])
 	  AC_CHECK_FUNCS(pcap_datalink_val_to_description)
 	  AC_CHECK_FUNCS(pcap_list_datalinks pcap_set_datalink pcap_lib_version)
 	  AC_CHECK_FUNCS(pcap_get_selectable_fd pcap_free_datalinks)
-	  AC_CHECK_FUNCS(pcap_create bpf_image pcap_set_tstamp_precision)
+	  AC_CHECK_FUNCS(pcap_create bpf_image)
 	fi
 	LIBS="$ac_save_LIBS"
 ])
@@ -638,8 +626,10 @@ AC_DEFUN([AC_WIRESHARK_PCAP_REMOTE_CHECK],
     LIBS="$PCAP_LIBS $SOCKET_LIBS $NSL_LIBS $LIBS"
     AC_DEFINE(HAVE_REMOTE, 1, [Define to 1 to enable remote
               capturing feature in WinPcap library])
-    AC_CHECK_FUNCS(pcap_open)
-    if test $ac_cv_func_pcap_open = "yes" ; then
+    AC_CHECK_FUNCS(pcap_open pcap_findalldevs_ex pcap_createsrcstr)
+    if test $ac_cv_func_pcap_open = "yes" -a \
+            $ac_cv_func_pcap_findalldevs_ex = "yes" -a \
+            $ac_cv_func_pcap_createsrcstr = "yes" ; then
         AC_DEFINE(HAVE_PCAP_REMOTE, 1,
             [Define to 1 if you have WinPcap remote capturing support and prefer to use these new API features.])
     fi
@@ -773,118 +763,233 @@ AC_DEFUN([AC_WIRESHARK_ZLIB_CHECK],
 #
 # AC_WIRESHARK_LIBLUA_CHECK
 #
-# Sets $have_lua to yes or no.
-# If it's yes, it also sets $LUA_CFLAGS and $LUA_LIBS.
 AC_DEFUN([AC_WIRESHARK_LIBLUA_CHECK],[
-
-	if test "x$want_lua_dir" = "x"
+	lua_ver=5.2
+	if test "x$lua_dir" != "x"
 	then
-		# The user didn't tell us where to find Lua.  Let's go look for it.
+		#
+		# The user specified a directory in which liblua resides,
+		# so add the "include" subdirectory of that directory to
+		# the include file search path and the "lib" subdirectory
+		# of that directory to the library search path.
+		#
+		# XXX - if there's also a liblua in a directory that's
+		# already in CPPFLAGS or LDFLAGS, this won't make us find
+		# the version in the specified directory, as the compiler
+		# and/or linker will search that other directory before it
+		# searches the specified directory.
+		#
+		wireshark_save_CPPFLAGS="$CPPFLAGS"
+		CPPFLAGS="$CPPFLAGS -I$lua_dir/include"
+		wireshark_save_LIBS="$LIBS"
+		LIBS="$LIBS -L$lua_dir/lib -llua -lm"
+		wireshark_save_LDFLAGS="$LDFLAGS"
+		LDFLAGS="$LDFLAGS -L$lua_dir/lib"
 
-		# First, try the standard (pkg-config) way.
-		PKG_CHECK_MODULES(LUA, lua, [have_lua=yes], [true])
-
-		# Unfortunately Lua's pkg-config file isn't standardly named.
-		# Apparently Debian, in particular, allows installation of multiple
-		# versions of Lua at the same time (thus each version has its own
-		# package name).
-		for ver in 5.2 -5.2 5.1 -5.1 5.0 -5.0
+		#
+		# Determine Lua version by reading the LUA_VERSION_NUM definition
+		# from lua.h under the given Lua directory. The value is 501 for
+		# Lua 5.1, 502 for Lua 5.2, etc.
+		#
+		AC_MSG_CHECKING(Lua version)
+		[[ -d "$lua_dir/include" ]] && grep -rq 'LUA_VERSION_NUM.*501' "$lua_dir/include" && lua_ver=5.1
+		AC_MSG_RESULT(Lua ${lua_ver})
+	else
+		#
+		# The user specified no directory in which liblua resides,
+		# we try to find out the lua version by looking at pathnames
+		# and we just add "-llua -lliblua" to the used libs.
+		#
+		AC_MSG_CHECKING(Lua version)
+		for i in 5.0 5.1 5.2
 		do
-			if test "x$have_lua" = "xyes"
-			then
-				break
-			fi
-
-			PKG_CHECK_MODULES(LUA, lua$ver, [have_lua=yes], [true])
+			[[ -d "/usr/include/lua$i" ]] && lua_ver=$i
 		done
-
+		AC_MSG_RESULT(Lua ${lua_ver})
+		wireshark_save_CPPFLAGS="$CPPFLAGS"
+		wireshark_save_LDFLAGS="$LDFLAGS"
+		wireshark_save_LIBS="$LIBS"
+		LIBS="$LIBS -llua -lm"
 	fi
 
-	if test "x$have_lua" != "xyes"
-	then
-		# We don't have pkg-config or the user specified the path to
-		# Lua (in $want_lua_dir).
-		# Let's look for the header file.
-
-		AC_MSG_CHECKING(for the location of lua.h)
-		if test "x$want_lua_dir" = "x"
-		then
-			# The user didn't tell us where to look so we'll look in some
-			# standard locations.
-			want_lua_dir="/usr /usr/local $prefix"
-		fi
-		for dir in $want_lua_dir
-		do
-			if test -r "$dir/include/lua.h"
+	#
+	# Make sure we have "lua.h", "lualib.h" and "lauxlib.h".  If we don't, it means we probably
+	# don't have liblua, so don't use it.
+	#
+	AC_CHECK_HEADERS(lua.h lualib.h lauxlib.h,,
+	[
+		AC_CHECK_HEADERS(lua${lua_ver}/lua.h lua${lua_ver}/lualib.h lua${lua_ver}/lauxlib.h,
+		[
+			if test "x$lua_dir" != "x"
 			then
-				header_dir="$dir/include"
-				lua_dir=$dir
-				break
-			fi
-
-			for ver in 5.2 52 5.1 51 5.0 50
-			do
-				if test -r "$dir/include/lua$ver/lua.h"
+				LUA_INCLUDES="-I$lua_dir/include/lua${lua_ver}"
+			else
+				#
+				# The user didn't specify a directory in which liblua resides;
+				# we must look for the headers in a "lua${lua_ver}" subdirectory of
+				# "/usr/include", "/usr/local/include", or "$prefix/include"
+				# as some systems apparently put the headers in a "lua${lua_ver}"
+				# subdirectory.
+				AC_MSG_CHECKING(for extraneous lua header directories)
+				found_lua_dir=""
+				lua_dir_list="/usr/include/lua${lua_ver} $prefix/include/lua${lua_ver}"
+				if test "x$ac_cv_enable_usr_local" = "xyes"
 				then
-					header_dir="$dir/include/lua$ver"
-					lua_dir=$dir
-					break
+					lua_dir_list="$lua_dir_list /usr/local/include/lua${lua_ver}"
 				fi
-			done
-		done
+				for lua_dir_ent in $lua_dir_list
+				do
+					if test -d $lua_dir_ent
+					then
+						LUA_INCLUDES="-I$lua_dir_ent"
+						found_lua_dir="$lua_dir_ent"
+						break
+					fi
+				done
 
-		if test "x$header_dir" = "x"
-		then
-			have_lua=no
-			AC_MSG_RESULT(not found)
-		else
-			AC_MSG_RESULT($header_dir)
-
-			AC_MSG_CHECKING(the Lua version)
-			lua_ver=`$AWK AS_ESCAPE('/LUA_VERSION_NUM/ { print $NF; }' $header_dir/lua.h | sed 's/0/./')`
-			AC_MSG_RESULT($lua_ver)
-
-			wireshark_save_CPPFLAGS="$CPPFLAGS"
-			CPPFLAGS="$CPPFLAGS -I$header_dir"
-			AC_CHECK_HEADERS(lua.h lualib.h lauxlib.h, ,
-			[
-				have_lua=no
-				# Restore our CPPFLAGS
-				CPPFLAGS="$wireshark_save_CPPFLAGS"
-				break
-			])
-
-			if test "x$have_lua" = "x"
-			then
-				# Restore our CPPFLAGS and set LUA_CFLAGS
-				CPPFLAGS="$wireshark_save_CPPFLAGS"
-				LUA_CFLAGS="-I$header_dir"
-
-				# We have the header files and they work.  Now let's check if we
-				# have the library and it works.
-				#
-				# XXX - if there's also a liblua in a directory that's
-				# already in CPPFLAGS or LDFLAGS, this won't make us find
-				# the version in the specified directory, as the compiler
-				# and/or linker will search that other directory before it
-				# searches the specified directory.
-				#
-				# XXX - lib64?
-				wireshark_save_LIBS="$LIBS"
-				LIBS="$LIBS -L$lua_dir/lib"
-				AC_SEARCH_LIBS(luaL_openlibs, [lua-${lua_ver} lua${lua_ver} lua],
-				[
-					LUA_LIBS="-L$lua_dir/lib $ac_cv_search_luaL_openlibs -lm"
+				if test "x$found_lua_dir" != "x"
+				then
+					AC_MSG_RESULT(found -- $found_lua_dir)
+				else
+					AC_MSG_RESULT(not found)
+					#
+					# Restore the versions of CPPFLAGS,
+					# LDFLAGS, and LIBS before we added the
+					# "--with-lua=" directory, as we didn't
+					# actually find lua there.
+					#
+					CPPFLAGS="$wireshark_save_CPPFLAGS"
+					LDFLAGS="$wireshark_save_LDFLAGS"
 					LIBS="$wireshark_save_LIBS"
-					have_lua=yes
-				],[
-					LIBS="$wireshark_save_LIBS"
-					have_lua=no
-				], -lm)
+					LUA_LIBS=""
+					if test "x$want_lua" = "xyes"
+					then
+						# we found lua${lua_ver}/lua.h, but we don't know which include dir contains it
+						AC_MSG_ERROR(Header file lua.h was found as lua${lua_ver}/lua.h but we can't locate the include directory. Please set the DIR for the --with-lua configure parameter.)
+					else
+						#
+						# We couldn't find the header file; don't use the
+						# library, as it's probably not present.
+						#
+						want_lua=no
+					fi
+				fi
 			fi
-		fi
-	fi
+		],
+		[
+			#
+			# Restore the versions of CPPFLAGS, LDFLAGS,
+			# and LIBS before we added the "--with-lua="
+			# directory, as we didn't actually find lua
+			# there.
+			#
+			CPPFLAGS="$wireshark_save_CPPFLAGS"
+			LDFLAGS="$wireshark_save_LDFLAGS"
+			LIBS="$wireshark_save_LIBS"
+			LUA_LIBS=""
+			if test "x$lua_dir" != "x"
+			then
+				#
+				# The user used "--with-lua=" to specify a directory
+				# containing liblua, but we didn't find the header file
+				# there; that either means they didn't specify the
+				# right directory or are confused about whether liblua
+				# is, in fact, installed.  Report the error and give up.
+				#
+				AC_MSG_ERROR([liblua header not found in directory specified in --with-lua])
+			else
+				if test "x$want_lua" = "xyes"
+				then
+					#
+					# The user tried to force us to use the library, but we
+					# couldn't find the header file; report an error.
+					#
+					AC_MSG_ERROR(Header file lua.h not found.)
+				else
+					#
+					# We couldn't find the header file; don't use the
+					# library, as it's probably not present.
+					#
+					want_lua=no
+				fi
+			fi
+		])
+	])
 
+	if test "x$want_lua" != "xno"
+	then
+		#
+		# Well, we at least have the lua header file.
+		#
+		# let's check if the libs are there
+		#
+
+		# At least on Suse 9.3 systems, liblualib needs linking
+		# against libm.
+		LIBS="$LIBS $LUA_LIBS -lm"
+
+		AC_CHECK_LIB(lua, luaL_openlibs,
+		[
+			#
+			#  Lua found
+			#
+			if test "x$lua_dir" != "x"
+			then
+				#
+				# Put the "-I" and "-L" flags for lua into
+				# LUA_INCLUDES and LUA_LIBS, respectively.
+				#
+				LUA_LIBS="-L$lua_dir/lib -llua -lm"
+				LUA_INCLUDES="-I$lua_dir/include"
+			else
+				LUA_LIBS="-llua -lm"
+				LUA_INCLUDES=""
+			fi
+			AC_DEFINE(HAVE_LUA, 1, [Define to use Lua])
+			want_lua=yes
+
+		],[
+			#
+			# We could not find the libs, maybe we have version number in the lib name
+			#
+
+			LIBS="$wireshark_save_LIBS -llua${lua_ver} -lm"
+
+			AC_CHECK_LIB(lua${lua_ver}, luaL_openlibs,
+			[
+			    #
+			    #  Lua found
+			    #
+			    LUA_LIBS=" -llua${lua_ver} -lm"
+			    AC_DEFINE(HAVE_LUA, 1, [Define to use Lua])
+			    want_lua=yes
+			],[
+				#
+				# Restore the versions of CPPFLAGS, LDFLAGS,
+				# and LIBS before we added the "--with-lua="
+				# directory, as we didn't actually find lua
+				# there.
+				#
+				CPPFLAGS="$wireshark_save_CPPFLAGS"
+				LDFLAGS="$wireshark_save_LDFLAGS"
+				LIBS="$wireshark_save_LIBS"
+				LUA_LIBS=""
+				# User requested --with-lua but it isn't available
+				if test "x$want_lua" = "xyes"
+				then
+					AC_MSG_ERROR(Linking with liblua failed.)
+				fi
+				want_lua=no
+			])
+		])
+
+	CPPFLAGS="$wireshark_save_CPPFLAGS"
+	LDFLAGS="$wireshark_save_LDFLAGS"
+	LIBS="$wireshark_save_LIBS"
+	AC_SUBST(LUA_LIBS)
+	AC_SUBST(LUA_INCLUDES)
+
+	fi
 ])
 
 #
@@ -1177,8 +1282,8 @@ AC_DEFUN([AC_WIRESHARK_KRB5_CHECK],
 	  CPPFLAGS="$CPPFLAGS -I$krb5_dir/include"
 	  ac_heimdal_version=`grep heimdal $krb5_dir/include/krb5.h | head -n 1 | sed 's/^.*heimdal.*$/HEIMDAL/'`
 	  # MIT Kerberos moved krb5.h to krb5/krb5.h starting with release 1.5
-	  ac_mit_version_olddir=`grep 'Massachusetts' $krb5_dir/include/krb5.h | head -n 1 | sed 's/^.*Massachusetts.*$/MIT/'`
-	  ac_mit_version_newdir=`grep 'Massachusetts' $krb5_dir/include/krb5/krb5.h | head -n 1 | sed 's/^.*Massachusetts.*$/MIT/'`
+	  ac_mit_version_olddir=`grep 'Massachusetts Institute of Technology' $krb5_dir/include/krb5.h | head -n 1 | sed 's/^.*Massachusetts Institute of Technology.*$/MIT/'`
+	  ac_mit_version_newdir=`grep 'Massachusetts Institute of Technology' $krb5_dir/include/krb5/krb5.h | head -n 1 | sed 's/^.*Massachusetts Institute of Technology.*$/MIT/'`
 	  ac_krb5_version="$ac_heimdal_version$ac_mit_version_olddir$ac_mit_version_newdir"
 	  if test "x$ac_krb5_version" = "xHEIMDAL"
 	  then
@@ -1448,25 +1553,31 @@ AC_DEFUN([AC_WIRESHARK_GEOIP_CHECK],
 #
 # $1 : ldflag(s) to test
 #
-# We attempt to compile and link a test program with the specified linker
-# flag. The defined flag is added to LDFLAGS only if the link succeeds.
+# The macro first determines if the compiler supports "-Wl,{option}" to
+# pass options through to the linker. Then it attempts to compile with
+# the defined ldflags. The defined flags are added to LDFLAGS only if
+# the compilation succeeds.
 #
 AC_DEFUN([AC_WIRESHARK_LDFLAGS_CHECK],
-[LD_OPTION="$1"
-AC_MSG_CHECKING(whether we can add $LD_OPTION to LDFLAGS)
-LDFLAGS_saved="$LDFLAGS"
-LDFLAGS="$LDFLAGS $LD_OPTION"
-AC_LINK_IFELSE(
-  [
-    AC_LANG_SOURCE([[main() { return; }]])
-  ],
-  [
-    AC_MSG_RESULT(yes)
-  ],
-  [
-    AC_MSG_RESULT(no)
-    LDFLAGS="$LDFLAGS_saved"
-  ])
+[GCC_OPTION="$1"
+AC_MSG_CHECKING(whether we can add $GCC_OPTION to LDFLAGS)
+if test "x$ac_supports_W_linker_passthrough" = "xyes"; then
+  LDFLAGS_saved="$LDFLAGS"
+  LDFLAGS="$LDFLAGS $GCC_OPTION"
+  AC_LINK_IFELSE([
+    AC_LANG_SOURCE([[
+		main() { return; }
+                  ]])],
+                  [
+                    AC_MSG_RESULT(yes)
+                  ],
+                  [
+                    AC_MSG_RESULT(no)
+                    LDFLAGS="$LDFLAGS_saved"
+                  ])
+else
+  AC_MSG_RESULT(no)
+fi
 ])
 
 dnl
@@ -1490,7 +1601,7 @@ AC_DEFUN([AC_WIRESHARK_CHECK_UNKNOWN_WARNING_OPTION_ERROR],
 		# We're assuming this is clang, where
 		# -Werror=unknown-warning-option is the appropriate
 		# option to force the compiler to fail.
-		#
+		# 
 		ac_wireshark_unknown_warning_option_error="-Werror=unknown-warning-option"
 	    ],
 	    [
@@ -1601,8 +1712,8 @@ if test "x$ac_supports_gcc_flags" = "xyes" ; then
     # compilers treat unknown warning options as errors (I'm looking at
     # you, clang).
     #
-    # If the option begins with "-f" or "-m", add -Werror to make sure
-    # that we'll get an error if we get "argument unused during compilation"
+    # If the option begins with "-f", add -Werror to make sure that
+    # we'll get an error if we get "argument unused during compilation"
     # warnings, as those will either cause a failure for files compiled
     # with -Werror or annoying noise for files compiled without it.
     # (Yeah, you, clang.)
@@ -1615,11 +1726,6 @@ if test "x$ac_supports_gcc_flags" = "xyes" ; then
     elif expr "x$GCC_OPTION" : "x-f.*" >/dev/null
     then
       CFLAGS="$CFLAGS -Werror $GCC_OPTION"
-    elif expr "x$GCC_OPTION" : "x-m.*" >/dev/null
-    then
-      CFLAGS="$CFLAGS -Werror $GCC_OPTION"
-    else
-      CFLAGS="$CFLAGS $GCC_OPTION"
     fi
     AC_COMPILE_IFELSE(
       [
@@ -1691,12 +1797,6 @@ if test "x$ac_supports_gcc_flags" = "xyes" ; then
     # warning about it can be a Good Idea with C, but it's not obvious to
     # me).
     #
-    # If the option begins with "-f" or "-m", add -Werror to make sure
-    # that we'll get an error if we get "argument unused during compilation"
-    # warnings, as those will either cause a failure for files compiled
-    # with -Werror or annoying noise for files compiled without it.
-    # (Yeah, you, clang++.)
-    #
     AC_MSG_CHECKING(whether we can add $GCC_OPTION to CXXFLAGS)
     CXXFLAGS_saved="$CXXFLAGS"
     if expr "x$GCC_OPTION" : "x-W.*" >/dev/null
@@ -1705,11 +1805,6 @@ if test "x$ac_supports_gcc_flags" = "xyes" ; then
     elif expr "x$GCC_OPTION" : "x-f.*" >/dev/null
     then
       CXXFLAGS="$CXXFLAGS -Werror $GCC_OPTION"
-    elif expr "x$GCC_OPTION" : "x-m.*" >/dev/null
-    then
-      CXXFLAGS="$CXXFLAGS -Werror $GCC_OPTION"
-    else
-      CXXFLAGS="$CXXFLAGS $GCC_OPTION"
     fi
     AC_LANG_PUSH([C++])
     AC_COMPILE_IFELSE(
@@ -1777,6 +1872,8 @@ if test "x$ac_supports_gcc_flags" = "xyes" ; then
        AC_MSG_WARN([$CC and $CXX appear to be a mismatched pair])
     fi
   fi
+else
+  AC_MSG_RESULT(no)
 fi
 ])
 
@@ -2005,13 +2102,6 @@ AC_DEFUN([AC_WIRESHARK_QT_CHECK],
 		AC_WIRESHARK_QT_MODULE_CHECK(PrintSupport, $1)
 
 		#
-		# Qt 5.0 added multimedia widgets in the Qt
-		# MultimediaWidgets module.
-		#
-		AC_WIRESHARK_QT_MODULE_CHECK(MultimediaWidgets, $1,
-			AC_DEFINE(QT_MULTIMEDIAWIDGETS_LIB, 1, [Define if we have QtMultimediaWidgets]))
-
-		#
 		# While we're at it, look for QtMacExtras.  (Presumably
 		# if we're not building for OS X, it won't be present.)
 		#
@@ -2031,3 +2121,126 @@ AC_DEFUN([AC_WIRESHARK_QT_CHECK],
 	fi
 
 ])
+
+#
+# AC_WIRESHARK_PYTHON_CHECK
+#
+# Check whether python devel package is present
+#
+AC_DEFUN([AC_WIRESHARK_PYTHON_CHECK],
+  [
+    #
+    # Checking whether we have a python devel environment available
+    #
+#  AC_CACHE_CHECK([checking python devel package], ac_cv_wireshark_python_devel,
+#    [
+    AC_CHECK_PROG([ac_ws_python_config], python-config, "yes", "no")
+    if test "x$ac_ws_python_config" = "xno"; then
+      ac_cv_wireshark_python_devel=no
+        if test "x$want_python" = "xyes"
+        then
+            #
+            # The user tried to force us to use Python, but we
+            # couldn't find the python-config tool; report an error.
+            #
+            AC_MSG_ERROR("python-config not found")
+        fi
+        #
+        # Set want_python to no, so we report that we aren't using
+        # the Python interpreter.
+        #
+        want_python=no
+    else
+      AC_MSG_CHECKING([python devel])
+      ac_save_ws_cflags=$CFLAGS
+      ac_save_ws_libs=$LIBS
+      CFLAGS=$(python-config --includes)
+      LIBS=$(python-config --ldflags)
+      AC_COMPILE_IFELSE(
+        [
+          AC_LANG_PROGRAM(
+            [[#include <Python.h>]],
+            [[Py_Initialiaze();]]
+          )
+        ],
+        [
+          #
+          # Compilation successful, we have python devel available
+          #
+          ac_cv_wireshark_python_devel=yes
+          PY_LIBS=$LIBS
+          PY_CFLAGS=$CFLAGS
+          AC_SUBST(PY_LIBS)
+          AC_SUBST(PY_CFLAGS)
+          CFLAGS="$ac_save_ws_cflags"
+          LIBS="$ac_save_ws_libs"
+          AC_DEFINE(HAVE_PYTHON, 1, [Define if python devel package available])
+          AC_MSG_RESULT([yes])
+        ],
+        [
+          #
+          # Compilation unsuccessful, python devel not available
+          #
+          ac_cv_wireshark_python_devel=no
+          CFLAGS=$ac_save_ws_cflags
+          LIBS=$ac_save_ws_libs
+          if test "x$want_python" = "xyes"
+          then
+            #
+            # The user tried to force us to use Python, but we
+            # couldn't compile the test program; report an error.
+            #
+            AC_MSG_ERROR("Python test program failed compilation")
+          fi
+          AC_MSG_RESULT([no])
+          #
+          # Set want_python to no, so we report that we aren't using
+          # the Python interpreter.
+          #
+          want_python=no
+        ])
+    fi
+#    ])
+])
+
+#
+# AC_WIRESHARK_CLANG_CHECK
+#
+# Check if either our C or C++ compiler is Clang
+#
+AC_DEFUN([AC_WIRESHARK_CLANG_CHECK], [
+
+  AC_MSG_CHECKING(if $CC is Clang)
+  AC_COMPILE_IFELSE([
+    AC_LANG_SOURCE([[
+#ifndef __clang__
+CC is not __clang__
+#endif
+    ]])],
+    [
+      CC_IS_CLANG='yes'
+      CFLAGS="$CFLAGS"
+    ],
+    CC_IS_CLANG='no'
+    )
+  AC_MSG_RESULT($CC_IS_CLANG)
+
+  AC_MSG_CHECKING(if $CXX is Clang)
+  AC_LANG_PUSH([C++])
+  AC_COMPILE_IFELSE([
+    AC_LANG_SOURCE([[
+#ifndef __clang__
+CXX is not __clang__
+#endif
+    ]])],
+    [
+      CXX_IS_CLANG='yes'
+      CXXFLAGS="$CXXFLAGS -Qunused-arguments"
+    ],
+    CXX_IS_CLANG='no'
+    )
+  AC_LANG_POP([C++])
+  AC_MSG_RESULT($CXX_IS_CLANG)
+
+])
+

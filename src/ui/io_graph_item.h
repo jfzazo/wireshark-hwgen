@@ -1,6 +1,6 @@
 /* io_graph_item.h
  * Definitions and functions for IO graph items
- *
+ * 
  * Copied from gtk/io_stat.c, (c) 2002 Ronnie Sahlberg
  *
  * Wireshark - Network traffic analyzer
@@ -24,6 +24,9 @@
 
 #ifndef __IO_GRAPH_ITEM_H__
 #define __IO_GRAPH_ITEM_H__
+
+#include <stdlib.h>
+#include <math.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,9 +77,9 @@ typedef struct _io_graph_item_t {
  * @param count [in] The number of items in the array.
  */
 static inline void
-reset_io_graph_items(io_graph_item_t *items, gsize count) {
+reset_io_graph_items(io_graph_item_t *items, int count) {
     io_graph_item_t *item;
-    gsize i;
+    int i;
 
     for (i = 0; i < count; i++) {
         item = &items[i];
@@ -169,7 +172,7 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
             case FT_UINT16:
             case FT_UINT24:
             case FT_UINT32:
-                new_int = fvalue_get_uinteger(&((field_info *)gp->pdata[i])->value);
+                new_int = abs((int)fvalue_get_uinteger(&((field_info *)gp->pdata[i])->value));
 
                 if ((new_int > item->int_max) || (item->fields == 0)) {
                     item->int_max = new_int;
@@ -184,7 +187,7 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
             case FT_INT16:
             case FT_INT24:
             case FT_INT32:
-                new_int = fvalue_get_sinteger(&((field_info *)gp->pdata[i])->value);
+                new_int = abs((int)fvalue_get_sinteger(&((field_info *)gp->pdata[i])->value));
                 if ((new_int > item->int_max) || (item->fields == 0)) {
                     item->int_max = new_int;
                 }
@@ -196,7 +199,7 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
                 break;
             case FT_UINT64:
             case FT_INT64:
-                new_int64 = fvalue_get_integer64(&((field_info *)gp->pdata[i])->value);
+                new_int64 = (guint64)labs((long)fvalue_get_integer64(&((field_info *)gp->pdata[i])->value));
                 if ((new_int64 > item->int_max) || (item->fields == 0)) {
                     item->int_max = new_int64;
                 }
@@ -207,7 +210,7 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
                 item->fields++;
                 break;
             case FT_FLOAT:
-                new_float = (gfloat)fvalue_get_floating(&((field_info *)gp->pdata[i])->value);
+                new_float = (gfloat)fabs(fvalue_get_floating(&((field_info *)gp->pdata[i])->value));
                 if ((new_float > item->float_max) || (item->fields == 0)) {
                     item->float_max = new_float;
                 }
@@ -218,7 +221,7 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
                 item->fields++;
                 break;
             case FT_DOUBLE:
-                new_double = fvalue_get_floating(&((field_info *)gp->pdata[i])->value);
+                new_double = fabs(fvalue_get_floating(&((field_info *)gp->pdata[i])->value));
                 if ((new_double > item->double_max) || (item->fields == 0)) {
                     item->double_max = new_double;
                 }

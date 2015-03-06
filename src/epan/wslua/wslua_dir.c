@@ -195,6 +195,11 @@ WSLUA_CONSTRUCTOR Dir_open(lua_State* L) {
     Dir dir;
     char* dirname_clean;
 
+    if (!dirname) {
+        WSLUA_ARG_ERROR(Dir_open,PATHNAME,"must be a string");
+        return 0;
+    }
+
     dirname_clean = wslua_get_actual_filename(dirname);
     if (!dirname_clean) {
         WSLUA_ARG_ERROR(Dir_open,PATHNAME,"directory does not exist");

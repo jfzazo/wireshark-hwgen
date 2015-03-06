@@ -29,8 +29,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
+#include <epan/prefs.h>
 
 #include <epan/addr_resolv.h>
 #include <epan/crc8-tvb.h>
@@ -113,7 +115,7 @@ dissect_epon(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     guint       dpoe_reserved;
 
     item = proto_tree_add_item(epon_tree, hf_epon_dpoe_security,
-                               tvb, 2+offset, 1, ENC_BIG_ENDIAN);
+                               tvb, 2+offset, 1, ENC_NA);
     sec_tree = proto_item_add_subtree(item, ett_epon_sec);
 
     /* The DPoE security byte is split into three fields:
@@ -293,16 +295,3 @@ proto_reg_handoff_epon(void)
 
   eth_handle = find_dissector("eth");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

@@ -54,7 +54,7 @@
  */
 
 
-#include <config.h>
+#include "config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,24 +67,14 @@
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_GETOPT_H
-#include <getopt.h>
-#endif
-
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
 
 #include <glib.h>
 
-#ifdef HAVE_LIBZ
-#include <zlib.h>     /* to get the libz version number */
-#endif
-
 #include <wsutil/privileges.h>
 #include <wsutil/filesystem.h>
-#include <wsutil/crash_info.h>
-#include <wsutil/ws_version_info.h>
 
 #ifdef HAVE_PLUGINS
 #include <wsutil/plugins.h>
@@ -92,11 +82,12 @@
 
 #include "wtap.h"
 #include <wsutil/report_err.h>
+#include <wsutil/privileges.h>
 #include <wsutil/str_util.h>
-#include <wsutil/file_util.h>
 
 #ifdef HAVE_LIBGCRYPT
 #include <wsutil/wsgcrypt.h>
+#include <wsutil/file_util.h>
 #endif
 
 #ifndef HAVE_GETOPT_LONG
@@ -106,6 +97,8 @@
 #ifdef _WIN32
 #include <wsutil/unicode-utils.h>
 #endif /* _WIN32 */
+
+#include "version.h"
 
 /*
  * By default capinfos now continues processing
@@ -545,8 +538,8 @@ print_stats(const gchar *filename, capture_info *cf_info)
       if (machine_readable) {
         print_value("", 2, " packets/sec", cf_info->packet_rate);
       } else {
-        size_string = format_size((gint64)cf_info->packet_rate, format_size_unit_packets_s);
-        printf ("%s\n", size_string);
+        size_string = format_size((gint64)cf_info->packet_rate, format_size_unit_none);
+        printf ("%spackets/sec\n", size_string);
         g_free(size_string);
       }
     }
@@ -880,8 +873,7 @@ process_cap_file(wtap *wth, const char *filename)
         if ((phdr->pkt_encap > 0) && (phdr->pkt_encap < WTAP_NUM_ENCAP_TYPES)) {
           cf_info.encap_counts[phdr->pkt_encap] += 1;
         } else {
-          fprintf(stderr, "capinfos: Unknown per-packet encapsulation %d in frame %u of file \"%s\"\n",
-                  phdr->pkt_encap, packet, filename);
+          fprintf(stderr, "capinfos: Unknown per-packet encapsulation: %d [frame number: %d]\n", phdr->pkt_encap, packet);
         }
       }
     }
@@ -892,17 +884,23 @@ process_cap_file(wtap *wth, const char *filename)
     fprintf(stderr,
         "capinfos: An error occurred after reading %u packets from \"%s\": %s.\n",
         packet, filename, wtap_strerror(err));
-    if (err == WTAP_ERR_SHORT_READ) {
-        /* Don't give up completely with this one. */
+    switch (err) {
+
+      case WTAP_ERR_SHORT_READ:
         status = 1;
         fprintf(stderr,
           "  (will continue anyway, checksums might be incorrect)\n");
-    } else {
-        if (err_info != NULL) {
-            fprintf(stderr, "(%s)\n", err_info);
-            g_free(err_info);
-        }
+        break;
 
+      case WTAP_ERR_UNSUPPORTED:
+      case WTAP_ERR_UNSUPPORTED_ENCAP:
+      case WTAP_ERR_BAD_FILE:
+      case WTAP_ERR_DECOMPRESS:
+        fprintf(stderr, "(%s)\n", err_info);
+        g_free(err_info);
+        /* fallthrough */
+
+      default:
         g_free(cf_info.encap_counts);
         return 1;
     }
@@ -994,8 +992,25 @@ process_cap_file(wtap *wth, const char *filename)
 }
 
 static void
-print_usage(FILE *output)
+usage(gboolean is_error)
 {
+  FILE *output;
+
+  if (!is_error) {
+    output = stdout;
+    /* XXX - add capinfos header info here */
+  }
+  else {
+    output = stderr;
+  }
+
+  fprintf(output, "Capinfos %s"
+#ifdef GITVERSION
+      " (" GITVERSION " from " GITBRANCH ")"
+#endif
+      "\n", VERSION);
+  fprintf(output, "Prints various information (infos) about capture files.\n");
+  fprintf(output, "See http://www.wireshark.org for more information.\n");
   fprintf(output, "\n");
   fprintf(output, "Usage: capinfos [options] <infile> ...\n");
   fprintf(output, "\n");
@@ -1082,47 +1097,14 @@ hash_to_str(const unsigned char *hash, size_t length, char *str) {
 }
 #endif /* HAVE_LIBGCRYPT */
 
-static void
-get_capinfos_compiled_info(GString *str)
-{
-  /* LIBZ */
-  g_string_append(str, ", ");
-#ifdef HAVE_LIBZ
-  g_string_append(str, "with libz ");
-#ifdef ZLIB_VERSION
-  g_string_append(str, ZLIB_VERSION);
-#else /* ZLIB_VERSION */
-  g_string_append(str, "(version unknown)");
-#endif /* ZLIB_VERSION */
-#else /* HAVE_LIBZ */
-  g_string_append(str, "without libz");
-#endif /* HAVE_LIBZ */
-}
-
-static void
-get_capinfos_runtime_info(GString *str)
-{
-  /* zlib */
-#if defined(HAVE_LIBZ) && !defined(_WIN32)
-  g_string_append_printf(str, ", with libz %s", zlibVersion());
-#endif
-}
-
 int
 main(int argc, char *argv[])
 {
-  GString *comp_info_str;
-  GString *runtime_info_str;
   wtap  *wth;
   int    err;
   gchar *err_info;
   int    opt;
   int    overall_error_status;
-  static const struct option long_options[] = {
-      {(char *)"help", no_argument, NULL, 'h'},
-      {(char *)"version", no_argument, NULL, 'v'},
-      {0, 0, 0, 0 }
-  };
 
   int status = 0;
 #ifdef HAVE_PLUGINS
@@ -1134,23 +1116,6 @@ main(int argc, char *argv[])
   gcry_md_hd_t hd = NULL;
   size_t hash_bytes;
 #endif
-
-  /* Set the C-language locale to the native environment. */
-  setlocale(LC_ALL, "");
-
-  /* Get the compile-time version information string */
-  comp_info_str = get_compiled_version_info(NULL, get_capinfos_compiled_info);
-
-  /* Get the run-time version information string */
-  runtime_info_str = get_runtime_version_info(get_capinfos_runtime_info);
-
-  /* Add it to the information to be reported on a crash. */
-  ws_add_crash_info("Capinfos (Wireshark) %s\n"
-         "\n"
-         "%s"
-         "\n"
-         "%s",
-      get_ws_vcs_version_info(), comp_info_str->str, runtime_info_str->str);
 
 #ifdef _WIN32
   arg_list_utf_16to8(argc, argv);
@@ -1240,7 +1205,7 @@ main(int argc, char *argv[])
   g_option_context_free(ctx);
 
 #endif /* USE_GOPTION */
-  while ((opt = getopt_long(argc, argv, "tEcs" FILE_HASH_OPT "dluaeyizvhxokCALTMRrSNqQBmb", long_options, NULL)) !=-1) {
+  while ((opt = getopt(argc, argv, "tEcs" FILE_HASH_OPT "dluaeyizvhxokCALTMRrSNqQBmb")) !=-1) {
 
     switch (opt) {
 
@@ -1383,30 +1348,22 @@ main(int argc, char *argv[])
         break;
 
       case 'h':
-        printf("Capinfos (Wireshark) %s\n"
-               "Print various information (infos) about capture files.\n"
-               "See http://www.wireshark.org for more information.\n",
-               get_ws_vcs_version_info());
-        print_usage(stdout);
-        exit(0);
-        break;
-
-      case 'v':
-        show_version("Capinfos (Wireshark)", comp_info_str, runtime_info_str);
-        g_string_free(comp_info_str, TRUE);
-        g_string_free(runtime_info_str, TRUE);
+        usage(FALSE);
         exit(0);
         break;
 
       case '?':              /* Bad flag - print usage message */
-        print_usage(stderr);
+        usage(TRUE);
         exit(1);
         break;
     }
   }
 
+  /* Set the C-language locale to the native environment. */
+  setlocale(LC_ALL, "");
+
   if ((argc - optind) < 1) {
-    print_usage(stderr);
+    usage(TRUE);
     exit(1);
   }
 
@@ -1456,9 +1413,15 @@ main(int argc, char *argv[])
     if (!wth) {
       fprintf(stderr, "capinfos: Can't open %s: %s\n", argv[opt],
           wtap_strerror(err));
-      if (err_info != NULL) {
-        fprintf(stderr, "(%s)\n", err_info);
-        g_free(err_info);
+      switch (err) {
+
+        case WTAP_ERR_UNSUPPORTED:
+        case WTAP_ERR_UNSUPPORTED_ENCAP:
+        case WTAP_ERR_BAD_FILE:
+        case WTAP_ERR_DECOMPRESS:
+          fprintf(stderr, "(%s)\n", err_info);
+          g_free(err_info);
+          break;
       }
       overall_error_status = 1; /* remember that an error has occurred */
       if (!continue_after_wtap_open_offline_failure)

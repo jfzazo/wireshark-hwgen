@@ -31,6 +31,8 @@
 #include <stdio.h>
 #endif
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include "packet-wap.h"
 #include "packet-wtls.h"
@@ -452,6 +454,7 @@ add_session_id(proto_tree *tree, int hf, int hf_str, tvbuff_t *tvb, int offset)
 	guint count;
 	guint i;
 	guint64 session_id;
+	header_field_info *hfinfo;
 
 	count = tvb_get_guint8(tvb, offset);
 	if (count == 0)
@@ -462,7 +465,9 @@ add_session_id(proto_tree *tree, int hf, int hf_str, tvbuff_t *tvb, int offset)
 			session_id = (session_id << 8) | tvb_get_guint8(tvb, offset + i);
 		proto_tree_add_uint64 (tree, hf, tvb, offset, count+1, session_id);
 	} else {
-		proto_tree_add_item(tree, hf, tvb, offset, count+1, ENC_NA);
+		hfinfo = proto_registrar_get_nth(hf);
+		proto_tree_add_text (tree, tvb, offset, count+1, "%s: %s",
+		    hfinfo->name, tvb_bytes_to_ep_str(tvb, offset+1, count));
 	}
 	return offset+1+count;
 }
@@ -1590,16 +1595,3 @@ proto_reg_handoff_wtls(void)
 	dissector_add_uint("udp.port", UDP_PORT_WTLS_WTP_WSP, wtls_handle);
 	dissector_add_uint("udp.port", UDP_PORT_WTLS_WSP_PUSH,wtls_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -31,6 +31,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/prefs.h>
@@ -295,7 +297,7 @@ dissect_bson_document(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
     gint doc_len = -1;   /* Document length */
 
     e_type = tvb_get_guint8(tvb, offset);
-    tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset+1, &str_len, ENC_ASCII);
+    tvb_get_stringz(wmem_packet_scope(), tvb, offset+1, &str_len);
 
     element = proto_tree_add_item(elements_tree, hf_mongo_element_name, tvb, offset+1, str_len-1, ENC_UTF_8|ENC_NA);
     element_sub_tree = proto_item_add_subtree(element, ett_mongo_element);
@@ -349,11 +351,11 @@ dissect_bson_document(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
         break;
       case BSON_ELEMENT_TYPE_REGEX:
         /* regex pattern */
-        tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &str_len, ENC_ASCII);
+        tvb_get_stringz(wmem_packet_scope(), tvb, offset, &str_len);
         proto_tree_add_item(element_sub_tree, hf_mongo_element_value_regex_pattern, tvb, offset, str_len, ENC_UTF_8|ENC_NA);
         offset += str_len;
         /* regex options */
-        tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &str_len, ENC_ASCII);
+        tvb_get_stringz(wmem_packet_scope(), tvb, offset, &str_len);
         proto_tree_add_item(element_sub_tree, hf_mongo_element_value_regex_options, tvb, offset, str_len, ENC_UTF_8|ENC_NA);
         offset += str_len;
         break;
@@ -647,7 +649,7 @@ dissect_mongo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
     return tvb_length(tvb);
 }
 static guint
-get_mongo_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_mongo_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   guint32 plen;
 

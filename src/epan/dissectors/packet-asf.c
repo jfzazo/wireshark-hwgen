@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/sminmpec.h>
@@ -188,7 +189,7 @@ dissect_asf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 		/* TODO: Add the rest as captures become available to test. */
 
 		default:
-			next_tvb = tvb_new_subset_length(tvb, 8, len);
+			next_tvb = tvb_new_subset(tvb, 8, len, len);
 			call_dissector(data_handle, next_tvb, pinfo, tree);
 			break;
 		}
@@ -393,16 +394,3 @@ proto_reg_handoff_asf(void)
 	asf_handle  = new_create_dissector_handle(dissect_asf, proto_asf);
 	dissector_add_uint("rmcp.class", RMCP_CLASS_ASF, asf_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

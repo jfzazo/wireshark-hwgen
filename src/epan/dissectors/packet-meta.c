@@ -21,10 +21,15 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-sscop.h"
 #include "packet-gsm_a_common.h"
 
@@ -810,16 +815,3 @@ proto_reg_handoff_meta(void)
     fphint_handle        = find_dissector("fp_hint");
     mtp2_handle          = find_dissector("mtp2");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

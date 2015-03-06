@@ -29,6 +29,7 @@
 #include <epan/prefs.h>
 #include <epan/expert.h>
 
+#include "packet-btl2cap.h"
 #include "packet-btsdp.h"
 
 static int proto_btmcap = -1;
@@ -123,7 +124,8 @@ dissect_btmcap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
             col_set_str(pinfo->cinfo, COL_INFO, "Rcvd ");
             break;
         default:
-            col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection ");
+            col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction %d ",
+                pinfo->p2p_dir);
             break;
     }
 
@@ -442,8 +444,8 @@ proto_reg_handoff_btmcap(void)
     dissector_add_uint("btl2cap.service", BTSDP_HDP_SINK_SERVICE_UUID, btmcap_handle);
 
     /* dynamic PSM */
-    dissector_add_for_decode_as("btl2cap.psm", btmcap_handle);
-    dissector_add_for_decode_as("btl2cap.cid", btmcap_handle);
+    dissector_add_handle("btl2cap.psm", btmcap_handle);
+    dissector_add_handle("btl2cap.cid", btmcap_handle);
 }
 
 /*

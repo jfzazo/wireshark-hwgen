@@ -26,8 +26,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/strutil.h>
+#include <epan/wmem/wmem.h>
 #include <epan/asn1.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
@@ -48,6 +52,7 @@
 #include "packet-t38.h"
 #include "packet-msrp.h"
 #include "packet-sprt.h"
+#include "packet-per.h"
 #include "packet-h245.h"
 #include "packet-h264.h"
 #include "packet-mp4ves.h"
@@ -169,12 +174,6 @@ static int hf_sdp_crypto_lifetime = -1;
 static int hf_sdp_crypto_mki = -1;
 static int hf_sdp_crypto_mki_length = -1;
 
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_sdp_nal_unit_2_string = -1;
-static int hf_sdp_key_and_salt = -1;
-static int hf_sdp_nal_unit_1_string = -1;
-static int hf_sdp_data = -1;
-
 /* trees */
 static int ett_sdp = -1;
 static int ett_sdp_owner = -1;
@@ -195,7 +194,6 @@ static expert_field ei_sdp_invalid_key_param   = EI_INIT;
 static expert_field ei_sdp_invalid_line_equal  = EI_INIT;
 static expert_field ei_sdp_invalid_line_fields = EI_INIT;
 static expert_field ei_sdp_invalid_line_space  = EI_INIT;
-static expert_field ei_sdp_invalid_conversion = EI_INIT;
 
 #define SDP_RTP_PROTO       0x00000001
 #define SDP_SRTP_PROTO      0x00000002
@@ -751,7 +749,7 @@ static void dissect_key_mgmt(tvbuff_t *tvb, packet_info * pinfo, proto_item * ti
     gchar      *prtcl_id    = NULL;
     gint        len;
     tvbuff_t   *keymgmt_tvb;
-    int         found_match = 0;
+    gboolean    found_match = FALSE;
     proto_tree *key_tree;
     gint        next_offset;
     gint        offset      = 0;
@@ -1128,8 +1126,8 @@ decode_sdp_fmtp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, gint offset
   end_offset = offset + tokenlen;
 
 #if 0
-    proto_tree_add_debug(tree, tvb, offset, tokenlen, "Debug; Analysed string: '%s'",
-    tvb_get_string_enc(wmem_packet_scope(), tvb, offset, tokenlen, ENC_ASCII));
+    proto_tree_add_text(tree, tvb, offset, tokenlen, "Debug; Analysed string: '%s'",
+    tvb_get_string(wmem_packet_scope(), tvb, offset, tokenlen));
 #endif
 
     /* Look for an '=' within this value - this may indicate that there is a
@@ -1145,7 +1143,7 @@ decode_sdp_fmtp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, gint offset
     tokenlen = next_offset - offset;
     field_name = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, tokenlen, ENC_UTF_8|ENC_NA);
 #if 0
-    proto_tree_add_debug(tree, tvb, offset, tokenlen, "Debug; MIMEtype '%s'Parameter name: '%s'", mime_type, field_name); */
+    proto_tree_add_text(tree, tvb, offset, tokenlen, "Debug; MIMEtype '%s'Parameter name: '%s'", mime_type, field_name); */
 #endif
     offset = next_offset;
 
@@ -1203,7 +1201,7 @@ decode_sdp_fmtp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, gint offset
      * in bit-significance order, starting from the
      * most significant bit, and 3) level_idc.
      */
-    if ((mime_type != NULL) && ((g_ascii_strcasecmp(mime_type, "H264") == 0) || (g_ascii_strcasecmp(mime_type, "H264-SVC") == 0))) {
+    if ((mime_type != NULL) && (g_ascii_strcasecmp(mime_type, "H264") == 0)) {
         if (strcmp(field_name, "profile-level-id") == 0) {
             int length = 0;
 
@@ -1212,7 +1210,7 @@ decode_sdp_fmtp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, gint offset
             format_specific_parameter = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, tokenlen, ENC_UTF_8|ENC_NA);
             data_tvb = ascii_bytes_to_tvb(tvb, pinfo, tokenlen, format_specific_parameter);
             if (!data_tvb) {
-                proto_tree_add_expert_format(tree, pinfo, &ei_sdp_invalid_conversion, tvb, offset, tokenlen, "Could not convert '%s' to 3 bytes", format_specific_parameter);
+                proto_tree_add_text(tree, tvb, offset, tokenlen, "Could not convert '%s' to 3 bytes", format_specific_parameter);
                 return;
             }
             length = tvb_length(data_tvb);
@@ -1221,7 +1219,7 @@ decode_sdp_fmtp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, gint offset
                     dissect_h264_profile(data_tvb, pinfo, tree);
                 }
             } else {
-                item = proto_tree_add_expert_format(tree, pinfo, &ei_sdp_invalid_conversion, tvb, offset, tokenlen, "Incorrectly coded, must be three bytes");
+                item = proto_tree_add_text(tree, tvb, offset, tokenlen, "Incorrectly coded, must be three bytes");
                 PROTO_ITEM_SET_GENERATED(item);
             }
         } else if (strcmp(field_name, "packetization-mode") == 0) {
@@ -1255,8 +1253,9 @@ decode_sdp_fmtp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, gint offset
             }
 
             data_p = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, tokenlen, ENC_UTF_8|ENC_NA);
-            proto_tree_add_string(tree, hf_sdp_nal_unit_1_string, tvb, offset, tokenlen, data_p);
+            proto_tree_add_text(tree, tvb, offset, tokenlen, "NAL unit 1 string: %s", data_p);
 
+            /* proto_tree_add_text(tree, tvb, offset, tokenlen, "String %s", data_p); */
             data_tvb = base64_to_tvb(tvb, data_p);
             add_new_data_source(pinfo, data_tvb, "h264 prop-parameter-sets");
 
@@ -1273,7 +1272,7 @@ decode_sdp_fmtp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, gint offset
                     offset   = comma_offset +1;
                     tokenlen = end_offset - offset;
                     data_p   = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, tokenlen, ENC_UTF_8|ENC_NA);
-                    proto_tree_add_string(tree, hf_sdp_nal_unit_2_string, tvb, offset, tokenlen, data_p);
+                    proto_tree_add_text(tree, tvb, offset, tokenlen, "NAL unit 2 string: %s", data_p);
                     data_tvb = base64_to_tvb(tvb, data_p);
                     add_new_data_source(pinfo, data_tvb, "h264 prop-parameter-sets 2");
                     dissect_h264_nal_unit(data_tvb, pinfo, tree);
@@ -1351,7 +1350,7 @@ static void dissect_sdp_media_attribute(tvbuff_t *tvb, packet_info *pinfo, proto
     proto_tree_add_item(sdp_media_attribute_tree,
                         hf_media_attribute_field,
                         tvb, offset, tokenlen, ENC_UTF_8|ENC_NA);
-    /*??field_name = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, tokenlen, ENC_ASCII);*/
+    /*??field_name = tvb_get_string(wmem_packet_scope(), tvb, offset, tokenlen);*/
     sdp_media_attrbute_code = find_sdp_media_attribute_names(tvb, offset, tokenlen);
 
     /* Skip colon */
@@ -1472,7 +1471,7 @@ static void dissect_sdp_media_attribute(tvbuff_t *tvb, packet_info *pinfo, proto
                                        transport_info->encoding_name[media_format]);
 
 #if 0 /* XXX:  ?? */
-                payload_type = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, tokenlen, ENC_ASCII);
+                payload_type = tvb_get_string(wmem_packet_scope(), tvb, offset, tokenlen);
 #endif
                 /* Move offset past the payload type */
                 offset = next_offset + 1;
@@ -1665,8 +1664,9 @@ static void dissect_sdp_media_attribute(tvbuff_t *tvb, packet_info *pinfo, proto
                 }
 
                 if (tvb_strncaseeql(tvb, offset, "inline", next_offset-offset) == 0) {
-                    parameter_tree = proto_tree_add_subtree(sdp_media_attribute_tree, tvb, offset,
-                        param_end_offset-offset, ett_sdp_crypto_key_parameters, NULL, "Key parameters");
+                    parameter_item = proto_tree_add_text(sdp_media_attribute_tree,
+                        tvb, offset, param_end_offset-offset, "Key parameters");
+                    parameter_tree = proto_item_add_subtree(parameter_item, ett_sdp_crypto_key_parameters);
                     /* XXX only for SRTP? */
                     /* srtp-key-info       = key-salt ["|" lifetime] ["|" mki] */
                     offset      = next_offset +1;
@@ -1680,13 +1680,13 @@ static void dissect_sdp_media_attribute(tvbuff_t *tvb, packet_info *pinfo, proto
                     key_salt_tvb = base64_to_tvb(tvb, data_p);
                     add_new_data_source(pinfo, key_salt_tvb, "Key_Salt_tvb");
                     if (master_key_length != 0) {
-                        proto_tree_add_item(parameter_tree, hf_sdp_key_and_salt, tvb, offset, tokenlen, ENC_NA);
+                        proto_tree_add_text(parameter_tree, tvb, offset, tokenlen, "Key and Salt");
                         proto_tree_add_item(parameter_tree, hf_sdp_crypto_master_key,
-                            key_salt_tvb, 0, master_key_length, ENC_NA);
+                            key_salt_tvb, 0, master_key_length, ENC_UTF_8|ENC_NA);
                         proto_tree_add_item(parameter_tree, hf_sdp_crypto_master_salt,
-                            key_salt_tvb, master_key_length, master_salt_length, ENC_NA);
+                            key_salt_tvb, master_key_length, master_salt_length, ENC_UTF_8|ENC_NA);
                     } else {
-                        proto_tree_add_item(parameter_tree, hf_sdp_key_and_salt, key_salt_tvb, 0, -1, ENC_NA);
+                        proto_tree_add_text(parameter_tree, key_salt_tvb, 0, -1, "Key and Salt");
                     }
 
                     /*  ["|" lifetime] ["|" mki] are optional */
@@ -1974,7 +1974,7 @@ setup_sdp_transport(tvbuff_t *tvb, packet_info *pinfo, enum sdp_exchange_type ex
     /*
      * Show the SDP message a line at a time.
      */
-    while (tvb_reported_length_remaining(tvb, offset) > 0) {
+    while (tvb_offset_exists(tvb, offset)) {
         /*
          * Find the end of the line.
          */
@@ -2030,7 +2030,8 @@ setup_sdp_transport(tvbuff_t *tvb, packet_info *pinfo, enum sdp_exchange_type ex
         if (hf != hf_unknown)
         {
             DINDENT();
-            call_sdp_subdissector(tvb_new_subset_length(tvb, offset + tokenoffset,
+            call_sdp_subdissector(tvb_new_subset(tvb, offset + tokenoffset,
+                                                   linelen - tokenoffset,
                                                    linelen - tokenoffset),
                                     pinfo,
                                     hf, NULL, linelen-tokenoffset, transport_info, &media_info);
@@ -2329,7 +2330,7 @@ dissect_sdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
      */
     in_media_description = FALSE;
 
-    while (tvb_reported_length_remaining(tvb, offset) > 0) {
+    while (tvb_offset_exists(tvb, offset)) {
         /*
          * Find the end of the line.
          */
@@ -2423,12 +2424,13 @@ dissect_sdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         tokenoffset = 2;
         if (hf == hf_unknown)
             tokenoffset = 0;
-        string = (char*)tvb_get_string_enc(wmem_packet_scope(), tvb, offset + tokenoffset,
-                                                 linelen - tokenoffset, ENC_ASCII);
+        string = (char*)tvb_get_string(wmem_packet_scope(), tvb, offset + tokenoffset,
+                                                 linelen - tokenoffset);
         sub_ti = proto_tree_add_string(sdp_tree, hf, tvb, offset, linelen,
                                        string);
 
-        call_sdp_subdissector(tvb_new_subset_length(tvb, offset + tokenoffset,
+        call_sdp_subdissector(tvb_new_subset(tvb, offset + tokenoffset,
+                                             linelen - tokenoffset,
                                              linelen - tokenoffset),
                               pinfo,
                               hf, sub_ti, linelen-tokenoffset,
@@ -2627,7 +2629,7 @@ dissect_sdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     datalen = tvb_length_remaining(tvb, offset);
     if (datalen > 0) {
-        proto_tree_add_item(sdp_tree, hf_sdp_data, tvb, offset, datalen, ENC_NA);
+        proto_tree_add_text(sdp_tree, tvb, offset, datalen, "Data (%d bytes)",  datalen);
     }
     /* Report this packet to the tap */
     tap_queue_packet(sdp_tap, pinfo, sdp_pi);
@@ -2992,11 +2994,6 @@ proto_register_sdp(void)
               FT_STRING, BASE_NONE, NULL, 0x0,
               NULL, HFILL }
         },
-      /* Generated from convert_proto_tree_add_text.pl */
-      { &hf_sdp_nal_unit_1_string, { "NAL unit 1 string", "sdp.nal_unit_1_string", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_sdp_nal_unit_2_string, { "NAL unit 2 string", "sdp.nal_unit_2_string", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_sdp_key_and_salt, { "Key and Salt", "sdp.key_and_salt", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_sdp_data, { "Data", "sdp.data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
     };
     static gint *ett[] = {
         &ett_sdp,
@@ -3041,13 +3038,6 @@ proto_register_sdp(void)
             { "sdp.invalid_line.extra_space",
               PI_MALFORMED, PI_ERROR,
               "Invalid SDP whitespace (extra space character)",
-              EXPFILL
-            }
-        },
-        { &ei_sdp_invalid_conversion,
-            { "sdp.invalid_conversion",
-              PI_PROTOCOL, PI_WARN,
-              "Invalid conversion",
               EXPFILL
             }
         }

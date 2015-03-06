@@ -37,6 +37,9 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 
@@ -89,211 +92,205 @@ static header_field_info *hfi_gif = NULL;
 
 /* header fields */
 /* GIF signature */
-static header_field_info hfi_version GIF_HFI_INIT = {
-    "Version",
-    IMG_GIF ".version",
-    FT_STRING, BASE_NONE, NULL, 0x00,
-    "GIF Version",
-    HFILL
-};
+static header_field_info hfi_version GIF_HFI_INIT =
+    {   "Version",
+	IMG_GIF ".version",
+	FT_STRING, BASE_NONE, NULL, 0x00,
+	"GIF Version",
+	HFILL
+    };
 
 /* Screen descriptor */
-static header_field_info hfi_screen_width GIF_HFI_INIT = {
-    "Screen width",
-    IMG_GIF ".screen.width",
-    FT_UINT16, BASE_DEC, NULL, 0x00,
-    NULL,
-    HFILL
-};
+static header_field_info hfi_screen_width GIF_HFI_INIT =
+    {   "Screen width",
+	IMG_GIF ".screen.width",
+	FT_UINT16, BASE_DEC, NULL, 0x00,
+	NULL,
+	HFILL
+    };
 
-static header_field_info hfi_screen_height GIF_HFI_INIT = {
-    "Screen height",
-    IMG_GIF ".screen.height",
-    FT_UINT16, BASE_DEC, NULL, 0x00,
-    NULL,
-    HFILL
-};
+static header_field_info hfi_screen_height GIF_HFI_INIT =
+    {   "Screen height",
+	IMG_GIF ".screen.height",
+	FT_UINT16, BASE_DEC, NULL, 0x00,
+	NULL,
+	HFILL
+    };
 
-static header_field_info hfi_global_color_map_present GIF_HFI_INIT = {
-    "Global color map is present",
-    IMG_GIF ".global.color_map.present",
-    FT_UINT8, BASE_DEC, VALS(vals_true_false), 0x80,
-    "Indicates if the global color map is present",
-    HFILL
-};
+static header_field_info hfi_global_color_map_present GIF_HFI_INIT =
+    {   "Global color map is present",
+	IMG_GIF ".global.color_map.present",
+	FT_UINT8, BASE_DEC, VALS(vals_true_false), 0x80,
+	"Indicates if the global color map is present",
+	HFILL
+    };
 
-static header_field_info hfi_global_color_resolution GIF_HFI_INIT = {
-    "Bits per color minus 1",
-    IMG_GIF ".global.color_bpp",
-    FT_UINT8, BASE_DEC, NULL, 0x70,
-    "The number of bits per color is one plus the field value.",
-    HFILL
-};
+static header_field_info hfi_global_color_resolution GIF_HFI_INIT =
+    {   "Bits per color minus 1",
+	IMG_GIF ".global.color_bpp",
+	FT_UINT8, BASE_DEC, NULL, 0x70,
+	"The number of bits per color is one plus the field value.",
+	HFILL
+    };
 
-static header_field_info hfi_global_color_map_ordered/* GIF89a */ GIF_HFI_INIT = {
-    "Global color map is ordered",
-    IMG_GIF ".global.color_map.ordered",
-    FT_UINT8, BASE_DEC, VALS(vals_true_false), 0x08,
-    "Indicates whether the global color map is ordered.",
-    HFILL
-};
+static header_field_info hfi_global_color_map_ordered/* GIF89a */ GIF_HFI_INIT =
+    {   "Global color map is ordered",
+	IMG_GIF ".global.color_map.ordered",
+	FT_UINT8, BASE_DEC, VALS(vals_true_false), 0x08,
+	"Indicates whether the global color map is ordered.",
+	HFILL
+    };
 
-static header_field_info hfi_global_image_bpp GIF_HFI_INIT = {
-    "Image bits per pixel minus 1",
-    IMG_GIF ".global.bpp",
-    FT_UINT8, BASE_DEC, NULL, 0x07,
-    "The number of bits per pixel is one plus the field value.",
-    HFILL
-};
+static header_field_info hfi_global_image_bpp GIF_HFI_INIT =
+    {   "Image bits per pixel minus 1",
+	IMG_GIF ".global.bpp",
+	FT_UINT8, BASE_DEC, NULL, 0x07,
+	"The number of bits per pixel is one plus the field value.",
+	HFILL
+    };
 
 /* Only makes sense if the global color map is present: */
-static header_field_info hfi_background_color GIF_HFI_INIT = {
-    "Background color index",
-    IMG_GIF ".image_background_index",
-    FT_UINT8, BASE_DEC, NULL, 0x00,
-    "Index of the background color in the color map.",
-    HFILL
-};
+static header_field_info hfi_background_color GIF_HFI_INIT =
+    {   "Background color index",
+	IMG_GIF ".image_background_index",
+	FT_UINT8, BASE_DEC, NULL, 0x00,
+	"Index of the background color in the color map.",
+	HFILL
+    };
 
-static header_field_info hfi_pixel_aspect_ratio/* GIF89a */ GIF_HFI_INIT = {
-    "Global pixel aspect ratio",
-    IMG_GIF ".global.pixel_aspect_ratio",
-    FT_UINT8, BASE_DEC, NULL, 0x00,
-    "Gives an approximate value of the aspect ratio of the pixels.",
-    HFILL
-};
+static header_field_info hfi_pixel_aspect_ratio/* GIF89a */ GIF_HFI_INIT =
+    {   "Global pixel aspect ratio",
+	IMG_GIF ".global.pixel_aspect_ratio",
+	FT_UINT8, BASE_DEC, NULL, 0x00,
+	"Gives an approximate value of the aspect ratio of the pixels.",
+	HFILL
+    };
 
-static header_field_info hfi_global_color_map GIF_HFI_INIT = {
-    "Global color map",
-    IMG_GIF ".global.color_map",
-    FT_BYTES, BASE_NONE, NULL, 0x00,
-    "Global color map.",
-    HFILL
-};
+static header_field_info hfi_global_color_map GIF_HFI_INIT =
+    {   "Global color map",
+	IMG_GIF ".global.color_map",
+	FT_BYTES, BASE_NONE, NULL, 0x00,
+	"Global color map.",
+	HFILL
+    };
 
 
 /* Image descriptor */
-static header_field_info hfi_image_left GIF_HFI_INIT = {
-    "Image left position",
-    IMG_GIF ".image.left",
-    FT_UINT16, BASE_DEC, NULL, 0x00,
-    "Offset between left of Screen and left of Image.",
-    HFILL
-};
+static header_field_info hfi_image_left GIF_HFI_INIT =
+    {   "Image left position",
+	IMG_GIF ".image.left",
+	FT_UINT16, BASE_DEC, NULL, 0x00,
+	"Offset between left of Screen and left of Image.",
+	HFILL
+    };
 
-static header_field_info hfi_image_top GIF_HFI_INIT = {
-    "Image top position",
-    IMG_GIF ".image.top",
-    FT_UINT16, BASE_DEC, NULL, 0x00,
-    "Offset between top of Screen and top of Image.",
-    HFILL
-};
+static header_field_info hfi_image_top GIF_HFI_INIT =
+    {   "Image top position",
+	IMG_GIF ".image.top",
+	FT_UINT16, BASE_DEC, NULL, 0x00,
+	"Offset between top of Screen and top of Image.",
+	HFILL
+    };
 
-static header_field_info hfi_image_width GIF_HFI_INIT = {
-    "Image width",
-    IMG_GIF ".image.width",
-    FT_UINT16, BASE_DEC, NULL, 0x00,
-    "Image width.",
-    HFILL
-};
+static header_field_info hfi_image_width GIF_HFI_INIT =
+    {   "Image width",
+	IMG_GIF ".image.width",
+	FT_UINT16, BASE_DEC, NULL, 0x00,
+	"Image width.",
+	HFILL
+    };
 
-static header_field_info hfi_image_height GIF_HFI_INIT = {
-    "Image height",
-    IMG_GIF ".image.height",
-    FT_UINT16, BASE_DEC, NULL, 0x00,
-    "Image height.",
-    HFILL
-};
+static header_field_info hfi_image_height GIF_HFI_INIT =
+    {   "Image height",
+	IMG_GIF ".image.height",
+	FT_UINT16, BASE_DEC, NULL, 0x00,
+	"Image height.",
+	HFILL
+    };
 
-static header_field_info hfi_local_color_map_present GIF_HFI_INIT = {
-    "Local color map is present",
-    IMG_GIF ".local.color_map.present",
-    FT_UINT8, BASE_DEC, VALS(vals_true_false), 0x80,
-    "Indicates if the local color map is present",
-    HFILL
-};
+static header_field_info hfi_local_color_map_present GIF_HFI_INIT =
+    {   "Local color map is present",
+	IMG_GIF ".local.color_map.present",
+	FT_UINT8, BASE_DEC, VALS(vals_true_false), 0x80,
+	"Indicates if the local color map is present",
+	HFILL
+    };
 
-static header_field_info hfi_local_color_resolution GIF_HFI_INIT = {
-    "Bits per color minus 1",
-    IMG_GIF ".local.color_bpp",
-    FT_UINT8, BASE_DEC, NULL, 0x70,
-    "The number of bits per color is one plus the field value.",
-    HFILL
-};
+static header_field_info hfi_local_color_resolution GIF_HFI_INIT =
+    {   "Bits per color minus 1",
+	IMG_GIF ".local.color_bpp",
+	FT_UINT8, BASE_DEC, NULL, 0x70,
+	"The number of bits per color is one plus the field value.",
+	HFILL
+    };
 
-static header_field_info hfi_local_color_map_ordered/* GIF89a */ GIF_HFI_INIT = {
-    "Local color map is ordered",
-    IMG_GIF ".local.color_map.ordered",
-    FT_UINT8, BASE_DEC, VALS(vals_true_false), 0x08,
-    "Indicates whether the local color map is ordered.",
-    HFILL
-};
+static header_field_info hfi_local_color_map_ordered/* GIF89a */ GIF_HFI_INIT =
+    {   "Local color map is ordered",
+	IMG_GIF ".local.color_map.ordered",
+	FT_UINT8, BASE_DEC, VALS(vals_true_false), 0x08,
+	"Indicates whether the local color map is ordered.",
+	HFILL
+    };
 
 #if 0
-static header_field_info hfi_local_image_bpp GIF_HFI_INIT = {
-    "Image bits per pixel minus 1",
-    IMG_GIF ".local.bpp",
-    FT_UINT8, BASE_DEC, NULL, 0x07,
-    "The number of bits per pixel is one plus the field value.",
-    HFILL
-};
+static header_field_info hfi_local_image_bpp GIF_HFI_INIT =
+    {   "Image bits per pixel minus 1",
+	IMG_GIF ".local.bpp",
+	FT_UINT8, BASE_DEC, NULL, 0x07,
+	"The number of bits per pixel is one plus the field value.",
+	HFILL
+    };
 #endif
 
-static header_field_info hfi_local_color_map GIF_HFI_INIT = {
-    "Local color map",
-    IMG_GIF ".local.color_map",
-    FT_BYTES, BASE_NONE, NULL, 0x00,
-    "Local color map.",
-    HFILL
-};
+static header_field_info hfi_local_color_map GIF_HFI_INIT =
+    {   "Local color map",
+	IMG_GIF ".local.color_map",
+	FT_BYTES, BASE_NONE, NULL, 0x00,
+	"Local color map.",
+	HFILL
+    };
 
 /* Extension */
-static header_field_info hfi_extension GIF_HFI_INIT = {
-    "Extension",
-    IMG_GIF ".extension",
-    FT_NONE, BASE_NONE, NULL, 0x00,
-    "Extension.",
-    HFILL
-};
+static header_field_info hfi_extension GIF_HFI_INIT =
+    {   "Extension",
+	IMG_GIF ".extension",
+	FT_NONE, BASE_NONE, NULL, 0x00,
+	"Extension.",
+	HFILL
+    };
 
-static header_field_info hfi_extension_label GIF_HFI_INIT = {
-    "Extension label",
-    IMG_GIF ".extension.label",
-    FT_UINT8, BASE_HEX, VALS(vals_extensions), 0x00,
-    "Extension label.",
-    HFILL
-};
+static header_field_info hfi_extension_label GIF_HFI_INIT =
+    {   "Extension label",
+	IMG_GIF ".extension.label",
+	FT_UINT8, BASE_HEX, VALS(vals_extensions), 0x00,
+	"Extension label.",
+	HFILL
+    };
 
-static header_field_info hfi_image GIF_HFI_INIT = {
-    "Image",
-    IMG_GIF ".image",
-    FT_NONE, BASE_NONE, NULL, 0x00,
-    "Image.",
-    HFILL
-};
+static header_field_info hfi_image GIF_HFI_INIT =
+    {   "Image",
+	IMG_GIF ".image",
+	FT_NONE, BASE_NONE, NULL, 0x00,
+	"Image.",
+	HFILL
+    };
 
-static header_field_info hfi_image_code_size GIF_HFI_INIT = {
-    "LZW minimum code size",
-    IMG_GIF ".image.code_size",
-    FT_UINT8, BASE_DEC, NULL, 0x00,
-    "Minimum code size for the LZW compression.",
-    HFILL
-};
+static header_field_info hfi_image_code_size GIF_HFI_INIT =
+    {   "LZW minimum code size",
+	IMG_GIF ".image.code_size",
+	FT_UINT8, BASE_DEC, NULL, 0x00,
+	"Minimum code size for the LZW compression.",
+	HFILL
+    };
 
 /* Trailer (end of GIF data stream) */
-static header_field_info hfi_trailer GIF_HFI_INIT = {
-    "Trailer (End of the GIF stream)",
-    IMG_GIF ".end",
-    FT_NONE, BASE_NONE, NULL, 0x00,
-    "This byte tells the decoder that the data stream is finished.",
-    HFILL
-};
-
-static header_field_info hfi_data_block GIF_HFI_INIT = {
-    "Data block",
-    IMG_GIF ".data_block",
-    FT_BYTES, BASE_NONE, NULL, 0x00,
-    NULL, HFILL };
+static header_field_info hfi_trailer GIF_HFI_INIT =
+    {   "Trailer (End of the GIF stream)",
+	IMG_GIF ".end",
+	FT_NONE, BASE_NONE, NULL, 0x00,
+	"This byte tells the decoder that the data stream is finished.",
+	HFILL
+    };
 
 
 /* Initialize the subtree pointers */
@@ -374,7 +371,7 @@ dissect_gif(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
         color_resolution = 1 + ((peek & 0x60) >> 4);
         image_bpp = 1 + (peek & 0x07);
 
-        subtree = proto_tree_add_subtree(gif_tree, tvb, 10, 1, ett_global_flags, &ti,
+        ti = proto_tree_add_text(gif_tree, tvb, 10, 1,
                 "Global settings:");
         if (color_map_present)
             proto_item_append_text(ti, " (Global color table present)");
@@ -382,6 +379,7 @@ dissect_gif(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
                 " (%u bit%s per color) (%u bit%s per pixel)",
                 color_resolution, plurality(color_resolution, "", "s"),
                 image_bpp, plurality(image_bpp, "", "s"));
+        subtree = proto_item_add_subtree(ti, ett_global_flags);
         proto_tree_add_item(subtree, &hfi_global_color_map_present,
                 tvb, 10, 1, ENC_LITTLE_ENDIAN);
         proto_tree_add_item(subtree, &hfi_global_color_resolution,
@@ -499,8 +497,8 @@ dissect_gif(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
                 do {
                     /* Read length of data block */
                     len = tvb_get_guint8(tvb, offset);
-                    proto_tree_add_bytes_format(subtree, hfi_data_block.id, tvb,
-                            offset+1, len, NULL,
+                    proto_tree_add_text(subtree, tvb,
+                            offset, 1 + len,
                             "Data block (length = %u)", len);
                     offset += (1 + len);
                     item_len += (1 + len);
@@ -538,7 +536,7 @@ dissect_gif(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
                 color_resolution = 1 + ((peek & 0x60) >> 4);
                 image_bpp = 1 + (peek & 0x07);
 
-                subtree2 = proto_tree_add_subtree(subtree, tvb, offset, 1, ett_local_flags, &ti2,
+                ti2 = proto_tree_add_text(subtree, tvb, offset, 1,
                         "Local settings:");
                 if (color_map_present)
                     proto_item_append_text(ti2, " (Local color table present)");
@@ -546,6 +544,7 @@ dissect_gif(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
                         " (%u bit%s per color) (%u bit%s per pixel)",
                         color_resolution, plurality(color_resolution, "", "s"),
                         image_bpp, plurality(image_bpp, "", "s"));
+                subtree2 = proto_item_add_subtree(ti2, ett_local_flags);
                 proto_tree_add_item(subtree2, &hfi_local_color_map_present,
                         tvb, offset, 1, ENC_LITTLE_ENDIAN);
                 proto_tree_add_item(subtree2, &hfi_local_color_resolution,
@@ -578,8 +577,8 @@ dissect_gif(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
                 do {
                     /* Read length of data block */
                     len = tvb_get_guint8(tvb, offset);
-                    proto_tree_add_bytes_format(subtree, hfi_data_block.id, tvb,
-                            offset + 1, len, NULL,
+                    proto_tree_add_text(subtree, tvb,
+                            offset, 1 + len,
                             "Data block (length = %u)", len);
                     offset += 1 + len;
                     item_len += (1 + len);
@@ -663,8 +662,6 @@ proto_register_gif(void)
          * Trailer
          */
         &hfi_trailer,
-
-        &hfi_data_block
     };
 #endif
 
@@ -705,16 +702,3 @@ proto_reg_handoff_gif(void)
     heur_dissector_add("http", dissect_gif_heur, hfi_gif->id);
     heur_dissector_add("wtap_file", dissect_gif_heur, hfi_gif->id);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

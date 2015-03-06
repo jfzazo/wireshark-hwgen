@@ -27,7 +27,7 @@
 #include <glib.h>
 #include <wtap.h>
 
-wtap_open_return_val packetlogger_open(wtap *wth, int *err, gchar **err_info _U_);
+int packetlogger_open(wtap *wth, int *err, gchar **err_info _U_);
 
 #endif /* __PACKETLOGGER_H__ */
 

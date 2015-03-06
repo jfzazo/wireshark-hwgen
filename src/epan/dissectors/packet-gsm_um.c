@@ -24,9 +24,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <wiretap/wtap.h>
+#include <epan/circuit.h>
 
 void proto_register_gsm_um(void);
 void proto_reg_handoff_gsm_um(void);
@@ -36,8 +39,6 @@ static int hf_gsm_um_direction = -1;
 static int hf_gsm_um_channel = -1;
 static int hf_gsm_um_bsic = -1;
 static int hf_gsm_um_arfcn = -1;
-static int hf_gsm_um_band = -1;
-static int hf_gsm_um_frequency = -1;
 static int hf_gsm_um_frame = -1;
 static int hf_gsm_um_error = -1;
 static int hf_gsm_um_timeshift = -1;
@@ -172,10 +173,9 @@ dissect_gsm_um(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 			proto_tree_add_uint(gsm_um_tree, hf_gsm_um_arfcn, tvb, 0, 0,
 				pinfo->pseudo_header->gsm_um.arfcn);
-			proto_tree_add_string(gsm_um_tree, hf_gsm_um_band, tvb, 0, 0,
-				band);
-			proto_tree_add_uint_format_value(gsm_um_tree, hf_gsm_um_frequency, tvb, 0, 0,
-				downlink, "%u.%03uMHz", downlink / 1000, downlink % 1000);
+			proto_tree_add_text(gsm_um_tree, tvb, 0, 0,
+				"Band: %s, Frequency: %u.%03uMHz", band,
+				downlink / 1000, downlink % 1000);
 			proto_tree_add_uint(gsm_um_tree, hf_gsm_um_bsic, tvb, 0, 0,
 				pinfo->pseudo_header->gsm_um.bsic);
 			proto_tree_add_uint(gsm_um_tree, hf_gsm_um_frame, tvb, 0, 0,
@@ -198,7 +198,7 @@ dissect_gsm_um(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				tvbuff_t *next_tvb;
 				guint8 pseudo_len, len_left, len_byte;
 
-				len_left = tvb_reported_length(tvb);
+				len_left = tvb_length(tvb);
 				len_byte = tvb_get_guint8(tvb, 0);
 				pseudo_len = len_byte >> 2;
 				next_tvb = tvb_new_subset(tvb, 1, MIN(len_left, pseudo_len), -1);
@@ -209,7 +209,7 @@ dissect_gsm_um(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				}
 
 				/* Only dissect non-empty frames */
-				if( tvb_reported_length(next_tvb) ) {
+				if( tvb_length(next_tvb) ) {
 					call_dissector(dtap_handle, next_tvb, pinfo, tree);
 				}
 			}
@@ -248,14 +248,6 @@ proto_register_gsm_um(void)
 		{ &hf_gsm_um_arfcn,
 		{ "ARFCN",	"gsm_um.arfcn", FT_UINT16, BASE_DEC,
 		  NULL, 0x0, "Absolute radio frequency channel number", HFILL }},
-
-		{ &hf_gsm_um_band,
-		{ "Band",	"gsm_um.band", FT_STRING, BASE_NONE,
-		  NULL, 0x0, NULL, HFILL }},
-
-		{ &hf_gsm_um_frequency,
-		{ "Frequency",	"gsm_um.frequency", FT_UINT32, BASE_DEC,
-		  NULL, 0x0, NULL, HFILL }},
 
 		{ &hf_gsm_um_frame,
 		{ "TDMA Frame",	"gsm_um.frame", FT_UINT32, BASE_DEC,
@@ -305,15 +297,3 @@ proto_reg_handoff_gsm_um(void)
 	dissector_add_uint("wtap_encap", WTAP_ENCAP_GSM_UM, gsm_um_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -29,7 +29,6 @@ set(CLEAN_FILES
 	ber.c
 	btsnoop.c
 	camins.c
-	capsa.c
 	catapult_dct2000.c
 	commview.c
 	cosine.c
@@ -50,7 +49,6 @@ set(CLEAN_FILES
 	lanalyzer.c
 	libpcap.c
 	logcat.c
-	logcat_text.c
 	merge.c
 	mpeg.c
 	mime_file.c
@@ -114,26 +112,14 @@ set(wiretap_LIBS
 
 add_library(wiretap ${LINK_MODE_LIB}
 	${WIRETAP_FILES}
-	${CMAKE_BINARY_DIR}/image/wiretap.rc
 )
 
-set(FULL_SO_VERSION "0.0.0")
+set(FULL_SO_VERSION "4.0.4")
 
-set_target_properties(wiretap PROPERTIES
-	COMPILE_DEFINITIONS "WS_BUILD_DLL"
-	LINK_FLAGS "${WS_LINK_FLAGS}"
-	VERSION ${FULL_SO_VERSION} SOVERSION 0
-	FOLDER "DLLs"
-)
-IF(MSVC)
-	set_target_properties(wiretap PROPERTIES OUTPUT_NAME "wiretap-${PROJECT_VERSION}")
-ENDIF()
-
-if(ENABLE_APPLICATION_BUNDLE)
-	set_target_properties(wiretap PROPERTIES
-		LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/run/Wireshark.app/Contents/Frameworks
-	)
-endif()
+set_target_properties(wiretap PROPERTIES COMPILE_DEFINITIONS "WS_BUILD_DLL")
+set_target_properties(wiretap PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+set_target_properties(wiretap PROPERTIES VERSION ${FULL_SO_VERSION} SOVERSION 4)
+set_target_properties(wiretap PROPERTIES FOLDER "DLLs")
 
 ABICHECK(libwiretap)
 
@@ -153,3 +139,4 @@ if(NOT ${ENABLE_STATIC})
 		ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	)
 endif()
+

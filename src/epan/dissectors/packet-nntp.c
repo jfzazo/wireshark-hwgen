@@ -23,7 +23,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/strutil.h>
 
 void proto_register_nntp(void);
 void proto_reg_handoff_nntp(void);
@@ -39,17 +41,17 @@ static gint ett_nntp = -1;
 static void
 dissect_nntp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	const gchar     *type;
+        const gchar     *type;
 	proto_tree	*nntp_tree;
 	proto_item	*ti;
 	gint		offset = 0;
 	gint		next_offset;
 	int		linelen;
 
-	if (pinfo->match_uint == pinfo->destport)
-		type = "Request";
-	else
-		type = "Response";
+        if (pinfo->match_uint == pinfo->destport)
+        	type = "Request";
+        else
+        	type = "Response";
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "NNTP");
 
@@ -135,16 +137,3 @@ proto_reg_handoff_nntp(void)
 	nntp_handle = create_dissector_handle(dissect_nntp, proto_nntp);
 	dissector_add_uint("tcp.port", TCP_PORT_NNTP, nntp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

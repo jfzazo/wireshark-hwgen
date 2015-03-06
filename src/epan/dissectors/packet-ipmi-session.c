@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 void proto_register_ipmi_session(void);
@@ -76,43 +77,43 @@ static const value_string ipmi_authtype_vals[] = {
 #define IPMI_OEM_EXPLICIT	2
 
 static const value_string ipmi_payload_vals[] = {
-	{ IPMI_IPMI_MESSAGE, "IPMI Message" },
-	{ 0x01,		     "SOL (serial over LAN)" },
-	{ IPMI_OEM_EXPLICIT, "OEM Explicit" },
+	{ IPMI_IPMI_MESSAGE,	"IPMI Message" },
+	{ 0x01,	"SOL (serial over LAN)" },
+	{ IPMI_OEM_EXPLICIT,	"OEM Explicit" },
 	/* Session Setup Payload Types */
-	{ 0x10,		     "RMCP+ Open Session Request" },
-	{ 0x11,		     "RMCP+ Open Session Response" },
-	{ 0x12,		     "RAKP Message 1" },
-	{ 0x13,		     "RAKP Message 2" },
-	{ 0x14,		     "RAKP Message 3" },
-	{ 0x15,		     "RAKP Message 4" },
+	{ 0x10,	"RMCP+ Open Session Request" },
+	{ 0x11,	"RMCP+ Open Session Response" },
+	{ 0x12,	"RAKP Message 1" },
+	{ 0x13,	"RAKP Message 2" },
+	{ 0x14,	"RAKP Message 3" },
+	{ 0x15,	"RAKP Message 4" },
 	/* OEM Payload Type Handles */
-	{ 0x20,		     "OEM0 (OEM Payload)" },
-	{ 0x21,		     "OEM1 (OEM Payload)" },
-	{ 0x22,		     "OEM2 (OEM Payload)" },
-	{ 0x23,		     "OEM3 (OEM Payload)" },
-	{ 0x24,		     "OEM4 (OEM Payload)" },
-	{ 0x25,		     "OEM5 (OEM Payload)" },
-	{ 0x26,		     "OEM6 (OEM Payload)" },
-	{ 0x27,		     "OEM7 (OEM Payload)" },
+	{ 0x20,	"OEM0 (OEM Payload)" },
+	{ 0x21,	"OEM1 (OEM Payload)" },
+	{ 0x22,	"OEM2 (OEM Payload)" },
+	{ 0x23,	"OEM3 (OEM Payload)" },
+	{ 0x24,	"OEM4 (OEM Payload)" },
+	{ 0x25,	"OEM5 (OEM Payload)" },
+	{ 0x26,	"OEM6 (OEM Payload)" },
+	{ 0x27,	"OEM7 (OEM Payload)" },
 	{ 0x00,	NULL }
 };
 
 static const true_false_string ipmi_payload_aut_val  = {
-	"Payload is authenticated",
-	"Payload is unauthenticated"
+  "Payload is authenticated",
+  "Payload is unauthenticated"
 };
 
 static const true_false_string ipmi_payload_enc_val  = {
-	"Payload is encrypted",
-	"Payload is unencrypted"
+  "Payload is encrypted",
+  "Payload is unencrypted"
 };
 
 static int
 dissect_ipmi_session(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
 	proto_tree	*sess_tree = NULL, *s_tree;
-	proto_item	*ti;
+	proto_item	*ti = NULL;
 	tvbuff_t	*next_tvb;
 	guint32		session_id;
 	guint8		authtype, payloadtype = 0;
@@ -182,13 +183,13 @@ dissect_ipmi_session(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
 
 		if (authtype == IPMI_AUTH_RMCPP) {
 			/* IPMI v2.0+ */
-			s_tree = proto_tree_add_subtree_format(sess_tree, tvb, offset, 1,
-					ett_ipmi_session_payloadtype, NULL,
+			ti = proto_tree_add_text(sess_tree, tvb, offset, 1,
 					"Payload type: %s (0x%02x), %sencrypted, %sauthenticated",
 					val_to_str_const(payloadtype, ipmi_payload_vals, "Unknown"),
 					payloadtype,
 					payloadtype_enc ? "" : "not ",
 					payloadtype_auth ? "" : "not ");
+			s_tree = proto_item_add_subtree(ti, ett_ipmi_session_payloadtype);
 			proto_tree_add_item(s_tree, hf_ipmi_session_payloadtype_enc, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 			proto_tree_add_item(s_tree, hf_ipmi_session_payloadtype_auth, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 			proto_tree_add_item(s_tree, hf_ipmi_session_payloadtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -320,16 +321,3 @@ proto_reg_handoff_ipmi_session(void)
 	data_handle = find_dissector("data");
 	ipmi_handle = find_dissector("ipmi");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

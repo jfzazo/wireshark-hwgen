@@ -35,44 +35,44 @@
 #include "epan/packet_info.h"
 #include "epan/value_string.h"
 #include <epan/tap.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/dissectors/packet-bssap.h>
 #include <epan/dissectors/packet-ansi_a.h>
 
 void register_tap_listener_ansi_astat(void);
 
 typedef struct _ansi_a_stat_t {
-    int         bsmap_message_type[0xff];
-    int         dtap_message_type[0xff];
+    int		bsmap_message_type[0xff];
+    int		dtap_message_type[0xff];
 } ansi_a_stat_t;
 
 
 static int
 ansi_a_stat_packet(
-    void                        *tapdata,
-    packet_info                 *pinfo _U_,
-    epan_dissect_t              *edt _U_,
-    const void                  *data)
+    void			*tapdata,
+    packet_info			*pinfo _U_,
+    epan_dissect_t		*edt _U_,
+    const void			*data)
 {
-    ansi_a_stat_t               *stat_p = (ansi_a_stat_t *)tapdata;
-    const ansi_a_tap_rec_t      *tap_p = (const ansi_a_tap_rec_t *)data;
+    ansi_a_stat_t		*stat_p = (ansi_a_stat_t *)tapdata;
+    const ansi_a_tap_rec_t	*tap_p = (const ansi_a_tap_rec_t *)data;
 
 
     switch (tap_p->pdu_type)
     {
     case BSSAP_PDU_TYPE_BSMAP:
-        stat_p->bsmap_message_type[tap_p->message_type]++;
-        break;
+	stat_p->bsmap_message_type[tap_p->message_type]++;
+	break;
 
     case BSSAP_PDU_TYPE_DTAP:
-        stat_p->dtap_message_type[tap_p->message_type]++;
-        break;
+	stat_p->dtap_message_type[tap_p->message_type]++;
+	break;
 
     default:
-        /*
-         * unknown PDU type !!!
-         */
-        return(0);
+	/*
+	 * unknown PDU type !!!
+	 */
+	return(0);
     }
 
     return(1);
@@ -81,10 +81,10 @@ ansi_a_stat_packet(
 
 static void
 ansi_a_stat_draw(
-    void                *tapdata)
+    void		*tapdata)
 {
-    ansi_a_stat_t       *stat_p = (ansi_a_stat_t *)tapdata;
-    guint8              i;
+    ansi_a_stat_t	*stat_p = (ansi_a_stat_t *)tapdata;
+    guint8		i;
 
 
     printf("\n");
@@ -95,15 +95,15 @@ ansi_a_stat_draw(
     i = 0;
     while (ansi_a_ios401_bsmap_strings[i].strptr)
     {
-        if (stat_p->bsmap_message_type[ansi_a_ios401_bsmap_strings[i].value] > 0)
-        {
-            printf("0x%02x  %-50s%d\n",
-                ansi_a_ios401_bsmap_strings[i].value,
-                ansi_a_ios401_bsmap_strings[i].strptr,
-                stat_p->bsmap_message_type[ansi_a_ios401_bsmap_strings[i].value]);
-        }
+	if (stat_p->bsmap_message_type[ansi_a_ios401_bsmap_strings[i].value] > 0)
+	{
+	    printf("0x%02x  %-50s%d\n",
+		ansi_a_ios401_bsmap_strings[i].value,
+		ansi_a_ios401_bsmap_strings[i].strptr,
+		stat_p->bsmap_message_type[ansi_a_ios401_bsmap_strings[i].value]);
+	}
 
-        i++;
+	i++;
     }
 
     printf("\nDTAP\n");
@@ -112,15 +112,15 @@ ansi_a_stat_draw(
     i = 0;
     while (ansi_a_ios401_dtap_strings[i].strptr)
     {
-        if (stat_p->dtap_message_type[ansi_a_ios401_dtap_strings[i].value] > 0)
-        {
-            printf("0x%02x  %-50s%d\n",
-                ansi_a_ios401_dtap_strings[i].value,
-                ansi_a_ios401_dtap_strings[i].strptr,
-                stat_p->dtap_message_type[ansi_a_ios401_dtap_strings[i].value]);
-        }
+	if (stat_p->dtap_message_type[ansi_a_ios401_dtap_strings[i].value] > 0)
+	{
+	    printf("0x%02x  %-50s%d\n",
+		ansi_a_ios401_dtap_strings[i].value,
+		ansi_a_ios401_dtap_strings[i].strptr,
+		stat_p->dtap_message_type[ansi_a_ios401_dtap_strings[i].value]);
+	}
 
-        i++;
+	i++;
     }
 
     printf("==============================================================\n");
@@ -128,56 +128,33 @@ ansi_a_stat_draw(
 
 
 static void
-ansi_a_stat_init(const char *opt_arg _U_, void *userdata _U_)
+ansi_a_stat_init(const char *opt_arg _U_, void* userdata _U_)
 {
-    ansi_a_stat_t       *stat_p;
-    GString             *err_p;
+    ansi_a_stat_t	*stat_p;
+    GString		*err_p;
 
     stat_p = (ansi_a_stat_t *)g_malloc(sizeof(ansi_a_stat_t));
 
     memset(stat_p, 0, sizeof(ansi_a_stat_t));
 
     err_p =
-        register_tap_listener("ansi_a", stat_p, NULL, 0,
-            NULL,
-            ansi_a_stat_packet,
-            ansi_a_stat_draw);
+	register_tap_listener("ansi_a", stat_p, NULL, 0,
+	    NULL,
+	    ansi_a_stat_packet,
+	    ansi_a_stat_draw);
 
     if (err_p != NULL)
     {
-        g_free(stat_p);
-        g_string_free(err_p, TRUE);
+	g_free(stat_p);
+	g_string_free(err_p, TRUE);
 
-        exit(1);
+	exit(1);
     }
 }
 
 
-static stat_tap_ui ansi_a_stat_ui = {
-    REGISTER_STAT_GROUP_GENERIC,
-    NULL,
-    "ansi_a",
-    ansi_a_stat_init,
-    -1,
-    0,
-    NULL
-};
-
 void
 register_tap_listener_ansi_astat(void)
 {
-    register_stat_tap_ui(&ansi_a_stat_ui, NULL);
+    register_stat_cmd_arg("ansi_a,", ansi_a_stat_init,NULL);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

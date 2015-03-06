@@ -27,7 +27,6 @@
 
 #include "epan/follow.h"
 #include "epan/dissectors/packet-tcp.h"
-#include "epan/dissectors/packet-udp.h"
 #include "epan/prefs.h"
 #include "epan/addr_resolv.h"
 #include "epan/charsets.h"
@@ -41,15 +40,16 @@
 #include "wsutil/tempfile.h"
 #include "wsutil/file_util.h"
 #include "wsutil/str_util.h"
-#include "wsutil/ws_version_info.h"
 
 #include "ws_symbol_export.h"
 
 #include "color_utils.h"
 
-#include "ui/follow.h"
+#include "file.h"
 
-#include "qt_ui_utils.h"
+#include "version_info.h"
+
+#include "ui/follow.h"
 
 #include <QKeyEvent>
 #include <QMessageBox>
@@ -61,38 +61,34 @@
 // To do:
 // - Instead of calling QMessageBox, display the error message in the text
 //   box and disable the appropriate controls.
-// - Draw text by hand similar to ByteViewText. This would let us add
-//   extra information, e.g. a timestamp column and get rid of the data
-//   limit.
-// - Add a progress bar and connect captureCaptureUpdateContinue to it
 
-FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_type_t type) :
-    WiresharkDialog(parent, cf),
+FollowStreamDialog::FollowStreamDialog(QWidget *parent, follow_type_t type, capture_file *cf) :
+    QDialog(parent),
     ui(new Ui::FollowStreamDialog),
+    cap_file_(cf),
     follow_type_(type),
-    truncated_(false),
     save_as_(false)
 {
     ui->setupUi(this);
 
     setAttribute(Qt::WA_DeleteOnClose, true);
     memset(&follow_info_, 0, sizeof(follow_info_));
-    follow_info_.show_type = SHOW_ASCII;
-    follow_info_.show_stream = BOTH_HOSTS;
 
     ui->teStreamContent->installEventFilter(this);
 
     // XXX Use recent settings instead
-    resize(parent.width() * 2 / 3, parent.height());
+    if (parent) {
+        resize(parent->width() * 2 / 3, parent->height());
+    }
 
     QComboBox *cbcs = ui->cbCharset;
     cbcs->blockSignals(true);
-    cbcs->addItem(tr("ASCII"), SHOW_ASCII);
-    cbcs->addItem(tr("C Arrays"), SHOW_CARRAY);
-    cbcs->addItem(tr("EBCDIC"), SHOW_EBCDIC);
-    cbcs->addItem(tr("Hex Dump"), SHOW_HEXDUMP);
-    cbcs->addItem(tr("UTF-8"), SHOW_RAW);
-    cbcs->addItem(tr("YAML"), SHOW_YAML);
+    cbcs->addItem("ASCII", SHOW_ASCII);
+    cbcs->addItem("C Arrays", SHOW_CARRAY);
+    cbcs->addItem("EBCDIC", SHOW_EBCDIC);
+    cbcs->addItem("Hex Dump", SHOW_HEXDUMP);
+    cbcs->addItem("UTF-8", SHOW_RAW);
+    cbcs->addItem("YAML", SHOW_YAML);
     cbcs->blockSignals(false);
 
     b_filter_out_ = ui->buttonBox->addButton(tr("Hide this stream"), QDialogButtonBox::ActionRole);
@@ -109,7 +105,6 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
             this, SLOT(fillHintLabel(int)));
     connect(ui->teStreamContent, SIGNAL(mouseClickedOnTextCursorPosition(int)),
             this, SLOT(goToPacketForTextPos(int)));
-    connect(&cap_file_, SIGNAL(captureFileClosing()), this, SLOT(captureFileClosing()));
 
     fillHintLabel(-1);
 }
@@ -143,19 +138,15 @@ void FollowStreamDialog::fillHintLabel(int text_pos)
     }
 
     if (pkt > 0) {
-        hint = QString(tr("Packet %1. ")).arg(pkt);
+        hint = QString("Packet %1. ").arg(pkt);
     }
 
-    hint += tr("%Ln <span style=\"color: %1; background-color:%2\">client</span> pkt(s), ", "", client_packet_count_)
-            .arg(ColorUtils::fromColorT(prefs.st_client_fg).name())
-            .arg(ColorUtils::fromColorT(prefs.st_client_bg).name())
-            + tr("%Ln <span style=\"color: %1; background-color:%2\">server</span> pkt(s), ", "", server_packet_count_)
-            .arg(ColorUtils::fromColorT(prefs.st_server_fg).name())
-            .arg(ColorUtils::fromColorT(prefs.st_server_bg).name())
+    hint += tr("%Ln client pkt(s), ", "", client_packet_count_)
+            + tr("%Ln server pkt(s), ", "", server_packet_count_)
             + tr("%Ln turn(s).", "", turns_);
 
     if (pkt > 0) {
-        hint.append(QString(tr(" Click to select.")));
+        hint.append(QString(" Click to select."));
     }
 
     hint.prepend("<small><i>");
@@ -166,9 +157,6 @@ void FollowStreamDialog::fillHintLabel(int text_pos)
 void FollowStreamDialog::goToPacketForTextPos(int text_pos)
 {
     int pkt = -1;
-    if (file_closed_) {
-        return;
-    }
 
     if (text_pos >= 0) {
         QMap<int, guint32>::iterator it = text_pos_to_packet_.upperBound(text_pos);
@@ -180,22 +168,6 @@ void FollowStreamDialog::goToPacketForTextPos(int text_pos)
     if (pkt > 0) {
         emit goToPacket(pkt);
     }
-}
-
-void FollowStreamDialog::updateWidgets(bool follow_in_progress)
-{
-    bool enable = !follow_in_progress;
-    if (file_closed_) {
-        ui->teStreamContent->setEnabled(true);
-        enable = false;
-    }
-
-    ui->cbDirections->setEnabled(enable);
-    ui->cbCharset->setEnabled(enable);
-    ui->streamNumberSpinBox->setEnabled(enable);
-    ui->leFind->setEnabled(enable);
-    ui->bFind->setEnabled(enable);
-    b_filter_out_->setEnabled(enable);
 }
 
 void FollowStreamDialog::findText(bool go_back)
@@ -214,14 +186,14 @@ void FollowStreamDialog::findText(bool go_back)
 
 void FollowStreamDialog::saveAs()
 {
-    QString file_name = QFileDialog::getSaveFileName(this, wsApp->windowTitleString(tr("Save Stream Content As" UTF8_HORIZONTAL_ELLIPSIS)));
+    QString file_name = QFileDialog::getSaveFileName(this, "Wireshark: Save stream content as");
     file_.setFileName(file_name);
     file_.open( QIODevice::WriteOnly );
     QTextStream out(&file_);
 
     save_as_ = true;
 
-    readStream();
+    follow_read_stream();
 
     if (follow_info_.show_type != SHOW_RAW)
     {
@@ -240,9 +212,10 @@ void FollowStreamDialog::helpButton()
 
 void FollowStreamDialog::filterOut()
 {
+
     emit updateFilter(filter_out_filter_, TRUE);
 
-    close();
+    this->close();
 }
 
 void FollowStreamDialog::on_cbDirections_currentIndexChanged(int index)
@@ -262,14 +235,14 @@ void FollowStreamDialog::on_cbDirections_currentIndexChanged(int index)
         return;
     }
 
-    readStream();
+    follow_read_stream();
 }
 
 void FollowStreamDialog::on_cbCharset_currentIndexChanged(int index)
 {
     if (index < 0) return;
     follow_info_.show_type = static_cast<show_type_t>(ui->cbCharset->itemData(index).toInt());
-    readStream();
+    follow_read_stream();
 }
 
 void FollowStreamDialog::on_bFind_clicked()
@@ -284,13 +257,9 @@ void FollowStreamDialog::on_leFind_returnPressed()
 
 void FollowStreamDialog::on_streamNumberSpinBox_valueChanged(int stream_num)
 {
-    if (file_closed_) return;
-
     if (stream_num >= 0) {
-        updateWidgets(true);
-        follow_index((follow_type_ == FOLLOW_TCP) ? TCP_STREAM : UDP_STREAM, stream_num);
+                    follow_tcp_index(stream_num);
         follow(QString(), true);
-        updateWidgets(false);
     }
 }
 
@@ -325,14 +294,12 @@ void FollowStreamDialog::resetStream()
     }
     g_list_free(follow_info_.payload);
     follow_info_.payload = NULL;
-    follow_info_.client_port = 0;
 }
 
 frs_return_t
-FollowStreamDialog::readStream()
+FollowStreamDialog::follow_read_stream()
 {
     ui->teStreamContent->clear();
-    truncated_ = false;
     frs_return_t ret;
 
     client_buffer_count_ = 0;
@@ -345,15 +312,15 @@ FollowStreamDialog::readStream()
     switch(follow_type_) {
 
     case FOLLOW_TCP :
-        ret = readTcpStream();
+        ret = follow_read_tcp_stream();
         break;
 
     case FOLLOW_UDP :
-        ret = readUdpStream();
+        ret = follow_read_udp_stream();
         break;
 
     case FOLLOW_SSL :
-        ret = readSslStream();
+        ret = follow_read_ssl_stream();
         break;
 
     default :
@@ -482,7 +449,7 @@ ssl_queue_packet_data(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, co
  * correctly but get extra blank lines very other line when printed.
  */
 frs_return_t
-FollowStreamDialog::readSslStream()
+FollowStreamDialog::follow_read_ssl_stream()
 {
     guint32      global_client_pos = 0, global_server_pos = 0;
     guint32 *    global_pos;
@@ -507,7 +474,7 @@ FollowStreamDialog::readSslStream()
             size_t nchars = rec->data.data_len;
             gchar *buffer = (gchar *)g_memdup(rec->data.data, (guint) nchars);
 
-            frs_return = showBuffer(buffer, nchars,
+            frs_return = follow_show(buffer, nchars,
                                      rec->is_from_server, rec->packet_num, global_pos);
             g_free(buffer);
             if (frs_return == FRS_PRINT_ERROR)
@@ -519,22 +486,25 @@ FollowStreamDialog::readSslStream()
 }
 
 void
-FollowStreamDialog::followStream()
+FollowStreamDialog::follow_stream()
 {
     follow_stats_t stats;
+
+    follow_info_.show_type = SHOW_ASCII;
+    follow_info_.show_stream = BOTH_HOSTS;
 
     /* Stream to show */
     follow_stats(&stats);
 
     follow_info_.is_ipv6 = stats.is_ipv6;
 
-    readStream();
+    follow_read_stream();
 }
 
 
 
-const int FollowStreamDialog::max_document_length_ = 2 * 1000 * 1000; // Just a guess
-void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 packet_num)
+
+void FollowStreamDialog::add_text(QString text, gboolean is_from_server, guint32 packet_num)
 {
     if (save_as_ == true)
     {
@@ -550,16 +520,6 @@ void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 
 #endif
         }
         return;
-    }
-
-    if (truncated_) {
-        return;
-    }
-
-    int char_count = ui->teStreamContent->document()->characterCount();
-    if (char_count + text.length() > max_document_length_) {
-        text.truncate(max_document_length_ - char_count);
-        truncated_ = true;
     }
 
     QColor tagserver_fg = ColorUtils::fromColorT(prefs.st_server_fg);
@@ -583,12 +543,15 @@ void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 
     ui->teStreamContent->insertPlainText(text);
     ui->teStreamContent->moveCursor(QTextCursor::End);
     text_pos_to_packet_[ui->teStreamContent->textCursor().anchor()] = packet_num;
+}
 
-    if (truncated_) {
-        ui->teStreamContent->setTextBackgroundColor(ui->teStreamContent->palette().window().color());
-        ui->teStreamContent->setTextColor(ui->teStreamContent->palette().windowText().color());
-        ui->teStreamContent->insertPlainText(tr("\n[Stream output truncated]"));
-        ui->teStreamContent->moveCursor(QTextCursor::End);
+void FollowStreamDialog::setCaptureFile(capture_file *cf)
+{
+    if (!cf) { // We only want to know when the file closes.
+        cap_file_ = NULL;
+        ui->streamNumberSpinBox->setEnabled(false);
+        ui->streamNumberSpinBox->setToolTip(QString());
+        ui->streamNumberLabel->setToolTip(QString());
     }
 }
 
@@ -597,6 +560,7 @@ void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 
 // / (slash), Ctrl-F - Focus and highlight the search box
 // Ctrl-G, Ctrl-N, F3 - Find next
 // Should we make it so that typing any text starts searching?
+#include <QDebug>
 bool FollowStreamDialog::eventFilter(QObject *obj, QEvent *event)
 {
     Q_UNUSED(obj);
@@ -652,7 +616,7 @@ static inline void sanitize_buffer(char *buffer, size_t nchars) {
 }
 
 frs_return_t
-FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_server, guint32 packet_num,
+FollowStreamDialog::follow_show(char *buffer, size_t nchars, gboolean is_from_server, guint32 packet_num,
                                 guint32 *global_pos)
 {
     gchar initbuf[256];
@@ -667,7 +631,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
         EBCDIC_to_ASCII((guint8*)buffer, (guint) nchars);
         sanitize_buffer(buffer, nchars);
         QByteArray ba = QByteArray(buffer, (int)nchars);
-        addText(ba, is_from_server, packet_num);
+        add_text(ba, is_from_server, packet_num);
         break;
     }
 
@@ -679,7 +643,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
         sanitize_buffer(buffer, nchars);
         sanitize_buffer(buffer, nchars);
         QByteArray ba = QByteArray(buffer, (int)nchars);
-        addText(ba, is_from_server, packet_num);
+        add_text(ba, is_from_server, packet_num);
         break;
     }
 
@@ -689,7 +653,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
         // replacement characters or removed. It would be nice if we could
         // explicitly choose one or the other.
         QString utf8 = QString::fromUtf8(buffer, (int)nchars);
-        addText(utf8, is_from_server, packet_num);
+        add_text(utf8, is_from_server, packet_num);
         break;
     }
 
@@ -737,7 +701,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
             *cur++ = '\n';
             *cur = 0;
 
-            addText(hexbuf, is_from_server, packet_num);
+            add_text(hexbuf, is_from_server, packet_num);
         }
         break;
 
@@ -747,7 +711,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
                    is_from_server ? 1 : 0,
                    is_from_server ? server_buffer_count_++ : client_buffer_count_++,
                    packet_num);
-        addText(initbuf, is_from_server, packet_num);
+        add_text(initbuf, is_from_server, packet_num);
 
         while (current_pos < nchars) {
             gchar hexbuf[256];
@@ -780,7 +744,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
             (*global_pos) += i;
             hexbuf[cur++] = '\n';
             hexbuf[cur] = 0;
-            addText(hexbuf, is_from_server, packet_num);
+            add_text(hexbuf, is_from_server, packet_num);
         }
         break;
 
@@ -806,7 +770,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
             current_pos += len;
             (*global_pos) += len;
         }
-        addText(yaml_text, is_from_server, packet_num);
+        add_text(yaml_text, is_from_server, packet_num);
         break;
     }
     }
@@ -831,7 +795,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
     return FRS_OK;
 }
 
-bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
+bool FollowStreamDialog::follow(QString previous_filter, bool use_tcp_index)
 {
     int                 tmp_fd;
     QString             follow_filter;
@@ -848,19 +812,19 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
 
     resetStream();
 
-    if (file_closed_)
+    if (cap_file_ == NULL)
     {
         QMessageBox::warning(this, tr("No capture file."), tr("Please make sure you have a capture file opened."));
         return false;
     }
 
-    if (cap_file_.capFile()->edt == NULL)
+    if (cap_file_->edt == NULL)
     {
         QMessageBox::warning(this, tr("Error following stream."), tr("Capture file invalid."));
         return false;
     }
 
-    proto_get_frame_protocols(cap_file_.capFile()->edt->pi.layers, NULL, &is_tcp, &is_udp, NULL, NULL);
+    proto_get_frame_protocols(cap_file_->edt->pi.layers, NULL, &is_tcp, &is_udp, NULL, NULL);
 
     switch (follow_type_)
     {
@@ -871,6 +835,7 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
         }
         break;
     case FOLLOW_UDP:
+        removeStreamControls();
         if (!is_udp) {
             QMessageBox::warning(this, tr("Error following stream."), tr("Please make sure you have a UDP packet selected."));
             return false;
@@ -879,7 +844,7 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
     case FOLLOW_SSL:
         /* we got ssl so we can follow */
         removeStreamControls();
-        if (!epan_dissect_packet_contains_field(cap_file_.capFile()->edt, "ssl")) {
+        if (!epan_dissect_packet_contains_field(cap_file_->edt, "ssl")) {
             QMessageBox::critical(this, tr("Error following stream."),
                                tr("Please make sure you have an SSL packet selected."));
             return false;
@@ -892,15 +857,12 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
         /* Create a new filter that matches all packets in the TCP stream,
            and set the display filter entry accordingly */
         reset_tcp_reassembly();
-    } else {
-        reset_udp_follow();
     }
 
-    if (use_stream_index) {
-        follow_filter = gchar_free_to_qstring(
-            build_follow_index_filter((follow_type_ == FOLLOW_TCP) ? TCP_STREAM : UDP_STREAM));
+    if (use_tcp_index) {
+        follow_filter = gchar_free_to_qstring(build_follow_index_filter());
     } else {
-        follow_filter = gchar_free_to_qstring(build_follow_conv_filter(&cap_file_.capFile()->edt->pi));
+        follow_filter = gchar_free_to_qstring(build_follow_conv_filter(&cap_file_->edt->pi));
     }
     if (follow_filter.isEmpty()) {
         QMessageBox::warning(this,
@@ -960,7 +922,7 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
         int stream_count = get_tcp_stream_count() - 1;
         ui->streamNumberSpinBox->blockSignals(true);
         ui->streamNumberSpinBox->setMaximum(stream_count);
-        ui->streamNumberSpinBox->setValue(get_follow_index(TCP_STREAM));
+        ui->streamNumberSpinBox->setValue(get_follow_tcp_index());
         ui->streamNumberSpinBox->blockSignals(false);
         ui->streamNumberSpinBox->setToolTip(tr("%Ln total stream(s).", "", stream_count));
         ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
@@ -968,7 +930,6 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
         break;
     }
     case FOLLOW_UDP:
-    {
         /* data will be passed via tap callback*/
         msg = register_tap_listener("udp_follow", &follow_info_,
                                     follow_filter.toUtf8().constData(),
@@ -979,17 +940,7 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
                                msg->str);
             return false;
         }
-
-        int stream_count = get_udp_stream_count() - 1;
-        ui->streamNumberSpinBox->blockSignals(true);
-        ui->streamNumberSpinBox->setMaximum(stream_count);
-        ui->streamNumberSpinBox->setValue(get_follow_index(UDP_STREAM));
-        ui->streamNumberSpinBox->blockSignals(false);
-        ui->streamNumberSpinBox->setToolTip(tr("%Ln total stream(s).", "", stream_count));
-        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
-
         break;
-    }
     case FOLLOW_SSL:
         /* we got ssl so we can follow */
         msg = register_tap_listener("ssl", &follow_info_,
@@ -1088,16 +1039,16 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
     switch (follow_type_)
     {
     case FOLLOW_TCP:
-        port0 = tcp_port_to_display(NULL, stats.port[0]);
-        port1 = tcp_port_to_display(NULL, stats.port[1]);
+        port0 = ep_tcp_port_to_display(stats.port[0]);
+        port1 = ep_tcp_port_to_display(stats.port[1]);
         break;
     case FOLLOW_UDP:
-        port0 = udp_port_to_display(NULL, stats.port[0]);
-        port1 = udp_port_to_display(NULL, stats.port[1]);
+        port0 = ep_udp_port_to_display(stats.port[0]);
+        port1 = ep_udp_port_to_display(stats.port[1]);
         break;
     case FOLLOW_SSL:
-        port0 = tcp_port_to_display(NULL, stats.port[0]);
-        port1 = tcp_port_to_display(NULL, stats.port[1]);
+        port0 = ep_tcp_port_to_display(stats.port[0]);
+        port1 = ep_tcp_port_to_display(stats.port[1]);
         break;
     }
 
@@ -1195,9 +1146,6 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
         }
     }
 
-    wmem_free(NULL, port0);
-    wmem_free(NULL, port1);
-
     /* Both Stream Directions */
     switch (follow_type_)
     {
@@ -1206,46 +1154,35 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index)
                 .arg(gchar_free_to_qstring(format_size(
                                                stats.bytes_written[0] + stats.bytes_written[1],
                      format_size_unit_bytes|format_size_prefix_si)));
-        setWindowSubtitle(tr("Follow TCP Stream (%1)").arg(follow_filter));
+        this->setWindowTitle(QString("Follow TCP Stream (%1)").arg(follow_filter));
         break;
     case FOLLOW_UDP:
         both_directions_string = QString("Entire conversation (%1)")
                 .arg(gchar_free_to_qstring(format_size(
                                                follow_info_.bytes_written[0] + follow_info_.bytes_written[1],
                      format_size_unit_bytes|format_size_prefix_si)));
-        setWindowSubtitle(tr("Follow UDP Stream (%1)").arg(follow_filter));
+        this->setWindowTitle(QString("Follow UDP Stream (%1)").arg(follow_filter));
         break;
     case FOLLOW_SSL:
         both_directions_string = QString("Entire conversation (%1)")
                 .arg(gchar_free_to_qstring(format_size(
                                                follow_info_.bytes_written[0] + follow_info_.bytes_written[1],
                      format_size_unit_bytes|format_size_prefix_si)));
-        setWindowSubtitle(tr("Follow SSL Stream (%1)").arg(follow_filter));
+        this->setWindowTitle(QString("Follow SSL Stream (%1)").arg(follow_filter));
         break;
     }
 
     ui->cbDirections->clear();
-    ui->cbDirections->addItem(both_directions_string);
-    ui->cbDirections->addItem(client_to_server_string);
-    ui->cbDirections->addItem(server_to_client_string);
+    this->ui->cbDirections->addItem(both_directions_string);
+    this->ui->cbDirections->addItem(client_to_server_string);
+    this->ui->cbDirections->addItem(server_to_client_string);
 
-    followStream();
+    follow_stream();
     fillHintLabel(-1);
 
-    if (data_out_file) {
-        fclose(data_out_file);
-        data_out_file = NULL;
-    }
+    data_out_file = NULL;
 
     return true;
-}
-
-void FollowStreamDialog::captureFileClosing()
-{
-    QString tooltip = tr("File closed.");
-    ui->streamNumberSpinBox->setToolTip(tooltip);
-    ui->streamNumberLabel->setToolTip(tooltip);
-    WiresharkDialog::captureFileClosing();
 }
 
 #define FLT_BUF_SIZE 1024
@@ -1268,7 +1205,7 @@ void FollowStreamDialog::captureFileClosing()
  * correctly but get extra blank lines very other line when printed.
  */
 frs_return_t
-FollowStreamDialog::readTcpStream()
+FollowStreamDialog::follow_read_tcp_stream()
 {
     FILE *data_out_fp;
     tcp_stream_chunk    sc;
@@ -1337,7 +1274,7 @@ FollowStreamDialog::readTcpStream()
 
             if (!skip)
             {
-                frs_return = showBuffer(buffer,
+                frs_return = follow_show(buffer,
                                          nchars, is_server, sc.packet_num, global_pos);
                 if(frs_return == FRS_PRINT_ERROR) {
                     fclose(data_out_fp);
@@ -1380,7 +1317,7 @@ FollowStreamDialog::readTcpStream()
  * correctly but get extra blank lines very other line when printed.
  */
 frs_return_t
-FollowStreamDialog::readUdpStream()
+FollowStreamDialog::follow_read_udp_stream()
 {
     guint32 global_client_pos = 0, global_server_pos = 0;
     guint32 *global_pos;
@@ -1409,7 +1346,7 @@ FollowStreamDialog::readUdpStream()
             buffer = (char *)g_memdup(follow_record->data->data,
                                       follow_record->data->len);
 
-            frs_return = showBuffer(
+            frs_return = follow_show(
                         buffer,
                         follow_record->data->len,
                         follow_record->is_server,

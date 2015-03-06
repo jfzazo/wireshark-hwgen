@@ -26,29 +26,16 @@
 #ifndef __RTP_STREAM_H__
 #define __RTP_STREAM_H__
 
-/** @file
- *  "RTP Streams" dialog box common routines.
- *  @ingroup main_ui_group
- */
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 #include "rtp_analysis.h"
 #include <glib.h>
 #include <stdio.h>
-
-#include "cfile.h"
-
 #include <epan/address.h>
-#include <epan/tap.h>
 
 
 /****************************************************************************/
 /* type for storing rtp frame information */
 typedef struct st_rtp_sample_header {
-    double rec_time;        /**< milliseconds since start of recording */
+    guint32 rec_time;	    /**< milliseconds since start of recording */
     guint16 frame_length;   /**< number of bytes in *frame */
 } rtp_sample_header_t;
 
@@ -63,36 +50,30 @@ typedef rtp_sample_t* rtp_sample_p;
 
 /** Defines an rtp stream */
 typedef struct _rtp_stream_info {
-    address         src_addr;
-    guint32         src_port;
-    address         dest_addr;
-    guint32         dest_port;
-    guint32         ssrc;
+    address src_addr;
+    guint32 src_port;
+    address dest_addr;
+    guint32 dest_port;
+    guint32 ssrc;
+    guint8  pt;
+    const gchar *info_payload_type_str;
+    guint32 npackets;
 
-    guint8          payload_type; /**< Numeric payload type */
-    gchar          *payload_type_name; /**< Payload type name */
-    gboolean        is_srtp;
+    guint32 first_frame_num;		/**< frame number of first frame */
+    guint32 setup_frame_number;		/**< frame number of setup message */
+    /* start of recording (GMT) of this stream */
+    guint32 start_sec;				/**< seconds */
+    guint32 start_usec;				/**< microseconds */
+    gboolean tag_vlan_error;
+    guint32 start_rel_sec;          /**< start stream rel seconds */
+    guint32 start_rel_usec;         /**< start stream rel microseconds */
+    guint32 stop_rel_sec;           /**< stop stream rel seconds */
+    guint32 stop_rel_usec;          /**< stop stream rel microseconds */
+    gboolean tag_diffserv_error;
+    guint16 vlan_id;
 
-    guint32         packet_count;
-    gboolean        end_stream; /**< Used to track streams across payload types */
-    int             rtp_event;
-
-    guint16         call_num; /**< Used to match call_num in voip_calls_info_t */
-    guint32         setup_frame_number; /**< frame number of setup message */
-    /* Start and stop packets needed for .num and .abs_ts */
-    frame_data     *start_fd;
-    frame_data     *stop_fd;
-    nstime_t        start_rel_time;     /**< relative start time from pinfo */
-    nstime_t        stop_rel_time;      /**< relative stop time from pinfo */
-    guint16         vlan_id;
-    gboolean        tag_vlan_error;
-    gboolean        tag_diffserv_error;
-
-    gboolean        decode; /**< Decode this stream */
-    GList          *rtp_packet_list; /**< List of RTP rtp_packet_t */
-
-    tap_rtp_stat_t  rtp_stats;  /**< here goes the RTP statistics info */
-    gboolean        problem;    /**< if the streams had wrong sequence numbers or wrong timerstamps */
+    tap_rtp_stat_t rtp_stats;       /**< here goes the RTP statistics info */
+    gboolean problem;               /**< if the streams had wrong sequence numbers or wrong timerstamps */
 } rtp_stream_info_t;
 
 
@@ -104,27 +85,21 @@ typedef enum
     TAP_MARK
 } tap_mode_t;
 
-typedef struct _rtpstream_tapinfo rtpstream_tapinfo_t;
-
-typedef void (*tap_mark_packet_cb)(rtpstream_tapinfo_t *tapinfo, frame_data *fd);
 
 /* structure that holds the information about all detected streams */
 /** struct holding all information of the tap */
-struct _rtpstream_tapinfo {
-    tap_draw_cb tap_draw;                   /**< tap draw callback */
-    tap_mark_packet_cb tap_mark_packet;     /**< packet marking callback */
-    void *tap_data;                         /**< data for tap callbacks */
-    int                nstreams; /**< number of streams in the list */
-    GList             *strinfo_list; /**< list of rtp_stream_info_t* */
-    int                npackets; /**< total number of rtp packets of all streams */
+typedef struct _rtpstream_tapinfo {
+    int     nstreams;                      /**< number of streams in the list */
+    GList*  strinfo_list;                  /**< list with all streams */
+    int     npackets;                      /**< total number of rtp packets of all streams */
     /* used while tapping. user shouldn't modify these */
-    tap_mode_t         mode;
-    rtp_stream_info_t *filter_stream_fwd; /**< used as filter in some tap modes */
-    rtp_stream_info_t *filter_stream_rev; /**< used as filter in some tap modes */
-    FILE              *save_file;
-    guint32            launch_count; /**< number of times the tap has been run */
-    gboolean           is_registered; /**< if the tap listener is currently registered or not */
-};
+    tap_mode_t mode;
+    rtp_stream_info_t* filter_stream_fwd;  /**< used as filter in some tap modes */
+    rtp_stream_info_t* filter_stream_rev;  /**< used as filter in some tap modes */
+    FILE*   save_file;
+    guint32 launch_count;                  /**< number of times the tap has been run */
+    gboolean is_registered;                /**< if the tap listener is currently registered or not */
+} rtpstream_tapinfo_t;
 
 /****************************************************************************/
 /* INTERFACE */
@@ -136,13 +111,19 @@ struct _rtpstream_tapinfo {
 * So whenever rtp_stream.c is added to the list of WIRESHARK_TAP_SRCs, the tap will be registered on startup.
 * If not, it will be registered on demand by the rtp_streams and rtp_analysis functions that need it.
 */
-void register_tap_listener_rtp_stream(rtpstream_tapinfo_t *tapinfo);
+void register_tap_listener_rtp_stream(void);
 
 /**
 * Removes the rtp_streams tap listener (if not already done)
 * From that point on, the RTP streams list won't be updated any more.
 */
-void remove_tap_listener_rtp_stream(rtpstream_tapinfo_t *tapinfo);
+void remove_tap_listener_rtp_stream(void);
+
+/**
+* Retrieves a constant reference to the unique info structure of the rtp_streams tap listener.
+* The user should not modify the data pointed to.
+*/
+const rtpstream_tapinfo_t* rtpstream_get_info(void);
 
 /**
 * Cleans up memory of rtp streams tap.
@@ -153,43 +134,20 @@ void rtpstream_reset(rtpstream_tapinfo_t *tapinfo);
 * Scans all packets for RTP streams and updates the RTP streams list.
 * (redissects all packets)
 */
-void rtpstream_scan(rtpstream_tapinfo_t *tapinfo, capture_file *cap_file);
+void rtpstream_scan(void);
 
 /**
 * Saves an RTP stream as raw data stream with timestamp information for later RTP playback.
 * (redissects all packets)
 */
-gboolean rtpstream_save(rtpstream_tapinfo_t *tapinfo, capture_file *cap_file, rtp_stream_info_t* stream, const gchar *filename);
-
-/**
-* Compares the endpoints of two RTP streams.
-*
-* @return TRUE if the
-*/
-gboolean rtp_stream_info_is_reverse(const rtp_stream_info_t *stream_a, rtp_stream_info_t *stream_b);
+gboolean rtpstream_save(rtp_stream_info_t* stream, const gchar *filename);
 
 /**
 * Marks all packets belonging to either of stream_fwd or stream_rev.
 * (both can be NULL)
 * (redissects all packets)
 */
-void rtpstream_mark(rtpstream_tapinfo_t *tapinfo, capture_file *cap_file, rtp_stream_info_t* stream_fwd, rtp_stream_info_t* stream_rev);
+void rtpstream_mark(rtp_stream_info_t* stream_fwd, rtp_stream_info_t* stream_rev);
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* __RTP_STREAM_H__ */
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -27,6 +27,8 @@
 
 #include "config.h"
 
+#include <epan/emem.h>
+
 /* WSLUA_MODULE Tree Adding information to the dissection tree */
 
 #include "wslua.h"
@@ -44,21 +46,11 @@ TreeItem* push_TreeItem(lua_State*L, TreeItem t) {
     return pushTreeItem(L,t);
 }
 
-TreeItem create_TreeItem(proto_tree* tree, proto_item* item)
-{
-    TreeItem tree_item = (TreeItem)g_malloc(sizeof(struct _wslua_treeitem));
-    tree_item->tree = tree;
-    tree_item->item = item;
-    tree_item->expired = FALSE;
-
-    return tree_item;
-}
-
 CLEAR_OUTSTANDING(TreeItem, expired, TRUE)
 
 WSLUA_CLASS_DEFINE(TreeItem,FAIL_ON_NULL_OR_EXPIRED("TreeItem"),NOP);
-/* ++TreeItem++s represent information in the packet-details pane.
-   A root +TreeItem+ is passed to dissectors as the third argument. */
+/* `TreeItem`s represent information in the packet-details pane.
+   A root `TreeItem` is passed to dissectors as the third argument. */
 
 /* the following is used by TreeItem_add_packet_field() - this can THROW errors */
 static proto_item *
@@ -209,8 +201,8 @@ WSLUA_METHOD TreeItem_add_packet_field(lua_State *L) {
     tvbr = shiftTvbRange(L,1);
     if (!tvbr) {
         /* No TvbRange specified */
-        tvbr = wmem_new(wmem_packet_scope(), struct _wslua_tvbrange);
-        tvbr->tvb = wmem_new(wmem_packet_scope(), struct _wslua_tvb);
+        tvbr = ep_new(struct _wslua_tvbrange);
+        tvbr->tvb = ep_new(struct _wslua_tvb);
         tvbr->tvb->ws_tvb = lua_tvb;
         tvbr->offset = 0;
         tvbr->len = 0;
@@ -264,7 +256,10 @@ WSLUA_METHOD TreeItem_add_packet_field(lua_State *L) {
         nargs--;
     }
 
-    tree_item = create_TreeItem(proto_item_add_subtree(item,ett > 0 ? ett : wslua_ett), item);
+    tree_item = (TreeItem)g_malloc(sizeof(struct _wslua_treeitem));
+    tree_item->item = item;
+    tree_item->tree = proto_item_add_subtree(item,ett > 0 ? ett : wslua_ett);
+    tree_item->expired = FALSE;
 
     PUSH_TREEITEM(L,tree_item);
 
@@ -307,8 +302,8 @@ static int TreeItem_add_item_any(lua_State *L, gboolean little_endian) {
     tvbr = shiftTvbRange(L,1);
 
     if (!tvbr) {
-        tvbr = wmem_new(wmem_packet_scope(), struct _wslua_tvbrange);
-        tvbr->tvb = wmem_new(wmem_packet_scope(), struct _wslua_tvb);
+        tvbr = ep_new(struct _wslua_tvbrange);
+        tvbr->tvb = ep_new(struct _wslua_tvb);
         tvbr->tvb->ws_tvb = lua_tvb;
         tvbr->offset = 0;
         tvbr->len = 0;
@@ -378,8 +373,6 @@ static int TreeItem_add_item_any(lua_State *L, gboolean little_endian) {
                 case FT_OID:
                 case FT_REL_OID:
                 case FT_SYSTEM_ID:
-                case FT_VINES:
-                case FT_FCWWN:
                 default:
                     luaL_error(L,"FT_ not yet supported");
                     return 0;
@@ -401,14 +394,7 @@ static int TreeItem_add_item_any(lua_State *L, gboolean little_endian) {
     } else {
         if (lua_gettop(L)) {
             const gchar* s = lua_tostring(L,1);
-            const int hf = get_hf_wslua_text();
-            if (hf > -1) {
-                /* use proto_tree_add_none_format() instead? */
-                item = proto_tree_add_item(tree_item->tree, hf, tvbr->tvb->ws_tvb, tvbr->offset, tvbr->len, ENC_NA);
-                proto_item_set_text(item, "%s", s);
-            } else {
-                luaL_error(L,"Internal error: hf_wslua_text not registered");
-            }
+            item = proto_tree_add_text(tree_item->tree, tvbr->tvb->ws_tvb, tvbr->offset, tvbr->len,"%s",s);
             lua_remove(L,1);
         } else {
             luaL_error(L,"Tree item ProtoField/Protocol handle is invalid (ProtoField/Proto not registered?)");
@@ -421,7 +407,10 @@ static int TreeItem_add_item_any(lua_State *L, gboolean little_endian) {
         lua_remove(L,1);
     }
 
-    tree_item = create_TreeItem(proto_item_add_subtree(item,ett > 0 ? ett : wslua_ett), item);
+    tree_item = (TreeItem)g_malloc(sizeof(struct _wslua_treeitem));
+    tree_item->item = item;
+    tree_item->tree = proto_item_add_subtree(item,ett > 0 ? ett : wslua_ett);
+    tree_item->expired = FALSE;
 
     PUSH_TREEITEM(L,tree_item);
 
@@ -435,13 +424,11 @@ WSLUA_METHOD TreeItem_add(lua_State *L) {
 
      If the `ProtoField` represents a numeric value (int, uint or float), then it's treated as a Big Endian (network order) value.
 
-     This function has a complicated form: 'treeitem:add([protofield,] [tvbrange,] [[value], label]])', such that if the first
-     argument is a `ProtoField` or a `Proto`, the second argument is a `TvbRange`, and a third argument is given, it's a value;
-     but if the second argument is a non-`TvbRange`, then it's the value (as opposed to filling that argument with 'nil',
-     which is invalid for this function).  If the first argument is a non-`ProtoField` and a non-`Proto` then this argument can
-     be either a `TvbRange` or a label, and the value is not in use.
-     */
-#define WSLUA_OPTARG_TreeItem_add_PROTOFIELD 2 /* The ProtoField field or Proto protocol object to add to the tree. */
+     This function has a complicated form: 'treeitem:add(protofield, [tvbrange,] [[value], label]])', such that if the second
+     argument is a `TvbRange`, and a third argument is given, it's a value; but if the second argument is a non-`TvbRange` type, then
+     it is the value (as opposed to filling that argument with 'nil', which is invalid for this function).
+    */
+#define WSLUA_ARG_TreeItem_add_PROTOFIELD 2 /* The ProtoField field or Proto protocol object to add to the tree. */
 #define WSLUA_OPTARG_TreeItem_add_TVBRANGE 3 /* The TvbRange of bytes in the packet this tree item covers/represents. */
 #define WSLUA_OPTARG_TreeItem_add_VALUE 4 /* The field's value, instead of the ProtoField/Proto one. */
 #define WSLUA_OPTARG_TreeItem_add_LABEL 5 /* One or more strings to use for the tree item label, instead of the ProtoField/Proto one. */
@@ -454,13 +441,11 @@ WSLUA_METHOD TreeItem_add_le(lua_State *L) {
 
      If the `ProtoField` represents a numeric value (int, uint or float), then it's treated as a Little Endian value.
 
-     This function has a complicated form: 'treeitem:add_le([protofield,] [tvbrange,] [[value], label]])', such that if the first
-     argument is a `ProtoField` or a `Proto`, the second argument is a `TvbRange`, and a third argument is given, it's a value;
-     but if the second argument is a non-`TvbRange`, then it's the value (as opposed to filling that argument with 'nil',
-     which is invalid for this function).  If the first argument is a non-`ProtoField` and a non-`Proto` then this argument can
-     be either a `TvbRange` or a label, and the value is not in use.
+     This function has a complicated form: 'treeitem:add_le(protofield, [tvbrange,] [[value], label]])', such that if the second
+     argument is a `TvbRange`, and a third argument is given, it's a value; but if the second argument is a non-`TvbRange` type, then
+     it is the value (as opposed to filling that argument with 'nil', which is invalid for this function).
      */
-#define WSLUA_OPTARG_TreeItem_add_le_PROTOFIELD 2 /* The ProtoField field or Proto protocol object to add to the tree. */
+#define WSLUA_ARG_TreeItem_add_le_PROTOFIELD 2 /* The ProtoField field or Proto protocol object to add to the tree. */
 #define WSLUA_OPTARG_TreeItem_add_le_TVBRANGE 3 /* The TvbRange of bytes in the packet this tree item covers/represents. */
 #define WSLUA_OPTARG_TreeItem_add_le_VALUE 4 /* The field's value, instead of the ProtoField/Proto one. */
 #define WSLUA_OPTARG_TreeItem_add_le_LABEL 5 /* One or more strings to use for the tree item label, instead of the ProtoField/Proto one. */
@@ -536,8 +521,8 @@ WSLUA_METHOD TreeItem_add_expert_info(lua_State *L) {
                                                             `PI_WARN`, or `PI_ERROR`. */
 #define WSLUA_OPTARG_TreeItem_add_expert_info_TEXT 4 /* The text for the expert info display. */
     TreeItem ti           = checkTreeItem(L,1);
-    int group             = (int)luaL_optinteger(L,WSLUA_OPTARG_TreeItem_add_expert_info_GROUP,PI_DEBUG);
-    int severity          = (int)luaL_optinteger(L,WSLUA_OPTARG_TreeItem_add_expert_info_SEVERITY,PI_CHAT);
+    int group             = luaL_optint(L,WSLUA_OPTARG_TreeItem_add_expert_info_GROUP,PI_DEBUG);
+    int severity          = luaL_optint(L,WSLUA_OPTARG_TreeItem_add_expert_info_SEVERITY,PI_CHAT);
     expert_field* ei_info = wslua_get_expert_field(group, severity);
     const gchar* str;
 
@@ -610,10 +595,10 @@ WSLUA_METHOD TreeItem_add_tvb_expert_info(lua_State *L) {
     tvbr = shiftTvbRange(L,WSLUA_ARG_TreeItem_add_tvb_expert_info_TVB);
 
     if (!tvbr) {
-        tvbr = wmem_new(wmem_packet_scope(), struct _wslua_tvbrange);
+        tvbr = ep_new(struct _wslua_tvbrange);
         tvbr->tvb = shiftTvb(L,WSLUA_ARG_TreeItem_add_tvb_expert_info_TVB);
         if (!tvbr->tvb) {
-            tvbr->tvb = wmem_new(wmem_packet_scope(), struct _wslua_tvb);
+            tvbr->tvb = ep_new(struct _wslua_tvb);
         }
         tvbr->tvb->ws_tvb = lua_tvb;
         tvbr->offset = 0;
@@ -671,7 +656,7 @@ WSLUA_METHOD TreeItem_set_len(lua_State *L) {
     */
 #define WSLUA_ARG_TreeItem_set_len_LEN 2 /* The length to be used. */
     TreeItem ti = checkTreeItem(L,1);
-    gint len = (int)luaL_checkinteger(L,WSLUA_ARG_TreeItem_set_len_LEN);
+    gint len = luaL_checkint(L,WSLUA_ARG_TreeItem_set_len_LEN);
 
     proto_item_set_len(ti->item, len);
 

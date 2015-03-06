@@ -31,16 +31,23 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
+
+#include <wsutil/eax.h>
+
 #include <epan/conversation.h>
 #include <epan/expert.h>
+#include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/strutil.h>
+#include <epan/dissectors/packet-ber.h>
+#include <epan/dissectors/packet-tcp.h>
 #include <epan/uat.h>
 #include <epan/oids.h>
-#include <wsutil/eax.h>
-#include "packet-ber.h"
-#include "packet-tcp.h"
+
+#include <stdio.h>
+#include <string.h>
+
 #include "packet-c1222.h"
 
 #define PNAME  "ANSI C12.22"
@@ -124,7 +131,7 @@ static int hf_c1222_c1221_auth_request = -1;      /* OCTET_STRING_SIZE_1_255 */
 static int hf_c1222_c1221_auth_response = -1;     /* OCTET_STRING_SIZE_CONSTR002 */
 
 /*--- End of included file: packet-c1222-hf.c ---*/
-#line 90 "../../asn1/c1222/packet-c1222-template.c"
+#line 97 "../../asn1/c1222/packet-c1222-template.c"
 /* These are the EPSEM pieces */
 /* first, the flag components */
 static int hf_c1222_epsem_flags = -1;
@@ -230,7 +237,7 @@ static gint ett_c1222_Calling_authentication_value_c1222_U = -1;
 static gint ett_c1222_Calling_authentication_value_c1221_U = -1;
 
 /*--- End of included file: packet-c1222-ett.c ---*/
-#line 183 "../../asn1/c1222/packet-c1222-template.c"
+#line 190 "../../asn1/c1222/packet-c1222-template.c"
 
 static expert_field ei_c1222_command_truncated = EI_INIT;
 static expert_field ei_c1222_bad_checksum = EI_INIT;
@@ -455,7 +462,7 @@ parse_c1222_detailed(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int cm
         user_id = tvb_get_ntohs(tvb, *offset);
         proto_tree_add_uint(tree, hf_c1222_logon_id, tvb, *offset, 2, user_id);
         *offset += 2;
-        user_name = tvb_get_string_enc(wmem_packet_scope(),tvb, *offset, 10, ENC_ASCII);
+        user_name = tvb_get_string(wmem_packet_scope(),tvb, *offset, 10);
         proto_tree_add_string(tree, hf_c1222_logon_user, tvb, *offset, 10, user_name);
         *offset += 10;
         *length -= 12;
@@ -467,7 +474,7 @@ parse_c1222_detailed(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int cm
       break;
     case C1222_CMD_SECURITY:
       if (*length >= 20) {
-        password = tvb_get_string_enc(wmem_packet_scope(),tvb, *offset, 20, ENC_ASCII);
+        password = tvb_get_string(wmem_packet_scope(),tvb, *offset, 20);
         proto_tree_add_string(tree, hf_c1222_security_password, tvb, *offset, 20, password);
         *offset += 20;
         *length -= 20;
@@ -492,7 +499,7 @@ parse_c1222_detailed(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int cm
         proto_tree_add_uint(tree, hf_c1222_auth_len, tvb, *offset, 1, auth_len);
         *offset += 1;
         if (*length >= auth_len) {
-          auth_req = tvb_bytes_to_str(wmem_packet_scope(), tvb, *offset, auth_len);
+          auth_req = tvb_bytes_to_ep_str(tvb, *offset, auth_len);
           proto_tree_add_item(tree, hf_c1222_auth_data, tvb, *offset, auth_len, ENC_NA);
           *offset += auth_len;
           *length -= auth_len + 1;
@@ -749,7 +756,7 @@ get_ber_len_size(guint32 n)
  *
  * \param ptr points to the buffer to be written
  * \param n is the length to be BER encoded
- * \param maxsize is the maximum number of bytes we're allowed to write
+ * \maxsize is the maximum number of bytes we're allowed to write
  * \returns length of encoded value in bytes
  */
 static int
@@ -775,7 +782,7 @@ encode_ber_len(guint8 *ptr, guint32 n, int maxsize)
  * \param err is updated to point to an error string if needed
  */
 static void
-c1222_uat_data_update_cb(void* n, char** err)
+c1222_uat_data_update_cb(void* n, const char** err)
 {
   c1222_uat_data_t* new_rec = (c1222_uat_data_t *)n;
 
@@ -1552,17 +1559,15 @@ dissect_c1222_MESSAGE(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _
 
 /*--- PDUs ---*/
 
-static int dissect_MESSAGE_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MESSAGE_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_c1222_MESSAGE(FALSE, tvb, offset, &asn1_ctx, tree, hf_c1222_MESSAGE_PDU);
-  return offset;
+  dissect_c1222_MESSAGE(FALSE, tvb, 0, &asn1_ctx, tree, hf_c1222_MESSAGE_PDU);
 }
 
 
 /*--- End of included file: packet-c1222-fn.c ---*/
-#line 1044 "../../asn1/c1222/packet-c1222-template.c"
+#line 1051 "../../asn1/c1222/packet-c1222-template.c"
 
 /**
  * Dissects a a full (reassembled) C12.22 message.
@@ -1581,9 +1586,13 @@ dissect_c1222_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, PNAME);
 
     /* create the c1222 protocol tree */
-    c1222_item = proto_tree_add_item(tree, proto_c1222, tvb, 0, -1, ENC_NA);
-    c1222_tree = proto_item_add_subtree(c1222_item, ett_c1222);
-    return dissect_MESSAGE_PDU(tvb, pinfo, c1222_tree, NULL);
+    if (tree) {
+      c1222_item = proto_tree_add_item(tree, proto_c1222, tvb, 0, -1, ENC_NA);
+      c1222_tree = proto_item_add_subtree(c1222_item, ett_c1222);
+      dissect_MESSAGE_PDU(tvb, pinfo, c1222_tree);
+    }
+
+    return tvb_length(tvb);
 }
 
 /**
@@ -1595,7 +1604,7 @@ dissect_c1222_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
  * \returns length of entire C12.22 message
  */
 static guint
-get_c1222_message_len(packet_info *pinfo, tvbuff_t *tvb, int offset, void *data _U_)
+get_c1222_message_len(packet_info *pinfo, tvbuff_t *tvb, int offset)
 {
   int orig_offset;
   guint length;
@@ -1619,7 +1628,7 @@ dissect_c1222(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
   tcp_dissect_pdus(tvb, pinfo, tree, c1222_desegment, 5,
           get_c1222_message_len, dissect_c1222_common, data);
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 /*--- proto_register_c1222 -------------------------------------------*/
@@ -1948,7 +1957,7 @@ void proto_register_c1222(void) {
         "OCTET_STRING_SIZE_CONSTR002", HFILL }},
 
 /*--- End of included file: packet-c1222-hfarr.c ---*/
-#line 1325 "../../asn1/c1222/packet-c1222-template.c"
+#line 1336 "../../asn1/c1222/packet-c1222-template.c"
   };
 
   /* List of subtrees */
@@ -1971,7 +1980,7 @@ void proto_register_c1222(void) {
     &ett_c1222_Calling_authentication_value_c1221_U,
 
 /*--- End of included file: packet-c1222-ettarr.c ---*/
-#line 1335 "../../asn1/c1222/packet-c1222-template.c"
+#line 1346 "../../asn1/c1222/packet-c1222-template.c"
   };
 
   static ei_register_info ei[] = {
@@ -2058,10 +2067,9 @@ proto_reg_handoff_c1222(void)
     dissector_add_uint("udp.port", global_c1222_port, c1222_udp_handle);
     initialized = TRUE;
   }
-  c1222_baseoid_len = oid_string2encoded(NULL, c1222_baseoid_str, &temp);
+  c1222_baseoid_len = oid_string2encoded(c1222_baseoid_str, &temp);
   c1222_baseoid = (guint8 *)wmem_realloc(wmem_epan_scope(), c1222_baseoid, c1222_baseoid_len);
   memcpy(c1222_baseoid, temp, c1222_baseoid_len);
-  wmem_free(NULL, temp);
 }
 /*
  * Editor modelines  -  http://www.wireshark.org/tools/modelines.html

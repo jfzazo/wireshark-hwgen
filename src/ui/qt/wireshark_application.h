@@ -22,14 +22,14 @@
 #ifndef WIRESHARK_APPLICATION_H
 #define WIRESHARK_APPLICATION_H
 
-#include <config.h>
+#include "config.h"
 
 #include <glib.h>
 
 #include "epan/prefs.h"
 
 #include "capture_opts.h"
-#include <capchild/capture_session.h>
+#include "capture_session.h"
 #include "file.h"
 #include "register.h"
 
@@ -38,13 +38,9 @@
 #include <QApplication>
 #include <QFileInfo>
 #include <QFont>
-#include <QIcon>
 #include <QList>
-#include <QSocketNotifier>
 #include <QThread>
 #include <QTimer>
-#include <QTranslator>
-
 
 // Recent items:
 // - Read from prefs
@@ -70,55 +66,40 @@ public:
         FilterExpressionsChanged,
         PacketDissectionChanged,
         PreferencesChanged,
-        StaticRecentFilesRead,
-        FieldsChanged
+        StaticRecentFilesRead
     };
 
     void registerUpdate(register_action_e action, const char *message);
     void emitAppSignal(AppSignal signal);
-    void emitStatCommandSignal(const QString &menu_path, const char *arg, void *userdata);
     void allSystemsGo();
-    void refreshLocalInterfaces();
     e_prefs * readConfigurationFiles(char **gdp_path, char **dp_path);
     QList<recent_item_status *> recentItems() const;
     void addRecentItem(const QString &filename, qint64 size, bool accessible);
+    void captureCallback(int event, capture_session * cap_session);
+    void captureFileCallback(int event, void * data);
     QDir lastOpenDir();
     void setLastOpenDir(const char *dir_name);
     void setLastOpenDir(QString *dir_str);
     void helpTopicAction(topic_action_e action);
-    const QFont monospaceFont() const { return mono_font_; }
+    QFont monospaceFont(bool bold = false);
     void setMonospaceFont(const char *font_string);
-    int monospaceTextSize(const char *str);
+    int monospaceTextSize(const char *str, bool bold = false);
     void setConfigurationProfile(const gchar *profile_name);
     bool isInitialized() { return initialized_; }
-    const QIcon &normalIcon() const { return normal_icon_; }
-    const QIcon &captureIcon() const { return capture_icon_; }
-    const QString &windowTitleSeparator() const { return window_title_separator_; }
-    const QString windowTitleString(QStringList title_parts);
-    const QString windowTitleString(QString title_part) { return windowTitleString(QStringList() << title_part); }
-
-    QTranslator translator;
-    QTranslator translatorQt;
-    void loadLanguage(const QString& language);
 
 private:
     bool initialized_;
-    QFont mono_font_;
+    QFont mono_regular_font_;
+    QFont mono_bold_font_;
     QTimer recent_timer_;
-    QTimer addr_resolv_timer_;
     QTimer tap_update_timer_;
     QList<QString> pending_open_files_;
-    QSocketNotifier *if_notifier_;
-    QIcon normal_icon_;
-    QIcon capture_icon_;
-    static QString window_title_separator_;
 
 protected:
     bool event(QEvent *event);
 
 signals:
     void appInitialized();
-    void localInterfaceListChanged();
     void openCaptureFile(QString &cf_path, QString &display_filter, unsigned int type);
     void recentFilesRead();
     void updateRecentItemStatus(const QString &filename, qint64 size, bool accessible);
@@ -129,22 +110,31 @@ signals:
     void filterExpressionsChanged();
     void packetDissectionChanged();
     void preferencesChanged();
-    void addressResolutionChanged();
-    void fieldsChanged();
 
-    void openStatCommandDialog(const QString &menu_path, const char *arg, void *userdata);
+    // XXX It might make more sense to move these to main.cpp or main_window.cpp or their own class.
+    void captureCapturePrepared(capture_session *cap_session);
+    void captureCaptureUpdateStarted(capture_session *cap_session);
+    void captureCaptureUpdateContinue(capture_session *cap_session);
+    void captureCaptureUpdateFinished(capture_session *cap_session);
+    void captureCaptureFixedStarted(capture_session *cap_session);
+    void captureCaptureFixedFinished(capture_session *cap_session);
+    void captureCaptureStopping(capture_session *cap_session);
+    void captureCaptureFailed(capture_session *cap_session);
+
+    void captureFileOpened(const capture_file *cf);
+    void captureFileReadStarted(const capture_file *cf);
+    void captureFileReadFinished(const capture_file *cf);
+    void captureFileClosing(const capture_file *cf);
+    void captureFileClosed(const capture_file *cf);
 
 public slots:
     void clearRecentItems();
-    void captureFileReadStarted();
-    void updateTaps();
 
 private slots:
     void cleanup();
-    void ifChangeEventsAvailable();
-    void itemStatusFinished(const QString filename = "", qint64 size = 0, bool accessible = false);
+    void itemStatusFinished(const QString &filename = "", qint64 size = 0, bool accessible = false);
     void refreshRecentFiles(void);
-    void refreshAddressResolution(void);
+    void updateTaps();
 };
 
 extern WiresharkApplication *wsApp;

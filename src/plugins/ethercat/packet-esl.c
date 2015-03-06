@@ -24,6 +24,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 
@@ -45,8 +47,8 @@ typedef union _EslFlagsUnion
         guint16    port1        : 1;
         guint16    port0        : 1;
         guint16    extended     : 1;
-        guint16    port11       : 1;
-        guint16    port10       : 1;
+	guint16    port11       : 1;
+	guint16    port10       : 1;
         guint16    crcError     : 1;
         guint16    alignError   : 1;
         guint16    timeStampEna : 1;
@@ -291,10 +293,10 @@ dissect_esl_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
         {
             if ( eth_withoutfcs_handle != NULL )
             {
-                next_tvb = tvb_new_subset_length(tvb, 0, esl_length-SIZEOF_ESLHEADER);
+                next_tvb = tvb_new_subset(tvb, 0, esl_length-SIZEOF_ESLHEADER, esl_length-SIZEOF_ESLHEADER);
                 call_dissector(eth_withoutfcs_handle, next_tvb, pinfo, tree);
             }
-            next_tvb = tvb_new_subset_length(tvb, esl_length-SIZEOF_ESLHEADER, SIZEOF_ESLHEADER);
+            next_tvb = tvb_new_subset(tvb, esl_length-SIZEOF_ESLHEADER, SIZEOF_ESLHEADER, SIZEOF_ESLHEADER);
             dissect_esl_header(next_tvb, pinfo, tree);
             modify_times(tvb, esl_length-SIZEOF_ESLHEADER, pinfo);
 
@@ -370,16 +372,3 @@ proto_reg_handoff_esl(void) {
     }
     proto_set_decoding(proto_esl, esl_enable_dissector);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

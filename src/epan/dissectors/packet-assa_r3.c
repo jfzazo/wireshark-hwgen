@@ -26,9 +26,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
-#include "packet-tcp.h"
+#include <epan/dissectors/packet-tcp.h>
 
 void proto_register_r3(void);
 void proto_reg_handoff_r3(void);
@@ -1088,38 +1090,7 @@ static gint hf_r3_configitemdata_16 = -1;
 static gint hf_r3_configitemdata_32 = -1;
 static gint hf_r3_configitemdata_string = -1;
 
-static gint hf_r3_timezonearray0 = -1;
-static gint hf_r3_timezonearray1 = -1;
-static gint hf_r3_timezonearray2 = -1;
-static gint hf_r3_timezonearray3 = -1;
-static gint hf_r3_timezonearray4 = -1;
-static gint hf_r3_timezonearray5 = -1;
-static gint hf_r3_timezonearray6 = -1;
-static gint hf_r3_timezonearray7 = -1;
-static gint hf_r3_timezonearray8 = -1;
-static gint hf_r3_timezonearray9 = -1;
-static gint hf_r3_timezonearray10 = -1;
-static gint hf_r3_timezonearray11 = -1;
-static gint hf_r3_timezonearray12 = -1;
-static gint hf_r3_timezonearray13 = -1;
-static gint hf_r3_timezonearray14 = -1;
-static gint hf_r3_timezonearray15 = -1;
-static gint hf_r3_timezonearray16 = -1;
-static gint hf_r3_timezonearray17 = -1;
-static gint hf_r3_timezonearray18 = -1;
-static gint hf_r3_timezonearray19 = -1;
-static gint hf_r3_timezonearray20 = -1;
-static gint hf_r3_timezonearray21 = -1;
-static gint hf_r3_timezonearray22 = -1;
-static gint hf_r3_timezonearray23 = -1;
-static gint hf_r3_timezonearray24 = -1;
-static gint hf_r3_timezonearray25 = -1;
-static gint hf_r3_timezonearray26 = -1;
-static gint hf_r3_timezonearray27 = -1;
-static gint hf_r3_timezonearray28 = -1;
-static gint hf_r3_timezonearray29 = -1;
-static gint hf_r3_timezonearray30 = -1;
-static gint hf_r3_timezonearray31 = -1;
+static gint hf_r3_timezonearray [32];
 
 static gint hf_r3_expireon_year = -1;
 static gint hf_r3_expireon_month = -1;
@@ -1200,14 +1171,7 @@ static gint hf_r3_definetimezone_starttime_hours = -1;
 static gint hf_r3_definetimezone_starttime_minutes = -1;
 static gint hf_r3_definetimezone_endtime_hours = -1;
 static gint hf_r3_definetimezone_endtime_minutes = -1;
-static gint hf_r3_definetimezone_daymap = -1;
-static gint hf_r3_definetimezone_daymap0 = -1;
-static gint hf_r3_definetimezone_daymap1 = -1;
-static gint hf_r3_definetimezone_daymap2 = -1;
-static gint hf_r3_definetimezone_daymap3 = -1;
-static gint hf_r3_definetimezone_daymap4 = -1;
-static gint hf_r3_definetimezone_daymap5 = -1;
-static gint hf_r3_definetimezone_daymap6 = -1;
+static gint hf_r3_definetimezone_daymap [7];
 static gint hf_r3_definetimezone_exceptiongroup = -1;
 static gint hf_r3_definetimezone_mode = -1;
 static gint hf_r3_definetimezone_calendar = -1;
@@ -1249,23 +1213,7 @@ static gint hf_r3_alarmlogdump_endtime_day = -1;
 static gint hf_r3_alarmlogdump_endtime_hours = -1;
 static gint hf_r3_alarmlogdump_endtime_minutes = -1;
 
-static gint hf_r3_nvramclearoptions = -1;
-static gint hf_r3_nvramclearoptions0 = -1;
-static gint hf_r3_nvramclearoptions1 = -1;
-static gint hf_r3_nvramclearoptions2 = -1;
-static gint hf_r3_nvramclearoptions3 = -1;
-static gint hf_r3_nvramclearoptions4 = -1;
-static gint hf_r3_nvramclearoptions5 = -1;
-static gint hf_r3_nvramclearoptions6 = -1;
-static gint hf_r3_nvramclearoptions7 = -1;
-static gint hf_r3_nvramclearoptions8 = -1;
-static gint hf_r3_nvramclearoptions9 = -1;
-static gint hf_r3_nvramclearoptions10 = -1;
-static gint hf_r3_nvramclearoptions11 = -1;
-static gint hf_r3_nvramclearoptions12 = -1;
-static gint hf_r3_nvramclearoptions13 = -1;
-static gint hf_r3_nvramclearoptions14 = -1;
-static gint hf_r3_nvramclearoptions15 = -1;
+static gint hf_r3_nvramclearoptions [16];
 
 static gint hf_r3_writeeventlog_user = -1;
 static gint hf_r3_writeeventlog_event = -1;
@@ -1364,7 +1312,6 @@ static gint hf_r3_capabilities_length = -1;
 static gint hf_r3_capabilities_type = -1;
 static gint hf_r3_capabilities_value = -1;
 
-static gint hf_r3_lockstate = -1;
 static gint hf_r3_lockstate_passage = -1;
 static gint hf_r3_lockstate_panic = -1;
 static gint hf_r3_lockstate_lockout = -1;
@@ -3006,73 +2953,6 @@ static const string_string r3_snmortisenames [] =
   { NULL, NULL }
 };
 
-static const int * r3_timezonearray[] = {
-  &hf_r3_timezonearray0,
-  &hf_r3_timezonearray1,
-  &hf_r3_timezonearray2,
-  &hf_r3_timezonearray3,
-  &hf_r3_timezonearray4,
-  &hf_r3_timezonearray5,
-  &hf_r3_timezonearray6,
-  &hf_r3_timezonearray7,
-  &hf_r3_timezonearray8,
-  &hf_r3_timezonearray9,
-  &hf_r3_timezonearray10,
-  &hf_r3_timezonearray11,
-  &hf_r3_timezonearray12,
-  &hf_r3_timezonearray13,
-  &hf_r3_timezonearray14,
-  &hf_r3_timezonearray15,
-  &hf_r3_timezonearray16,
-  &hf_r3_timezonearray17,
-  &hf_r3_timezonearray18,
-  &hf_r3_timezonearray19,
-  &hf_r3_timezonearray20,
-  &hf_r3_timezonearray21,
-  &hf_r3_timezonearray22,
-  &hf_r3_timezonearray23,
-  &hf_r3_timezonearray24,
-  &hf_r3_timezonearray25,
-  &hf_r3_timezonearray26,
-  &hf_r3_timezonearray27,
-  &hf_r3_timezonearray28,
-  &hf_r3_timezonearray29,
-  &hf_r3_timezonearray30,
-  &hf_r3_timezonearray31,
-  NULL
-};
-
-static const int * r3_definetimezone_daymap[] = {
-  &hf_r3_definetimezone_daymap0,
-  &hf_r3_definetimezone_daymap1,
-  &hf_r3_definetimezone_daymap2,
-  &hf_r3_definetimezone_daymap3,
-  &hf_r3_definetimezone_daymap4,
-  &hf_r3_definetimezone_daymap5,
-  &hf_r3_definetimezone_daymap6,
-  NULL
-};
-
-static const int * r3_nvramclearoptions[] = {
-  &hf_r3_nvramclearoptions0,
-  &hf_r3_nvramclearoptions1,
-  &hf_r3_nvramclearoptions2,
-  &hf_r3_nvramclearoptions3,
-  &hf_r3_nvramclearoptions4,
-  &hf_r3_nvramclearoptions5,
-  &hf_r3_nvramclearoptions6,
-  &hf_r3_nvramclearoptions7,
-  &hf_r3_nvramclearoptions8,
-  &hf_r3_nvramclearoptions9,
-  &hf_r3_nvramclearoptions10,
-  &hf_r3_nvramclearoptions11,
-  &hf_r3_nvramclearoptions12,
-  &hf_r3_nvramclearoptions13,
-  &hf_r3_nvramclearoptions14,
-  &hf_r3_nvramclearoptions15,
-  NULL
-};
-
 /*
  *  Mapping table so dissect_r3_cmd_setconfig() knows what the configuration item type is
  */
@@ -3716,7 +3596,7 @@ dissect_r3_upstreamfields (tvbuff_t *tvb, guint32 start_offset, guint32 length, 
        */
       case UPSTREAMFIELD_SERIALNUMBER :
         {
-          tvbuff_t *sn_tvb = tvb_new_subset_length (tvb, offset, dataLength);
+          tvbuff_t *sn_tvb = tvb_new_subset (tvb, offset, dataLength, dataLength);
 
           dissect_serialnumber (sn_tvb, 0, length, pinfo, upstreamfield_tree, hf_r3_upstreamfieldarray [fieldType]);
         }
@@ -3730,12 +3610,14 @@ dissect_r3_upstreamfields (tvbuff_t *tvb, guint32 start_offset, guint32 length, 
           }
           else
           {
+            proto_item *eventlog_item;
             proto_tree *eventlog_tree;
 
             if (!upstreamfield_tree)
               break;
 
-            eventlog_tree = proto_tree_add_subtree(upstreamfield_tree, tvb, offset, 9, ett_r3eventlogrecord, NULL, "Event Log Record");
+            eventlog_item = proto_tree_add_text (upstreamfield_tree, tvb, offset, 9, "Event Log Record");
+            eventlog_tree = proto_item_add_subtree (eventlog_item, ett_r3eventlogrecord);
 
             proto_tree_add_item (eventlog_tree, hf_r3_eventlog_year,       tvb, offset + 0, 1, ENC_LITTLE_ENDIAN);
             proto_tree_add_item (eventlog_tree, hf_r3_eventlog_month,      tvb, offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -3757,15 +3639,16 @@ dissect_r3_upstreamfields (tvbuff_t *tvb, guint32 start_offset, guint32 length, 
           }
           else
           {
+            proto_item *datetime_item;
             proto_tree *datetime_tree;
 
             if (!upstreamfield_tree)
               break;
 
-            datetime_tree = proto_tree_add_subtree_format(upstreamfield_tree, tvb, offset, 8, ett_r3datetime, NULL,
-                "Date/Time: %02u/%02u/%02u-%u %02u:%02u:%02u %u",
+            datetime_item = proto_tree_add_text (upstreamfield_tree, tvb, offset, 8, "Date/Time: %02u/%02u/%02u-%u %02u:%02u:%02u %u",
                 tvb_get_guint8 (tvb, offset + 0), tvb_get_guint8 (tvb, offset + 1), tvb_get_guint8 (tvb, offset + 2), tvb_get_guint8 (tvb, offset + 3),
                 tvb_get_guint8 (tvb, offset + 4), tvb_get_guint8 (tvb, offset + 5), tvb_get_guint8 (tvb, offset + 6), tvb_get_guint8 (tvb, offset + 7));
+            datetime_tree = proto_item_add_subtree (datetime_item, ett_r3datetime);
 
             proto_tree_add_item (datetime_tree, hf_r3_datetime_year,    tvb, offset + 0, 1, ENC_LITTLE_ENDIAN);
             proto_tree_add_item (datetime_tree, hf_r3_datetime_month,   tvb, offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -3788,6 +3671,7 @@ dissect_r3_upstreamfields (tvbuff_t *tvb, guint32 start_offset, guint32 length, 
           }
           else
           {
+            proto_item *declinedlog_item;
             proto_tree *declinedlog_tree;
             guint8 cred1type;
             guint8 cred2type;
@@ -3795,7 +3679,8 @@ dissect_r3_upstreamfields (tvbuff_t *tvb, guint32 start_offset, guint32 length, 
             if (!upstreamfield_tree)
               break;
 
-            declinedlog_tree = proto_tree_add_subtree(upstreamfield_tree, tvb, offset, 49, ett_r3declinedlogrecord, NULL, "Declined Log Record");
+            declinedlog_item = proto_tree_add_text (upstreamfield_tree, tvb, offset, 49, "Declined Log Record");
+            declinedlog_tree = proto_item_add_subtree (declinedlog_item, ett_r3declinedlogrecord);
 
             proto_tree_add_item (declinedlog_tree, hf_r3_declinedlog_year,       tvb, offset + 0, 1, ENC_LITTLE_ENDIAN);
             proto_tree_add_item (declinedlog_tree, hf_r3_declinedlog_month,      tvb, offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -3824,14 +3709,15 @@ dissect_r3_upstreamfields (tvbuff_t *tvb, guint32 start_offset, guint32 length, 
           }
           else
           {
+            proto_item *expireon_item;
             proto_tree *expireon_tree;
 
             if (!upstreamfield_tree)
               break;
 
-            expireon_tree = proto_tree_add_subtree_format(upstreamfield_tree, tvb, offset, 3, ett_r3expireon, NULL,
-                "Expire YY/MM/DD: %02u/%02u/%02u",
+            expireon_item = proto_tree_add_text (upstreamfield_tree, tvb, offset, 3, "Expire YY/MM/DD: %02u/%02u/%02u",
                 tvb_get_guint8 (tvb, offset + 2), tvb_get_guint8 (tvb, offset + 0), tvb_get_guint8 (tvb, offset + 1));
+            expireon_tree = proto_item_add_subtree (expireon_item, ett_r3expireon);
 
             proto_tree_add_item (expireon_tree, hf_r3_expireon_month, tvb, offset + 0, 1, ENC_LITTLE_ENDIAN);
             proto_tree_add_item (expireon_tree, hf_r3_expireon_day,   tvb, offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -3848,7 +3734,20 @@ dissect_r3_upstreamfields (tvbuff_t *tvb, guint32 start_offset, guint32 length, 
           }
           else
           {
-            proto_tree_add_bitmask(upstreamfield_tree, tvb, offset, hf_r3_upstreamfieldarray[fieldType], ett_r3timezone, r3_timezonearray, ENC_LITTLE_ENDIAN);
+            proto_item *timezone_item;
+            proto_tree *timezone_tree;
+            guint32 i;
+            guint32 tz;
+
+            if (!upstreamfield_tree)
+              break;
+
+            tz = tvb_get_letohl (tvb, offset);
+            timezone_item = proto_tree_add_item (upstreamfield_tree, hf_r3_upstreamfieldarray [fieldType], tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            timezone_tree = proto_item_add_subtree (timezone_item, ett_r3timezone);
+
+            for (i = 0; i < 32; i++)
+              proto_tree_add_boolean (timezone_tree, hf_r3_timezonearray [i], tvb, offset, 4, tz);
           }
         }
         break;
@@ -3861,12 +3760,14 @@ dissect_r3_upstreamfields (tvbuff_t *tvb, guint32 start_offset, guint32 length, 
           }
           else
           {
+            proto_item *alarmlog_item;
             proto_tree *alarmlog_tree;
 
             if (!upstreamfield_tree)
               break;
 
-            alarmlog_tree = proto_tree_add_subtree(upstreamfield_tree, tvb, offset, 9, ett_r3alarmlogrecord, NULL, "Alarm Record");
+            alarmlog_item = proto_tree_add_text (upstreamfield_tree, tvb, offset, 9, "Alarm Record");
+            alarmlog_tree = proto_item_add_subtree (alarmlog_item, ett_r3alarmlogrecord);
 
             proto_tree_add_item (alarmlog_tree, hf_r3_alarmlog_year,       tvb, offset + 0, 1, ENC_LITTLE_ENDIAN);
             proto_tree_add_item (alarmlog_tree, hf_r3_alarmlog_month,      tvb, offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -3903,6 +3804,7 @@ dissect_r3_upstreamcommand_reserved (tvbuff_t *tvb _U_, guint32 start_offset _U_
 static void
 dissect_r3_upstreamcommand_debugmsg (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *debugmsg_item;
   proto_tree *debugmsg_tree;
 
   if (!tree)
@@ -3910,7 +3812,8 @@ dissect_r3_upstreamcommand_debugmsg (tvbuff_t *tvb, guint32 start_offset, guint3
 
   DISSECTOR_ASSERT(start_offset == 0);
 
-  debugmsg_tree = proto_tree_add_subtree(tree, tvb, 0, -1, ett_r3debugmsg, NULL, "Debug message");
+  debugmsg_item = proto_tree_add_text (tree, tvb, 0, -1, "Debug message");
+  debugmsg_tree = proto_item_add_subtree (debugmsg_item, ett_r3debugmsg);
 
   proto_tree_add_item (debugmsg_tree, hf_r3_debugmsg, tvb, 1, -1, ENC_ASCII|ENC_NA);
 }
@@ -3946,6 +3849,7 @@ dissect_r3_upstreamcommand_dumpeventlog (tvbuff_t *tvb, guint32 start_offset, gu
   }
   else
   {
+    proto_item  *eventlog_item;
     proto_tree  *eventlog_tree;
     const gchar *en;
 
@@ -3954,8 +3858,8 @@ dissect_r3_upstreamcommand_dumpeventlog (tvbuff_t *tvb, guint32 start_offset, gu
 
     en = val_to_str_ext_const (tvb_get_guint8 (tvb, 10), &r3_eventnames_ext, "[Unknown Event]");
 
-    eventlog_tree = proto_tree_add_subtree_format(tree, tvb, start_offset, 10, ett_r3eventlogrecord, NULL,
-        "Event Log Record %u (%s)", tvb_get_letohs (tvb, 0), en);
+    eventlog_item = proto_tree_add_text (tree, tvb, start_offset, 10, "Event Log Record %u (%s)", tvb_get_letohs (tvb, 0), en);
+    eventlog_tree = proto_item_add_subtree (eventlog_item, ett_r3eventlogrecord);
 
     proto_tree_add_item (eventlog_tree, hf_r3_eventlog_recordnumber, tvb,  0, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item (eventlog_tree, hf_r3_eventlog_year,         tvb,  2, 1, ENC_LITTLE_ENDIAN);
@@ -4008,7 +3912,7 @@ dissect_r3_upstreamcommand_queryconfig (tvbuff_t *tvb, guint32 start_offset, gui
 
   while (offset < tvb_reported_length (tvb))
   {
-    proto_item  *pi;
+    proto_item  *upstreamfield_item, *pi;
     proto_tree  *upstreamfield_tree;
     const gchar *ci;
     guint8 item_length;
@@ -4016,8 +3920,8 @@ dissect_r3_upstreamcommand_queryconfig (tvbuff_t *tvb, guint32 start_offset, gui
     ci = val_to_str_ext_const (tvb_get_guint8 (tvb, offset + 1), &r3_configitemnames_ext, "[Unknown Configuration Item]");
 
     item_length = tvb_get_guint8 (tvb, offset + 0);
-    upstreamfield_tree = proto_tree_add_subtree_format(tree, tvb, offset + 0, item_length, ett_r3upstreamfield, NULL,
-                        "Config Field: %s (%u)", ci, tvb_get_guint8 (tvb, offset + 1));
+    upstreamfield_item = proto_tree_add_text (tree, tvb, offset + 0, item_length, "Config Field: %s (%u)", ci, tvb_get_guint8 (tvb, offset + 1));
+    upstreamfield_tree = proto_item_add_subtree (upstreamfield_item, ett_r3upstreamfield);
 
     pi = proto_tree_add_item (upstreamfield_tree, hf_r3_configitemlength, tvb, offset + 0, 1, ENC_LITTLE_ENDIAN);
     if (item_length == 0) {
@@ -4106,8 +4010,8 @@ dissect_r3_upstreamcommand_mfg (tvbuff_t *tvb, guint32 start_offset, guint32 len
 
   proto_tree_add_item (tree, hf_r3_mfgfield_length, tvb, 0, 1, ENC_LITTLE_ENDIAN);
 
-  mfg_tree = proto_tree_add_subtree_format(tree, tvb, 1, -1, ett_r3commandmfg, &mfg_item,
-                    "Upstream Manufacturing Field: %s (%u)", cn, mfg_fld);
+  mfg_item = proto_tree_add_text (tree, tvb, 1, -1, "Upstream Manufacturing Field: %s (%u)", cn, mfg_fld);
+  mfg_tree = proto_item_add_subtree (mfg_item, ett_r3commandmfg);
 
   proto_tree_add_item (mfg_tree, hf_r3_mfgfield, tvb, 1, 1, ENC_LITTLE_ENDIAN);
 
@@ -4153,6 +4057,7 @@ dissect_r3_upstreamcommand_declinedwarning (tvbuff_t *tvb, guint32 start_offset,
 static void
 dissect_r3_upstreamcommand_dumpdeclinedlog (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *declinedlog_item;
   proto_tree *declinedlog_tree;
   guint8      cred1type;
   guint8      cred2type;
@@ -4162,8 +4067,8 @@ dissect_r3_upstreamcommand_dumpdeclinedlog (tvbuff_t *tvb, guint32 start_offset,
 
   DISSECTOR_ASSERT(start_offset == 0);
 
-  declinedlog_tree = proto_tree_add_subtree_format(tree, tvb, start_offset, 49,
-      ett_r3declinedlogrecord, NULL, "Declined Log Record %u", tvb_get_letohs (tvb, 0));
+  declinedlog_item = proto_tree_add_text (tree, tvb, start_offset, 49, "Declined Log Record %u", tvb_get_letohs (tvb, 0));
+  declinedlog_tree = proto_item_add_subtree (declinedlog_item, ett_r3declinedlogrecord);
 
   proto_tree_add_item (declinedlog_tree, hf_r3_declinedlog_recordnumber, tvb, 0, 2, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (declinedlog_tree, hf_r3_declinedlog_year,         tvb, 2, 1, ENC_LITTLE_ENDIAN);
@@ -4198,6 +4103,7 @@ dissect_r3_upstreamcommand_alarmwarning (tvbuff_t *tvb, guint32 start_offset, gu
 static void
 dissect_r3_upstreamcommand_dumpalarmlog (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *alarmlog_item;
   proto_tree *alarmlog_tree;
 
   if (!tree)
@@ -4205,8 +4111,8 @@ dissect_r3_upstreamcommand_dumpalarmlog (tvbuff_t *tvb, guint32 start_offset, gu
 
   DISSECTOR_ASSERT(start_offset == 0);
 
-  alarmlog_tree = proto_tree_add_subtree_format(tree, tvb, start_offset, 9,
-        ett_r3alarmlogrecord, NULL, "Alarm Log Record %u", tvb_get_letohs (tvb, 0));
+  alarmlog_item = proto_tree_add_text (tree, tvb, start_offset, 9, "Alarm Log Record %u", tvb_get_letohs (tvb, 0));
+  alarmlog_tree = proto_item_add_subtree (alarmlog_item, ett_r3alarmlogrecord);
 
   proto_tree_add_item (alarmlog_tree, hf_r3_alarmlog_recordnumber, tvb, 0, 2, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (alarmlog_tree, hf_r3_alarmlog_year,         tvb, 2, 1, ENC_LITTLE_ENDIAN);
@@ -4240,6 +4146,7 @@ dissect_r3_upstreamcommand_commandalarm (tvbuff_t *tvb, guint32 start_offset, gu
 static void
 dissect_r3_upstreamcommand_dumpdebuglog (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *debuglog_item;
   proto_tree *debuglog_tree;
 
   if (!tree)
@@ -4247,8 +4154,8 @@ dissect_r3_upstreamcommand_dumpdebuglog (tvbuff_t *tvb, guint32 start_offset, gu
 
   DISSECTOR_ASSERT(start_offset == 0);
 
-  debuglog_tree = proto_tree_add_subtree_format(tree, tvb, start_offset, 8,
-            ett_r3debuglogrecord, NULL, "Debug Log Record %u", tvb_get_letohs (tvb, 0));
+  debuglog_item = proto_tree_add_text (tree, tvb, start_offset, 8, "Debug Log Record %u", tvb_get_letohs (tvb, 0));
+  debuglog_tree = proto_item_add_subtree (debuglog_item, ett_r3debuglogrecord);
 
   proto_tree_add_item (debuglog_tree, hf_r3_debuglog_recordnumber, tvb, 0, 2, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (debuglog_tree, hf_r3_debuglog_flags,        tvb, 2, 4, ENC_LITTLE_ENDIAN);
@@ -4280,8 +4187,9 @@ dissect_r3_upstreammfgfield_iopins (tvbuff_t *tvb, guint32 start_offset, guint32
 
     for (i = 0; i < len; i += 3, portname++)
     {
-      proto_tree *port_tree = proto_tree_add_subtree_format(tree, tvb, i, 3, ett_r3iopins, NULL,
+      proto_item *port_item = proto_tree_add_text (tree, tvb, i, 3,
                                                    "Port %c Configuration", (portname == 'I') ? ++portname : portname);
+      proto_tree *port_tree = proto_item_add_subtree (port_item, ett_r3iopins);
 
       proto_tree_add_item (port_tree, hf_r3_iopins_lat,  tvb, i + 0, 1, ENC_LITTLE_ENDIAN);
       proto_tree_add_item (port_tree, hf_r3_iopins_port, tvb, i + 1, 1, ENC_LITTLE_ENDIAN);
@@ -4332,6 +4240,7 @@ dissect_r3_upstreammfgfield_hardwareid (tvbuff_t *tvb, guint32 start_offset, gui
 static void
 dissect_r3_upstreammfgfield_checkpointlog (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *cpl_item;
   proto_tree *cpl_tree;
   guint       counter;
   gint        len;
@@ -4345,24 +4254,22 @@ dissect_r3_upstreammfgfield_checkpointlog (tvbuff_t *tvb, guint32 start_offset, 
   len = tvb_length_remaining (tvb, 1);
 
   proto_tree_add_item (tree, hf_r3_checkpointlog_entryptr, tvb, 0, 1, ENC_LITTLE_ENDIAN);
-  cpl_tree = proto_tree_add_subtree(tree, tvb, 1, -1, ett_r3checkpointlog, NULL, "Checkpoint Log");
+  cpl_item = proto_tree_add_text (tree, tvb, 1, -1, "Checkpoint Log");
+  cpl_tree = proto_item_add_subtree (cpl_item, ett_r3checkpointlog);
 
   counter = 0;
   for (i = 0; i < len; i += 2, counter++)
   {
     guint        rcon      = tvb_get_guint8 (tvb, i + 0);
     guint        cp        = tvb_get_guint8 (tvb, i + 1);
-    proto_item  *cpe_item;
-    proto_tree  *cpe_tree;
+    proto_item  *cpe_item  = proto_tree_add_text (cpl_tree, tvb, i + 0, 2, "Checkpoint Log Entry %u", counter);
+    proto_tree  *cpe_tree  = proto_item_add_subtree (cpe_item, ett_r3checkpointlogentry);
     guint        resettype;
     const gchar *desc;
     static const gchar *resets [] = { "Stack underflow", "Stack overflow", "Power-On",
                                       "Software", "Brown-out", "MCLR in sleep", "WDT",
                                       "Normal", "[Unknown Reset Type]" };
 
-
-    cpe_tree = proto_tree_add_subtree_format(cpl_tree, tvb, i + 0, 2, ett_r3checkpointlogentry, &cpe_item,
-                            "Checkpoint Log Entry %u", counter);
     desc = val_to_str_ext_const (cp, &r3_checkpointnames_ext, "[Unknown Checkpoint]");
 
     if (rcon == 0xff)
@@ -4399,6 +4306,7 @@ static void
 dissect_r3_upstreammfgfield_cpuregisters (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
   proto_tree *tmp_tree [19];
+  proto_item *cr_item;
   proto_tree *cr_tree;
 
   if (!tree)
@@ -4406,7 +4314,8 @@ dissect_r3_upstreammfgfield_cpuregisters (tvbuff_t *tvb, guint32 start_offset, g
 
   DISSECTOR_ASSERT(start_offset == 0);
 
-  cr_tree = proto_tree_add_subtree(tree, tvb, start_offset, -1, ett_r3cpuregisters, NULL, "CPU Registers");
+  cr_item = proto_tree_add_text (tree, tvb, start_offset, -1, "CPU Registers");
+  cr_tree = proto_item_add_subtree (cr_item, ett_r3cpuregisters);
 
   tmp_tree [ 0] = proto_item_add_subtree (proto_tree_add_item (cr_tree, hf_r3_cpuregisters_intcon,  tvb,  0, 1, ENC_LITTLE_ENDIAN), ett_r3cpuregister);
   tmp_tree [ 1] = proto_item_add_subtree (proto_tree_add_item (cr_tree, hf_r3_cpuregisters_intcon2, tvb,  1, 1, ENC_LITTLE_ENDIAN), ett_r3cpuregister);
@@ -4587,21 +4496,22 @@ dissect_r3_upstreammfgfield_taskflags (tvbuff_t *tvb, guint32 start_offset, guin
 {
   gint len;
   gint i;
+  proto_item *tfg_item;
   proto_tree *tfg_tree;
 
   DISSECTOR_ASSERT(start_offset == 0);
 
   len      = MAX(0, tvb_length_remaining (tvb, 0));
-  tfg_tree = proto_tree_add_subtree_format(tree, tvb, 0, -1, ett_r3taskflags, NULL,
-      "Task Flags (%u tasks)", len / 5);
+  tfg_item = proto_tree_add_text (tree, tvb, 0, -1, "Task Flags (%u tasks)", len / 5);
+  tfg_tree = proto_item_add_subtree (tfg_item, ett_r3taskflags);
 
   for (i = 0; i < len; i += 5)
   {
-    proto_tree *tf_tree = proto_tree_add_subtree_format(tfg_tree, tvb, i, 5,
-                                               ett_r3taskflagsentry, NULL,
+    proto_item *tf_item = proto_tree_add_text (tfg_tree, tvb, i, 5,
                                                "Task Flags (%2d: 0x%06x)",
                                                tvb_get_guint8 (tvb, i + 0),
                                                tvb_get_letohl (tvb, i + 1));
+    proto_tree *tf_tree = proto_item_add_subtree (tf_item, ett_r3taskflagsentry);
 
     proto_tree_add_item (tf_tree, hf_r3_taskflags_taskid, tvb, i + 0, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item (tf_tree, hf_r3_taskflags_flags,  tvb, i + 1, 4, ENC_LITTLE_ENDIAN);
@@ -4626,7 +4536,8 @@ dissect_r3_upstreammfgfield_timerchain (tvbuff_t *tvb, guint32 start_offset, gui
 
   for (i = 0; i < len; i += 12)
   {
-    proto_tree *tc_tree = proto_tree_add_subtree(tree, tvb, 3 + i, 12, ett_r3timerchain, NULL, "Timer Chain Entry");
+    proto_item *tc_item = proto_tree_add_text (tree, tvb, 3 + i, 12, "Timer Chain Entry");
+    proto_tree *tc_tree = proto_item_add_subtree (tc_item, ett_r3timerchain);
 
     proto_tree_add_item (tc_tree, hf_r3_timerchain_tasktag,  tvb, 3 + i + 0, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item (tc_tree, hf_r3_timerchain_address,  tvb, 3 + i + 1, 2, ENC_LITTLE_ENDIAN);
@@ -4649,14 +4560,18 @@ dissect_r3_upstreammfgfield_peekpoke (tvbuff_t *tvb, guint32 start_offset, guint
 
   for (i = 0; i < len; i += 3)
   {
-    proto_item *peekpoke_item;
-    proto_item *peekpoke_op_item;
-    proto_tree *peekpoke_tree;
+    proto_item *peekpoke_item    = NULL;
+    proto_item *peekpoke_op_item = NULL;
+    proto_tree *peekpoke_tree    = NULL;
 
-    peekpoke_tree = proto_tree_add_subtree(tree, tvb, i, 3, ett_r3peekpoke, &peekpoke_item, "");
+    if (tree)
+    {
+      peekpoke_item = proto_tree_add_text (tree, tvb, i, 3, "%s", "");
+      peekpoke_tree = proto_item_add_subtree (peekpoke_item, ett_r3peekpoke);
 
-    peekpoke_op_item = proto_tree_add_item (peekpoke_tree, hf_r3_peekpoke_operation, tvb, i + 0, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item (peekpoke_tree, hf_r3_peekpoke_address,   tvb, i + 1, 2, ENC_LITTLE_ENDIAN);
+      peekpoke_op_item = proto_tree_add_item (peekpoke_tree, hf_r3_peekpoke_operation, tvb, i + 0, 1, ENC_LITTLE_ENDIAN);
+      proto_tree_add_item (peekpoke_tree, hf_r3_peekpoke_address,   tvb, i + 1, 2, ENC_LITTLE_ENDIAN);
+    }
 
     switch (tvb_get_guint8 (tvb, i + 0))
     {
@@ -4731,40 +4646,47 @@ dissect_r3_upstreammfgfield_peekpoke (tvbuff_t *tvb, guint32 start_offset, guint
 static void
 dissect_r3_upstreammfgfield_lockstate (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
-static const int * r3_lockstate_flags[] = {
-  &hf_r3_lockstate_passage,
-  &hf_r3_lockstate_panic,
-  &hf_r3_lockstate_lockout,
-  &hf_r3_lockstate_relock,
-  &hf_r3_lockstate_autoopen,
-  &hf_r3_lockstate_nextauto,
-  &hf_r3_lockstate_lockstate,
-  &hf_r3_lockstate_wantstate,
-  &hf_r3_lockstate_remote,
-  &hf_r3_lockstate_update,
-  &hf_r3_lockstate_exceptionspresent,
-  &hf_r3_lockstate_exceptionsactive,
-  &hf_r3_lockstate_timezonespresent,
-  &hf_r3_lockstate_timezonesactive,
-  &hf_r3_lockstate_autounlockspresent,
-  &hf_r3_lockstate_autounlocksactive,
-  &hf_r3_lockstate_uapmspresent,
-  &hf_r3_lockstate_uapmsactive,
-  &hf_r3_lockstate_uapmrelockspresent,
-  &hf_r3_lockstate_uapmreslocksactive,
-  &hf_r3_lockstate_nvramprotect,
-  &hf_r3_lockstate_nvramchecksum,
-  NULL
-};
+  proto_item *ls_item;
+  proto_tree *ls_tree;
+  guint       ls;
 
- DISSECTOR_ASSERT(start_offset == 0);
+  if (!tree)
+    return;
 
- proto_tree_add_bitmask(tree, tvb, start_offset, hf_r3_lockstate, ett_r3lockstate, r3_lockstate_flags, ENC_LITTLE_ENDIAN);
+  DISSECTOR_ASSERT(start_offset == 0);
+
+  ls      = tvb_get_letoh24 (tvb, 0);
+  ls_item = proto_tree_add_text (tree, tvb, 0, -1, "Lock State (0x%06x)", ls);
+  ls_tree = proto_item_add_subtree (ls_item, ett_r3lockstate);
+
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_passage,            tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_panic,              tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_lockout,            tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_relock,             tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_autoopen,           tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_nextauto,           tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_lockstate,          tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_wantstate,          tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_remote,             tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_update,             tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_exceptionspresent,  tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_exceptionsactive,   tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_timezonespresent,   tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_timezonesactive,    tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_autounlockspresent, tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_autounlocksactive,  tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_uapmspresent,       tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_uapmsactive,        tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_uapmrelockspresent, tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_uapmreslocksactive, tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_nvramprotect,       tvb, 0, 3, ls);
+  proto_tree_add_boolean (ls_tree, hf_r3_lockstate_nvramchecksum,      tvb, 0, 3, ls);
 }
 
 static void
 dissect_r3_upstreammfgfield_capabilities (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *cf_item;
   proto_tree *cf_tree;
   gint        len;
   guint       items;
@@ -4794,7 +4716,8 @@ dissect_r3_upstreammfgfield_capabilities (tvbuff_t *tvb, guint32 start_offset, g
   if (!tree)
     return;
 
-  cf_tree = proto_tree_add_subtree_format(tree, tvb, 0, len, ett_r3capabilities, NULL, "Capabilities (%u items)", items);
+  cf_item = proto_tree_add_text (tree, tvb, 0, len, "Capabilities (%u items)", items);
+  cf_tree = proto_item_add_subtree (cf_item, ett_r3capabilities);
 
   i = 0;
   while (i<len && (step=tvb_get_guint8(tvb, i))>0)
@@ -4825,6 +4748,7 @@ dissect_r3_upstreammfgfield_dumpm41t81 (tvbuff_t *tvb, guint32 start_offset, gui
   }
   else
   {
+    proto_item *rtc_item;
     proto_tree *rtc_tree;
     proto_tree *tmp_tree [20];
     guint       offset_in_bits;
@@ -4832,7 +4756,8 @@ dissect_r3_upstreammfgfield_dumpm41t81 (tvbuff_t *tvb, guint32 start_offset, gui
     if (!tree)
       return;
 
-    rtc_tree = proto_tree_add_subtree(tree, tvb, 0, -1, ett_r3m41t81registers, NULL, "M41T81 RTC Registers");
+    rtc_item = proto_tree_add_text (tree, tvb, 0, -1, "M41T81 RTC Registers");
+    rtc_tree = proto_item_add_subtree (rtc_item, ett_r3m41t81registers);
 
     tmp_tree [ 0] = proto_item_add_subtree (proto_tree_add_item (rtc_tree, hf_r3_dumpm41t81_reg00, tvb,  0, 1, ENC_LITTLE_ENDIAN), ett_r3m41t81register);
     tmp_tree [ 1] = proto_item_add_subtree (proto_tree_add_item (rtc_tree, hf_r3_dumpm41t81_reg01, tvb,  1, 1, ENC_LITTLE_ENDIAN), ett_r3m41t81register);
@@ -4942,6 +4867,7 @@ dissect_r3_upstreammfgfield_checksumresults (tvbuff_t *tvb, guint32 start_offset
   }
   else
   {
+    proto_item *cksum_item;
     proto_tree *cksum_tree;
     guint32     error = FALSE;
     gint        i;
@@ -4957,8 +4883,8 @@ dissect_r3_upstreammfgfield_checksumresults (tvbuff_t *tvb, guint32 start_offset
       i += step;
     }
 
-    cksum_tree = proto_tree_add_subtree_format(tree, tvb, 0, len, ett_r3checksumresults, NULL,
-                                   "Checksum Results (%s)", error ? "Error" : "No Errors");
+    cksum_item = proto_tree_add_text (tree, tvb, 0, len, "Checksum Results (%s)", error ? "Error" : "No Errors");
+    cksum_tree = proto_item_add_subtree (cksum_item, ett_r3checksumresults);
 
     i = 0;
     while (i<len && (step=tvb_get_guint8(tvb, i))>0)
@@ -5006,13 +4932,14 @@ dissect_r3_upstreammfgfield_mortisestatelog (tvbuff_t *tvb, guint32 start_offset
     guint       state   = tvb_get_guint8 (tvb, 3 + i + 0);
     guint       last    = tvb_get_guint8 (tvb, 3 + i + 1);
     guint       event   = tvb_get_guint8 (tvb, 3 + i + 2);
-    proto_tree  *ms_tree = proto_tree_add_subtree_format(tree, tvb, 3 + i, 3, ett_r3mortisestatelog, NULL,
+    proto_item *ms_item = proto_tree_add_text (tree, tvb, 3 + i, 3,
                                                "State Log Entry %2d (State=0x%02x, Last=0x%02x, Event=%s (0x%02x))",
                                                i / 3,
                                                state,
                                                last,
                                                val_to_str_ext_const (event, &r3_mortiseeventnames_ext, "[Unknown]"),
                                                event);
+    proto_tree  *ms_tree = proto_item_add_subtree (ms_item, ett_r3mortisestatelog);
 
     proto_tree_add_item (ms_tree, hf_r3_mortisestatelog_state, tvb, 3 + i + 0, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item (ms_tree, hf_r3_mortisestatelog_last,  tvb, 3 + i + 1, 1, ENC_LITTLE_ENDIAN);
@@ -5023,6 +4950,7 @@ dissect_r3_upstreammfgfield_mortisestatelog (tvbuff_t *tvb, guint32 start_offset
 static void
 dissect_r3_upstreammfgfield_mortisepins (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *iopins_item;
   proto_tree *iopins_tree;
 
   if (!tree)
@@ -5030,8 +4958,9 @@ dissect_r3_upstreammfgfield_mortisepins (tvbuff_t *tvb, guint32 start_offset, gu
 
   DISSECTOR_ASSERT(start_offset == 0);
 
-  iopins_tree = proto_tree_add_subtree_format(tree, tvb, 0, 1, ett_r3iopins, NULL,
+  iopins_item = proto_tree_add_text (tree, tvb, 0, 1,
                                      "Mortise Pin States (0x%02x)", tvb_get_guint8 (tvb, 0));
+  iopins_tree = proto_item_add_subtree (iopins_item, ett_r3iopins);
 
   proto_tree_add_item (iopins_tree, hf_r3_mortisepins_s1, tvb, 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (iopins_tree, hf_r3_mortisepins_s2, tvb, 0, 1, ENC_LITTLE_ENDIAN);
@@ -5112,19 +5041,21 @@ dissect_r3_response_hasdata (tvbuff_t *tvb, guint32 start_offset, guint32 length
 
     if (tree)
     {
+      proto_item  *upstreamcommand_item;
       const gchar *ct;
       ct = val_to_str_ext_const (upstreamCmd, &r3_upstreamcommandnames_ext, "[Unknown Command Type]");
 
       proto_tree_add_item (tree, hf_r3_responsetype, tvb, 2, 1, ENC_LITTLE_ENDIAN);
 
-      upstreamcommand_tree = proto_tree_add_subtree_format(tree, tvb, 3, -1, ett_r3upstreamcommand, NULL,
+      upstreamcommand_item = proto_tree_add_text (tree, tvb, 3, -1,
                                                   "Upstream Command: %s (%u)", ct, upstreamCmd);
+      upstreamcommand_tree = proto_item_add_subtree (upstreamcommand_item, ett_r3upstreamcommand);
 
       proto_tree_add_item (upstreamcommand_tree, hf_r3_upstreamcommand, tvb, 3, 1, ENC_LITTLE_ENDIAN);
     }
     tvb_ensure_bytes_exist (tvb, 0, commandPacketLen - 4);
 
-    upstreamcommand_tvb = tvb_new_subset_length (tvb, 4, commandPacketLen - 4);
+    upstreamcommand_tvb = tvb_new_subset (tvb, 4, commandPacketLen - 4, commandPacketLen - 4);
     if (r3upstreamcommand_dissect [upstreamCmd])
       (*r3upstreamcommand_dissect [upstreamCmd]) (upstreamcommand_tvb, 0, commandPacketLen - 4, pinfo, upstreamcommand_tree);
   }
@@ -5140,7 +5071,7 @@ dissect_r3_cmd_response (tvbuff_t *tvb, guint32 start_offset, guint32 length, pa
 {
   guint8          responseLen  = tvb_get_guint8 (tvb, start_offset + 0);
   responseType_e  responseType = (responseType_e)tvb_get_guint8 (tvb, start_offset + 2);
-  tvbuff_t       *payload_tvb  = tvb_new_subset_length (tvb, start_offset, responseLen);
+  tvbuff_t       *payload_tvb  = tvb_new_subset (tvb, start_offset, responseLen, responseLen);
 
   if (tree)
   {
@@ -5208,6 +5139,7 @@ static void
 dissect_r3_cmd_setdatetime (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
   proto_tree *dt_tree;
+  proto_item *dt_item;
   guint8      cmdLen;
   tvbuff_t   *payload_tvb;
 
@@ -5215,12 +5147,12 @@ dissect_r3_cmd_setdatetime (tvbuff_t *tvb, guint32 start_offset, guint32 length 
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
 
-  dt_tree = proto_tree_add_subtree_format (tree, payload_tvb, 0, -1, ett_r3setdatetime, NULL,
+  dt_item = proto_tree_add_text (tree, payload_tvb, 0, -1,
                                  "Set Date/Time (%02u/%02u/%02u-%u %02u:%02u:%02u)",
                                  tvb_get_guint8 (payload_tvb, 0),
                                  tvb_get_guint8 (payload_tvb, 1),
@@ -5229,6 +5161,7 @@ dissect_r3_cmd_setdatetime (tvbuff_t *tvb, guint32 start_offset, guint32 length 
                                  tvb_get_guint8 (payload_tvb, 4),
                                  tvb_get_guint8 (payload_tvb, 5),
                                  tvb_get_guint8 (payload_tvb, 6));
+  dt_tree = proto_item_add_subtree (dt_item, ett_r3setdatetime);
 
   proto_tree_add_item (dt_tree, hf_r3_setdate_year,    payload_tvb, 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (dt_tree, hf_r3_setdate_month,   payload_tvb, 1, 1, ENC_LITTLE_ENDIAN);
@@ -5260,7 +5193,7 @@ dissect_r3_cmd_setconfig (tvbuff_t *tvb, guint32 start_offset, guint32 length _U
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -5281,8 +5214,9 @@ dissect_r3_cmd_setconfig (tvbuff_t *tvb, guint32 start_offset, guint32 length _U
       "[Unknown Configuration Item]");
 
     item_length = tvb_get_guint8 (payload_tvb, offset + 0);
-    sc_tree = proto_tree_add_subtree_format(tree, payload_tvb, offset + 0, item_length,
-                                   ett_r3upstreamfield, NULL, "Config Field: %s (%u)", ci, configItem);
+    sc_item = proto_tree_add_text (tree, payload_tvb, offset + 0, item_length,
+                                   "Config Field: %s (%u)", ci, configItem);
+    sc_tree = proto_item_add_subtree (sc_item, ett_r3upstreamfield);
 
     sc_item = proto_tree_add_item (sc_tree, hf_r3_configitemlength, payload_tvb, offset + 0, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item (sc_tree, hf_r3_configitem,       payload_tvb, offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -5361,7 +5295,7 @@ static void
 dissect_r3_cmd_manageuser (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo, proto_tree *tree)
 {
   guint8    cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  tvbuff_t *payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  tvbuff_t *payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
   guint32   offset      = 0;
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
@@ -5437,17 +5371,18 @@ dissect_r3_cmd_manageuser (tvbuff_t *tvb, guint32 start_offset, guint32 length _
           }
           else
           {
+            proto_item *expireon_item;
             proto_tree *expireon_tree;
 
             if (!tree)
               break;
 
-            expireon_tree = proto_tree_add_subtree_format(mu_tree, payload_tvb, offset, 3,
-                                                 ett_r3expireon, NULL,
+            expireon_item = proto_tree_add_text (mu_tree, payload_tvb, offset, 3,
                                                  "Expire YY/MM/DD: %02u/%02u/%02u",
                                                  tvb_get_guint8 (payload_tvb, offset + 2),
                                                  tvb_get_guint8 (payload_tvb, offset + 0),
                                                  tvb_get_guint8 (payload_tvb, offset + 1));
+            expireon_tree = proto_item_add_subtree (expireon_item, ett_r3expireon);
 
             proto_tree_add_item (expireon_tree, hf_r3_expireon_month, payload_tvb, offset + 0, 1, ENC_LITTLE_ENDIAN);
             proto_tree_add_item (expireon_tree, hf_r3_expireon_day,   payload_tvb, offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -5464,7 +5399,20 @@ dissect_r3_cmd_manageuser (tvbuff_t *tvb, guint32 start_offset, guint32 length _
           }
           else
           {
-            proto_tree_add_bitmask(mu_tree, payload_tvb, offset, hf_r3_adduserparamtypearray[paramType], ett_r3timezone, r3_timezonearray, ENC_LITTLE_ENDIAN);
+            proto_item *timezone_item;
+            proto_tree *timezone_tree;
+            guint32     i;
+            guint32     tz;
+
+            if (!tree)
+              break;
+
+            tz = tvb_get_letohl (payload_tvb, offset);
+            timezone_item = proto_tree_add_item (mu_tree, hf_r3_upstreamfieldarray [paramType], payload_tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            timezone_tree = proto_item_add_subtree (timezone_item, ett_r3timezone);
+
+            for (i = 0; i < 32; i++)
+              proto_tree_add_boolean (timezone_tree, hf_r3_timezonearray [i], payload_tvb, offset, 4, tz);
           }
         }
         break;
@@ -5488,7 +5436,7 @@ dissect_r3_cmd_deleteusers (tvbuff_t *tvb, guint32 start_offset, guint32 length 
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -5499,7 +5447,9 @@ dissect_r3_cmd_deleteusers (tvbuff_t *tvb, guint32 start_offset, guint32 length 
 static void
 dissect_r3_cmd_defineexception (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *startdate_item;
   proto_tree *startdate_tree;
+  proto_item *enddate_item;
   proto_tree *enddate_tree;
   guint8      cmdLen;
   tvbuff_t   *payload_tvb;
@@ -5508,32 +5458,32 @@ dissect_r3_cmd_defineexception (tvbuff_t *tvb, guint32 start_offset, guint32 len
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
 
   proto_tree_add_item (tree, hf_r3_defineexception_number, payload_tvb, 0, 1, ENC_LITTLE_ENDIAN);
 
-  startdate_tree = proto_tree_add_subtree_format(tree, payload_tvb, 1, 4,
-                                        ett_r3defineexceptionstartdate, NULL,
+  startdate_item = proto_tree_add_text (tree, payload_tvb, 1, 4,
                                         "Start MM/DD HH:MM (%02u/%02u %02u:%02u)",
                                         tvb_get_guint8 (payload_tvb, 1),
                                         tvb_get_guint8 (payload_tvb, 2),
                                         tvb_get_guint8 (payload_tvb, 3),
                                         tvb_get_guint8 (payload_tvb, 4));
+  startdate_tree = proto_item_add_subtree (startdate_item, ett_r3defineexceptionstartdate);
   proto_tree_add_item (startdate_tree, hf_r3_defineexception_startdate_month,   payload_tvb, 1, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (startdate_tree, hf_r3_defineexception_startdate_day,     payload_tvb, 2, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (startdate_tree, hf_r3_defineexception_startdate_hours,   payload_tvb, 3, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (startdate_tree, hf_r3_defineexception_startdate_minutes, payload_tvb, 4, 1, ENC_LITTLE_ENDIAN);
 
-  enddate_tree = proto_tree_add_subtree_format(tree, payload_tvb, 5, 4,
-                                        ett_r3defineexceptionenddate, NULL,
+  enddate_item = proto_tree_add_text (tree, payload_tvb, 5, 4,
                                       "End MM/DD HH:MM (%02u/%02u %02u:%02u)",
                                       tvb_get_guint8 (payload_tvb, 5),
                                       tvb_get_guint8 (payload_tvb, 6),
                                       tvb_get_guint8 (payload_tvb, 7),
                                       tvb_get_guint8 (payload_tvb, 8));
+  enddate_tree = proto_item_add_subtree (enddate_item, ett_r3defineexceptionenddate);
   proto_tree_add_item (enddate_tree, hf_r3_defineexception_enddate_month,   payload_tvb, 5, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (enddate_tree, hf_r3_defineexception_enddate_day,     payload_tvb, 6, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (enddate_tree, hf_r3_defineexception_enddate_hours,   payload_tvb, 7, 1, ENC_LITTLE_ENDIAN);
@@ -5543,6 +5493,7 @@ dissect_r3_cmd_defineexception (tvbuff_t *tvb, guint32 start_offset, guint32 len
 static void
 dissect_r3_cmd_defineexceptiongroup (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *bits_item;
   proto_tree *bits_tree;
   guint       cmdLen;
   tvbuff_t   *payload_tvb;
@@ -5553,14 +5504,15 @@ dissect_r3_cmd_defineexceptiongroup (tvbuff_t *tvb, guint32 start_offset, guint3
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
 
   proto_tree_add_item (tree, hf_r3_defineexceptiongroup_number, payload_tvb, 0, 1, ENC_LITTLE_ENDIAN);
 
-  bits_tree = proto_tree_add_subtree(tree, payload_tvb, 1, -1, ett_r3defineexceptiongroupbits, NULL, "Exception Group Bit Field");
+  bits_item = proto_tree_add_text (tree, payload_tvb, 1, -1, "Exception Group Bit Field");
+  bits_tree = proto_item_add_subtree (bits_item, ett_r3defineexceptiongroupbits);
 
   for (i = 1; i < (cmdLen - 2); i++)
   {
@@ -5585,7 +5537,7 @@ dissect_r3_cmd_definecalendar (tvbuff_t *tvb, guint32 start_offset, guint32 leng
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -5595,11 +5547,11 @@ dissect_r3_cmd_definecalendar (tvbuff_t *tvb, guint32 start_offset, guint32 leng
   for (i = 0; i < 12; i++)
   {
     guint32     daymap = tvb_get_letohl (payload_tvb, (i * 4) + 1);
-    proto_tree *calendar_tree = proto_tree_add_subtree_format(tree, payload_tvb, (i * 4) + 1, 4,
-                                                     ett_r3definecalendarmonth [i + 1], NULL,
+    proto_item *calendar_item = proto_tree_add_text (tree, payload_tvb, (i * 4) + 1, 4,
                                                      "Calendar Bit Field - %s (0x%08x)",
                                                      (mn = val_to_str_ext_const (i + 1, &r3_monthnames_ext, "[Unknown Month]")),
                                                      daymap);
+    proto_tree *calendar_tree = proto_item_add_subtree (calendar_item, ett_r3definecalendarmonth [i + 1]);
     guint32     j;
 
     for (j = 0; j < 31; j++)
@@ -5614,40 +5566,50 @@ dissect_r3_cmd_definecalendar (tvbuff_t *tvb, guint32 start_offset, guint32 leng
 static void
 dissect_r3_cmd_definetimezone (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *starttime_item;
   proto_tree *starttime_tree;
+  proto_item *endtime_item;
   proto_tree *endtime_tree;
+  proto_item *daymap_item;
+  proto_tree *daymap_tree;
   guint8      cmdLen;
   tvbuff_t   *payload_tvb;
+  guint32     i;
   guint8      tzmode;
 
   if (!tree)
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
 
   proto_tree_add_item (tree, hf_r3_definetimezone_number, payload_tvb, 0, 1, ENC_LITTLE_ENDIAN);
 
-  starttime_tree = proto_tree_add_subtree_format(tree, payload_tvb, 1, 2,
-                                        ett_r3definetimezonestarttime, NULL,
+  starttime_item = proto_tree_add_text (tree, payload_tvb, 1, 2,
                                         "Start HH:MM (%02u:%02u)",
                                         tvb_get_guint8 (payload_tvb, 1),
                                         tvb_get_guint8 (payload_tvb, 2));
+  starttime_tree = proto_item_add_subtree (starttime_item, ett_r3definetimezonestarttime);
   proto_tree_add_item (starttime_tree, hf_r3_definetimezone_starttime_hours,   payload_tvb, 1, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_definetimezone_starttime_minutes, payload_tvb, 2, 1, ENC_LITTLE_ENDIAN);
 
-  endtime_tree = proto_tree_add_subtree_format(tree, payload_tvb, 3, 2,
-                                      ett_r3definetimezoneendtime, NULL,
+  endtime_item = proto_tree_add_text (tree, payload_tvb, 3, 2,
                                       "End HH:MM (%02u:%02u)",
                                       tvb_get_guint8 (payload_tvb, 3),
                                       tvb_get_guint8 (payload_tvb, 4));
+  endtime_tree = proto_item_add_subtree (endtime_item, ett_r3definetimezoneendtime);
   proto_tree_add_item (endtime_tree, hf_r3_definetimezone_endtime_hours,   payload_tvb, 3, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (endtime_tree, hf_r3_definetimezone_endtime_minutes, payload_tvb, 4, 1, ENC_LITTLE_ENDIAN);
 
-  proto_tree_add_bitmask(tree, payload_tvb, 5, hf_r3_definetimezone_daymap, ett_r3definetimezonedaymap, r3_definetimezone_daymap, ENC_NA);
+  daymap_item = proto_tree_add_text (tree, payload_tvb, 5, 1, "Day Map (0x%02x)", tvb_get_guint8 (payload_tvb, 5));
+  daymap_tree = proto_item_add_subtree (daymap_item, ett_r3definetimezonedaymap);
+
+  for (i = 0; i < 7; i++)
+    proto_tree_add_boolean (daymap_tree, hf_r3_definetimezone_daymap [i], payload_tvb, 5, 1,
+                            tvb_get_guint8 (payload_tvb, 5));
 
   proto_tree_add_item (tree, hf_r3_definetimezone_exceptiongroup, payload_tvb, 6, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_uint (tree, hf_r3_definetimezone_mode, payload_tvb, 7, 1,
@@ -5666,7 +5628,7 @@ dissect_r3_cmd_rmtauthretry (tvbuff_t *tvb, guint32 start_offset, guint32 length
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -5678,6 +5640,7 @@ dissect_r3_cmd_rmtauthretry (tvbuff_t *tvb, guint32 start_offset, guint32 length
 static void
 dissect_r3_cmd_filters (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *filter_item;
   proto_tree *filter_tree;
   guint8      cmdLen;
   tvbuff_t   *payload_tvb;
@@ -5687,15 +5650,16 @@ dissect_r3_cmd_filters (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_,
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
 
   proto_tree_add_item (tree, hf_r3_filter_type, payload_tvb, 1, 1, ENC_LITTLE_ENDIAN);
 
-  filter_tree = proto_tree_add_subtree_format(tree, payload_tvb, 2, -1, ett_r3filters, NULL,
+  filter_item = proto_tree_add_text (tree, payload_tvb, 2, -1,
                                      "Filters (%u specified)", tvb_get_guint8 (payload_tvb, 0));
+  filter_tree = proto_item_add_subtree (filter_item, ett_r3filters);
 
   for (i = 0; i < tvb_get_guint8 (payload_tvb, 0); i++)
     proto_tree_add_item (filter_tree, hf_r3_filter_list, payload_tvb, i + 2, 1, ENC_LITTLE_ENDIAN);
@@ -5715,16 +5679,17 @@ dissect_r3_cmd_alarmconfigure (tvbuff_t *tvb, guint32 start_offset, guint32 leng
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
 
-  alarm_tree = proto_tree_add_subtree(tree, payload_tvb, 0, -1, ett_r3alarmlist, &alarm_item, "Alarm List (0 items)");
+  alarm_item = proto_tree_add_text (tree, payload_tvb, 0, -1, "Alarm List (0 items)");
+  alarm_tree = proto_item_add_subtree (alarm_item, ett_r3alarmlist);
 
   while (offset < (cmdLen - 2))
   {
-    proto_item  *pi;
+    proto_item  *alarmcfg_item, *pi;
     proto_tree  *alarmcfg_tree;
     const gchar *ai;
     const gchar *as;
@@ -5739,8 +5704,9 @@ dissect_r3_cmd_alarmconfigure (tvbuff_t *tvb, guint32 start_offset, guint32 leng
       as = (tvb_get_guint8 (payload_tvb, offset + 2) & 0xfe) ?
         "Error" : (tvb_get_guint8 (payload_tvb, offset + 2) & 0x01) ? "Enabled" : "Disabled";
 
-    alarmcfg_tree = proto_tree_add_subtree_format(alarm_tree, payload_tvb, offset, tvb_get_guint8 (payload_tvb, offset),
-                                         ett_r3alarmcfg, NULL, "Alarm Item (%s, %s)", ai, as);
+    alarmcfg_item = proto_tree_add_text (alarm_tree, payload_tvb, offset, tvb_get_guint8 (payload_tvb, offset),
+                                         "Alarm Item (%s, %s)", ai, as);
+    alarmcfg_tree = proto_item_add_subtree (alarmcfg_item, ett_r3alarmcfg);
 
     alarm_len = tvb_get_guint8 (payload_tvb, offset + 0);
     pi = proto_tree_add_item (alarmcfg_tree, hf_r3_alarm_length, payload_tvb, offset + 0, 1, ENC_LITTLE_ENDIAN);
@@ -5764,7 +5730,9 @@ dissect_r3_cmd_alarmconfigure (tvbuff_t *tvb, guint32 start_offset, guint32 leng
 static void
 dissect_r3_cmd_eventlogdump (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *starttime_item;
   proto_tree *starttime_tree;
+  proto_item *endtime_item;
   proto_tree *endtime_tree;
   guint8      cmdLen;
   tvbuff_t   *payload_tvb;
@@ -5773,33 +5741,33 @@ dissect_r3_cmd_eventlogdump (tvbuff_t *tvb, guint32 start_offset, guint32 length
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
 
-  starttime_tree = proto_tree_add_subtree_format(tree, payload_tvb, 0, 5,
-                                        ett_r3eventlogdumpstarttime, NULL,
+  starttime_item = proto_tree_add_text (tree, payload_tvb, 0, 5,
                                         "Start YY/MM/DD HH:MM (%02u/%02u/%02u %02u:%02u)",
                                         tvb_get_guint8 (payload_tvb, 0),
                                         tvb_get_guint8 (payload_tvb, 1),
                                         tvb_get_guint8 (payload_tvb, 2),
                                         tvb_get_guint8 (payload_tvb, 3),
                                         tvb_get_guint8 (payload_tvb, 4));
+  starttime_tree = proto_item_add_subtree (starttime_item, ett_r3eventlogdumpstarttime);
   proto_tree_add_item (starttime_tree, hf_r3_eventlogdump_starttime_year,    payload_tvb, 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_eventlogdump_starttime_month,   payload_tvb, 1, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_eventlogdump_starttime_day,     payload_tvb, 2, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_eventlogdump_starttime_hours,   payload_tvb, 3, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_eventlogdump_starttime_minutes, payload_tvb, 4, 1, ENC_LITTLE_ENDIAN);
 
-  endtime_tree = proto_tree_add_subtree_format(tree, payload_tvb, 5, 5,
-                                      ett_r3eventlogdumpendtime, NULL,
+  endtime_item = proto_tree_add_text (tree, payload_tvb, 5, 5,
                                       "End YY/MM/DD HH:MM (%02u/%02u/%02u %02u:%02u)",
                                       tvb_get_guint8 (payload_tvb, 5),
                                       tvb_get_guint8 (payload_tvb, 6),
                                       tvb_get_guint8 (payload_tvb, 7),
                                       tvb_get_guint8 (payload_tvb, 8),
                                       tvb_get_guint8 (payload_tvb, 9));
+  endtime_tree = proto_item_add_subtree (endtime_item, ett_r3eventlogdumpendtime);
   proto_tree_add_item (endtime_tree, hf_r3_eventlogdump_endtime_year,    payload_tvb, 5, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (endtime_tree, hf_r3_eventlogdump_endtime_month,   payload_tvb, 6, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (endtime_tree, hf_r3_eventlogdump_endtime_day,     payload_tvb, 7, 1, ENC_LITTLE_ENDIAN);
@@ -5812,7 +5780,9 @@ dissect_r3_cmd_eventlogdump (tvbuff_t *tvb, guint32 start_offset, guint32 length
 static void
 dissect_r3_cmd_declinedlogdump (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *starttime_item;
   proto_tree *starttime_tree;
+  proto_item *endtime_item;
   proto_tree *endtime_tree;
   guint8      cmdLen;
   tvbuff_t   *payload_tvb;
@@ -5821,33 +5791,33 @@ dissect_r3_cmd_declinedlogdump (tvbuff_t *tvb, guint32 start_offset, guint32 len
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
 
-  starttime_tree = proto_tree_add_subtree_format(tree, payload_tvb, 0, 5,
-                                        ett_r3declinedlogdumpstarttime, NULL,
+  starttime_item = proto_tree_add_text (tree, payload_tvb, 0, 5,
                                         "Start YY/MM/DD HH:MM (%02u/%02u/%02u %02u:%02u)",
                                         tvb_get_guint8 (payload_tvb, 0),
                                         tvb_get_guint8 (payload_tvb, 1),
                                         tvb_get_guint8 (payload_tvb, 2),
                                         tvb_get_guint8 (payload_tvb, 3),
                                         tvb_get_guint8 (payload_tvb, 4));
+  starttime_tree = proto_item_add_subtree (starttime_item, ett_r3declinedlogdumpstarttime);
   proto_tree_add_item (starttime_tree, hf_r3_declinedlogdump_starttime_year,    payload_tvb, 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_declinedlogdump_starttime_month,   payload_tvb, 1, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_declinedlogdump_starttime_day,     payload_tvb, 2, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_declinedlogdump_starttime_hours,   payload_tvb, 3, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_declinedlogdump_starttime_minutes, payload_tvb, 4, 1, ENC_LITTLE_ENDIAN);
 
-  endtime_tree = proto_tree_add_subtree_format(tree, payload_tvb, 5, 5,
-                                      ett_r3declinedlogdumpendtime, NULL,
+  endtime_item = proto_tree_add_text (tree, payload_tvb, 5, 5,
                                       "End YY/MM/DD HH:MM (%02u/%02u/%02u %02u:%02u)",
                                       tvb_get_guint8 (payload_tvb, 5),
                                       tvb_get_guint8 (payload_tvb, 6),
                                       tvb_get_guint8 (payload_tvb, 7),
                                       tvb_get_guint8 (payload_tvb, 8),
                                       tvb_get_guint8 (payload_tvb, 9));
+  endtime_tree = proto_item_add_subtree (endtime_item, ett_r3declinedlogdumpendtime);
   proto_tree_add_item (endtime_tree, hf_r3_declinedlogdump_endtime_year,    payload_tvb, 5, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (endtime_tree, hf_r3_declinedlogdump_endtime_month,   payload_tvb, 6, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (endtime_tree, hf_r3_declinedlogdump_endtime_day,     payload_tvb, 7, 1, ENC_LITTLE_ENDIAN);
@@ -5858,7 +5828,9 @@ dissect_r3_cmd_declinedlogdump (tvbuff_t *tvb, guint32 start_offset, guint32 len
 static void
 dissect_r3_cmd_alarmlogdump (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *starttime_item;
   proto_tree *starttime_tree;
+  proto_item *endtime_item;
   proto_tree *endtime_tree;
   guint8      cmdLen;
   tvbuff_t   *payload_tvb;
@@ -5867,33 +5839,33 @@ dissect_r3_cmd_alarmlogdump (tvbuff_t *tvb, guint32 start_offset, guint32 length
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
 
-  starttime_tree = proto_tree_add_subtree_format(tree, payload_tvb, 0, 5,
-                                        ett_r3alarmlogdumpstarttime, NULL,
+  starttime_item = proto_tree_add_text (tree, payload_tvb, 0, 5,
                                         "Start YY/MM/DD HH:MM (%02u/%02u/%02u %02u:%02u)",
                                         tvb_get_guint8 (payload_tvb, 0),
                                         tvb_get_guint8 (payload_tvb, 1),
                                         tvb_get_guint8 (payload_tvb, 2),
                                         tvb_get_guint8 (payload_tvb, 3),
                                         tvb_get_guint8 (payload_tvb, 4));
+  starttime_tree = proto_item_add_subtree (starttime_item, ett_r3alarmlogdumpstarttime);
   proto_tree_add_item (starttime_tree, hf_r3_alarmlogdump_starttime_year,    payload_tvb, 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_alarmlogdump_starttime_month,   payload_tvb, 1, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_alarmlogdump_starttime_day,     payload_tvb, 2, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_alarmlogdump_starttime_hours,   payload_tvb, 3, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (starttime_tree, hf_r3_alarmlogdump_starttime_minutes, payload_tvb, 4, 1, ENC_LITTLE_ENDIAN);
 
-  endtime_tree = proto_tree_add_subtree_format(tree, payload_tvb, 5, 5,
-                                      ett_r3alarmlogdumpendtime, NULL,
+  endtime_item = proto_tree_add_text (tree, payload_tvb, 5, 5,
                                       "End YY/MM/DD HH:MM (%02u/%02u/%02u %02u:%02u)",
                                       tvb_get_guint8 (payload_tvb, 5),
                                       tvb_get_guint8 (payload_tvb, 6),
                                       tvb_get_guint8 (payload_tvb, 7),
                                       tvb_get_guint8 (payload_tvb, 8),
                                       tvb_get_guint8 (payload_tvb, 9));
+  endtime_tree = proto_item_add_subtree (endtime_item, ett_r3alarmlogdumpendtime);
   proto_tree_add_item (endtime_tree, hf_r3_alarmlogdump_endtime_year,    payload_tvb, 5, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (endtime_tree, hf_r3_alarmlogdump_endtime_month,   payload_tvb, 6, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (endtime_tree, hf_r3_alarmlogdump_endtime_day,     payload_tvb, 7, 1, ENC_LITTLE_ENDIAN);
@@ -5913,15 +5885,16 @@ dissect_r3_cmd_downloadfirmware (tvbuff_t *tvb, guint32 start_offset, guint32 le
   guint32     calculatedCRC;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   if (tree)
   {
     proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
 
-    dlfw_tree = proto_tree_add_subtree_format(tree, payload_tvb, 0, -1, ett_r3downloadfirmware, &dlfw_item,
+    dlfw_item = proto_tree_add_text (tree, payload_tvb, 0, -1,
                                      "Download Record (Record #%u, ", tvb_get_letohs (payload_tvb, 2));
+    dlfw_tree = proto_item_add_subtree (dlfw_item, ett_r3downloadfirmware);
 
     proto_tree_add_item (dlfw_tree, hf_r3_firmwaredownload_length, payload_tvb, 0, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item (dlfw_tree, hf_r3_firmwaredownload_record, payload_tvb, 2, 2, ENC_LITTLE_ENDIAN);
@@ -6006,7 +5979,7 @@ dissect_r3_cmd_downloadfirmwaretimeout (tvbuff_t *tvb, guint32 start_offset, gui
   if (tree)
   {
     cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-    payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+    payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
     proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -6026,7 +5999,7 @@ dissect_r3_cmd_powertableselection (tvbuff_t *tvb, guint32 start_offset, guint32
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -6037,10 +6010,29 @@ dissect_r3_cmd_powertableselection (tvbuff_t *tvb, guint32 start_offset, guint32
 static void
 dissect_r3_cmd_clearnvram (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
+  proto_item *nvram_item;
+  proto_tree *nvram_tree;
+  guint8      cmdLen;
+  tvbuff_t   *payload_tvb;
+  guint32     nvramclearoptions;
+  guint32     i;
+
+  if (!tree)
+    return;
+
+  cmdLen            = tvb_get_guint8 (tvb, start_offset + 0);
+  payload_tvb       = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
+
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
-  proto_tree_add_bitmask(tree, tvb, start_offset + 2, hf_r3_nvramclearoptions,
-			       ett_r3clearnvram, r3_nvramclearoptions, ENC_LITTLE_ENDIAN);
+
+  nvramclearoptions = tvb_get_letohs (payload_tvb, 0);
+
+  nvram_item = proto_tree_add_text (tree, payload_tvb, 0, 2, "NVRAM Clean Options (0x%04x)", nvramclearoptions);
+  nvram_tree = proto_item_add_subtree (nvram_item, ett_r3clearnvram);
+
+  for (i = 0; i < 16; i++)
+    proto_tree_add_boolean (nvram_tree, hf_r3_nvramclearoptions [i], payload_tvb, 0, 2, nvramclearoptions);
 }
 
 static void
@@ -6053,7 +6045,7 @@ dissect_r3_cmd_dpac (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, pa
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -6094,7 +6086,7 @@ dissect_r3_cmd_logwrite (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_
     return;
 
   cmdLen      = tvb_get_guint8 (tvb, start_offset + 0);
-  payload_tvb = tvb_new_subset_length (tvb, start_offset + 2, cmdLen - 2);
+  payload_tvb = tvb_new_subset (tvb, start_offset + 2, cmdLen - 2, cmdLen - 2);
 
   proto_tree_add_item (tree, hf_r3_commandlength, tvb, start_offset + 0, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item (tree, hf_r3_command,       tvb, start_offset + 1, 1, ENC_LITTLE_ENDIAN);
@@ -6140,7 +6132,7 @@ dissect_r3_cmd_extendedresponse (tvbuff_t *tvb, guint32 start_offset, guint32 le
 static void
 dissect_r3_cmdmfg_setserialnumber (tvbuff_t *tvb, guint32 start_offset, guint32 length _U_, packet_info *pinfo _U_, proto_tree *tree)
 {
-  tvbuff_t *sn_tvb = tvb_new_subset_length (tvb, start_offset + 2, 16);
+  tvbuff_t *sn_tvb = tvb_new_subset (tvb, start_offset + 2, 16, 16);
 
   if (tree)
   {
@@ -6279,13 +6271,13 @@ dissect_r3_cmdmfg_forceoptions (tvbuff_t *tvb, guint32 start_offset, guint32 len
   i = 0;
   while (i<len && (step=tvb_get_guint8(tvb, start_offset + i))>0)
   {
-    proto_tree *force_tree = proto_tree_add_subtree_format(tree, tvb, start_offset + i, tvb_get_guint8 (tvb, start_offset + i),
-                                                  ett_r3forceoptions, NULL,
+    proto_item *force_item = proto_tree_add_text (tree, tvb, start_offset + i, tvb_get_guint8 (tvb, start_offset + i),
                                                   "Force Option %s (%u)",
                                                   val_to_str_ext_const (
                                                     tvb_get_guint8 (tvb, start_offset + i + 1),
                                                     &r3_forceitemnames_ext, "[Unknown]"),
                                                   tvb_get_guint8 (tvb, start_offset + i + 1));
+    proto_tree *force_tree = proto_item_add_subtree (force_item, ett_r3forceoptions);
     proto_item *force_item_item;
 
     proto_tree_add_item (force_tree, hf_r3_forceoptions_length, tvb, start_offset + i + 0, 1, ENC_LITTLE_ENDIAN);
@@ -6389,7 +6381,8 @@ dissect_r3_cmdmfg_peekpoke (tvbuff_t *tvb, guint32 start_offset, guint32 length 
     proto_item *peekpoke_op_item;
     proto_tree *peekpoke_tree;
 
-    peekpoke_tree = proto_tree_add_subtree(tree, tvb, start_offset + i, 3, ett_r3peekpoke, &peekpoke_item, "");
+    peekpoke_item = proto_tree_add_text (tree, tvb, start_offset + i, 3, "%s", "");
+    peekpoke_tree = proto_item_add_subtree (peekpoke_item, ett_r3peekpoke);
 
     peekpoke_op_item = proto_tree_add_item (peekpoke_tree, hf_r3_peekpoke_operation, tvb, start_offset + i + 0, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item (peekpoke_tree, hf_r3_peekpoke_address,   tvb, start_offset + i + 1, 2, ENC_LITTLE_ENDIAN);
@@ -6608,13 +6601,13 @@ dissect_r3_command (tvbuff_t *tvb, guint32 start_offset, guint32 length, packet_
   else
     cn = val_to_str_ext_const (cmd, &r3_cmdmfgnames_ext, "[Unknown Mfg Command]");
 
-  cmd_tree = proto_tree_add_subtree_format(r3_tree, tvb, start_offset, cmdLen,
-                            ett_r3cmd, &cmd_item, "Command Packet: %s (%d)", cn, cmd);
+  cmd_item = proto_tree_add_text (r3_tree, tvb, start_offset, cmdLen, "Command Packet: %s (%d)", cn, cmd);
+  cmd_tree = proto_item_add_subtree (cmd_item, ett_r3cmd);
 
   if (!mfgCommandFlag)
   {
     if (cmd >= CMD_LAST)
-      expert_add_info(pinfo, cmd_item, &ei_r3_unknown_command_value);
+      expert_add_info(pinfo, proto_tree_get_parent (cmd_tree), &ei_r3_unknown_command_value);
     else if (r3command_dissect [cmd])
       (*r3command_dissect [cmd]) (tvb, start_offset, length, pinfo, cmd_tree);
   }
@@ -6770,7 +6763,7 @@ dissect_r3_message (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
 }
 
 static guint
-get_r3_message_len (packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_r3_message_len (packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   return (guint) tvb_get_guint8 (tvb, offset + 3) + 1;
 }
@@ -7158,162 +7151,162 @@ void proto_register_r3 (void)
           NULL, HFILL }
       },
 
-      { &hf_r3_timezonearray0,
+      { &hf_r3_timezonearray [ 0],
         { "Timezone  0", "r3.timezone.0",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000001,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray1,
+      { &hf_r3_timezonearray [ 1],
         { "Timezone  1", "r3.timezone.1",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000002,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray2,
+      { &hf_r3_timezonearray [ 2],
         { "Timezone  2", "r3.timezone.2",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000004,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray3,
+      { &hf_r3_timezonearray [ 3],
         { "Timezone  3", "r3.timezone.3",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000008,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray4,
+      { &hf_r3_timezonearray [ 4],
         { "Timezone  4", "r3.timezone.4",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000010,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray5,
+      { &hf_r3_timezonearray [ 5],
         { "Timezone  5", "r3.timezone.5",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000020,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray6,
+      { &hf_r3_timezonearray [ 6],
         { "Timezone  6", "r3.timezone.6",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000040,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray7,
+      { &hf_r3_timezonearray [ 7],
         { "Timezone  7", "r3.timezone.7",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000080,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray8,
+      { &hf_r3_timezonearray [ 8],
         { "Timezone  8", "r3.timezone.8",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000100,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray9,
+      { &hf_r3_timezonearray [ 9],
         { "Timezone  9", "r3.timezone.9",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000200,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray10,
+      { &hf_r3_timezonearray [10],
         { "Timezone 10", "r3.timezone.10",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000400,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray11,
+      { &hf_r3_timezonearray [11],
         { "Timezone 11", "r3.timezone.11",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00000800,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray12,
+      { &hf_r3_timezonearray [12],
         { "Timezone 12", "r3.timezone.12",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00001000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray13,
+      { &hf_r3_timezonearray [13],
         { "Timezone 13", "r3.timezone.13",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00002000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray14,
+      { &hf_r3_timezonearray [14],
         { "Timezone 14", "r3.timezone.14",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00004000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray15,
+      { &hf_r3_timezonearray [15],
         { "Timezone 15", "r3.timezone.15",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00008000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray16,
+      { &hf_r3_timezonearray [16],
         { "Timezone 16", "r3.timezone.16",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00010000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray17,
+      { &hf_r3_timezonearray [17],
         { "Timezone 17", "r3.timezone.17",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00020000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray18,
+      { &hf_r3_timezonearray [18],
         { "Timezone 18", "r3.timezone.18",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00040000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray19,
+      { &hf_r3_timezonearray [19],
         { "Timezone 19", "r3.timezone.19",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00080000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray20,
+      { &hf_r3_timezonearray [20],
         { "Timezone 20", "r3.timezone.20",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00100000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray21,
+      { &hf_r3_timezonearray [21],
         { "Timezone 21", "r3.timezone.21",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00200000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray22,
+      { &hf_r3_timezonearray [22],
         { "Timezone 22", "r3.timezone.22",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00400000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray23,
+      { &hf_r3_timezonearray [23],
         { "Timezone 23", "r3.timezone.23",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x00800000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray24,
+      { &hf_r3_timezonearray [24],
         { "Timezone 24", "r3.timezone.24",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x01000000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray25,
+      { &hf_r3_timezonearray [25],
         { "Timezone 25", "r3.timezone.25",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x02000000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray26,
+      { &hf_r3_timezonearray [26],
         { "Timezone 26", "r3.timezone.26",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x04000000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray27,
+      { &hf_r3_timezonearray [27],
         { "Timezone 27", "r3.timezone.27",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x08000000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray28,
+      { &hf_r3_timezonearray [28],
         { "Timezone 28", "r3.timezone.28",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x10000000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray29,
+      { &hf_r3_timezonearray [29],
         { "Timezone 29", "r3.timezone.29",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x20000000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray30,
+      { &hf_r3_timezonearray [30],
         { "Timezone 30", "r3.timezone.30",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x40000000,
           NULL, HFILL }
       },
-      { &hf_r3_timezonearray31,
+      { &hf_r3_timezonearray [31],
         { "Timezone 31", "r3.timezone.31",
           FT_BOOLEAN, 32, TFS (&tfs_enabled_disabled), 0x80000000,
           NULL, HFILL }
@@ -7670,42 +7663,37 @@ void proto_register_r3 (void)
           FT_UINT8, BASE_DEC_HEX, NULL, 0x0,
           NULL, HFILL }
       },
-      { &hf_r3_definetimezone_daymap,
-        { "Day Map", "r3.definetimezone.daymap",
-          FT_UINT8, BASE_HEX, NULL, 0x0,
-          NULL, HFILL }
-      },
-      { &hf_r3_definetimezone_daymap0,
+      { &hf_r3_definetimezone_daymap [0],
         { "Sunday", "r3.definetimezone.daymap.sunday",
           FT_BOOLEAN, 8, TFS (&tfs_enabled_disabled), 0x00000001,
           NULL, HFILL }
       },
-      { &hf_r3_definetimezone_daymap1,
+      { &hf_r3_definetimezone_daymap [1],
         { "Monday", "r3.definetimezone.daymap.monday",
           FT_BOOLEAN, 8, TFS (&tfs_enabled_disabled), 0x00000002,
           NULL, HFILL }
       },
-      { &hf_r3_definetimezone_daymap2,
+      { &hf_r3_definetimezone_daymap [2],
         { "Tuesday", "r3.definetimezone.daymap.tuesday",
           FT_BOOLEAN, 8, TFS (&tfs_enabled_disabled), 0x00000004,
           NULL, HFILL }
       },
-      { &hf_r3_definetimezone_daymap3,
+      { &hf_r3_definetimezone_daymap [3],
         { "Wednesday", "r3.definetimezone.daymap.wednesday",
           FT_BOOLEAN, 8, TFS (&tfs_enabled_disabled), 0x00000008,
           NULL, HFILL }
       },
-      { &hf_r3_definetimezone_daymap4,
+      { &hf_r3_definetimezone_daymap [4],
         { "Thursday", "r3.definetimezone.daymap.thursday",
           FT_BOOLEAN, 8, TFS (&tfs_enabled_disabled), 0x00000010,
           NULL, HFILL }
       },
-      { &hf_r3_definetimezone_daymap5,
+      { &hf_r3_definetimezone_daymap [5],
         { "Friday", "r3.definetimezone.daymap.friday",
           FT_BOOLEAN, 8, TFS (&tfs_enabled_disabled), 0x00000020,
           NULL, HFILL }
       },
-      { &hf_r3_definetimezone_daymap6,
+      { &hf_r3_definetimezone_daymap [6],
         { "Saturday", "r3.definetimezone.daymap.saturday",
           FT_BOOLEAN, 8, TFS (&tfs_enabled_disabled), 0x00000040,
           NULL, HFILL }
@@ -7895,87 +7883,82 @@ void proto_register_r3 (void)
           NULL, HFILL }
       },
 
-      { &hf_r3_nvramclearoptions,
-        { "NVRAM Clean Options", "r3.nvramclear",
-          FT_UINT16, BASE_HEX, NULL, 0x0,
-          NULL, HFILL }
-      },
-      { &hf_r3_nvramclearoptions0,
+      { &hf_r3_nvramclearoptions [ 0],
         { "NVRAMCLEAROPTIONS_CFGINSTALLER", "r3.nvramclear.cfginstaller",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000001,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions1,
+      { &hf_r3_nvramclearoptions [ 1],
         { "NVRAMCLEAROPTIONS_CFGADMIN", "r3.nvramclear.cfgadmin",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000002,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions2,
+      { &hf_r3_nvramclearoptions [ 2],
         { "NVRAMCLEAROPTIONS_EXCEPTIONS", "r3.nvramclear.exceptions",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000004,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions3,
+      { &hf_r3_nvramclearoptions [ 3],
         { "NVRAMCLEAROPTIONS_EXCEPTIONGROUPS", "r3.nvramclear.exceptiongroups",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000008,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions4,
+      { &hf_r3_nvramclearoptions [ 4],
         { "NVRAMCLEAROPTIONS_CALENDARS", "r3.nvramclear.calendars",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000010,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions5,
+      { &hf_r3_nvramclearoptions [ 5],
         { "NVRAMCLEAROPTIONS_TIMEZONES", "r3.nvramclear.timezones",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000020,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions6,
+      { &hf_r3_nvramclearoptions [ 6],
         { "NVRAMCLEAROPTIONS_FILTERS", "r3.nvramclear.filters",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000040,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions7,
+      { &hf_r3_nvramclearoptions [ 7],
         { "NVRAMCLEAROPTIONS_EVENTLOG", "r3.nvramclear.eventlog",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000080,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions8,
+      { &hf_r3_nvramclearoptions [ 8],
         { "NVRAMCLEAROPTIONS_USERDATA", "r3.nvramclear.userdata",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000100,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions9,
+      { &hf_r3_nvramclearoptions [ 9],
         { "NVRAMCLEAROPTIONS_DECLINEDLOG", "r3.nvramclear.declinedlog",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000200,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions10,
+      { &hf_r3_nvramclearoptions [10],
         { "NVRAMCLEAROPTIONS_ALARMLOG", "r3.nvramclear.alarmlog",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000400,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions11,
+      { &hf_r3_nvramclearoptions [11],
         { "NVRAMCLEAROPTIONS_LRUCACHE", "r3.nvramclear.lrucache",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00000800,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions12,
+      { &hf_r3_nvramclearoptions [12],
         { "NVRAMCLEAROPTIONS_DBHASH", "r3.nvramclear.dbhash",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00001000,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions13,
+      { &hf_r3_nvramclearoptions [13],
         { "NVRAMCLEAROPTIONS_CFGSYSTEM", "r3.nvramclear.cfgsystem",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00002000,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions14,
+      { &hf_r3_nvramclearoptions [14],
         { "NVRAMCLEAROPTIONS_UNUSED", "r3.nvramclear.unused",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00004000,
           NULL, HFILL }
       },
-      { &hf_r3_nvramclearoptions15,
+      { &hf_r3_nvramclearoptions [15],
         { "NVRAMCLEAROPTIONS_USEBACKUP", "r3.nvramclear.usebackup",
           FT_BOOLEAN, 16, TFS (&tfs_enabled_disabled), 0x00008000,
           NULL, HFILL }
@@ -8422,12 +8405,6 @@ void proto_register_r3 (void)
       { &hf_r3_capabilities_value,
         { "Value", "r3.capabilities.value",
           FT_UINT16, BASE_HEX_DEC, NULL, 0x0,
-          NULL, HFILL }
-      },
-
-      { &hf_r3_lockstate,
-        { "Lock State", "r3.lockstate",
-          FT_UINT24, BASE_HEX, NULL, 0x0,
           NULL, HFILL }
       },
 
@@ -10083,7 +10060,7 @@ void proto_register_r3 (void)
     { &ei_r3_response_hasdata_octet_2, { "r3.response_hasdata.octet_2_not_response_hasdata", PI_PROTOCOL, PI_WARN, "Octet 2 not RESPONSE_HASDATA", EXPFILL }},
     { &ei_r3_response_hasdata_octet_3, { "r3.response_hasdata.octet_3_ge_upstreamcommand_last", PI_PROTOCOL, PI_WARN, "Octet 3 >= UPSTREAMCOMMAND_LAST", EXPFILL }},
     { &ei_r3_firmwaredownload_action, { "r3.firmwaredownload.action.unknown", PI_PROTOCOL, PI_WARN, "Unknown Firmware download action", EXPFILL }},
-    { &ei_r3_cmd_downloadfirmwaretimeout, { "r3.command.downloadfirmwaretimeout", PI_UNDECODED, PI_WARN, "Download Firmware Timeout", EXPFILL }},
+    { &ei_r3_cmd_downloadfirmwaretimeout, { "r3.r3.command.downloadfirmwaretimeout", PI_UNDECODED, PI_WARN, "Download Firmware Timeout", EXPFILL }},
     { &ei_r3_unknown_command_value, { "r3.command.unknown", PI_UNDECODED, PI_WARN, "Unknown command value", EXPFILL }},
   };
 
@@ -10104,15 +10081,15 @@ void proto_reg_handoff_r3 (void)
   dissector_add_uint ("tcp.port", 8023, r3_handle);
 }
 
+
 /*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
+ * Editor modelines
  *
- * Local Variables:
+ * Local variables:
  * c-basic-offset: 2
  * tab-width: 8
  * indent-tabs-mode: nil
  * End:
  *
- * vi: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
+ * vim: set tabstop=2 softtabstop=2 shiftwidth=2 expandtab:
  */

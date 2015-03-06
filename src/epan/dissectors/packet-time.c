@@ -39,11 +39,8 @@ static const enum_val_t time_display_types[] = {
     { NULL, NULL, 0 }
 };
 
-static const true_false_string tfs_response_request = { "Response", "Request" };
-
 static int proto_time = -1;
 static int hf_time_time = -1;
-static int hf_time_response = -1;
 
 static gint ett_time = -1;
 /* Instead of using absolute_time_display_e as the type for
@@ -71,13 +68,14 @@ dissect_time(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     ti = proto_tree_add_item(tree, proto_time, tvb, 0, -1, ENC_NA);
     time_tree = proto_item_add_subtree(ti, ett_time);
 
-    proto_tree_add_boolean(time_tree, hf_time_response, tvb, 0, 0, pinfo->srcport==pinfo->match_uint);
+    proto_tree_add_text(time_tree, tvb, 0, 0,
+            pinfo->srcport==pinfo->match_uint ? "Type: Response":"Type: Request");
     if (pinfo->srcport == pinfo->match_uint) {
         /* seconds since 1900-01-01 00:00:00 GMT, *not* 1970 */
         guint32 delta_seconds = tvb_get_ntohl(tvb, 0);
         proto_tree_add_uint_format(time_tree, hf_time_time, tvb, 0, 4,
                 delta_seconds, "%s",
-                abs_time_secs_to_str(wmem_packet_scope(), delta_seconds-2208988800U,
+                abs_time_secs_to_ep_str(delta_seconds-2208988800U,
                     (absolute_time_display_e)time_display_type, TRUE));
     }
 }
@@ -89,13 +87,8 @@ proto_register_time(void)
         { &hf_time_time,
             { "Time", "time.time",
                 FT_UINT32, BASE_DEC, NULL, 0x0,
-                "Seconds since 00:00 (midnight) 1 January 1900 GMT", HFILL }},
-        { &hf_time_response,
-            { "Type", "time.response",
-                FT_BOOLEAN, BASE_NONE, TFS(&tfs_response_request), 0x0,
-                "Response or Request", HFILL }}
+                "Seconds since 00:00 (midnight) 1 January 1900 GMT", HFILL }}
     };
-
     static gint *ett[] = {
         &ett_time,
     };

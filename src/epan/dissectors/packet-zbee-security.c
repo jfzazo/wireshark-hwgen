@@ -25,12 +25,14 @@
 /*  Include Files */
 #include "config.h"
 
+#include <string.h>
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 
 #include <epan/prefs.h>
 #include <epan/expert.h>
+#include <epan/emem.h>
 #include <epan/uat.h>
 
 /* We require libgcrpyt in order to decrypt ZigBee packets. Without it the best
@@ -47,31 +49,28 @@
 
 /* Helper Functions */
 #ifdef HAVE_LIBGCRYPT
-static void        zbee_sec_key_hash(guint8 *, guint8, guint8 *);
+static guint8 *    zbee_sec_key_hash(guint8 *, guint8, guint8 *);
 static void        zbee_sec_make_nonce (zbee_security_packet *, guint8 *);
 static gboolean    zbee_sec_decrypt_payload(zbee_security_packet *, const gchar *, const gchar, guint8 *,
         guint, guint, guint8 *);
 #endif
 static gboolean    zbee_security_parse_key(const gchar *, guint8 *, gboolean);
+static void proto_init_zbee_security(void);
 
 /* Field pointers. */
-static int hf_zbee_sec_field = -1;
 static int hf_zbee_sec_key_id = -1;
 static int hf_zbee_sec_nonce = -1;
 static int hf_zbee_sec_counter = -1;
 static int hf_zbee_sec_src64 = -1;
 static int hf_zbee_sec_key_seqno = -1;
 static int hf_zbee_sec_mic = -1;
-static int hf_zbee_sec_key = -1;
 static int hf_zbee_sec_key_origin = -1;
-static int hf_zbee_sec_decryption_key = -1;
 
 /* Subtree pointers. */
 static gint ett_zbee_sec = -1;
 static gint ett_zbee_sec_control = -1;
 
 static expert_field ei_zbee_sec_encrypted_payload = EI_INIT;
-static expert_field ei_zbee_sec_extended_source_unknown = EI_INIT;
 
 static dissector_handle_t   data_handle;
 
@@ -128,13 +127,10 @@ typedef struct _uat_key_record_t {
     gchar    *string;
     guint8    byte_order;
     gchar    *label;
+    guint8    key[ZBEE_SEC_CONST_KEYSIZE];
 } uat_key_record_t;
 
-UAT_CSTRING_CB_DEF(uat_key_records, string, uat_key_record_t)
-UAT_VS_DEF(uat_key_records, byte_order, uat_key_record_t, guint8, 0, "Normal")
-UAT_CSTRING_CB_DEF(uat_key_records, label, uat_key_record_t)
-
-static GSList           *zbee_pc_keyring = NULL;
+/*  */
 static uat_key_record_t *uat_key_records = NULL;
 static guint             num_uat_key_records = 0;
 
@@ -154,14 +150,11 @@ static void* uat_key_record_copy_cb(void* n, const void* o, size_t siz _U_) {
         new_key->label = NULL;
     }
 
-    new_key->byte_order = old_key->byte_order;
-
     return new_key;
 }
 
-static void uat_key_record_update_cb(void* r, char** err) {
+static void uat_key_record_update_cb(void* r, const char** err) {
     uat_key_record_t* rec = (uat_key_record_t *)r;
-    guint8 key[ZBEE_SEC_CONST_KEYSIZE];
 
     if (rec->string == NULL) {
         *err = g_strdup("Key can't be blank");
@@ -170,7 +163,7 @@ static void uat_key_record_update_cb(void* r, char** err) {
 
         if (rec->string[0] != 0) {
             *err = NULL;
-            if ( !zbee_security_parse_key(rec->string, key, rec->byte_order) ) {
+            if ( !zbee_security_parse_key(rec->string, rec->key, rec->byte_order) ) {
                 *err = g_strdup_printf("Expecting %d hexadecimal bytes or\n"
                         "a %d character double-quoted string", ZBEE_SEC_CONST_KEYSIZE, ZBEE_SEC_CONST_KEYSIZE);
             }
@@ -187,27 +180,11 @@ static void uat_key_record_free_cb(void*r) {
     if (key->label) g_free(key->label);
 }
 
-static void uat_key_record_post_update(void) {
-    guint           i;
-    key_record_t    key_record;
-    guint8          key[ZBEE_SEC_CONST_KEYSIZE];
+UAT_CSTRING_CB_DEF(uat_key_records, string, uat_key_record_t)
+UAT_VS_DEF(uat_key_records, byte_order, uat_key_record_t, guint8, 0, "Normal")
+UAT_CSTRING_CB_DEF(uat_key_records, label, uat_key_record_t)
 
-    /* empty the key ring */
-    if (zbee_pc_keyring) {
-       g_slist_free(zbee_pc_keyring);
-       zbee_pc_keyring = NULL;
-    }
-
-    /* Load the pre-configured slist from the UAT. */
-    for (i=0; (uat_key_records) && (i<num_uat_key_records) ; i++) {
-        key_record.frame_num = ZBEE_SEC_PC_KEY; /* means it's a user PC key */
-        key_record.label = g_strdup(uat_key_records[i].label);
-        if (zbee_security_parse_key(uat_key_records[i].string, key, uat_key_records[i].byte_order)) {
-            memcpy(&key_record.key, key, ZBEE_SEC_CONST_KEYSIZE);
-            zbee_pc_keyring = g_slist_prepend(zbee_pc_keyring, g_memdup(&key_record, sizeof(key_record_t)));
-        }
-    }
-}
+static GSList *zbee_pc_keyring = NULL;
 
 /*
  * Enable this macro to use libgcrypt's CBC_MAC mode for the authentication
@@ -232,10 +209,6 @@ static void uat_key_record_post_update(void) {
 void zbee_security_register(module_t *zbee_prefs, int proto)
 {
     static hf_register_info hf[] = {
-        { &hf_zbee_sec_field,
-          { "Security Control Field",   "zbee.sec.field", FT_UINT8, BASE_HEX, NULL,
-            0x0, NULL, HFILL }},
-
         { &hf_zbee_sec_key_id,
           { "Key Id",                    "zbee.sec.key", FT_UINT8, BASE_HEX, VALS(zbee_sec_key_names),
             ZBEE_SEC_CONTROL_KEY, NULL, HFILL }},
@@ -260,16 +233,8 @@ void zbee_security_register(module_t *zbee_prefs, int proto)
           { "Message Integrity Code", "zbee.sec.mic", FT_BYTES, BASE_NONE, NULL, 0x0,
             NULL, HFILL }},
 
-        { &hf_zbee_sec_key,
-          { "Key", "zbee.sec.key", FT_BYTES, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
         { &hf_zbee_sec_key_origin,
           { "Key Origin", "zbee.sec.key.origin", FT_FRAMENUM, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_zbee_sec_decryption_key,
-          { "Key Label", "zbee.sec.decryption_key", FT_STRING, BASE_NONE, NULL, 0x0,
             NULL, HFILL }}
     };
 
@@ -280,7 +245,6 @@ void zbee_security_register(module_t *zbee_prefs, int proto)
 
     static ei_register_info ei[] = {
         { &ei_zbee_sec_encrypted_payload, { "zbee_sec.encrypted_payload", PI_UNDECODED, PI_WARN, "Encrypted Payload", EXPFILL }},
-        { &ei_zbee_sec_extended_source_unknown, { "zbee_sec.extended_source_unknown", PI_PROTOCOL, PI_NOTE, "Extended Source: Unknown", EXPFILL }},
     };
 
     expert_module_t* expert_zbee_sec;
@@ -292,7 +256,7 @@ void zbee_security_register(module_t *zbee_prefs, int proto)
                         "a 16-character string in double-quotes."),
         UAT_FLD_VS(uat_key_records, byte_order, "Byte Order", byte_order_vals,
                         "Byte order of key."),
-        UAT_FLD_CSTRING(uat_key_records, label, "Label", "User label for key."),
+        UAT_FLD_LSTRING(uat_key_records, label, "Label", "User label for key."),
         UAT_END_FIELDS
     };
 
@@ -319,7 +283,7 @@ void zbee_security_register(module_t *zbee_prefs, int proto)
                                uat_key_record_copy_cb,
                                uat_key_record_update_cb,
                                uat_key_record_free_cb,
-                               uat_key_record_post_update,
+                               NULL, /* TODO: post_update */
                                key_uat_fields );
 
     prefs_register_uat_preference(zbee_prefs,
@@ -333,6 +297,8 @@ void zbee_security_register(module_t *zbee_prefs, int proto)
     expert_zbee_sec = expert_register_protocol(proto);
     expert_register_field_array(expert_zbee_sec, ei, array_length(ei));
 
+    /* Register the init routine. */
+    register_init_routine(proto_init_zbee_security);
 } /* zbee_security_register */
 
 /*FUNCTION:------------------------------------------------------
@@ -456,7 +422,10 @@ zbee_security_handoff(void)
 tvbuff_t *
 dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint offset)
 {
-    proto_tree     *sec_tree;
+    proto_tree     *sec_tree = NULL;
+    proto_item     *sec_root;
+    proto_tree     *field_tree;
+    proto_item     *ti;
 
     zbee_security_packet    packet;
     guint           mic_len;
@@ -464,8 +433,6 @@ dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint o
     tvbuff_t       *payload_tvb;
 
 #ifdef HAVE_LIBGCRYPT
-    proto_item         *ti;
-    proto_item         *key_item;
     guint8             *enc_buffer;
     guint8             *dec_buffer;
     gboolean            decrypted;
@@ -477,12 +444,6 @@ dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint o
     ieee802154_hints_t *ieee_hints;
     ieee802154_map_rec *map_rec = NULL;
 
-    static const int * sec_flags[] = {
-        &hf_zbee_sec_key_id,
-        &hf_zbee_sec_nonce,
-        NULL
-    };
-
     /* Init */
     memset(&packet, 0, sizeof(zbee_security_packet));
 
@@ -493,7 +454,10 @@ dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint o
         proto_get_id_by_filter_name(IEEE802154_PROTOABBREV_WPAN), 0);
 
     /* Create a subtree for the security information. */
-    sec_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_zbee_sec, NULL, "ZigBee Security Header");
+    if (tree) {
+        sec_root = proto_tree_add_text(tree, tvb, offset, tvb_length_remaining(tvb, offset), "ZigBee Security Header");
+        sec_tree = proto_item_add_subtree(sec_root, ett_zbee_sec);
+    }
 
     /*  Get and display the Security control field */
     packet.control  = tvb_get_guint8(tvb, offset);
@@ -510,7 +474,7 @@ dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint o
      * is automatically freed before the next packet is processed.
      */
 #ifdef HAVE_LIBGCRYPT
-    enc_buffer = (guint8 *)tvb_memdup(wmem_packet_scope(), tvb, 0, tvb_captured_length(tvb));
+    enc_buffer = (guint8 *)tvb_memdup(wmem_packet_scope(), tvb, 0, tvb_length(tvb));
     /*
      * Override the const qualifiers and patch the security level field, we
      * know it is safe to overide the const qualifiers because we just
@@ -521,8 +485,15 @@ dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint o
     packet.level    = zbee_get_bit_field(packet.control, ZBEE_SEC_CONTROL_LEVEL);
     packet.key_id   = zbee_get_bit_field(packet.control, ZBEE_SEC_CONTROL_KEY);
     packet.nonce    = zbee_get_bit_field(packet.control, ZBEE_SEC_CONTROL_NONCE);
+    if (tree) {
+        ti = proto_tree_add_text(sec_tree, tvb, offset, 1, "Security Control Field");
+        field_tree = proto_item_add_subtree(ti, ett_zbee_sec_control);
 
-    proto_tree_add_bitmask(sec_tree, tvb, offset, hf_zbee_sec_field, ett_zbee_sec_control, sec_flags, ENC_NA);
+        proto_tree_add_uint(field_tree, hf_zbee_sec_key_id, tvb, offset, 1,
+                                packet.control & ZBEE_SEC_CONTROL_KEY);
+        proto_tree_add_boolean(field_tree, hf_zbee_sec_nonce, tvb, offset, 1,
+                                packet.control & ZBEE_SEC_CONTROL_NONCE);
+    }
     offset += 1;
 
     /* Get and display the frame counter field. */
@@ -575,16 +546,16 @@ dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint o
                 /* use the ieee extended source address for NWK decryption */
                 if ( ieee_hints && (map_rec = ieee_hints->map_rec) )
                     packet.src64 = map_rec->addr64;
-                else
-                    proto_tree_add_expert(sec_tree, pinfo, &ei_zbee_sec_extended_source_unknown, tvb, 0, 0);
+                else if (tree)
+                    proto_tree_add_text(sec_tree, tvb, 0, 0, "[Extended Source: Unknown]");
                 break;
 
             default:
                 /* use the nwk extended source address for APS decryption */
                 if ( nwk_hints && (map_rec = nwk_hints->map_rec) )
                     packet.src64 = map_rec->addr64;
-                else
-                    proto_tree_add_expert(sec_tree, pinfo, &ei_zbee_sec_extended_source_unknown, tvb, 0, 0);
+                else if (tree)
+                    proto_tree_add_text(sec_tree, tvb, 0, 0, "[Extended Source: Unknown]");
                 break;
         }
     }
@@ -626,7 +597,7 @@ dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint o
     if (mic_len) {
         /* Display the MIC. */
         if (tree) {
-            proto_tree_add_item(sec_tree, hf_zbee_sec_mic, tvb, (gint)(tvb_captured_length(tvb)-mic_len),
+            proto_tree_add_item(sec_tree, hf_zbee_sec_mic, tvb, (gint)(tvb_length(tvb)-mic_len),
                    mic_len, ENC_NA);
         }
     }
@@ -648,7 +619,7 @@ dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint o
         (packet.level == ZBEE_SEC_MIC128)) {
 
         /* Payload is only integrity protected. Just return the sub-tvbuff. */
-        return tvb_new_subset_length(tvb, offset, payload_len);
+        return tvb_new_subset(tvb, offset, payload_len, payload_len);
     }
 
 #ifdef HAVE_LIBGCRYPT
@@ -739,11 +710,8 @@ dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint o
 
     if ( decrypted ) {
         if ( tree && key_rec ) {
-            key_item = proto_tree_add_bytes(sec_tree, hf_zbee_sec_key, tvb, 0, ZBEE_SEC_CONST_KEYSIZE, key_rec->key);
-            PROTO_ITEM_SET_GENERATED(key_item);
-
             if ( key_rec->frame_num == ZBEE_SEC_PC_KEY ) {
-                ti = proto_tree_add_string(sec_tree, hf_zbee_sec_decryption_key, tvb, 0, 0, key_rec->label);
+                ti = proto_tree_add_text(sec_tree, tvb, 0, 0, "Decryption Key: %s", key_rec->label);
             } else {
                 ti = proto_tree_add_uint(sec_tree, hf_zbee_sec_key_origin, tvb, 0, 0,
                         key_rec->frame_num);
@@ -1213,15 +1181,18 @@ zbee_sec_hash(guint8 *input, guint input_len, guint8 *output)
  *          ipad = 0x36 repeated.
  *          opad = 0x5c repeated.
  *          H() = ZigBee Cryptographic Hash (B.1.3 and B.6).
+ *
+ *      The output of this function is an ep_alloced buffer containing
+ *      the key-hashed output, and is garaunteed never to return NULL.
  *  PARAMETERS
- *      guint8  *key      - ZigBee Security Key (must be ZBEE_SEC_CONST_KEYSIZE) in length.
- *      guint8  input     - ZigBee CCM* Nonce (must be ZBEE_SEC_CONST_NONCE_LEN) in length.
- *      guint8  *hash_out - buffer into which the key-hashed output is placed
+ *      guint8  *key    - ZigBee Security Key (must be ZBEE_SEC_CONST_KEYSIZE) in length.
+ *      guint8  input   - ZigBee CCM* Nonce (must be ZBEE_SEC_CONST_NONCE_LEN) in length.
+ *      packet_info *pinfo  - pointer to packet information fields
  *  RETURNS
- *      void
+ *      guint8*
  *---------------------------------------------------------------
  */
-static void
+static guint8 *
 zbee_sec_key_hash(guint8 *key, guint8 input, guint8 *hash_out)
 {
     guint8              hash_in[2*ZBEE_SEC_CONST_BLOCKSIZE];
@@ -1241,6 +1212,7 @@ zbee_sec_key_hash(guint8 *key, guint8 input, guint8 *hash_out)
     zbee_sec_hash(hash_out, ZBEE_SEC_CONST_BLOCKSIZE+1, hash_in+ZBEE_SEC_CONST_BLOCKSIZE);
     /* Hash the contents of hash_in to get the final result. */
     zbee_sec_hash(hash_in, 2*ZBEE_SEC_CONST_BLOCKSIZE, hash_out);
+    return hash_out;
 } /* zbee_sec_key_hash */
 #else   /* HAVE_LIBGCRYPT */
 gboolean
@@ -1258,15 +1230,35 @@ zbee_sec_ccm_decrypt(const gchar    *key _U_,   /* Input */
 }
 #endif  /* HAVE_LIBGCRYPT */
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
+/*FUNCTION:------------------------------------------------------
+ *  NAME
+ *      proto_init_zbee_security
+ *  DESCRIPTION
+ *      Init routine for the
+ *  PARAMETERS
+ *      none
+ *  RETURNS
+ *      void
+ *---------------------------------------------------------------
  */
+static void
+proto_init_zbee_security(void)
+{
+    guint           i;
+    key_record_t    key_record;
+
+        /* empty the key ring */
+    if (zbee_pc_keyring) {
+       g_slist_free(zbee_pc_keyring);
+       zbee_pc_keyring = NULL;
+    }
+
+    /* Load the pre-configured slist from the UAT. */
+    for (i=0; (uat_key_records) && (i<num_uat_key_records) ; i++) {
+        key_record.frame_num = ZBEE_SEC_PC_KEY; /* means it's a user PC key */
+        key_record.label = g_strdup(uat_key_records[i].label);
+        memcpy(&key_record.key, &uat_key_records[i].key, ZBEE_SEC_CONST_KEYSIZE);
+
+        zbee_pc_keyring = g_slist_prepend(zbee_pc_keyring, g_memdup(&key_record, sizeof(key_record_t)));
+    } /* for */
+} /* proto_init_zbee_security */

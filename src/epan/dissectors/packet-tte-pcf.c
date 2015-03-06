@@ -29,6 +29,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/etypes.h>
 
@@ -40,6 +42,7 @@ void proto_reg_handoff_tte_pcf(void);
 /* Initialize the protocol and registered fields */
 static int proto_tte_pcf = -1;
 
+/* static int hf_tte_pcf = -1; */
 static int hf_tte_pcf_ic = -1;
 static int hf_tte_pcf_mn = -1;
 /* static int hf_tte_pcf_res0 = -1; */
@@ -143,47 +146,54 @@ proto_register_tte_pcf(void)
 {
     static hf_register_info hf[] = {
 
+#if 0
+        { &hf_tte_pcf,
+            { "Protocol Control Frame", "tte.pcf",
+            FT_BYTES, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+#endif
         { &hf_tte_pcf_ic,
-            { "Integration Cycle", "tte_pcf.ic",
+            { "Integration Cycle", "tte.pcf.ic",
             FT_UINT32, BASE_HEX, NULL, 0x0,
             NULL, HFILL }
         },
             { &hf_tte_pcf_mn,
-            { "Membership New", "tte_pcf.mn",
+            { "Membership New", "tte.pcf.mn",
             FT_UINT32, BASE_HEX, NULL, 0x0,
             NULL, HFILL }
         },
 #if 0
             { &hf_tte_pcf_res0,
-            { "Reserved 0", "tte_pcf.res0",
+            { "Reserved 0", "tte.pcf.res0",
             FT_UINT32, BASE_HEX, NULL, 0x0,
             NULL, HFILL }
         },
 #endif
         { &hf_tte_pcf_sp,
-            { "Sync Priority", "tte_pcf.sp",
+            { "Sync Priority", "tte.pcf.sp",
             FT_UINT8, BASE_HEX, NULL, 0x0,
             NULL, HFILL }
         },
         { &hf_tte_pcf_sd,
-            { "Sync Domain", "tte_pcf.sd",
+            { "Sync Domain", "tte.pcf.sd",
             FT_UINT8, BASE_HEX, NULL, 0x0,
             NULL, HFILL }
         },
         { &hf_tte_pcf_type,
-            { "Type", "tte_pcf.type",
+            { "Type", "tte.pcf.type",
             FT_UINT8, BASE_HEX, VALS(pcf_type_str_vals), 0x0F,
             NULL, HFILL }
         },
 #if 0
         { &hf_tte_pcf_res1,
-            { "Reserved 1", "tte_pcf.res1",
+            { "Reserved 1", "tte.pcf.res1",
             FT_BYTES, BASE_NONE, NULL, 0x0,
             NULL, HFILL }
         },
 #endif
         { &hf_tte_pcf_tc,
-            { "Transparent Clock", "tte_pcf.tc",
+            { "Transparent Clock", "tte.pcf.tc",
             FT_UINT64, BASE_HEX, NULL, 0x0,
             NULL, HFILL }
         }
@@ -219,15 +229,3 @@ proto_reg_handoff_tte_pcf(void)
 
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

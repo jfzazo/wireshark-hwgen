@@ -1,9 +1,15 @@
 #
-# - Find bison/yacc executable
+# - Find unix commands from cygwin
+# This module looks for some usual Unix commands.
 #
 
 INCLUDE(FindCygwin)
-INCLUDE(FindChocolatey)
+#INCLUDE(FindChocolatey)
+
+# Chocolatey's C:\Chocolatey\bin\win_flex and -\win_bison are
+# currently unusable without some manual adjustments to the
+# win_flex and win_bison wrapper scripts. Calling the executables
+# directly should work.
 
 FIND_PROGRAM(YACC_EXECUTABLE
   NAMES
@@ -11,8 +17,9 @@ FIND_PROGRAM(YACC_EXECUTABLE
     win_bison
     yacc
   PATHS
-    ${CHOCOLATEY_BIN_PATH}/bin
     ${CYGWIN_INSTALL_PATH}/bin
+#    ${CHOCOLATEY_INSTALL_PATH}/bin
+#    ${CHOCOLATEY_INSTALL_PATH}/lib/winflexbison.2.4.1.20140103/tools
     /bin
     /usr/bin
     /usr/local/bin

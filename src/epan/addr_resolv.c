@@ -50,19 +50,12 @@
  * code in tcpdump, to avoid those sorts of problems, and that was
  * picked up by tcpdump.org tcpdump.
  *
- * So, for now, we do not use alarm() and SIGALRM to time out host name
- * lookups.  If we get a lot of complaints about lookups taking a long time,
- * we can reconsider that decision.  (Note that tcpdump originally added
- * such a timeout mechanism that for the benefit of systems using NIS to
- * look up host names; that might now be fixed in NIS implementations, for
- * those sites still using NIS rather than DNS for that....  tcpdump no
- * longer does that, for the same reasons that we don't.)
- *
- * If we're using an asynchronous DNS resolver, that shouldn't be an issue.
- * If we're using a synchronous name lookup mechanism (which we'd do mainly
- * to support resolving addresses and host names using more mechanisms than
- * just DNS, such as NIS, NBNS, or Mr. Hosts File), we could do that in
- * a separate thread, making it, in effect, asynchronous.
+ * So, for now, we do not define AVOID_DNS_TIMEOUT.  If we get a
+ * significantly more complaints about lookups taking a long time,
+ * we can reconsider that decision.  (Note that tcpdump originally
+ * added that for the benefit of systems using NIS to look up host
+ * names; that might now be fixed in NIS implementations, for those
+ * sites still using NIS rather than DNS for that....)
  */
 
 #ifdef HAVE_UNISTD_H
@@ -81,6 +74,8 @@
 #include <arpa/inet.h>
 #endif
 
+#include <signal.h>
+
 #ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>     /* needed to define AF_ values on UNIX */
 #endif
@@ -89,7 +84,7 @@
 #include <winsock2.h>       /* needed to define AF_ values on Windows */
 #endif
 
-#ifndef HAVE_INET_ATON
+#ifndef HAVE_INET_ATON_H
 # include "wsutil/inet_aton.h"
 #endif
 
@@ -133,6 +128,7 @@
 #include <epan/strutil.h>
 #include <epan/to_str-int.h>
 #include <epan/prefs.h>
+#include <epan/emem.h>
 
 #define ENAME_HOSTS     "hosts"
 #define ENAME_SUBNETS   "subnets"
@@ -600,9 +596,9 @@ parse_services_file(const char * path)
  * unsigned integer to ascii
  */
 static gchar *
-wmem_utoa(wmem_allocator_t *allocator, guint port)
+ep_utoa(guint port)
 {
-    gchar *bp = (gchar *)wmem_alloc(allocator, MAXNAMELEN);
+    gchar *bp = (gchar *)ep_alloc(MAXNAMELEN);
 
     /* XXX, guint32_to_str() ? */
     guint32_to_str_buf(port, bp, MAXNAMELEN);
@@ -854,6 +850,7 @@ static hashipv4_t *
 host_lookup(const guint addr, gboolean *found)
 {
     hashipv4_t * volatile tp;
+    struct hostent *hostp;
 
     *found = TRUE;
 
@@ -888,6 +885,25 @@ try_resolv:
         }
 #endif /* ASYNC_DNS */
 
+        /*
+         * The Windows "gethostbyaddr()" insists on translating 0.0.0.0 to
+         * the name of the host on which it's running; to work around that
+         * botch, we don't try to translate an all-zero IP address to a host
+         * name.
+         */
+        if (addr != 0) {
+            /* Use async DNS if possible, else fall back to timeouts,
+             * else call gethostbyaddr and hope for the best
+             */
+
+            hostp = gethostbyaddr((const char *)&addr, 4, AF_INET);
+
+            if (hostp != NULL && hostp->h_name[0] != '\0') {
+                g_strlcpy(tp->name, hostp->h_name, MAXNAMELEN);
+                return tp;
+            }
+        }
+
         /* unknown host or DNS timeout */
 
     }
@@ -919,6 +935,7 @@ host_lookup6(const struct e_in6_addr *addr, gboolean *found)
 #ifdef HAVE_C_ARES
     async_dns_queue_msg_t *caqm;
 #endif /* HAVE_C_ARES */
+    struct hostent *hostp;
 #endif /* INET6 */
 
     *found = TRUE;
@@ -968,6 +985,13 @@ try_resolv:
         }
 #endif /* HAVE_C_ARES */
 
+        /* Quick hack to avoid DNS/YP timeout */
+        hostp = gethostbyaddr((const char *)addr, sizeof(*addr), AF_INET6);
+
+        if (hostp != NULL && hostp->h_name[0] != '\0') {
+            g_strlcpy(tp->name, hostp->h_name, MAXNAMELEN);
+            return tp;
+        }
 #endif /* INET6 */
     }
 
@@ -1455,7 +1479,6 @@ eth_addr_resolve(hashether_t *tp) {
     } else {
         guint         mask;
         gchar        *name;
-        address       ether_addr;
 
         /* Unknown name.  Try looking for it in the well-known-address
            tables for well-known address ranges smaller than 2^24. */
@@ -1553,8 +1576,7 @@ eth_addr_resolve(hashether_t *tp) {
         }
 
         /* No match whatsoever. */
-        SET_ADDRESS(&ether_addr, AT_ETHER, 6, addr);
-        address_to_str_buf(&ether_addr, tp->resolved_name, MAXNAMELEN);
+        g_snprintf(tp->resolved_name, MAXNAMELEN, "%s", ether_to_str(addr));
         tp->status = HASHETHER_STATUS_RESOLVED_DUMMY;
         return tp;
     }
@@ -1863,7 +1885,7 @@ add_ipxnet_name(guint addr, const gchar *name)
 #endif
 
 static gchar *
-ipxnet_name_lookup(wmem_allocator_t *allocator, const guint addr)
+ipxnet_name_lookup(const guint addr)
 {
     hashipxnet_t *tp;
     ipxnet_t *ipxnet;
@@ -1877,7 +1899,7 @@ ipxnet_name_lookup(wmem_allocator_t *allocator, const guint addr)
         tp = g_new(hashipxnet_t, 1);
         g_hash_table_insert(ipxnet_hash_table, key, tp);
     }else{
-        return wmem_strdup(allocator, tp->name);
+        return tp->name;
     }
 
     /* fill in a new entry */
@@ -1892,7 +1914,7 @@ ipxnet_name_lookup(wmem_allocator_t *allocator, const guint addr)
         g_strlcpy(tp->name, ipxnet->name, MAXNAMELEN);
     }
 
-    return wmem_strdup(allocator, tp->name);
+    return (tp->name);
 
 } /* ipxnet_name_lookup */
 
@@ -2247,19 +2269,19 @@ subnet_entry_set(guint32 subnet_addr, const guint32 mask_length, const gchar* na
     hash_idx = HASH_IPV4_ADDRESS(subnet_addr);
 
     if(NULL == entry->subnet_addresses) {
-        entry->subnet_addresses = (sub_net_hashipv4_t**) g_malloc0(sizeof(sub_net_hashipv4_t*) * HASHHOSTSIZE);
+        entry->subnet_addresses = (sub_net_hashipv4_t**) se_alloc0(sizeof(sub_net_hashipv4_t*) * HASHHOSTSIZE);
     }
 
     if(NULL != (tp = entry->subnet_addresses[hash_idx])) {
         if(tp->addr == subnet_addr) {
             return;    /* XXX provide warning that an address was repeated? */
         } else {
-            sub_net_hashipv4_t * new_tp = g_new(sub_net_hashipv4_t, 1);
+            sub_net_hashipv4_t * new_tp = se_new(sub_net_hashipv4_t);
             tp->next = new_tp;
             tp = new_tp;
         }
     } else {
-        tp = entry->subnet_addresses[hash_idx] = g_new(sub_net_hashipv4_t, 1);
+        tp = entry->subnet_addresses[hash_idx] = se_new(sub_net_hashipv4_t);
     }
 
     tp->next = NULL;
@@ -2300,15 +2322,6 @@ subnet_name_lookup_init(void)
     g_free(subnetspath);
 }
 
-static void
-cleanup_subnet_entry(sub_net_hashipv4_t* entry)
-{
-    if ((entry != NULL) && (entry->next != NULL)) {
-        cleanup_subnet_entry(entry->next);
-    }
-
-    g_free(entry);
-}
 
 /*
  *  External Functions
@@ -2410,7 +2423,7 @@ host_name_lookup_process(void) {
     nfds = ares_fds(ghba_chan, &rfds, &wfds);
     if (nfds > 0) {
         if (select(nfds, &rfds, &wfds, NULL, &tv) == -1) { /* call to select() failed */
-            fprintf(stderr, "Warning: call to select() failed, error is %s\n", g_strerror(errno));
+            fprintf(stderr, "Warning: call to select() failed, error is %s\n", strerror(errno));
             return nro;
         }
         ares_process(ghba_chan, &rfds, &wfds);
@@ -2705,17 +2718,15 @@ host_name_lookup_init(void)
     }
     g_free(hostspath);
 #ifdef HAVE_C_ARES
-    if (gbl_resolv_flags.concurrent_dns) {
 #ifdef CARES_HAVE_ARES_LIBRARY_INIT
-        if (ares_library_init(ARES_LIB_INIT_ALL) == ARES_SUCCESS) {
+    if (ares_library_init(ARES_LIB_INIT_ALL) == ARES_SUCCESS) {
 #endif
-            if (ares_init(&ghba_chan) == ARES_SUCCESS && ares_init(&ghbn_chan) == ARES_SUCCESS) {
-                async_dns_initialized = TRUE;
-            }
-#ifdef CARES_HAVE_ARES_LIBRARY_INIT
+        if (ares_init(&ghba_chan) == ARES_SUCCESS && ares_init(&ghbn_chan) == ARES_SUCCESS) {
+            async_dns_initialized = TRUE;
         }
-#endif
+#ifdef CARES_HAVE_ARES_LIBRARY_INIT
     }
+#endif
 #else
 #ifdef HAVE_GNU_ADNS
     /*
@@ -2751,23 +2762,21 @@ host_name_lookup_init(void)
     }
 #endif /* _WIN32 */
 
-    if (gbl_resolv_flags.concurrent_dns) {
-        /* XXX - Any flags we should be using? */
-        /* XXX - We could provide config settings for DNS servers, and
-           pass them to ADNS with adns_init_strcfg */
-        if (adns_init(&ads, adns_if_none, 0 /*0=>stderr*/) != 0) {
-            /*
-             * XXX - should we report the error?  I'm assuming that some crashes
-             * reported on a Windows machine with TCP/IP not configured are due
-             * to "adns_init()" failing (due to the lack of TCP/IP) and leaving
-             * ADNS in a state where it crashes due to that.  We'll still try
-             * doing name resolution anyway.
-             */
-            return;
-        }
-        async_dns_initialized = TRUE;
-        async_dns_in_flight = 0;
+    /* XXX - Any flags we should be using? */
+    /* XXX - We could provide config settings for DNS servers, and
+       pass them to ADNS with adns_init_strcfg */
+    if (adns_init(&ads, adns_if_none, 0 /*0=>stderr*/) != 0) {
+        /*
+         * XXX - should we report the error?  I'm assuming that some crashes
+         * reported on a Windows machine with TCP/IP not configured are due
+         * to "adns_init()" failing (due to the lack of TCP/IP) and leaving
+         * ADNS in a state where it crashes due to that.  We'll still try
+         * doing name resolution anyway.
+         */
+        return;
     }
+    async_dns_initialized = TRUE;
+    async_dns_in_flight = 0;
 #endif /* HAVE_GNU_ADNS */
 #endif /* HAVE_C_ARES */
 
@@ -2785,7 +2794,6 @@ host_name_lookup_init(void)
 void
 host_name_lookup_cleanup(void)
 {
-    guint32 i, j;
     _host_name_lookup_cleanup();
 
     if(ipxnet_hash_table){
@@ -2803,18 +2811,7 @@ host_name_lookup_cleanup(void)
         ipv6_hash_table = NULL;
     }
 
-    for(i = 0; i < SUBNETLENGTHSIZE; ++i) {
-        if (subnet_length_entries[i].subnet_addresses != NULL) {
-            for (j = 0; j < HASHHOSTSIZE; j++) {
-                if (subnet_length_entries[i].subnet_addresses[j] != NULL)
-                {
-                    cleanup_subnet_entry(subnet_length_entries[i].subnet_addresses[j]);
-                }
-            }
-            g_free(subnet_length_entries[i].subnet_addresses);
-            subnet_length_entries[i].subnet_addresses = NULL;
-        }
-    }
+    memset(subnet_length_entries, 0, sizeof(subnet_length_entries));
 
     have_subnet_entry = FALSE;
     new_resolved_objects = FALSE;
@@ -2854,71 +2851,72 @@ manually_resolve_cleanup(void)
 }
 
 gchar *
-udp_port_to_display(wmem_allocator_t *allocator, guint port)
+ep_udp_port_to_display(guint port)
 {
 
     if (!gbl_resolv_flags.transport_name) {
-        return wmem_utoa(allocator, port);
+        return ep_utoa(port);
     }
 
-    return wmem_strdup(allocator, serv_name_lookup(port, PT_UDP));
+    return serv_name_lookup(port, PT_UDP);
 
-} /* udp_port_to_display */
+} /* ep_udp_port_to_display */
 
 gchar *
-dccp_port_to_display(wmem_allocator_t *allocator, guint port)
+ep_dccp_port_to_display(guint port)
 {
 
     if (!gbl_resolv_flags.transport_name) {
-        return wmem_utoa(allocator, port);
+        return ep_utoa(port);
     }
 
-    return wmem_strdup(allocator, serv_name_lookup(port, PT_DCCP));
+    return serv_name_lookup(port, PT_DCCP);
 
-} /* dccp_port_to_display */
+} /* ep_dccp_port_to_display */
 
 gchar *
-tcp_port_to_display(wmem_allocator_t *allocator, guint port)
+ep_tcp_port_to_display(guint port)
 {
 
     if (!gbl_resolv_flags.transport_name) {
-        return wmem_utoa(allocator, port);
+        return ep_utoa(port);
     }
 
-    return wmem_strdup(allocator, serv_name_lookup(port, PT_TCP));
+    return serv_name_lookup(port, PT_TCP);
 
-} /* tcp_port_to_display */
+} /* ep_tcp_port_to_display */
 
 gchar *
-sctp_port_to_display(wmem_allocator_t *allocator, guint port)
+ep_sctp_port_to_display(guint port)
 {
 
     if (!gbl_resolv_flags.transport_name) {
-        return wmem_utoa(allocator, port);
+        return ep_utoa(port);
     }
 
-    return wmem_strdup(allocator, serv_name_lookup(port, PT_SCTP));
+    return serv_name_lookup(port, PT_SCTP);
 
-} /* sctp_port_to_display */
+} /* ep_sctp_port_to_display */
 
 const gchar *
-address_to_display(wmem_allocator_t *allocator, const address *addr)
+ep_address_to_display(const address *addr)
 {
-    gchar *str = NULL;
-    const gchar *result = solve_address_to_name(addr);
+    const gchar *result;
 
-    if (result != NULL) {
-        str = wmem_strdup(allocator, result);
-    }
-    else if (addr->type == AT_NONE) {
-        str = wmem_strdup(allocator, "NONE");
-    }
-    else {
-        str = (gchar *) wmem_alloc(allocator, MAX_ADDR_STR_LEN);
-        address_to_str_buf(addr, str, MAX_ADDR_STR_LEN);
+    result = solve_address_to_name(addr);
+
+    if (result != NULL)
+        return result;
+
+    /* if it gets here, either it is of type AT_NONE, */
+    /* or it should be solvable in address_to_str -unless addr->type is wrongly defined */
+
+    if (addr->type == AT_NONE){
+        return "NONE";
     }
 
-    return str;
+    /* We need an ephemeral allocated string */
+    return ep_address_to_str(addr);
 }
 
 const gchar *
@@ -2951,6 +2949,15 @@ get_addr_name(const address *addr)
         return NULL;
     }
 }
+
+void
+get_addr_name_buf(const address *addr, gchar *buf, gsize size)
+{
+    const gchar *result = ep_address_to_display(addr);
+
+    g_strlcpy(buf, result, size);
+} /* get_addr_name_buf */
+
 
 gchar *
 get_ether_name(const guint8 *addr)
@@ -3019,14 +3026,14 @@ add_ether_byip(const guint ip, const guint8 *eth)
 } /* add_ether_byip */
 
 const gchar *
-get_ipxnet_name(wmem_allocator_t *allocator, const guint32 addr)
+get_ipxnet_name(const guint32 addr)
 {
 
     if (!gbl_resolv_flags.network_name) {
-        return ipxnet_to_str_punct(allocator, addr, '\0');
+        return ipxnet_to_str_punct(addr, '\0');
     }
 
-    return ipxnet_name_lookup(allocator, addr);
+    return ipxnet_name_lookup(addr);
 
 } /* get_ipxnet_name */
 
@@ -3044,8 +3051,8 @@ get_ipxnet_addr(const gchar *name, gboolean *known)
 
 } /* get_ipxnet_addr */
 
-gchar *
-get_manuf_name(wmem_allocator_t *allocator, const guint8 *addr)
+const gchar *
+get_manuf_name(const guint8 *addr)
 {
     gchar *cur;
     int manuf_key;
@@ -3061,11 +3068,11 @@ get_manuf_name(wmem_allocator_t *allocator, const guint8 *addr)
     manuf_key = manuf_key | oct;
 
     if (!gbl_resolv_flags.mac_name || ((cur = (gchar *)g_hash_table_lookup(manuf_hashtable, &manuf_key)) == NULL)) {
-        cur=wmem_strdup_printf(allocator, "%02x:%02x:%02x", addr[0], addr[1], addr[2]);
+        cur=ep_strdup_printf("%02x:%02x:%02x", addr[0], addr[1], addr[2]);
         return cur;
     }
 
-    return wmem_strdup(allocator, cur);
+    return cur;
 
 } /* get_manuf_name */
 
@@ -3077,13 +3084,13 @@ uint_get_manuf_name(const guint oid)
     addr[0] = (oid >> 16) & 0xFF;
     addr[1] = (oid >> 8) & 0xFF;
     addr[2] = (oid >> 0) & 0xFF;
-    return get_manuf_name(wmem_packet_scope(), addr);
+    return get_manuf_name(addr);
 }
 
 const gchar *
 tvb_get_manuf_name(tvbuff_t *tvb, gint offset)
 {
-    return get_manuf_name(wmem_packet_scope(), tvb_get_ptr(tvb, offset, 3));
+    return get_manuf_name(tvb_get_ptr(tvb, offset, 3));
 }
 
 const gchar *
@@ -3129,20 +3136,41 @@ tvb_get_manuf_name_if_known(tvbuff_t *tvb, gint offset)
 }
 
 const gchar *
-eui64_to_display(wmem_allocator_t *allocator, const guint64 addr_eui64)
+ep_eui64_to_display(const guint64 addr_eui64)
 {
-    gchar *name;
-    guint8 *addr = (guint8 *)wmem_alloc(allocator, 8);
+    gchar *cur, *name;
+    guint8 *addr = (guint8 *)ep_alloc(8);
 
     /* Copy and convert the address to network byte order. */
     *(guint64 *)(void *)(addr) = pntoh64(&(addr_eui64));
 
     if (!gbl_resolv_flags.mac_name || ((name = manuf_name_lookup(addr)) == NULL)) {
-        return wmem_strdup_printf(allocator, "%02x:%02x:%02x%02x:%02x:%02x%02x:%02x", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7]);
+        cur=ep_strdup_printf("%02x:%02x:%02x:%02x:%02x:%02x%02x:%02x", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7]);
+        return cur;
     }
-    return wmem_strdup_printf(allocator, "%s_%02x:%02x:%02x:%02x:%02x", name, addr[3], addr[4], addr[5], addr[6], addr[7]);
+    cur=ep_strdup_printf("%s_%02x:%02x:%02x:%02x:%02x", name, addr[3], addr[4], addr[5], addr[6], addr[7]);
+    return cur;
 
-} /* eui64_to_display */
+} /* ep_eui64_to_display */
+
+
+const gchar *
+ep_eui64_to_display_if_known(const guint64 addr_eui64)
+{
+    gchar *cur, *name;
+    guint8 *addr = (guint8 *)ep_alloc(8);
+
+    /* Copy and convert the address to network byte order. */
+    *(guint64 *)(void *)(addr) = pntoh64(&(addr_eui64));
+
+    if ((name = manuf_name_lookup(addr)) == NULL) {
+        return NULL;
+    }
+
+    cur=ep_strdup_printf("%s_%02x:%02x:%02x:%02x:%02x", name, addr[3], addr[4], addr[5], addr[6], addr[7]);
+    return cur;
+
+} /* ep_eui64_to_display_if_known */
 
 #ifdef HAVE_C_ARES
 #define GHI_TIMEOUT (250 * 1000)
@@ -3223,7 +3251,7 @@ get_host_ipaddr(const char *host, guint32 *addrp)
         if (nfds > 0) {
             tvp = ares_timeout(ghbn_chan, &tv, &tv);
             if (select(nfds, &rfds, &wfds, NULL, tvp) == -1) { /* call to select() failed */
-                fprintf(stderr, "Warning: call to select() failed, error is %s\n", g_strerror(errno));
+                fprintf(stderr, "Warning: call to select() failed, error is %s\n", strerror(errno));
                 return FALSE;
             }
             ares_process(ghbn_chan, &rfds, &wfds);
@@ -3310,7 +3338,7 @@ get_host_ipaddr6(const char *host, struct e_in6_addr *addrp)
     if (nfds > 0) {
         tvp = ares_timeout(ghbn_chan, &tv, &tv);
         if (select(nfds, &rfds, &wfds, NULL, tvp) == -1) { /* call to select() failed */
-            fprintf(stderr, "Warning: call to select() failed, error is %s\n", g_strerror(errno));
+            fprintf(stderr, "Warning: call to select() failed, error is %s\n", strerror(errno));
             return FALSE;
         }
         ares_process(ghbn_chan, &rfds, &wfds);

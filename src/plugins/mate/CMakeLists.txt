@@ -19,11 +19,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-include(WiresharkPlugin)
-
-# This info is from moduleinfo.nmake
-set_module_info(mate 1 0 0 1)
-
 set(DISSECTOR_SRC
 	packet-mate.c
 )
@@ -73,10 +68,18 @@ register_dissector_files(plugin.c
 	${DISSECTOR_SRC}
 )
 
-add_plugin_library(mate)
+add_library(mate ${LINK_MODE_MODULE}
+	${PLUGIN_FILES}
+)
+set_target_properties(mate PROPERTIES PREFIX "")
+set_target_properties(mate PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+set_target_properties(mate PROPERTIES FOLDER "Plugins")
+
+target_link_libraries(mate epan)
 
 install(TARGETS mate
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION} NAMELINK_SKIP
 	RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}
 )
+

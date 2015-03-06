@@ -27,9 +27,12 @@
 
 #include <math.h>
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/addr_resolv.h>
+#include <epan/wmem/wmem.h>
+
 #include <epan/tvbparse.h>
 
 #include "packet-ntp.h"
@@ -398,17 +401,6 @@ static const value_string ctrl_err_status_types[] = {
 	{ 0,		NULL}
 };
 
-static const value_string err_values_types[] = {
-	{ 0,		"No error" },
-	{ 1,		"incompatible implementation number"},
-	{ 2,		"unimplemented request code" },
-	{ 3,		"format error" },
-	{ 4,		"no data available" },
-	{ 5,		"unknown" },
-	{ 6,		"unknown" },
-	{ 7,		"authentication failure"},
-	{ 0,		NULL}
-};
 
 #define NTPPRIV_R_MASK 0x80
 
@@ -419,16 +411,12 @@ static const value_string err_values_types[] = {
 #define NTPPRIV_AUTH_MASK 0x80
 #define NTPPRIV_SEQ_MASK 0x7f
 
-#define XNTPD 0x03
-
 static const value_string priv_impl_types[] = {
 	{ 0,		"UNIV" },
 	{ 2,		"XNTPD_OLD (pre-IPv6)" },
 	{ 3,		"XNTPD" },
 	{ 0,		NULL}
 };
-
-#define MON_GETLIST_1 42
 
 static const value_string priv_rc_types[] = {
 	{ 0,		"PEER_LIST" },
@@ -547,24 +535,6 @@ static int hf_ntppriv_auth = -1;
 static int hf_ntppriv_seq = -1;
 static int hf_ntppriv_impl = -1;
 static int hf_ntppriv_reqcode = -1;
-static int hf_ntppriv_errcode = -1;
-static int hf_ntppriv_numitems = -1;
-static int hf_ntppriv_mbz = -1;
-static int hf_monlist_item = -1;
-static int hf_ntppriv_itemsize = -1;
-static int hf_ntppriv_avgint = -1;
-static int hf_ntppriv_lsint = -1;
-static int hf_ntppriv_count = -1;
-static int hf_ntppriv_restr = -1;
-static int hf_ntppriv_addr = -1;
-static int hf_ntppriv_daddr = -1;
-static int hf_ntppriv_flags = -1;
-static int hf_ntppriv_port = -1;
-static int hf_ntppriv_mode = -1;
-static int hf_ntppriv_version = -1;
-static int hf_ntppriv_v6_flag = -1;
-static int hf_ntppriv_addr6 = -1;
-static int hf_ntppriv_daddr6 = -1;
 
 static gint ett_ntp = -1;
 static gint ett_ntp_flags = -1;
@@ -575,16 +545,11 @@ static gint ett_ntpctrl_status = -1;
 static gint ett_ntpctrl_data = -1;
 static gint ett_ntpctrl_item = -1;
 static gint ett_ntppriv_auth_seq = -1;
-static gint ett_monlist_item = -1;
 
-static expert_field ei_ntp_ext = EI_INIT;
-
-
-
-static void dissect_ntp_std (tvbuff_t *, packet_info *, proto_tree *, guint8);
-static void dissect_ntp_ctrl(tvbuff_t *, packet_info *, proto_tree *, guint8);
-static void dissect_ntp_priv(tvbuff_t *, packet_info *, proto_tree *, guint8);
-static int  dissect_ntp_ext (tvbuff_t *, packet_info *, proto_tree *, int);
+static void dissect_ntp_std (tvbuff_t *, proto_tree *, guint8);
+static void dissect_ntp_ctrl(tvbuff_t *, proto_tree *, guint8);
+static void dissect_ntp_priv(tvbuff_t *, proto_tree *, guint8);
+static int  dissect_ntp_ext (tvbuff_t *, proto_tree *, int);
 
 static const char *mon_names[12] = {
 	"Jan",
@@ -733,7 +698,7 @@ dissect_ntp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	proto_tree      *ntp_tree;
 	proto_item      *ti = NULL;
 	guint8		 flags;
-	void (*dissector)(tvbuff_t *, packet_info *, proto_item *, guint8);
+	void (*dissector)(tvbuff_t *, proto_item *, guint8);
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "NTP");
 
@@ -768,11 +733,11 @@ dissect_ntp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	                       val_to_str_const(flags & NTP_MODE_MASK, info_mode_types, "Unknown"));
 
 	/* Dissect according to mode */
-	(*dissector)(tvb, pinfo, ntp_tree, flags);
+	(*dissector)(tvb, ntp_tree, flags);
 }
 
 static void
-dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, guint8 flags)
+dissect_ntp_std(tvbuff_t *tvb, proto_tree *ntp_tree, guint8 flags)
 {
 	proto_tree      *flags_tree;
 	proto_item	*tf;
@@ -871,7 +836,7 @@ dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, guint8 
 	buff = (gchar *)wmem_alloc(wmem_packet_scope(), NTP_TS_SIZE);
 	if (stratum <= 1) {
 		g_snprintf (buff, NTP_TS_SIZE, "Unidentified reference source '%.4s'",
-			tvb_get_string_enc(wmem_packet_scope(), tvb, 12, 4, ENC_ASCII));
+			tvb_get_string(wmem_packet_scope(), tvb, 12, 4));
 		for (i = 0; primary_sources[i].id; i++) {
 			if (tvb_memeql(tvb, 12, primary_sources[i].id, 4) == 0) {
 				g_snprintf(buff, NTP_TS_SIZE, "%s",
@@ -920,7 +885,7 @@ dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, guint8 
 	 */
 	macofs = 48;
 	while (tvb_reported_length_remaining(tvb, macofs) > (gint)MAX_MAC_LEN)
-		macofs = dissect_ntp_ext(tvb, pinfo, ntp_tree, macofs);
+		macofs = dissect_ntp_ext(tvb, ntp_tree, macofs);
 
 	/* When the NTP authentication scheme is implemented, the
 	 * Key Identifier and Message Digest fields contain the
@@ -938,38 +903,42 @@ dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, guint8 
 }
 
 static int
-dissect_ntp_ext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, int offset)
+dissect_ntp_ext(tvbuff_t *tvb, proto_tree *ntp_tree, int offset)
 {
 	proto_tree      *ext_tree, *flags_tree;
-	proto_item	*tf, *ext_item;
+	proto_item	*tf;
 	guint16		 extlen;
 	int		 endoffset;
 	guint8		 flags;
 	guint32		 vallen, vallen_round, siglen;
 
 	extlen = tvb_get_ntohs(tvb, offset+2);
-	tf = proto_tree_add_item(ntp_tree, hf_ntp_ext, tvb, offset, extlen,
-	    ENC_NA);
-	ext_tree = proto_item_add_subtree(tf, ett_ntp_ext);
-
 	if (extlen < 8) {
 		/* Extension length isn't enough for the extension header.
 		 * Report the error, and return an offset that goes to
 		 * the end of the tvbuff, so we stop dissecting.
 		 */
-		expert_add_info_format(pinfo, tf, &ei_ntp_ext, "Extension length %u < 8", extlen);
-		return tvb_reported_length(tvb);
+		proto_tree_add_text(ntp_tree, tvb, offset+2, 2,
+				    "Extension length %u < 8", extlen);
+		offset += tvb_length_remaining(tvb, offset);
+		return offset;
 	}
 	if (extlen % 4) {
 		/* Extension length isn't a multiple of 4.
 		 * Report the error, and return an offset that goes
 		 * to the end of the tvbuff, so we stop dissecting.
 		 */
-		expert_add_info_format(pinfo, tf, &ei_ntp_ext, "Extension length %u isn't a multiple of 4",
+		proto_tree_add_text(ntp_tree, tvb, offset+2, 2,
+			"Extension length %u isn't a multiple of 4",
 				    extlen);
-		return tvb_reported_length(tvb);
+		offset += tvb_length_remaining(tvb, offset);
+		return offset;
 	}
 	endoffset = offset + extlen;
+
+	tf = proto_tree_add_item(ntp_tree, hf_ntp_ext, tvb, offset, extlen,
+	    ENC_NA);
+	ext_tree = proto_item_add_subtree(tf, ett_ntp_ext);
 
 	flags = tvb_get_guint8(tvb, offset);
 	tf = proto_tree_add_uint(ext_tree, hf_ntp_ext_flags, tvb, offset, 1,
@@ -1013,7 +982,7 @@ dissect_ntp_ext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, int off
 	/* XXX fstamp can be server flags */
 
 	vallen = tvb_get_ntohl(tvb, offset);
-	ext_item = proto_tree_add_uint(ext_tree, hf_ntp_ext_vallen, tvb, offset, 4,
+	proto_tree_add_uint(ext_tree, hf_ntp_ext_vallen, tvb, offset, 4,
 			    vallen);
 	offset += 4;
 	vallen_round = (vallen + 3) & (-4);
@@ -1023,7 +992,8 @@ dissect_ntp_ext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, int off
 			 * Value goes past the length of the extension
 			 * field.
 			 */
-			expert_add_info_format(pinfo, ext_item, &ei_ntp_ext,
+			proto_tree_add_text(ext_tree, tvb, offset,
+					    endoffset - offset,
 					    "Value length makes value go past the end of the extension field");
 			return endoffset;
 		}
@@ -1033,7 +1003,7 @@ dissect_ntp_ext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, int off
 	offset += vallen_round;
 
 	siglen = tvb_get_ntohl(tvb, offset);
-	ext_item = proto_tree_add_uint(ext_tree, hf_ntp_ext_siglen, tvb, offset, 4,
+	proto_tree_add_uint(ext_tree, hf_ntp_ext_siglen, tvb, offset, 4,
 			    siglen);
 	offset += 4;
 	if (siglen != 0) {
@@ -1042,7 +1012,8 @@ dissect_ntp_ext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, int off
 			 * Value goes past the length of the extension
 			 * field.
 			 */
-			expert_add_info_format(pinfo, ext_item, &ei_ntp_ext,
+			proto_tree_add_text(ext_tree, tvb, offset,
+					    endoffset - offset,
 					    "Signature length makes value go past the end of the extension field");
 			return endoffset;
 		}
@@ -1120,7 +1091,7 @@ dissect_ntp_ctrl_clockstatus(tvbuff_t *tvb, proto_tree *status_tree, guint16 off
 }
 
 static void
-dissect_ntp_ctrl(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *ntp_tree, guint8 flags)
+dissect_ntp_ctrl(tvbuff_t *tvb, proto_tree *ntp_tree, guint8 flags)
 {
 	proto_tree	*flags_tree;
 	proto_item	*tf;
@@ -1188,7 +1159,7 @@ dissect_ntp_ctrl(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *ntp_tree, gu
 		}
 	}
 	proto_tree_add_uint(ntp_tree, hf_ntpctrl_associd, tvb, 6, 2, associd);
-	proto_tree_add_uint(ntp_tree, hf_ntpctrl_offset, tvb, 8, 2, tvb_get_ntohs(tvb, 8));
+	proto_tree_add_uint(ntp_tree, hf_ntpctrl_offset,  tvb, 8, 2, tvb_get_ntohs(tvb, 8));
 	datalen = tvb_get_ntohs(tvb, 10);
 	proto_tree_add_uint(ntp_tree, hf_ntpctrl_count, tvb, 10, 2, datalen);
 
@@ -1284,7 +1255,7 @@ init_parser(void)
 }
 
 static void
-dissect_ntp_priv(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *ntp_tree, guint8 flags)
+dissect_ntp_priv(tvbuff_t *tvb, proto_tree *ntp_tree, guint8 flags)
 {
 	proto_tree      *flags_tree;
 	proto_item	*tf;
@@ -1312,56 +1283,6 @@ dissect_ntp_priv(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *ntp_tree, gu
 
 	reqcode = tvb_get_guint8(tvb, 3);
 	proto_tree_add_uint(ntp_tree, hf_ntppriv_reqcode, tvb, 3, 1, reqcode);
-
-	if (impl == XNTPD && reqcode == MON_GETLIST_1) {
-
-		guint16		numitems;
-		guint16		itemsize;
-		guint16		offset;
-		guint		i;
-
-		guint32		v6_flag;
-
-		proto_item*     monlist_item;
-		proto_tree*     monlist_item_tree;
-
-		proto_tree_add_bits_item(ntp_tree, hf_ntppriv_errcode, tvb, 32, 4, ENC_BIG_ENDIAN);
-		proto_tree_add_bits_item(ntp_tree, hf_ntppriv_numitems, tvb, 36, 12, ENC_BIG_ENDIAN);
-		proto_tree_add_bits_item(ntp_tree, hf_ntppriv_mbz, tvb, 48, 4, ENC_BIG_ENDIAN);
-		proto_tree_add_bits_item(ntp_tree, hf_ntppriv_itemsize, tvb, 52, 12, ENC_BIG_ENDIAN);
-
-		numitems = tvb_get_letohs(tvb, 5) & 0x0FFF;
-		itemsize = tvb_get_letohs(tvb, 7) & 0x0FFF;
-
-		for (i = 0; i < numitems; i++) {
-
-			offset = 8 + itemsize * i;
-
-			v6_flag = tvb_get_ntohl(tvb, offset + 32);
-
-			monlist_item = proto_tree_add_string_format(ntp_tree, hf_monlist_item, tvb, offset,
-				itemsize, "Monlist Item", "Monlist item: address: %s:%u",
-				tvb_ip_to_str(tvb, offset + 16), tvb_get_ntohs(tvb, offset + 28));
-			monlist_item_tree = proto_item_add_subtree(monlist_item, ett_monlist_item);
-
-			proto_tree_add_item(monlist_item_tree, hf_ntppriv_avgint, tvb, offset, 4, ENC_BIG_ENDIAN);
-			proto_tree_add_item(monlist_item_tree, hf_ntppriv_lsint, tvb, offset + 4, 4, ENC_BIG_ENDIAN);
-			proto_tree_add_item(monlist_item_tree, hf_ntppriv_restr, tvb, offset + 8, 4, ENC_BIG_ENDIAN);
-			proto_tree_add_item(monlist_item_tree, hf_ntppriv_count, tvb, offset + 12, 4, ENC_BIG_ENDIAN);
-			proto_tree_add_item(monlist_item_tree, hf_ntppriv_addr, tvb, offset + 16, 4, ENC_BIG_ENDIAN);
-			proto_tree_add_item(monlist_item_tree, hf_ntppriv_daddr, tvb, offset + 20, 4, ENC_BIG_ENDIAN);
-			proto_tree_add_item(monlist_item_tree, hf_ntppriv_flags, tvb, offset + 24, 4, ENC_BIG_ENDIAN);
-			proto_tree_add_item(monlist_item_tree, hf_ntppriv_port, tvb, offset + 28, 2, ENC_BIG_ENDIAN);
-			proto_tree_add_item(monlist_item_tree, hf_ntppriv_mode, tvb, offset + 30, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(monlist_item_tree, hf_ntppriv_version, tvb, offset + 31, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_boolean(monlist_item_tree, hf_ntppriv_v6_flag, tvb, offset + 32, 4, v6_flag);
-
-			if (v6_flag != 0) {
-				proto_tree_add_item(monlist_item_tree, hf_ntppriv_addr6, tvb, offset + 36, 16, ENC_NA);
-				proto_tree_add_item(monlist_item_tree, hf_ntppriv_daddr6, tvb, offset + 52, 16, ENC_NA);
-			}
-		}
-	}
 }
 
 void
@@ -1565,61 +1486,7 @@ proto_register_ntp(void)
 			VALS(priv_impl_types), 0, NULL, HFILL }},
 		{ &hf_ntppriv_reqcode, {
 			"Request code", "ntp.priv.reqcode", FT_UINT8, BASE_DEC | BASE_EXT_STRING,
-			&priv_rc_types_ext, 0, NULL, HFILL }},
-		{ &hf_ntppriv_errcode, {
-			"Err", "ntp.priv.err", FT_UINT8, BASE_HEX,
-			VALS(err_values_types), 0, NULL, HFILL }},
-		{ &hf_ntppriv_numitems, {
-			"Number of data items", "ntp.priv.numitems", FT_UINT16, BASE_DEC,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_mbz, {
-			"Reserved", "ntp.priv.reserved", FT_UINT8, BASE_HEX,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_monlist_item, {
-			"Monlist item", "ntp.priv.monlist.item",
-		         FT_STRINGZ, BASE_NONE, NULL, 0x00, NULL, HFILL }},
-		{ &hf_ntppriv_itemsize, {
-			"Size of data item", "ntp.priv.monlist.itemsize", FT_UINT16, BASE_HEX,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_avgint, {
-			"avgint", "ntp.priv.monlist.avgint", FT_UINT32, BASE_DEC,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_lsint, {
-			"lsint", "ntp.priv.monlist.lsint", FT_UINT32, BASE_DEC,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_restr, {
-			"restr", "ntp.priv.monlist.restr", FT_UINT32, BASE_HEX,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_count, {
-			"count", "ntp.priv.monlist.count", FT_UINT32, BASE_DEC,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_addr, {
-			"remote address", "ntp.priv.monlist.remote_address", FT_IPv4, BASE_NONE,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_daddr, {
-			"local address", "ntp.priv.monlist.local_address", FT_IPv4, BASE_NONE,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_flags, {
-			"flags", "ntp.priv.monlist.flags", FT_UINT32, BASE_HEX,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_port, {
-			"port", "ntp.priv.monlist.port", FT_UINT16, BASE_DEC,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_mode, {
-			"mode", "ntp.priv.monlist.mode", FT_UINT8, BASE_DEC,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_version, {
-			"version", "ntp.priv.monlist.version", FT_UINT8, BASE_DEC,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_v6_flag, {
-			"ipv6", "ntp.priv.monlist.ipv6", FT_BOOLEAN, BASE_NONE,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_addr6, {
-			"ipv6 remote addr", "ntp.priv.monlist.addr6", FT_IPv6, BASE_NONE,
-			NULL, 0, NULL, HFILL }},
-		{ &hf_ntppriv_daddr6, {
-			"ipv6 local addr", "ntp.priv.monlist.daddr6", FT_IPv6, BASE_NONE,
-			NULL, 0, NULL, HFILL }}
+			&priv_rc_types_ext, 0, NULL, HFILL }}
 	};
 	static gint *ett[] = {
 		&ett_ntp,
@@ -1630,22 +1497,13 @@ proto_register_ntp(void)
 		&ett_ntpctrl_status,
 		&ett_ntpctrl_data,
 		&ett_ntpctrl_item,
-		&ett_ntppriv_auth_seq,
-		&ett_monlist_item
+		&ett_ntppriv_auth_seq
 	};
-
-	static ei_register_info ei[] = {
-		{ &ei_ntp_ext, { "ntp.ext.invalid_length", PI_PROTOCOL, PI_WARN, "Extension invalid length", EXPFILL }},
-	};
-
-	expert_module_t* expert_ntp;
 
 	proto_ntp = proto_register_protocol("Network Time Protocol", "NTP",
 	    "ntp");
 	proto_register_field_array(proto_ntp, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_ntp = expert_register_protocol(proto_ntp);
-	expert_register_field_array(expert_ntp, ei, array_length(ei));
 
 	init_parser();
 }

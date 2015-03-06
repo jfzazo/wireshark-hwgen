@@ -26,13 +26,17 @@
 
 #include "config.h"
 
+#include <stdio.h>
 
 #include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
+#include <epan/epan.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/tap.h>
 #include <epan/conversation.h>
 #include <epan/dissectors/packet-scsi.h>
+#include <epan/dissectors/packet-fc.h>
 #include <epan/dissectors/packet-scsi-sbc.h>
 #include <epan/dissectors/packet-scsi-ssc.h>
 #include <epan/dissectors/packet-scsi-smc.h>
@@ -40,14 +44,18 @@
 #include <epan/dissectors/packet-scsi-mmc.h>
 
 #include "ui/simple_dialog.h"
-#include <epan/stat_groups.h>
+#include "../globals.h"
+#include "../stat_menu.h"
 
+#include "ui/gtk/gui_stat_menu.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/main.h"
 #include "ui/gtk/service_response_time_table.h"
 #include "ui/gtk/tap_param_dlg.h"
+#include "ui/gtk/gtkglobals.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkscsistat(void);
 
@@ -235,9 +243,7 @@ gtk_scsistat_init(const char *opt_arg, void* userdata _U_)
 	init_srt_table(&rs->srt_table, 256, vbox, hf_name);
 
 	for(i=0; i<256; i++){
-		gchar* tmp_str = val_to_str_ext_wmem(NULL, i, rs->cdbnames_ext, "Unknown-0x%02x");
-		init_srt_table_row(&rs->srt_table, i, tmp_str);
-		wmem_free(NULL, tmp_str);
+		init_srt_table_row(&rs->srt_table, i, val_to_str_ext(i, rs->cdbnames_ext, "Unknown-0x%02x"));
 	}
 
 
@@ -277,8 +283,8 @@ static const enum_val_t scsi_command_sets[] = {
 };
 
 static tap_param scsi_stat_params[] = {
-	{ PARAM_ENUM,   "cmdset", "Command set", scsi_command_sets, FALSE },
-	{ PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+	{ PARAM_ENUM,   "Command set", scsi_command_sets },
+	{ PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg scsi_stat_dlg = {

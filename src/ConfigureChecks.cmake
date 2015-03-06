@@ -31,6 +31,7 @@ check_include_file("dlfcn.h"             HAVE_DLFCN_H)
 check_include_file("fcntl.h"             HAVE_FCNTL_H)
 check_include_file("getopt.h"            HAVE_GETOPT_H)
 check_include_file("grp.h"               HAVE_GRP_H)
+check_include_file("inet/aton.h"         HAVE_INET_ATON_H)
 check_include_file("inttypes.h"          HAVE_INTTYPES_H)
 check_include_file("memory.h"            HAVE_MEMORY_H)
 check_include_file("netinet/in.h"        HAVE_NETINET_IN_H)
@@ -71,11 +72,6 @@ set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
 check_function_exists("dladdr"           HAVE_DLADDR)
 cmake_pop_check_state()
 
-#
-# Use check_symbol_exists just in case math.h does something magic
-# and there's not actually a function named floorl()
-#
-check_symbol_exists("floorl" "math.h"    HAVE_FLOORL)
 check_function_exists("gethostbyname2"   HAVE_GETHOSTBYNAME2)
 check_function_exists("getopt_long"      HAVE_GETOPT_LONG)
 if(HAVE_GETOPT_LONG)
@@ -86,24 +82,15 @@ if(HAVE_GETOPT_LONG)
     endif()
 endif()
 check_function_exists("getprotobynumber" HAVE_GETPROTOBYNUMBER)
-check_function_exists("inet_aton"        HAVE_INET_ATON)
 check_function_exists("inet_ntop"        HAVE_INET_NTOP_PROTO)
 check_function_exists("issetugid"        HAVE_ISSETUGID)
 check_function_exists("mmap"             HAVE_MMAP)
 check_function_exists("mprotect"         HAVE_MPROTECT)
 check_function_exists("mkdtemp"          HAVE_MKDTEMP)
 check_function_exists("mkstemp"          HAVE_MKSTEMP)
-check_function_exists("popcount"         HAVE_POPCOUNT)
 check_function_exists("setresgid"        HAVE_SETRESGID)
 check_function_exists("setresuid"        HAVE_SETRESUID)
-check_function_exists("strptime"         HAVE_STRPTIME)
 check_function_exists("sysconf"          HAVE_SYSCONF)
-if (APPLE)
-	cmake_push_check_state()
-	set(CMAKE_REQUIRED_LIBRARIES ${APPLE_CORE_FOUNDATION_LIBRARY})
-	check_function_exists("CFPropertyListCreateWithStream" HAVE_CFPROPERTYLISTCREATEWITHSTREAM)
-	cmake_pop_check_state()
-endif()
 
 #Struct members
 include(CheckStructHasMember)
@@ -116,69 +103,22 @@ check_symbol_exists(tzname "time.h" HAVE_TZNAME)
 
 # Check for stuff that isn't testable via the tests above
 #include(CheckCSourceCompiles)
+check_c_source_compiles(
+	"#include <linux/nl80211.h>
+	int main() {
+		enum nl80211_commands x = NL80211_CMD_SET_CHANNEL;
+	}"
+	HAVE_NL80211_CMD_SET_CHANNEL
+)
+check_c_source_compiles(
+	"#include <linux/nl80211.h>
+	int main() {
+		int x = NL80211_FREQUENCY_ATTR_MAX_TX_POWER;
+		x = NL80211_ATTR_SUPPORTED_IFTYPES;
+		x = NL80211_ATTR_SUPPORTED_COMMANDS;
+		x = NL80211_ATTR_WIPHY_FREQ;
+		x = NL80211_CHAN_NO_HT;
+	}"
+	HAVE_NL80211
+)
 
-#
-# *If* we found libnl, check if we can use nl80211 stuff with it.
-#
-if (NL_FOUND)
-	check_c_source_compiles(
-		"#include <linux/nl80211.h>
-		int main() {
-			int x = NL80211_FREQUENCY_ATTR_MAX_TX_POWER;
-			x = NL80211_ATTR_SUPPORTED_IFTYPES;
-			x = NL80211_ATTR_SUPPORTED_COMMANDS;
-			x = NL80211_ATTR_WIPHY_FREQ;
-			x = NL80211_CHAN_NO_HT;
-		}"
-		HAVE_NL80211
-	)
-	check_c_source_compiles(
-		"#include <linux/nl80211.h>
-		int main() {
-			enum nl80211_commands x = NL80211_CMD_SET_CHANNEL;
-		}"
-		HAVE_NL80211_CMD_SET_CHANNEL
-	)
-	check_c_source_compiles(
-		"#include <linux/nl80211.h>
-		int main() {
-			enum nl80211_protocol_features x = NL80211_PROTOCOL_FEATURE_SPLIT_WIPHY_DUMP;
-		}"
-		HAVE_NL80211_SPLIT_WIPHY_DUMP
-	)
-endif()
-
-#
-# Check whether GLib's printf supports thousands grouping. (This might
-# be different from the system's printf since GLib can optionally use
-# its own printf implementation.)
-#
-if (CMAKE_CROSSCOMPILING OR WIN32)
-	#
-	# Play it safe when cross-compiling.
-	#
-	# XXX - compiling and trying to run the test below appears
-	# to loop infinitely on Windows, and the locale is wrong in
-	# any case, so we don't do this on Window for now.
-	#
-	set(HAVE_GLIB_PRINTF_GROUPING FALSE)
-else()
-	cmake_push_check_state()
-	set(CMAKE_REQUIRED_INCLUDES ${GLIB2_INCLUDE_DIRS})
-	set(CMAKE_REQUIRED_LIBRARIES ${GLIB2_LIBRARIES})
-	check_c_source_runs(
-		"#include <glib.h>
-		#include <locale.h>
-		#include <stdio.h>
-		#include <string.h>
-
-		int
-		main ()
-		{
-		  gchar *str;
-		  setlocale(LC_ALL, \"en_US.UTF-8\");
-		  str = g_strdup_printf(\"%'u\", 123456);
-		  return (strcmp (str, \"123,456\") != 0);
-		}" HAVE_GLIB_PRINTF_GROUPING)
-	cmake_pop_check_state()
-endif()

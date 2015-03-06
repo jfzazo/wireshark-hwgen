@@ -34,6 +34,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/sminmpec.h>
@@ -540,7 +541,7 @@ static const value_string eapwps_tlv_association_state_vals[] = {
 
 static const value_string eapwps_tlv_authentication_type_vals[] = {
   { EAPWPS_AUTHTYPE_OPEN,    "Open" },
-  { EAPWPS_AUTHTYPE_WPAPSK,  "WPA PSK" },
+  { EAPWPS_AUTHTYPE_WPA2PSK, "WPA PSK" },
   { EAPWPS_AUTHTYPE_SHARED,  "Shared" },
   { EAPWPS_AUTHTYPE_WPA,     "WPA" },
   { EAPWPS_AUTHTYPE_WPA2,    "WPA2" },
@@ -801,8 +802,10 @@ add_wps_wfa_ext(guint8 id, proto_tree *tree, tvbuff_t *tvb,
   proto_tree *elem;
   guint8      val8;
 
-  elem = proto_tree_add_subtree(tree, tvb, offset - 2, 2 + size, ett_wps_wfa_ext, &item,
-                             val_to_str(id, eapwps_wfa_ext_types, "Unknown (%u)"));
+  item = proto_tree_add_text(tree, tvb, offset - 2, 2 + size, "%s",
+                             val_to_str(id, eapwps_wfa_ext_types,
+                                        "Unknown (%u)"));
+  elem = proto_item_add_subtree(item, ett_wps_wfa_ext);
   proto_tree_add_item(elem, hf_eapwps_wfa_ext_id,  tvb, offset - 2, 1, ENC_BIG_ENDIAN);
   proto_tree_add_item(elem, hf_eapwps_wfa_ext_len, tvb, offset - 1, 1, ENC_BIG_ENDIAN);
 
@@ -901,14 +904,16 @@ dissect_wps_tlvs(proto_tree *eap_tree, tvbuff_t *tvb, int offset,
       break;
     }
 
+    tlv_item = NULL;
+    tlv_root = NULL;
     tmp_item = NULL;
 
     tlv_type = tvb_get_ntohs(tvb, offset);
     tlv_len  = tvb_get_ntohs(tvb, offset+2);
 
     /* TOP Node for each TLV-item */
-    tlv_root = proto_tree_add_subtree_format(eap_tree, tvb, offset, tlv_len+4,
-                        ett_wps_tlv, &tlv_item, "Unknown Type (0x%04x)", tlv_type);
+    tlv_item = proto_tree_add_text(eap_tree, tvb, offset, tlv_len+4, "Unknown Type (0x%04x)", tlv_type);
+    tlv_root = proto_item_add_subtree(tlv_item, ett_wps_tlv);
 
     /* analog to Tagged parameters in 802.11 */
     proto_tree_add_item(tlv_root, hf_eapwps_tlv_type, tvb, offset,   2, ENC_BIG_ENDIAN);
@@ -1620,7 +1625,7 @@ dissect_wps_tlvs(proto_tree *eap_tree, tvbuff_t *tvb, int offset,
           break;
         case FT_STRING:
           fmt    = ": %s";
-          valuep = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+4, tlv_len, ENC_ASCII);
+          valuep = tvb_get_string(wmem_packet_scope(), tvb, offset+4, tlv_len);
           break;
         default:
           /* make compiler happy */

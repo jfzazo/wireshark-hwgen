@@ -23,12 +23,13 @@
 
 
 #include "config.h"
-
+#include <glib.h>
+#include <epan/wmem/wmem.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
+#include "packet-tcp.h"
 #include <epan/prefs.h>
 #include <epan/to_str.h>
-#include "packet-tcp.h"
 
 /* forward reference */
 void proto_register_sasp(void);
@@ -319,7 +320,7 @@ static const value_string set_mem_state_reply_response_code[] = {
 
 
 static guint
-get_sasp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_sasp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     /* Get the length of the SASP packet. */
     return tvb_get_ntohl(tvb, offset + 5);
@@ -477,10 +478,12 @@ dissect_sasp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 
 static void dissect_reg_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *reg_tree;
     proto_tree *reg_req_data;
     guint16     gmd_cnt, i;
 
-    reg_req_data = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_reg_req_sz, NULL, "Reg Request");
+    reg_tree = proto_tree_add_text(pay_load, tvb, offset, -1, "Reg Request");
+    reg_req_data = proto_item_add_subtree(reg_tree, ett_sasp_reg_req_sz);
 
     /* Reg Req Size */
     proto_tree_add_item(reg_req_data, hf_sasp_reg_req_sz, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -503,9 +506,11 @@ static void dissect_reg_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 
 static void dissect_reg_rep(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *reg_rep;
     proto_tree *reg_rep_tree;
 
-    reg_rep_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1 , ett_sasp_reg_rep, NULL, "Reg Reply");
+    reg_rep = proto_tree_add_text(pay_load, tvb, offset, -1 , "Reg Reply");
+    reg_rep_tree = proto_item_add_subtree(reg_rep, ett_sasp_reg_rep);
 
     /* Size */
     proto_tree_add_item(reg_rep_tree, hf_sasp_reg_rep_sz, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -521,13 +526,15 @@ static void dissect_dereg_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 offse
     /*proto_item *dereg_req_reason_flag;*/
     /*proto_tree *dereg_req_reason_flag_tree;*/
     guint16          gmd_cnt, i;
+    proto_item      *dereg_tree;
     proto_tree      *dereg_req_data;
     guint8           reason_flag;
     static gboolean  first_flag         = TRUE;
     wmem_strbuf_t   *reasonflags_strbuf = wmem_strbuf_new_label(wmem_packet_scope());
     static const gchar *fstr[] = {"No Reason", "Learned & Purposeful" };
 
-    dereg_req_data = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_dereg_req_sz, NULL, "DeReg Request");
+    dereg_tree = proto_tree_add_text(pay_load, tvb, offset, -1 , "DeReg Request");
+    dereg_req_data = proto_item_add_subtree(dereg_tree, ett_sasp_dereg_req_sz);
 
     /* Size */
     proto_tree_add_item(dereg_req_data, hf_sasp_dereg_req_sz, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -570,9 +577,11 @@ static void dissect_dereg_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 offse
 
 static void dissect_dereg_rep(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *dereg_rep;
     proto_tree *dereg_rep_tree;
 
-    dereg_rep_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_dereg_rep, NULL, "Dereg Reply");
+    dereg_rep = proto_tree_add_text(pay_load, tvb, offset, -1 , "Dereg Reply");
+    dereg_rep_tree = proto_item_add_subtree(dereg_rep, ett_sasp_dereg_rep);
 
     /* Size */
     proto_tree_add_item(dereg_rep_tree, hf_sasp_dereg_rep_sz, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -585,10 +594,12 @@ static void dissect_dereg_rep(tvbuff_t *tvb, proto_tree *pay_load, guint32 offse
 
 static void dissect_sendwt(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *sendwt;
     proto_tree *sendwt_tree;
     guint16     gwed_cnt, i;
 
-    sendwt_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_sendwt, NULL, "Send Weight");
+    sendwt = proto_tree_add_text(pay_load, tvb, offset, -1 , "Send Weight");
+    sendwt_tree = proto_item_add_subtree(sendwt, ett_sasp_sendwt);
 
     /* Size */
     proto_tree_add_item(sendwt_tree, hf_sasp_sendwt_sz, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -607,10 +618,12 @@ static void dissect_sendwt(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 
 static void dissect_setmemstate_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *setmemstate;
     proto_tree *setmemstate_req_data;
     guint16     gmsd_cnt, i;
 
-    setmemstate_req_data = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_setmemstate_req, NULL, "Set Mem State Request");
+    setmemstate = proto_tree_add_text(pay_load, tvb, offset, -1 , "Set Mem State Request");
+    setmemstate_req_data = proto_item_add_subtree(setmemstate, ett_sasp_setmemstate_req);
 
     /* Size */
     proto_tree_add_item(setmemstate_req_data, hf_sasp_setmemstate_req_sz, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -631,9 +644,11 @@ static void dissect_setmemstate_req(tvbuff_t *tvb, proto_tree *pay_load, guint32
 
 static void dissect_setmemstate_rep(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *setmemstate_rep;
     proto_tree *setmemstate_rep_tree;
 
-    setmemstate_rep_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_setmemstate_rep, NULL, "Set Mem State Reply");
+    setmemstate_rep = proto_tree_add_text(pay_load, tvb, offset, -1 , "Set Mem State Reply");
+    setmemstate_rep_tree = proto_item_add_subtree(setmemstate_rep, ett_sasp_setmemstate_rep);
 
     /* Size */
     proto_tree_add_item(setmemstate_rep_tree, hf_sasp_setmemstate_rep_sz, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -653,7 +668,7 @@ static guint32 dissect_memdatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 
     struct e_in6_addr ipv6_address;
 
     tvb_get_ipv6(tvb, offset+7, &ipv6_address);
-    ip_str = tvb_ip6_to_str(tvb, offset+7);
+    ip_str = ip6_to_str(&ipv6_address);
 
     lab_len = tvb_get_guint8(tvb, offset+23);
 
@@ -700,11 +715,13 @@ static guint32 dissect_memdatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 
 
 static guint32 dissect_grpdatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *grpdatacomp;
     proto_tree *grpdatacomp_tree;
     guint8      LB_uid_len;
     guint8      grp_name_len;
 
-    grpdatacomp_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_grpdatacomp, NULL, "Group Data Component");
+    grpdatacomp = proto_tree_add_text(pay_load, tvb, offset, -1 , "Group Data Component");
+    grpdatacomp_tree = proto_item_add_subtree(grpdatacomp, ett_sasp_grpdatacomp);
 
     /*Type*/
     proto_tree_add_item(grpdatacomp_tree, hf_sasp_grpdatacomp, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -743,11 +760,13 @@ static guint32 dissect_grpdatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 
 
 static guint32 dissect_grp_memdatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *grp_memdatacomp;
     proto_tree *grp_memdatacomp_tree;
     guint16     mem_cnt;
     guint16     i;
 
-    grp_memdatacomp_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_grp_memdatacomp, NULL, "Group Of Member Data");
+    grp_memdatacomp = proto_tree_add_text(pay_load, tvb, offset, -1 , "Group Of Member Data");
+    grp_memdatacomp_tree = proto_item_add_subtree(grp_memdatacomp, ett_sasp_grp_memdatacomp);
 
     /* Group MEM Data */
     proto_tree_add_item(grp_memdatacomp_tree, hf_sasp_grp_memdatacomp, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -775,10 +794,12 @@ static guint32 dissect_grp_memdatacomp(tvbuff_t *tvb, proto_tree *pay_load, guin
 
 static void dissect_wt_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *get_wt_data;
     proto_tree *get_wt_tree;
     guint16     gd_cnt, i;
 
-    get_wt_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_getwt, NULL, "Get Wt Req");
+    get_wt_data = proto_tree_add_text(pay_load, tvb, offset, -1 , "Get Wt Req");
+    get_wt_tree = proto_item_add_subtree(get_wt_data, ett_sasp_getwt);
 
     /* Size */
     proto_tree_add_item(get_wt_tree, hf_sasp_wt_req_sz, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -797,10 +818,12 @@ static void dissect_wt_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 
 static void dissect_wt_rep(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *wt_rep;
     proto_tree *wt_rep_tree;
     guint16     gwed_cnt, i;
 
-    wt_rep_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_wt_rep, NULL, "Get Weights Reply");
+    wt_rep = proto_tree_add_text(pay_load, tvb, offset, -1 , "Get Weights Reply");
+    wt_rep_tree = proto_item_add_subtree(wt_rep, ett_sasp_wt_rep);
 
     /* Size */
     proto_tree_add_item(wt_rep_tree, hf_sasp_wt_rep_sz, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -836,9 +859,11 @@ static void dissect_setlbstate_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 
         NULL
     };
 
+    proto_item *setlbstate_req;
     proto_tree *setlbstate_req_tree;
 
-    setlbstate_req_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_setlbstate_req, NULL, "Set LB State Req");
+    setlbstate_req = proto_tree_add_text(pay_load, tvb, offset, -1 , "Set LB State Req");
+    setlbstate_req_tree = proto_item_add_subtree(setlbstate_req, ett_sasp_setlbstate_req);
 
     /* Size*/
     proto_tree_add_item(setlbstate_req_tree, hf_sasp_setlbstate_req_sz,
@@ -869,9 +894,11 @@ static void dissect_setlbstate_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 
 
 static void dissect_setlbstate_rep(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *setlbstate_rep;
     proto_tree *setlbstate_rep_tree;
 
-    setlbstate_rep_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_setlbstate_rep, NULL, "Set LB State Rep");
+    setlbstate_rep = proto_tree_add_text(pay_load, tvb, offset, -1 , "Set LB State Rep");
+    setlbstate_rep_tree = proto_item_add_subtree(setlbstate_rep, ett_sasp_setlbstate_rep);
 
     /* Size */
     proto_tree_add_item(setlbstate_rep_tree, hf_sasp_setlbstate_rep_sz,
@@ -886,12 +913,14 @@ static void dissect_setlbstate_rep(tvbuff_t *tvb, proto_tree *pay_load, guint32 
 
 static guint32 dissect_grp_memstatedatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *grp_memstatedatacomp;
     proto_tree *grp_memstatedatacomp_tree;
     guint16     mem_cnt;
     guint16     i;
 
-    grp_memstatedatacomp_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1,
-                        ett_sasp_grp_memstatedatacomp, NULL, "Group Mem State Comp");
+    grp_memstatedatacomp = proto_tree_add_text(pay_load, tvb, offset, -1 , "Group Mem State Comp");
+    grp_memstatedatacomp_tree = proto_item_add_subtree(grp_memstatedatacomp,
+        ett_sasp_grp_memstatedatacomp);
 
     /* Type */
     proto_tree_add_item(grp_memstatedatacomp_tree, hf_sasp_grp_memstatedatacomp,
@@ -924,12 +953,14 @@ static guint32 dissect_grp_memstatedatacomp(tvbuff_t *tvb, proto_tree *pay_load,
 static guint32 dissect_memstatedatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
     proto_tree *memstatedatacomp_tree;
+    proto_item *memstatedatacomp;
     proto_tree *memdatacomp_tree;
     guint8      memstate_flag;
 
     offset = dissect_memdatacomp(tvb, pay_load, offset, &memdatacomp_tree);
 
-    memstatedatacomp_tree = proto_tree_add_subtree(memdatacomp_tree, tvb, offset, -1, ett_sasp_memstatedatacomp, NULL, "Member State Data");
+    memstatedatacomp = proto_tree_add_text(memdatacomp_tree, tvb, offset, -1 , "Member State Data");
+    memstatedatacomp_tree = proto_item_add_subtree(memstatedatacomp, ett_sasp_memstatedatacomp);
 
     /* Type */
     proto_tree_add_item(memstatedatacomp_tree, hf_sasp_memstatedatacomp_instance,
@@ -959,6 +990,7 @@ static guint32 dissect_memstatedatacomp(tvbuff_t *tvb, proto_tree *pay_load, gui
 static guint32 dissect_weight_entry_data_comp(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
     proto_tree *weight_entry_data_comp_tree;
+    proto_item *weight_entry_data_comp;
 
     static const int *wtflags[] = {
         &hf_sasp_wed_contactsuccess_flag,
@@ -970,8 +1002,9 @@ static guint32 dissect_weight_entry_data_comp(tvbuff_t *tvb, proto_tree *pay_loa
 
     offset = dissect_memdatacomp(tvb, pay_load, offset, NULL);
 
-    weight_entry_data_comp_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1,
-                            ett_sasp_weight_entry_data_comp, NULL, "Weight Entry Data");
+    weight_entry_data_comp = proto_tree_add_text(pay_load, tvb, offset, -1 , "Weight Entry Data");
+    weight_entry_data_comp_tree = proto_item_add_subtree(weight_entry_data_comp,
+        ett_sasp_weight_entry_data_comp);
 
     /* Type */
     proto_tree_add_item(weight_entry_data_comp_tree, hf_sasp_weight_entry_data_comp_type,
@@ -1002,11 +1035,14 @@ static guint32 dissect_weight_entry_data_comp(tvbuff_t *tvb, proto_tree *pay_loa
 
 static guint32 dissect_grp_wt_entry_datacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 {
+    proto_item *grp_wt_entry_datacomp;
     proto_tree *grp_wt_entry_datacomp_tree;
     guint16     wt_entry_cnt;
     guint16     i;
 
-    grp_wt_entry_datacomp_tree = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_grp_wt_entry_datacomp, NULL, "Group of Wt Entry Data");
+    grp_wt_entry_datacomp = proto_tree_add_text(pay_load, tvb, offset, -1 , "Group of Wt Entry Data");
+    grp_wt_entry_datacomp_tree = proto_item_add_subtree(grp_wt_entry_datacomp,
+        ett_sasp_grp_wt_entry_datacomp);
 
     /* Type */
     proto_tree_add_item(grp_wt_entry_datacomp_tree, hf_sasp_grp_wt_entry_datacomp_type,

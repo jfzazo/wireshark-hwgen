@@ -28,11 +28,12 @@
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include <epan/oui.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-wap.h"
 #include "packet-btl2cap.h"
 #include "packet-btsdp.h"
 #include "packet-btavctp.h"
-#include "packet-btavrcp.h"
 
 static int proto_btavrcp                                                   = -1;
 
@@ -195,8 +196,6 @@ static int hf_btavrcp_feature_uid_persistency                              = -1;
 static int hf_btavrcp_reassembled                                          = -1;
 static int hf_btavrcp_currect_path                                         = -1;
 static int hf_btavrcp_response_time                                        = -1;
-static int hf_btavrcp_command_in_frame                                     = -1;
-static int hf_btavrcp_response_in_frame                                    = -1;
 static int hf_btavrcp_data                                                 = -1;
 
 static gint ett_btavrcp                                                    = -1;
@@ -210,7 +209,6 @@ static gint ett_btavrcp_features                                           = -1;
 static gint ett_btavrcp_features_not_used                                  = -1;
 static gint ett_btavrcp_path                                               = -1;
 
-static expert_field ei_btavrcp_no_response = EI_INIT;
 static expert_field ei_btavrcp_item_length_bad = EI_INIT;
 static expert_field ei_btavrcp_unexpected_data = EI_INIT;
 
@@ -271,9 +269,8 @@ static dissector_handle_t btavrcp_handle;
 
 #define STATUS_OK  0x04
 
-static wmem_tree_t *reassembling  = NULL;
-static wmem_tree_t *timing        = NULL;
-       wmem_tree_t *btavrcp_song_positions = NULL;
+static wmem_tree_t *reassembling = NULL;
+static wmem_tree_t *timing       = NULL;
 
 typedef struct _fragment {
     guint        start_frame_number;
@@ -307,7 +304,7 @@ typedef struct _timing_info {
     guint32   opcode;
     guint32   op;
     guint32   op_arg;
-} timing_info_t;
+    } timing_info_t;
 
 static const value_string packet_type_vals[] = {
     { PACKET_TYPE_SINGLE,     "Single" },
@@ -637,7 +634,7 @@ dissect_attribute_entries(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     for (i_entry = 0; i_entry < count; ++i_entry) {
         attribute_id = tvb_get_ntohl(tvb, offset);
         value_length = tvb_get_ntohs(tvb, offset + 4 + 2);
-        value = tvb_get_string_enc(NULL, tvb, offset + 4 + 2 + 2, value_length, ENC_ASCII);
+        value = tvb_get_string(NULL, tvb, offset + 4 + 2 + 2, value_length);
 
         if (attribute_id == 0x01) col_append_fstr(pinfo->cinfo, COL_INFO, " - Title: \"%s\"", value);
 
@@ -675,7 +672,7 @@ dissect_item_mediaplayer(tvbuff_t *tvb, proto_tree *tree, gint offset)
 
     item_length = tvb_get_ntohs(tvb, offset + 1);
     displayable_name_length = tvb_get_ntohs(tvb, offset + 1 + 2 + 1 + 1 + 4 + 16 + 1 + 2);
-    displayable_name = tvb_get_string_enc(NULL, tvb, offset + 1 + 2 + 1 + 1 + 4 + 16 + 1 + 2 + 2, displayable_name_length, ENC_ASCII);
+    displayable_name = tvb_get_string(NULL, tvb, offset + 1 + 2 + 1 + 1 + 4 + 16 + 1 + 2 + 2, displayable_name_length);
 
     pitem = proto_tree_add_none_format(tree, hf_btavrcp_player_item, tvb, offset, 1 + 2 + item_length, "Player: %s", displayable_name);
     ptree = proto_item_add_subtree(pitem, ett_btavrcp_player);
@@ -837,7 +834,7 @@ dissect_item_media_element(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     item_length = tvb_get_ntohs(tvb, offset + 1);
     displayable_name_length = tvb_get_ntohs(tvb, offset + 1 + 2 + 8 + 1 + 2);
-    displayable_name = tvb_get_string_enc(NULL, tvb, offset + 1 + 2 + 8 + 1 + 2 + 2, displayable_name_length, ENC_ASCII);
+    displayable_name = tvb_get_string(NULL, tvb, offset + 1 + 2 + 8 + 1 + 2 + 2, displayable_name_length);
 
     pitem = proto_tree_add_none_format(tree, hf_btavrcp_item , tvb, offset, 1 + 2 + item_length, "Element: %s", displayable_name);
     ptree = proto_item_add_subtree(pitem, ett_btavrcp_element);
@@ -889,7 +886,7 @@ dissect_item_folder(tvbuff_t *tvb, proto_tree *tree, gint offset)
 
     item_length = tvb_get_ntohs(tvb, offset + 1);
     displayable_name_length = tvb_get_ntohs(tvb, offset + 1 + 2 + 8 + 1 + 1 + 2);
-    displayable_name = tvb_get_string_enc(NULL, tvb, offset + 1 + 2 + 8 + 1 + 1 + 2 + 2, displayable_name_length, ENC_ASCII);
+    displayable_name = tvb_get_string(NULL, tvb, offset + 1 + 2 + 8 + 1 + 1 + 2 + 2, displayable_name_length);
 
     pitem = proto_tree_add_none_format(tree, hf_btavrcp_folder, tvb, offset, 1 + 2 + item_length, "Folder : %s", displayable_name);
     ptree = proto_item_add_subtree(pitem, ett_btavrcp_folder);
@@ -1528,7 +1525,7 @@ dissect_vendor_dependant(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                 offset += 1;
 
                 col_append_fstr(pinfo->cinfo, COL_INFO, " PlayStatus: %s, SongPosition: %ums, SongLength: %ums",
-                        val_to_str_const(play_status, play_status_vals, "unknown"), song_position, song_length);
+                        val_to_str_const(play_status, play_status_vals, "unknown"), song_length, song_position);
             }
             break;
         case PDU_REGISTER_NOTIFICATION:
@@ -1592,27 +1589,6 @@ dissect_vendor_dependant(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                         if (song_position == 0xFFFFFFFF) {
                             proto_item_append_text(pitem, " (NOT SELECTED)");
                             col_append_str(pinfo->cinfo, COL_INFO, " (NOT SELECTED)");
-                        } else if (!pinfo->fd->flags.visited) {
-                            btavrcp_song_position_data_t  *song_position_data;
-
-                            k_interface_id = interface_id;
-                            k_adapter_id   = adapter_id;
-                            k_frame_number = pinfo->fd->num;
-
-                            key[0].length = 1;
-                            key[0].key = &k_interface_id;
-                            key[1].length = 1;
-                            key[1].key = &k_adapter_id;
-                            key[2].length = 1;
-                            key[2].key = &k_frame_number;
-                            key[3].length = 0;
-                            key[3].key = NULL;
-
-                            song_position_data = wmem_new(wmem_file_scope(), btavrcp_song_position_data_t);
-                            song_position_data->song_position = song_position;
-                            song_position_data->used_in_frame = 0;
-
-                            wmem_tree_insert32_array(btavrcp_song_positions, key, song_position_data);
                         }
                         break;
                     case EVENT_BATTERY_STATUS_CHANGED:
@@ -1933,7 +1909,7 @@ dissect_browsing(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                     folder_name_length = tvb_get_ntohs(tvb, offset);
                     offset += 2;
                     proto_tree_add_item(ptree, hf_btavrcp_folder_name, tvb, offset, folder_name_length, ENC_NA);
-                    folder_name = tvb_get_string_enc(NULL, tvb, offset, folder_name_length, ENC_ASCII);
+                    folder_name = tvb_get_string(NULL, tvb, offset, folder_name_length);
                     offset += folder_name_length;
                     proto_item_append_text(pitem, "%s/", folder_name);
                     col_append_fstr(pinfo->cinfo, COL_INFO, "%s/", folder_name);
@@ -2137,7 +2113,8 @@ dissect_btavrcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             col_set_str(pinfo->cinfo, COL_INFO, "Rcvd ");
             break;
         default:
-            col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection ");
+            col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction %d ",
+                pinfo->p2p_dir);
             break;
     }
 
@@ -2315,20 +2292,17 @@ dissect_btavrcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             if (response_time > timing_info->max_response_time) {
                 proto_item_append_text(pitem, "; TIME EXCEEDED");
             }
-            PROTO_ITEM_SET_GENERATED(pitem);
 
             if (timing_info->response_frame_number == 0) {
-                pitem = proto_tree_add_expert(btavrcp_tree, pinfo, &ei_btavrcp_no_response, tvb, 0, 0);
-                PROTO_ITEM_SET_GENERATED(pitem);
+                    proto_item_append_text(pitem, "; There is no response");
             }  else {
                 if (is_command)  {
-                    pitem = proto_tree_add_uint(btavrcp_tree, hf_btavrcp_response_in_frame, tvb, 0, 0, timing_info->response_frame_number);
-                    PROTO_ITEM_SET_GENERATED(pitem);
+                    proto_item_append_text(pitem, "; Response is at frame: %u", timing_info->response_frame_number);
                 } else {
-                    pitem = proto_tree_add_uint(btavrcp_tree, hf_btavrcp_command_in_frame, tvb, 0, 0, timing_info->command_frame_number);
-                    PROTO_ITEM_SET_GENERATED(pitem);
+                    proto_item_append_text(pitem, "; Command is at frame: %u", timing_info->command_frame_number);
                 }
             }
+            PROTO_ITEM_SET_GENERATED(pitem);
 
         }
 
@@ -3148,16 +3122,6 @@ proto_register_btavrcp(void)
             FT_UINT32, BASE_DEC, NULL, 0x00,
             NULL, HFILL }
         },
-        { &hf_btavrcp_command_in_frame,
-            { "Command in frame",                "btavrcp.command_in_frame",
-            FT_FRAMENUM, BASE_NONE, NULL, 0x00,
-            NULL, HFILL }
-        },
-        { &hf_btavrcp_response_in_frame,
-            { "Response in frame",               "btavrcp.response_in_frame",
-            FT_FRAMENUM, BASE_NONE, NULL, 0x00,
-            NULL, HFILL }
-        },
         { &hf_btavrcp_data,
             { "Data",                            "btavrcp.data",
             FT_NONE, BASE_NONE, NULL, 0x0,
@@ -3179,12 +3143,10 @@ proto_register_btavrcp(void)
     static ei_register_info ei[] = {
         { &ei_btavrcp_item_length_bad, { "btavrcp.item.length.bad", PI_PROTOCOL, PI_WARN, "Item length does not correspond to sum of length of attributes", EXPFILL }},
         { &ei_btavrcp_unexpected_data, { "btavrcp.unexpected_data", PI_PROTOCOL, PI_WARN, "Unexpected data", EXPFILL }},
-        { &ei_btavrcp_no_response,     { "btavrcp.no_response",     PI_PROTOCOL, PI_WARN, "No response", EXPFILL }},
     };
 
-    reassembling   = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
-    timing         = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
-    btavrcp_song_positions = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
+    reassembling = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
+    timing       = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
 
     proto_btavrcp = proto_register_protocol("Bluetooth AVRCP Profile", "BT AVRCP", "btavrcp");
     btavrcp_handle = new_register_dissector("btavrcp", dissect_btavrcp, proto_btavrcp);

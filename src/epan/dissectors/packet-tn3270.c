@@ -45,10 +45,15 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
+#include <epan/address.h>
+#include <epan/wmem/wmem.h>
 #include <epan/conversation.h>
-#include <epan/expert.h>
+#include <epan/strutil.h>
 
 #include "packet-tn3270.h"
 
@@ -1620,11 +1625,7 @@ static gint ett_tn3270_msr_state_mask = -1;
 static gint ett_tn3270_data_chain_fields = -1;
 static gint ett_tn3270_query_list = -1;
 
-static expert_field ei_tn3270_order_code = EI_INIT;
-static expert_field ei_tn3270_command_code = EI_INIT;
-static expert_field ei_tn3270_aid = EI_INIT;
-
-static gint dissect_orders_and_data(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, tn3270_conv_info_t *tn3270_info);
+static gint dissect_orders_and_data(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset, tn3270_conv_info_t *tn3270_info);
 static gint dissect_buffer_address(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset, gint hf, tn3270_conv_info_t *tn3270_info);
 
 typedef struct hf_items {
@@ -2054,7 +2055,7 @@ dissect_outbound_text_header(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset
 
 /* 5.16 Outbound 3270DS */
 static gint
-dissect_outbound_3270ds(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *tvb, gint offset,
+dissect_outbound_3270ds(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset,
                         tn3270_conv_info_t *tn3270_info, gint sf_body_length )
 {
   gint start = offset;
@@ -2100,7 +2101,7 @@ dissect_outbound_3270ds(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *t
       if ((offset - start) < sf_body_length)
         offset += dissect_wcc(tn3270_tree, tvb, offset);
       if ((offset - start) < sf_body_length)
-        offset += dissect_orders_and_data(tn3270_tree, pinfo, tvb, offset, tn3270_info);
+        offset += dissect_orders_and_data(tn3270_tree, tvb, offset, tn3270_info);
       break;
     default:
       break;
@@ -2191,6 +2192,7 @@ dissect_read_partition(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset,
 {
   gint        start = offset;
   gint        type;
+  proto_item *pi;
   proto_tree *query_list_tree;
   gint        qcode_list_len, i;
 
@@ -2225,8 +2227,9 @@ dissect_read_partition(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset,
 
     if (sf_body_length > (offset - start)) {
       qcode_list_len = sf_body_length - (offset - start);
-      query_list_tree = proto_tree_add_subtree(tn3270_tree, tvb, offset, qcode_list_len,
-                               ett_tn3270_query_list, NULL, "Query List");
+      pi = proto_tree_add_text(tn3270_tree, tvb, offset, qcode_list_len,
+                               "Query List");
+      query_list_tree = proto_item_add_subtree(pi, ett_tn3270_query_list);
       for (i = 0; i < qcode_list_len; i++) {
         proto_tree_add_item(query_list_tree,
                             hf_tn3270_sf_query_reply,
@@ -4380,7 +4383,7 @@ process_inbound_structured_field(proto_tree *sf_tree, tvbuff_t *tvb, gint offset
 /* sf_body_length is the total length of the structured field including the sf_len and sf_id fields */
 /* call only with valid sf_id */
 static gint
-process_outbound_structured_field(proto_tree *sf_tree, packet_info *pinfo, tvbuff_t *tvb, gint offset,
+process_outbound_structured_field(proto_tree *sf_tree, tvbuff_t *tvb, gint offset,
                                   tn3270_conv_info_t *tn3270_info, guint sf_id, gint sf_body_length)
 {
   gint start = offset;          /* start of structured field param(s) */
@@ -4424,7 +4427,7 @@ process_outbound_structured_field(proto_tree *sf_tree, packet_info *pinfo, tvbuf
       offset += dissect_load_programmed_symbols(sf_tree, tvb, offset, sf_body_length);
       break;
     case SF_OB_OUTBOUND_3270DS:
-      offset += dissect_outbound_3270ds(sf_tree, pinfo, tvb, offset, tn3270_info, sf_body_length);
+      offset += dissect_outbound_3270ds(sf_tree, tvb, offset, tn3270_info, sf_body_length);
       break;
     case SF_OB_PRESENT_ABSOLUTE_FORMAT:
       offset += dissect_present_absolute_format(sf_tree, tvb, offset, sf_body_length);
@@ -4645,10 +4648,12 @@ static proto_tree *
 display_sf_hdr(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset,
                    gint sf_length, guint sf_id, guint sf_id_len, const gchar *sf_id_str)
 {
+  proto_item *pi;
   proto_tree *sf_tree;
 
-  sf_tree = proto_tree_add_subtree_format(tn3270_tree, tvb, offset, sf_length,
-                           ett_sf, NULL, "Structured Field: %s", sf_id_str);
+  pi = proto_tree_add_text(tn3270_tree, tvb, offset, sf_length,
+                           "Structured Field: %s", sf_id_str);
+  sf_tree = proto_item_add_subtree(pi, ett_sf);
 
   proto_tree_add_item(sf_tree,
                       hf_tn3270_sf_length,
@@ -4665,7 +4670,7 @@ display_sf_hdr(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset,
 }
 
 static gint
-dissect_structured_fields(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *tvb, gint offset,
+dissect_structured_fields(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset,
                           tn3270_conv_info_t *tn3270_info, gboolean direction_inbound)
 {
   proto_tree  *sf_tree;
@@ -4714,7 +4719,7 @@ dissect_structured_fields(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t 
         offset += process_inbound_structured_field(sf_tree, tvb, offset, tn3270_info, sf_id, sf_length-2-sf_id_len);
       }
       else {
-        offset += process_outbound_structured_field(sf_tree, pinfo, tvb, offset, tn3270_info, sf_id, sf_length-2-sf_id_len);
+        offset += process_outbound_structured_field(sf_tree, tvb, offset, tn3270_info, sf_id, sf_length-2-sf_id_len);
       }
       continue;
     }
@@ -4734,6 +4739,7 @@ dissect_structured_fields(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t 
     display_sf_hdr(tn3270_tree, tvb, offset, sf_length,
                    sf_length, sf_id_len, sf_id_str);
     offset += sf_length;
+    continue;
   } /* while */
 
   return (offset - start);
@@ -4958,11 +4964,10 @@ dissect_field_attribute_pairs(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offse
 }
 
 static gint
-dissect_orders_and_data(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, tn3270_conv_info_t *tn3270_info)
+dissect_orders_and_data(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset, tn3270_conv_info_t *tn3270_info)
 {
   gint start = offset;
   gint order_code;
-  proto_item* item;
 
   /* Order Code */
 
@@ -4970,7 +4975,7 @@ dissect_orders_and_data(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *t
   while (tvb_reported_length_remaining(tvb, offset) > 0) {
     order_code = tvb_get_guint8(tvb, offset);
     if ((order_code > 0) && (order_code <= OC_MAX)) {  /* XXX: also 0xFF ?? */
-      item = proto_tree_add_item(tn3270_tree,
+      proto_tree_add_item(tn3270_tree,
                           hf_tn3270_order_code,
                           tvb, offset,
                           1,
@@ -5007,7 +5012,7 @@ dissect_orders_and_data(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *t
         case OC_IC:
           break;
         default:
-          expert_add_info(pinfo, item, &ei_tn3270_order_code);
+          proto_tree_add_text(tn3270_tree, tvb, offset, 1, "Bogus value: %u", order_code);
           break;
       } /* switch */
     }
@@ -5038,9 +5043,10 @@ dissect_tn3270e_header(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset)
 
   data_type = tvb_get_guint8(tvb, offset);
 
-  tn3270e_hdr_tree = proto_tree_add_subtree_format(tn3270_tree, tvb, offset, -1,
-                           ett_tn3270e_hdr, &pi, "TN3270E Header (Data Type: %s)",
+  pi = proto_tree_add_text(tn3270_tree, tvb, offset, -1,
+                           "TN3270E Header (Data Type: %s)",
                            val_to_str_const(data_type, vals_tn3270_header_data_types, "Unknown"));
+  tn3270e_hdr_tree = proto_item_add_subtree(pi, ett_tn3270e_hdr);
 
   offset += tn3270_add_hf_items(tn3270e_hdr_tree, tvb, offset,
                                 fields);
@@ -5088,11 +5094,10 @@ dissect_tn3270e_header(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset)
 
 /* Detect and Handle Direction of Stream */
 static gint
-dissect_outbound_stream(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, tn3270_conv_info_t *tn3270_info)
+dissect_outbound_stream(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset, tn3270_conv_info_t *tn3270_info)
 {
   gint command_code;
   gint start = offset;
-  proto_item* item;
 
   /* Command Code*/
   command_code = tvb_get_guint8(tvb, offset);
@@ -5117,13 +5122,6 @@ dissect_outbound_stream(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *t
       break;
   }
 
-  item = proto_tree_add_item(tn3270_tree,
-                        hf_tn3270_command_code,
-                        tvb, offset,
-                        1,
-                        ENC_BIG_ENDIAN);
-  offset += 1;
-
   switch (command_code) {
     case CC_LCL_W:
     case CC_LCL_EW:
@@ -5133,13 +5131,25 @@ dissect_outbound_stream(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *t
     case CC_RMT_EW:
     case CC_RMT_EWA:
     case CC_RMT_EAU:
+      proto_tree_add_item(tn3270_tree,
+                          hf_tn3270_command_code,
+                          tvb, offset,
+                          1,
+                          ENC_BIG_ENDIAN);
+      offset += 1;
       /* WCC */
       offset += dissect_wcc(tn3270_tree, tvb, offset);
-      offset += dissect_orders_and_data(tn3270_tree, pinfo, tvb, offset, tn3270_info);
+      offset += dissect_orders_and_data(tn3270_tree, tvb, offset, tn3270_info);
       break;
     case CC_LCL_WSF:
     case CC_RMT_WSF:
-      offset += dissect_structured_fields(tn3270_tree, pinfo, tvb, offset, tn3270_info, FALSE);
+      proto_tree_add_item(tn3270_tree,
+                          hf_tn3270_command_code,
+                          tvb, offset,
+                          1,
+                          ENC_BIG_ENDIAN);
+      offset += 1;
+      offset += dissect_structured_fields(tn3270_tree, tvb, offset, tn3270_info, FALSE);
       break;
     case CC_LCL_RB:
     case CC_LCL_RM:
@@ -5147,9 +5157,17 @@ dissect_outbound_stream(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *t
     case CC_RMT_RB:
     case CC_RMT_RM:
     case CC_RMT_RMA:
+      proto_tree_add_item(tn3270_tree,
+                          hf_tn3270_command_code,
+                          tvb, offset,
+                          1,
+                          ENC_BIG_ENDIAN);
+      offset += 1;
       break;
     default:
-      expert_add_info(pinfo, item, &ei_tn3270_command_code);
+      /* XXX: Add expert item ? */
+      proto_tree_add_text(tn3270_tree, tvb, offset, 1, "Bogus value: %u", command_code);
+      offset += 1;
       break;
   }
 
@@ -5160,15 +5178,14 @@ dissect_outbound_stream(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *t
 /* INBOUND DATA STREAM (DISPLAY -> MAINFRAME PROGRAM) */
 /* Dissect tvb as inbound */
 static gint
-dissect_inbound_stream(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, tn3270_conv_info_t *tn3270_info)
+dissect_inbound_stream(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset, tn3270_conv_info_t *tn3270_info)
 {
   gint start = offset;
   gint aid;
-  proto_item* item;
 
   /* Command Code*/
   aid = tvb_get_guint8(tvb, offset);
-  item = proto_tree_add_item(tn3270_tree,
+  proto_tree_add_item(tn3270_tree,
                       hf_tn3270_aid,
                       tvb, offset,
                       1,
@@ -5176,7 +5193,7 @@ dissect_inbound_stream(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *tv
   offset += 1;
   switch (aid) {
     case  AID_STRUCTURED_FIELD:
-      offset += dissect_structured_fields(tn3270_tree, pinfo, tvb, offset, tn3270_info, TRUE);
+      offset += dissect_structured_fields(tn3270_tree, tvb, offset, tn3270_info, TRUE);
       break;
     case  AID_PA1_KEY:
     case  AID_PA2_KEY_CNCL:
@@ -5222,10 +5239,10 @@ dissect_inbound_stream(proto_tree *tn3270_tree, packet_info *pinfo, tvbuff_t *tv
     case  AID_OPERATOR_ID_READER:
     case  AID_MAG_READER_NUMBER:
       offset += dissect_buffer_address(tn3270_tree, tvb, offset, hf_tn3270_cursor_address, tn3270_info);
-      offset += dissect_orders_and_data(tn3270_tree, pinfo, tvb, offset, tn3270_info);
+      offset += dissect_orders_and_data(tn3270_tree, tvb, offset, tn3270_info);
       break;
     default:
-      expert_add_info(pinfo, item, &ei_tn3270_aid);
+      proto_tree_add_text(tn3270_tree, tvb, offset, 1, "Bogus value: %u", aid);
       offset += 1;
       break;
   }
@@ -5280,10 +5297,10 @@ dissect_tn3270(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   if(tree) {
     while (tvb_reported_length_remaining(tvb, offset) > 0) {
       if (pinfo->srcport == tn3270_info->outbound_port) {
-        offset += dissect_outbound_stream(tn3270_tree, pinfo, tvb, offset, tn3270_info);
+        offset += dissect_outbound_stream(tn3270_tree, tvb, offset, tn3270_info);
       }
       else {
-        offset += dissect_inbound_stream(tn3270_tree, pinfo, tvb, offset, tn3270_info);
+        offset += dissect_inbound_stream(tn3270_tree, tvb, offset, tn3270_info);
       }
     }
   }
@@ -6645,20 +6662,20 @@ proto_register_tn3270(void)
          NULL, HFILL }
     },
     { &hf_tn3270_cs_form_type1,
-      { "18-byte form",
+      { "18-byte form; the first 2 bytes contain a 16-bit vertical slice,"
+        " the following 16 bytes contain 8-bit horizontal slices. For a 9"
+        " x 12 character matrix the last 4 bytes contain binary zero.",
         "tn3270.cs_form_type1",
         FT_BOOLEAN, 8, NULL, 0x80,
-        "the first 2 bytes contain a 16-bit vertical slice,"
-        " the following 16 bytes contain 8-bit horizontal slices. For a 9"
-        " x 12 character matrix the last 4 bytes contain binary zero.", HFILL }
+        NULL, HFILL }
     },
     { &hf_tn3270_cs_form_type2,
-      { "18-byte form (COMPRESSED)",
+      { "18-byte form; the first 2 bytes contain a 16-bit vertical slice,"
+        " the following 16 bytes contain 8-bit horizontal slices. For a 9"
+        " x 12 character matrix the last 4 bytes contain binary zero. (COMPRESSED)",
         "tn3270.cs_form_type2",
         FT_BOOLEAN, 8, NULL, 0x40,
-        "the first 2 bytes contain a 16-bit vertical slice,"
-        " the following 16 bytes contain 8-bit horizontal slices. For a 9"
-        " x 12 character matrix the last 4 bytes contain binary zero. (COMPRESSED)", HFILL }
+        NULL, HFILL }
     },
     { &hf_tn3270_cs_form_type3,
       { "Row loading (from top to bottom)",
@@ -7464,16 +7481,18 @@ proto_register_tn3270(void)
          NULL, HFILL }
     },
     { &hf_tn3270_ua_xr,
-      {  "Distance between points in X direction as a fraction",
+      {  "Distance between points in X direction as a fraction, measured in UNITS, with 2-byte"
+         " numerator and 2-byte denominator",
          "tn3270.ua_xr",
          FT_UINT32, BASE_HEX, NULL, 0x0,
-         "measured in UNITS, with 2-byte numerator and 2-byte denominator", HFILL }
+         NULL, HFILL }
     },
     { &hf_tn3270_ua_yr,
-      {  "Distance between points in Y direction as a fraction",
+      {  "Distance between points in Y direction as a fraction, measured in UNITS, with 2-byte"
+         " numerator and 2-byte denominator",
          "tn3270.ua_xr",
          FT_UINT32, BASE_HEX, NULL, 0x0,
-         "measured in UNITS, with 2-byte numerator and 2-byte denominator", HFILL }
+         NULL, HFILL }
     },
     { &hf_tn3270_ua_aw,
       {  "Number of X units in default cell",
@@ -7656,20 +7675,10 @@ proto_register_tn3270(void)
     &ett_tn3270_query_list
   };
 
-  static ei_register_info ei[] = {
-    { &ei_tn3270_order_code, { "tn3270.order_code.bogus", PI_PROTOCOL, PI_WARN, "Bogus value", EXPFILL }},
-    { &ei_tn3270_command_code, { "tn3270.command_code.bogus", PI_PROTOCOL, PI_WARN, "Bogus value", EXPFILL }},
-    { &ei_tn3270_aid, { "tn3270.aid.bogus", PI_PROTOCOL, PI_WARN, "Bogus value", EXPFILL }},
-  };
-
-  expert_module_t* expert_tn3270;
-
   proto_tn3270 = proto_register_protocol("TN3270 Protocol", "TN3270", "tn3270");
   register_dissector("tn3270", dissect_tn3270, proto_tn3270);
   proto_register_field_array(proto_tn3270, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
-  expert_tn3270 = expert_register_protocol(proto_tn3270);
-  expert_register_field_array(expert_tn3270, ei, array_length(ei));
 
 }
 

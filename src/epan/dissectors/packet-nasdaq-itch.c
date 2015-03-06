@@ -34,9 +34,13 @@
 #include "config.h"
 
 #include <stdlib.h>
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
 #include <wsutil/type_util.h>
 
 /* Chi-X version */
@@ -146,7 +150,7 @@ static int hf_nasdaq_itch_cross = -1;
 static int
 order_ref_number(tvbuff_t *tvb, packet_info *pinfo, proto_tree *nasdaq_itch_tree, int offset)
 {
-  const char *str_value = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 9, ENC_ASCII);
+  const char *str_value = tvb_get_string(wmem_packet_scope(), tvb, offset, 9);
   guint32     value     = (guint32)strtoul(str_value, NULL, 10);
 
   proto_tree_add_uint(nasdaq_itch_tree, hf_nasdaq_itch_order_reference, tvb, offset, 9, value);
@@ -163,7 +167,7 @@ time_stamp(tvbuff_t *tvb, proto_tree *nasdaq_itch_tree, int id, int offset, int 
   if (nasdaq_itch_tree) {
       guint32     ms, val;
       const char *display   = "";
-      const char *str_value = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, size, ENC_ASCII);
+      const char *str_value = tvb_get_string(wmem_packet_scope(), tvb, offset, size);
 
       ms = val = (guint32)strtoul(str_value, NULL, 10);
       switch (size) {
@@ -172,7 +176,6 @@ time_stamp(tvbuff_t *tvb, proto_tree *nasdaq_itch_tree, int id, int offset, int 
           break;
       case 5:
           ms = val *1000;
-          /* Fall Through */
       case 8: /* 0 86 400 000 */
           display = wmem_strdup_printf(wmem_packet_scope(), " %u (%02u:%02u:%02u.%03u)", val,
               ms/3600000, (ms % 3600000)/60000, (ms % 60000)/1000, ms %1000);
@@ -188,7 +191,7 @@ static int
 number_of_shares(tvbuff_t *tvb, packet_info *pinfo, proto_tree *nasdaq_itch_tree, int id, int offset, int big)
 {
   gint size = (big) ? 10 : 6;
-  const char *str_value = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, size, ENC_ASCII);
+  const char *str_value = tvb_get_string(wmem_packet_scope(), tvb, offset, size);
 
   guint32 value = (guint32)strtoul(str_value, NULL, 10);
 
@@ -204,7 +207,7 @@ price(tvbuff_t *tvb, packet_info *pinfo, proto_tree *nasdaq_itch_tree, int id, i
 {
   gint size = (big) ? 19 : 10;
 
-  const char *str_value = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, size, ENC_ASCII);
+  const char *str_value = tvb_get_string(wmem_packet_scope(), tvb, offset, size);
   gdouble     value     = guint64_to_gdouble(g_ascii_strtoull(str_value, NULL, 10))/((big)?1000000.0:10000.0);
 
   proto_tree_add_double(nasdaq_itch_tree, id, tvb, offset, size, value);
@@ -217,7 +220,7 @@ price(tvbuff_t *tvb, packet_info *pinfo, proto_tree *nasdaq_itch_tree, int id, i
 static int
 stock(tvbuff_t *tvb, packet_info *pinfo, proto_tree *nasdaq_itch_tree, int offset)
 {
-  char *stock_p = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 6, ENC_ASCII);
+  char *stock_p = tvb_get_string(wmem_packet_scope(), tvb, offset, 6);
 
   proto_tree_add_item(nasdaq_itch_tree, hf_nasdaq_itch_stock, tvb, offset, 6, ENC_ASCII|ENC_NA);
   col_append_fstr(pinfo->cinfo, COL_INFO, "<%s> ", stock_p);
@@ -433,6 +436,7 @@ dissect_nasdaq_itch(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 /* Register the protocol with Wireshark */
 
+void proto_reg_handoff_nasdaq_itch(void);
 void proto_register_nasdaq_itch(void);
 
 void
@@ -587,6 +591,12 @@ proto_register_nasdaq_itch(void)
                                  &nasdaq_itch_chi_x);
 
   register_dissector("nasdaq-itch", dissect_nasdaq_itch, proto_nasdaq_itch);
+}
+
+
+void
+proto_reg_handoff_nasdaq_itch(void)
+{
 }
 
 /*

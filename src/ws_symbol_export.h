@@ -47,29 +47,6 @@
 #ifndef SYMBOL_EXPORT_H
 #define SYMBOL_EXPORT_H
 
-/*
- * NOTE: G_HAVE_GNUC_VISIBILITY is defined only if all of
- *
- *    __attribute__ ((visibility ("hidden")))
- *
- *    __attribute__ ((visibility ("internal")))
- *
- *    __attribute__ ((visibility ("protected")))
- *
- *    __attribute__ ((visibility ("default")))
- *
- * are supported, and at least some versions of GCC from Apple support
- * "default" and "hidden" but not "internal" or "protected", so it
- * shouldn't be used to determine whether "hidden" or "default" is
- * supported.
- *
- * This also means that we shouldn't use G_GNUC_INTERNAL instead of
- * WS_DLL_LOCAL, as GLib uses G_HAVE_GNUC_VISIBILITY to determine
- * whether to use __attribute__ ((visibility ("hidden"))) for
- * G_GNUC_INTERNAL, and that will not use it even with compilers
- * that support it.
- */
-
 /* Originally copied from GCC Wiki at http://gcc.gnu.org/wiki/Visibility */
 #if defined _WIN32 || defined __CYGWIN__
   /* Compiling for Windows, so we use the Windows DLL declarations. */
@@ -144,26 +121,10 @@
 #define WS_DLL_LOCAL  __attribute__ ((visibility ("hidden")))
   #else /* ! __GNUC__ >= 4 */
     /*
-     * We have no way to make stuff not explicitly marked as
-     * visible invisible outside a library, but we might have
-     * a way to make stuff explicitly marked as local invisible
-     * outside the library.
-     *
-     * This was lifted from GLib; see above for why we don't use
-     * G_GNUC_INTERNAL.
+     * We have no way to control visibility.
      */
-    #if defined(__SUNPRO_C) && (__SUNPRO_C >= 0x590)
-      /* This supports GCC-style __attribute__ ((visibility (XXX))) */
-      #define WS_DLL_PUBLIC_DEF __attribute__ ((visibility ("default")))
-      #define WS_DLL_LOCAL __attribute__ ((visibility ("hidden")))
-    #elif defined(__SUNPRO_C) && (__SUNPRO_C >= 0x550)
-      /* This doesn't, but supports __global and __hidden */
-      #define WS_DLL_PUBLIC_DEF __global
-      #define WS_DLL_LOCAL __hidden
-    #else /* not Sun C with "hidden" support */
-      #define WS_DLL_PUBLIC_DEF
-      #define WS_DLL_LOCAL
-    #endif
+    #define WS_DLL_PUBLIC_DEF
+    #define WS_DLL_LOCAL
   #endif /* __GNUC__ >= 4 */
 #endif
 
@@ -178,19 +139,6 @@
  *
  * Either can be used for exported *function* declarations and definitions.
  */
-#define WS_DLL_PUBLIC  WS_DLL_PUBLIC_DEF extern
+#define WS_DLL_PUBLIC	WS_DLL_PUBLIC_DEF extern
 
 #endif /* SYMBOL_EXPORT_H */
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

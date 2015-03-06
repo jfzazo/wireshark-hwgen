@@ -532,10 +532,6 @@ char *yytext;
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef _WIN32
-#include <io.h>  /* for isatty() */
-#endif
-
 #include "text2pcap.h"
 
 /*
@@ -551,7 +547,7 @@ char *yytext;
 #pragma warning (disable:4018)
 #endif
 
-#line 555 "text2pcap-scanner.c"
+#line 551 "text2pcap-scanner.c"
 
 #define INITIAL 0
 
@@ -736,10 +732,10 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 78 "text2pcap-scanner.l"
+#line 74 "text2pcap-scanner.l"
 
 
-#line 743 "text2pcap-scanner.c"
+#line 739 "text2pcap-scanner.c"
 
 	if ( !(yy_init) )
 		{
@@ -824,64 +820,64 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 80 "text2pcap-scanner.l"
+#line 76 "text2pcap-scanner.l"
 { parse_token(T_BYTE, yytext); }
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 81 "text2pcap-scanner.l"
+#line 77 "text2pcap-scanner.l"
 { parse_token(T_BYTE, yytext); parse_token(T_EOL, NULL); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 82 "text2pcap-scanner.l"
+#line 78 "text2pcap-scanner.l"
 { parse_token(T_OFFSET, yytext); }
 	YY_BREAK
 case 4:
 /* rule 4 can match eol */
 YY_RULE_SETUP
-#line 83 "text2pcap-scanner.l"
+#line 79 "text2pcap-scanner.l"
 { parse_token(T_OFFSET, yytext); parse_token(T_EOL, NULL); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 84 "text2pcap-scanner.l"
+#line 80 "text2pcap-scanner.l"
 { parse_token(T_OFFSET, yytext+1); }
 	YY_BREAK
 case 6:
 /* rule 6 can match eol */
 YY_RULE_SETUP
-#line 85 "text2pcap-scanner.l"
+#line 81 "text2pcap-scanner.l"
 { parse_token(T_EOL, NULL); }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 86 "text2pcap-scanner.l"
+#line 82 "text2pcap-scanner.l"
 ; /* ignore whitespace */
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 87 "text2pcap-scanner.l"
+#line 83 "text2pcap-scanner.l"
 { parse_token(T_DIRECTIVE, yytext); }
 	YY_BREAK
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 88 "text2pcap-scanner.l"
+#line 84 "text2pcap-scanner.l"
 ; /* ignore comments */
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 89 "text2pcap-scanner.l"
+#line 85 "text2pcap-scanner.l"
 { parse_token(T_TEXT, yytext); }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 91 "text2pcap-scanner.l"
+#line 87 "text2pcap-scanner.l"
 ECHO;
 	YY_BREAK
-#line 885 "text2pcap-scanner.c"
+#line 881 "text2pcap-scanner.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -1842,7 +1838,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 91 "text2pcap-scanner.l"
+#line 87 "text2pcap-scanner.l"
 
 
 

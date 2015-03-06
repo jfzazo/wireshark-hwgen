@@ -31,7 +31,7 @@ SignerInfos
 SignatureValue
 UnsignedAttributes
 
-#.REGISTER_NEW
+#.REGISTER
 ContentInfo			B "1.2.840.113549.1.9.16.1.6" "id-ct-contentInfo"
 #OctetString		B "1.2.840.113549.1.7.1"      "id-data"			 see x509sat.cnf
 SignedData			B "1.2.840.113549.1.7.2"      "id-signedData"
@@ -90,7 +90,7 @@ RevocationInfoChoice/other		otherRIC
 	%(DEFAULT_BODY)s
 
 	if(object_identifier_id) {
-		name = oid_resolved_from_string(wmem_packet_scope(), object_identifier_id);
+		name = oid_resolved_from_string(object_identifier_id);
 		proto_item_append_text(tree, " (%%s)", name ? name : object_identifier_id);
 	}
 
@@ -131,7 +131,7 @@ RevocationInfoChoice/other		otherRIC
   %(DEFAULT_BODY)s
 
   if(object_identifier_id) {
-    name = oid_resolved_from_string(wmem_packet_scope(), object_identifier_id);
+    name = oid_resolved_from_string(object_identifier_id);
     proto_item_append_text(tree, " (%%s)", name ? name : object_identifier_id);
   }
 
@@ -163,7 +163,7 @@ RevocationInfoChoice/other		otherRIC
   %(DEFAULT_BODY)s
 
   if(object_identifier_id) {
-    name = oid_resolved_from_string(wmem_packet_scope(), object_identifier_id);
+    name = oid_resolved_from_string(object_identifier_id);
     proto_item_append_text(tree, " %%s", name ? name : object_identifier_id);
     cap_tree = tree;
   }

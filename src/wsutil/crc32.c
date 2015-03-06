@@ -30,8 +30,6 @@
 #include <glib.h>
 #include <wsutil/crc32.h>
 
-#define CRC32_ACCUMULATE(c,d,table) (c=(c>>8)^(table)[(c^(d))&0xFF])
-
 /*****************************************************************/
 /*                                                               */
 /* CRC32C LOOKUP TABLE                                           */
@@ -51,7 +49,7 @@
 /* in the FTP archive "ftp.adelaide.edu.au/pub/rocksoft".        */
 /*                                                               */
 /*****************************************************************/
-#define CRC32C(c,d) CRC32_ACCUMULATE(c,d,crc32c_table)
+#define CRC32C(c,d) (c=(c>>8)^crc32c_table[(c^(d))&0xFF])
 
 static const guint32 crc32c_table[256] = {
 		0x00000000U, 0xF26B8303U, 0xE13B70F7U, 0x1350F3F4U, 0xC79A971FU,
@@ -112,8 +110,8 @@ static const guint32 crc32c_table[256] = {
  *
  * Polynomial is
  *
- *  x^32 + x^26 + x^23 + x^22 + x^16 + x^12 + x^11 + x^10 + x^8 +
- *      x^7 + x^5 + x^4 + x^2 + x + 1
+ *  x^32 + x^26 + x^23 + x^22 + x^16 + x^12 + x^11 + x^8 + x^7 +
+ *      x^5 + x^4 + x^2 + x + 1
  */
 static const guint32 crc32_ccitt_table[256] = {
 	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419,
@@ -177,10 +175,6 @@ static const guint32 crc32_ccitt_table[256] = {
  *
  *  x^32 + x^26 + x^23 + x^22 + x^16 + x^12 + x^11 + x^10 + x^8 +
  *      x^7 + x^5 + x^4 + x^2 + x + 1
- *
- * (which is the same polynomial as the one above us).
- *
- * NOTE: this is also used for ATM AAL5.
  */
 static const guint32 crc32_mpeg2_table[256] = {
 		0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b,
@@ -343,7 +337,7 @@ crc32_ccitt_seed(const guint8 *buf, guint len, guint32 seed)
 	guint32 crc32 = seed;
 
 	for (i = 0; i < len; i++)
-		CRC32_ACCUMULATE(crc32, buf[i], crc32_ccitt_table);
+		crc32 = crc32_ccitt_table[(crc32 ^ buf[i]) & 0xff] ^ (crc32 >> 8);
 
 	return ( ~crc32 );
 }
@@ -368,8 +362,8 @@ crc32_0x0AA725CF_seed(const guint8 *buf, guint len, guint32 seed)
 	guint crc32;
 
 	crc32 = (guint)seed;
-	while( len-- != 0 )
-		CRC32_ACCUMULATE(crc32, *buf++, crc32_0AA725CF_reverse);
+		while( len-- != 0 )
+			crc32 = crc32_0AA725CF_reverse[(crc32 ^ *buf++) & 0xff] ^ (crc32 >> 8);
 
 	return (guint32)crc32;
 }

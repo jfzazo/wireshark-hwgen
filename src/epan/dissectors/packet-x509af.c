@@ -31,6 +31,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
@@ -132,7 +133,7 @@ static int hf_x509af_q = -1;                      /* INTEGER */
 static int hf_x509af_g = -1;                      /* INTEGER */
 
 /*--- End of included file: packet-x509af-hf.c ---*/
-#line 49 "../../asn1/x509af/packet-x509af-template.c"
+#line 50 "../../asn1/x509af/packet-x509af-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_pkix_crl = -1;
@@ -173,7 +174,7 @@ static gint ett_x509af_SET_OF_AttributeType = -1;
 static gint ett_x509af_DSS_Params = -1;
 
 /*--- End of included file: packet-x509af-ett.c ---*/
-#line 53 "../../asn1/x509af/packet-x509af-template.c"
+#line 54 "../../asn1/x509af/packet-x509af-template.c"
 static const char *algorithm_id;
 
 /*--- Included file: packet-x509af-fn.c ---*/
@@ -218,7 +219,7 @@ dissect_x509af_T_algorithmId(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int o
   algorithm_id = actx->external.direct_reference;
 
   if(actx->external.direct_reference) {
-    name = oid_resolved_from_string(wmem_packet_scope(), actx->external.direct_reference);
+    name = oid_resolved_from_string(actx->external.direct_reference);
 
     proto_item_append_text(tree, " (%s)", name ? name : actx->external.direct_reference);
   }
@@ -376,7 +377,7 @@ dissect_x509af_T_extnId(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset
 
 
   if(actx->external.direct_reference) {
-    name = oid_resolved_from_string(wmem_packet_scope(), actx->external.direct_reference);
+    name = oid_resolved_from_string(actx->external.direct_reference);
 
     proto_item_append_text(tree, " (%s)", name ? name : actx->external.direct_reference);
   }
@@ -858,45 +859,35 @@ dissect_x509af_DSS_Params(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offs
 
 /*--- PDUs ---*/
 
-int dissect_x509af_Certificate_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+void dissect_x509af_Certificate_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_x509af_Certificate(FALSE, tvb, offset, &asn1_ctx, tree, hf_x509af_x509af_Certificate_PDU);
-  return offset;
+  dissect_x509af_Certificate(FALSE, tvb, 0, &asn1_ctx, tree, hf_x509af_x509af_Certificate_PDU);
 }
-static int dissect_CertificatePair_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CertificatePair_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_x509af_CertificatePair(FALSE, tvb, offset, &asn1_ctx, tree, hf_x509af_CertificatePair_PDU);
-  return offset;
+  dissect_x509af_CertificatePair(FALSE, tvb, 0, &asn1_ctx, tree, hf_x509af_CertificatePair_PDU);
 }
-static int dissect_CertificateList_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CertificateList_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_x509af_CertificateList(FALSE, tvb, offset, &asn1_ctx, tree, hf_x509af_CertificateList_PDU);
-  return offset;
+  dissect_x509af_CertificateList(FALSE, tvb, 0, &asn1_ctx, tree, hf_x509af_CertificateList_PDU);
 }
-static int dissect_AttributeCertificate_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_AttributeCertificate_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_x509af_AttributeCertificate(FALSE, tvb, offset, &asn1_ctx, tree, hf_x509af_AttributeCertificate_PDU);
-  return offset;
+  dissect_x509af_AttributeCertificate(FALSE, tvb, 0, &asn1_ctx, tree, hf_x509af_AttributeCertificate_PDU);
 }
-static int dissect_DSS_Params_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_DSS_Params_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_x509af_DSS_Params(FALSE, tvb, offset, &asn1_ctx, tree, hf_x509af_DSS_Params_PDU);
-  return offset;
+  dissect_x509af_DSS_Params(FALSE, tvb, 0, &asn1_ctx, tree, hf_x509af_DSS_Params_PDU);
 }
 
 
 /*--- End of included file: packet-x509af-fn.c ---*/
-#line 55 "../../asn1/x509af/packet-x509af-template.c"
+#line 56 "../../asn1/x509af/packet-x509af-template.c"
 
 const char *x509af_get_last_algorithm_id(void) {
   return algorithm_id;
@@ -906,7 +897,8 @@ const char *x509af_get_last_algorithm_id(void) {
 static int
 dissect_pkix_crl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *data _U_)
 {
-	proto_tree *tree;
+	proto_item *item=NULL;
+	proto_tree *tree=NULL;
 	asn1_ctx_t asn1_ctx;
 	asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
 
@@ -915,7 +907,10 @@ dissect_pkix_crl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, voi
 	col_set_str(pinfo->cinfo, COL_INFO, "Certificate Revocation List");
 
 
-	tree=proto_tree_add_subtree(parent_tree, tvb, 0, -1, ett_pkix_crl, NULL, "Certificate Revocation List");
+	if(parent_tree){
+		item=proto_tree_add_text(parent_tree, tvb, 0, -1, "Certificate Revocation List");
+		tree = proto_item_add_subtree(item, ett_pkix_crl);
+	}
 
 	return dissect_x509af_CertificateList(FALSE, tvb, 0, &asn1_ctx, tree, -1);
 }
@@ -1234,7 +1229,7 @@ void proto_register_x509af(void) {
         "INTEGER", HFILL }},
 
 /*--- End of included file: packet-x509af-hfarr.c ---*/
-#line 92 "../../asn1/x509af/packet-x509af-template.c"
+#line 97 "../../asn1/x509af/packet-x509af-template.c"
   };
 
   /* List of subtrees */
@@ -1277,7 +1272,7 @@ void proto_register_x509af(void) {
     &ett_x509af_DSS_Params,
 
 /*--- End of included file: packet-x509af-ettarr.c ---*/
-#line 98 "../../asn1/x509af/packet-x509af-template.c"
+#line 103 "../../asn1/x509af/packet-x509af-template.c"
   };
 
   /* Register protocol */
@@ -1288,9 +1283,9 @@ void proto_register_x509af(void) {
   proto_register_subtree_array(ett, array_length(ett));
 
 
-  new_register_ber_syntax_dissector("Certificate", proto_x509af, dissect_x509af_Certificate_PDU);
-  new_register_ber_syntax_dissector("CertificateList", proto_x509af, dissect_CertificateList_PDU);
-  new_register_ber_syntax_dissector("CrossCertificatePair", proto_x509af, dissect_CertificatePair_PDU);
+  register_ber_syntax_dissector("Certificate", proto_x509af, dissect_x509af_Certificate_PDU);
+  register_ber_syntax_dissector("CertificateList", proto_x509af, dissect_CertificateList_PDU);
+  register_ber_syntax_dissector("CrossCertificatePair", proto_x509af, dissect_CertificatePair_PDU);
 
   register_ber_oid_syntax(".cer", NULL, "Certificate");
   register_ber_oid_syntax(".crt", NULL, "Certificate");
@@ -1308,22 +1303,22 @@ void proto_reg_handoff_x509af(void) {
 
 /*--- Included file: packet-x509af-dis-tab.c ---*/
 #line 1 "../../asn1/x509af/packet-x509af-dis-tab.c"
-  new_register_ber_oid_dissector("2.5.4.36", dissect_x509af_Certificate_PDU, proto_x509af, "id-at-userCertificate");
-  new_register_ber_oid_dissector("2.5.4.37", dissect_x509af_Certificate_PDU, proto_x509af, "id-at-cAcertificate");
-  new_register_ber_oid_dissector("2.5.4.38", dissect_CertificateList_PDU, proto_x509af, "id-at-authorityRevocationList");
-  new_register_ber_oid_dissector("2.5.4.39", dissect_CertificateList_PDU, proto_x509af, "id-at-certificateRevocationList");
-  new_register_ber_oid_dissector("2.5.4.40", dissect_CertificatePair_PDU, proto_x509af, "id-at-crossCertificatePair");
-  new_register_ber_oid_dissector("2.5.4.53", dissect_CertificateList_PDU, proto_x509af, "id-at-deltaRevocationList");
-  new_register_ber_oid_dissector("2.5.4.58", dissect_AttributeCertificate_PDU, proto_x509af, "id-at-attributeCertificate");
-  new_register_ber_oid_dissector("2.5.4.59", dissect_CertificateList_PDU, proto_x509af, "id-at-attributeCertificateRevocationList");
-  new_register_ber_oid_dissector("1.2.840.10040.4.1", dissect_DSS_Params_PDU, proto_x509af, "id-dsa");
+  register_ber_oid_dissector("2.5.4.36", dissect_x509af_Certificate_PDU, proto_x509af, "id-at-userCertificate");
+  register_ber_oid_dissector("2.5.4.37", dissect_x509af_Certificate_PDU, proto_x509af, "id-at-cAcertificate");
+  register_ber_oid_dissector("2.5.4.38", dissect_CertificateList_PDU, proto_x509af, "id-at-authorityRevocationList");
+  register_ber_oid_dissector("2.5.4.39", dissect_CertificateList_PDU, proto_x509af, "id-at-certificateRevocationList");
+  register_ber_oid_dissector("2.5.4.40", dissect_CertificatePair_PDU, proto_x509af, "id-at-crossCertificatePair");
+  register_ber_oid_dissector("2.5.4.53", dissect_CertificateList_PDU, proto_x509af, "id-at-deltaRevocationList");
+  register_ber_oid_dissector("2.5.4.58", dissect_AttributeCertificate_PDU, proto_x509af, "id-at-attributeCertificate");
+  register_ber_oid_dissector("2.5.4.59", dissect_CertificateList_PDU, proto_x509af, "id-at-attributeCertificateRevocationList");
+  register_ber_oid_dissector("1.2.840.10040.4.1", dissect_DSS_Params_PDU, proto_x509af, "id-dsa");
 
 
 /*--- End of included file: packet-x509af-dis-tab.c ---*/
-#line 126 "../../asn1/x509af/packet-x509af-template.c"
+#line 131 "../../asn1/x509af/packet-x509af-template.c"
 
-	/*XXX these should really go to a better place but since
-	  I have not that ITU standard, I'll put it here for the time
+	/*XXX these should really go to a better place but since that
+	  I have not that ITU standard, ill put it here for the time
 	  being.
 	  Only implemented those algorithms that take no parameters
 	  for the time being,   ronnie
@@ -1353,15 +1348,15 @@ void proto_reg_handoff_x509af(void) {
 
 	/* these will generally be encoded as ";binary" in LDAP */
 
-	new_register_ldap_name_dissector("cACertificate", dissect_x509af_Certificate_PDU, proto_x509af);
-	new_register_ldap_name_dissector("userCertificate", dissect_x509af_Certificate_PDU, proto_x509af);
+	register_ldap_name_dissector("cACertificate", dissect_x509af_Certificate_PDU, proto_x509af);
+	register_ldap_name_dissector("userCertificate", dissect_x509af_Certificate_PDU, proto_x509af);
 
-	new_register_ldap_name_dissector("certificateRevocationList", dissect_CertificateList_PDU, proto_x509af);
-	new_register_ldap_name_dissector("crl", dissect_CertificateList_PDU, proto_x509af);
+	register_ldap_name_dissector("certificateRevocationList", dissect_CertificateList_PDU, proto_x509af);
+	register_ldap_name_dissector("crl", dissect_CertificateList_PDU, proto_x509af);
 
-	new_register_ldap_name_dissector("authorityRevocationList", dissect_CertificateList_PDU, proto_x509af);
-	new_register_ldap_name_dissector("arl", dissect_CertificateList_PDU, proto_x509af);
+	register_ldap_name_dissector("authorityRevocationList", dissect_CertificateList_PDU, proto_x509af);
+	register_ldap_name_dissector("arl", dissect_CertificateList_PDU, proto_x509af);
 
-	new_register_ldap_name_dissector("crossCertificatePair", dissect_CertificatePair_PDU, proto_x509af);
+	register_ldap_name_dissector("crossCertificatePair", dissect_CertificatePair_PDU, proto_x509af);
 }
 

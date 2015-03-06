@@ -143,11 +143,16 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-@SSE42_SUPPORTED_TRUE@am__append_1 = libwsutil_sse42.la
+@NEED_GETOPT_LO_TRUE@am__append_1 = @GETOPT_LO@
+@NEED_INET_ATON_LO_TRUE@am__append_2 = @INET_ATON_LO@
+@NEED_INET_NTOP_LO_TRUE@am__append_3 = @INET_NTOP_LO@
+@NEED_INET_PTON_LO_TRUE@am__append_4 = @INET_PTON_LO@
+@NEED_STRNCASECMP_LO_TRUE@am__append_5 = @STRNCASECMP_LO@
+@NEED_STRPTIME_LO_TRUE@am__append_6 = @STRPTIME_LO@
 DIST_COMMON = $(srcdir)/../Makefile.am.inc $(srcdir)/Makefile.common \
 	$(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/depcomp
-@HAVE_WARNINGS_AS_ERRORS_TRUE@am__append_2 = -Werror
+@HAVE_WARNINGS_AS_ERRORS_TRUE@am__append_7 = -Werror
 subdir = wsutil
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/aclocal-fallback/glib-2.0.m4 \
@@ -190,20 +195,20 @@ am__uninstall_files_from_dir = { \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
 am__installdirs = "$(DESTDIR)$(libdir)"
-LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
-am__DEPENDENCIES_1 = $(am__append_1)
+LTLIBRARIES = $(lib_LTLIBRARIES)
+am__DEPENDENCIES_1 =
+am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am__objects_1 = adler32.lo aes.lo airpdcap_wep.lo base64.lo bitswap.lo \
-	buffer.lo cfutils.lo clopts_common.lo cmdarg_err.lo \
-	copyright_info.lo crash_info.lo crc6.lo crc7.lo crc8.lo \
-	crc10.lo crc11.lo crc16.lo crc16-plain.lo crc32.lo des.lo \
+	buffer.lo crash_info.lo crc6.lo crc7.lo crc8.lo crc10.lo \
+	crc11.lo crc16.lo crc16-plain.lo crc32.lo crcdrm.lo des.lo \
 	eax.lo filesystem.lo g711.lo md4.lo md5.lo mpeg-audio.lo \
-	nstime.lo os_version_info.lo plugins.lo privileges.lo sha1.lo \
-	sober128.lo strnatcmp.lo str_util.lo rc4.lo report_err.lo \
-	tempfile.lo time_util.lo type_util.lo ws_mempbrk.lo u3.lo \
-	unicode-utils.lo ws_version_info.lo
+	nstime.lo plugins.lo privileges.lo sha1.lo strnatcmp.lo \
+	str_util.lo rc4.lo report_err.lo tempfile.lo time_util.lo \
+	type_util.lo u3.lo unicode-utils.lo
 am__objects_2 =
-am__objects_3 = $(am__objects_2)
-am_libwsutil_la_OBJECTS = $(am__objects_1) $(am__objects_3)
+am_libwsutil_la_OBJECTS = $(am__objects_1) $(am__objects_2)
 libwsutil_la_OBJECTS = $(am_libwsutil_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -212,14 +217,6 @@ am__v_lt_1 =
 libwsutil_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(libwsutil_la_LDFLAGS) $(LDFLAGS) -o $@
-libwsutil_sse42_la_LIBADD =
-am_libwsutil_sse42_la_OBJECTS =  \
-	libwsutil_sse42_la-ws_mempbrk_sse42.lo
-libwsutil_sse42_la_OBJECTS = $(am_libwsutil_sse42_la_OBJECTS)
-libwsutil_sse42_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
-	$(libwsutil_sse42_la_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
-	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -254,10 +251,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libwsutil_la_SOURCES) $(EXTRA_libwsutil_la_SOURCES) \
-	$(libwsutil_sse42_la_SOURCES)
-DIST_SOURCES = $(libwsutil_la_SOURCES) $(EXTRA_libwsutil_la_SOURCES) \
-	$(libwsutil_sse42_la_SOURCES)
+SOURCES = $(libwsutil_la_SOURCES) $(EXTRA_libwsutil_la_SOURCES)
+DIST_SOURCES = $(libwsutil_la_SOURCES) $(EXTRA_libwsutil_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -300,8 +295,8 @@ CCDEPMODE = @CCDEPMODE@
 CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
-CFLAGS_SSE42 = @CFLAGS_SSE42@
 CONFIG_ARGS = @CONFIG_ARGS@
+CONFIG_WITH_ARGS = @CONFIG_WITH_ARGS@
 COREFOUNDATION_FRAMEWORKS = @COREFOUNDATION_FRAMEWORKS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -327,7 +322,6 @@ ELINKS = @ELINKS@
 ENABLE_STATIC = @ENABLE_STATIC@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FLOORL_LO = @FLOORL_LO@
 FOP = @FOP@
 GEOIP_LIBS = @GEOIP_LIBS@
 GETOPT_LO = @GETOPT_LO@
@@ -400,7 +394,7 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
-LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDES = @LUA_INCLUDES@
 LUA_LIBS = @LUA_LIBS@
 LYNX = @LYNX@
 MAKEINFO = @MAKEINFO@
@@ -436,14 +430,14 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_LIBS = @PLUGIN_LIBS@
 POD2HTML = @POD2HTML@
 POD2MAN = @POD2MAN@
-POPCOUNT_LO = @POPCOUNT_LO@
 PORTAUDIO_INCLUDES = @PORTAUDIO_INCLUDES@
 PORTAUDIO_LIBS = @PORTAUDIO_LIBS@
 PYTHON = @PYTHON@
+PY_CFLAGS = @PY_CFLAGS@
+PY_LIBS = @PY_LIBS@
 QT_MIN_VERSION = @QT_MIN_VERSION@
 Qt_LIBS = @Qt_LIBS@
 RANLIB = @RANLIB@
-RCC = @RCC@
 RPMBUILD_WITH_ARGS = @RPMBUILD_WITH_ARGS@
 SBC_CFLAGS = @SBC_CFLAGS@
 SBC_LIBS = @SBC_LIBS@
@@ -454,6 +448,8 @@ SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+STRNCASECMP_LO = @STRNCASECMP_LO@
+STRPTIME_C = @STRPTIME_C@
 STRPTIME_LO = @STRPTIME_LO@
 SYSTEMCONFIGURATION_FRAMEWORKS = @SYSTEMCONFIGURATION_FRAMEWORKS@
 UIC = @UIC@
@@ -473,6 +469,7 @@ ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 ac_cv_wireshark_have_rpm = @ac_cv_wireshark_have_rpm@
+ac_ws_python_config = @ac_ws_python_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -502,8 +499,6 @@ echld_test_bin = @echld_test_bin@
 editcap_bin = @editcap_bin@
 editcap_man = @editcap_man@
 exec_prefix = @exec_prefix@
-extcapdir = @extcapdir@
-have_sw_vers = @have_sw_vers@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -524,10 +519,10 @@ mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 plugindir = @plugindir@
-plugins_dir = @plugins_dir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pythondir = @pythondir@
 randpkt_bin = @randpkt_bin@
 randpkt_man = @randpkt_man@
 rawshark_bin = @rawshark_bin@
@@ -558,20 +553,11 @@ wireshark_man = @wireshark_man@
 wiresharkfilter_man = @wiresharkfilter_man@
 ACLOCAL_AMFLAGS = `../aclocal-flags`
 
-# Optional headers for ABI checking
-wsutil_optional_abi_includes = 
-
-# Header files for functions in libwsutil's ABI on this platform.
-libwsutil_abi_INCLUDES = \
-	$(libwsutil_nonrepl_INCLUDES)	\
-	$(wsutil_optional_abi_includes)
-
-
 # Optional objects that I know how to build. These will be
-# linked into libwsutil if necessary.
-wsutil_optional_objects = @FLOORL_LO@ @GETOPT_LO@ @INET_ATON_LO@ \
-	@INET_NTOP_LO@ @INET_PTON_LO@ @POPCOUNT_LO@ @STRPTIME_LO@ \
-	$(am__append_1)
+# linked into libwsutil.
+wsutil_optional_objects = $(am__append_1) $(am__append_2) \
+	$(am__append_3) $(am__append_4) $(am__append_5) \
+	$(am__append_6)
 AUTOMAKE_OPTIONS = -Wno-portability
 AM_V_AWK = $(am__v_AWK_@AM_V@)
 am__v_AWK_ = $(am__v_AWK_@AM_DEFAULT_V@)
@@ -601,10 +587,6 @@ LIBWSUTIL_SRC = \
 	base64.c	\
 	bitswap.c	\
 	buffer.c	\
-	cfutils.c	\
-	clopts_common.c	\
-	cmdarg_err.c	\
-	copyright_info.c \
 	crash_info.c	\
 	crc6.c		\
 	crc7.c		\
@@ -614,6 +596,7 @@ LIBWSUTIL_SRC = \
 	crc16.c		\
 	crc16-plain.c	\
 	crc32.c		\
+	crcdrm.c	\
 	des.c		\
 	eax.c		\
 	filesystem.c	\
@@ -622,11 +605,9 @@ LIBWSUTIL_SRC = \
 	md5.c		\
 	mpeg-audio.c	\
 	nstime.c	\
-	os_version_info.c \
 	plugins.c	\
 	privileges.c	\
 	sha1.c		\
-	sober128.c	\
 	strnatcmp.c	\
 	str_util.c	\
 	rc4.c		\
@@ -634,26 +615,19 @@ LIBWSUTIL_SRC = \
 	tempfile.c	\
 	time_util.c	\
 	type_util.c	\
-	ws_mempbrk.c	\
 	u3.c		\
-	unicode-utils.c	\
-	ws_version_info.c
+	unicode-utils.c
 
 
-# Header files that don't declare replacement functions for functions
-# present in the APIs/ABIs of some, but not all, targets.
-libwsutil_nonrepl_INCLUDES = \
+# Header files that are not generated from other files
+LIBWSUTIL_INCLUDES = \
 	adler32.h	\
 	aes.h		\
 	base64.h	\
 	bits_ctz.h	\
 	bits_count_ones.h	\
-	bitswap.h	\
+	bitswap.h		\
 	buffer.h	\
-	cfutils.h	\
-	clopts_common.h	\
-	cmdarg_err.h	\
-	copyright_info.h \
 	crash_info.h	\
 	crc6.h		\
 	crc7.h		\
@@ -663,6 +637,7 @@ libwsutil_nonrepl_INCLUDES = \
 	crc16.h		\
 	crc16-plain.h	\
 	crc32.h		\
+	crcdrm.h	\
 	des.h		\
 	eax.h		\
 	filesystem.h	\
@@ -671,12 +646,10 @@ libwsutil_nonrepl_INCLUDES = \
 	md5.h		\
 	mpeg-audio.h	\
 	nstime.h	\
-	os_version_info.h \
 	plugins.h	\
 	privileges.h	\
 	sha1.h		\
 	sign_ext.h	\
-	sober128.h	\
 	strnatcmp.h	\
 	str_util.h	\
 	pint.h		\
@@ -686,22 +659,12 @@ libwsutil_nonrepl_INCLUDES = \
 	time_util.h	\
 	type_util.h	\
 	u3.h		\
-	unicode-utils.h \
-	ws_cpuid.h	\
-	ws_diag_control.h \
-	ws_mempbrk.h	\
-	ws_version_info.h
+	unicode-utils.h
 
-
-# Header files that are not generated from other files
-LIBWSUTIL_INCLUDES = \
-	$(libwsutil_nonrepl_INCLUDES)
-
-AM_CFLAGS = -DWS_BUILD_DLL $(am__append_2)
-noinst_LTLIBRARIES = libwsutil_sse42.la
+AM_CFLAGS = -DWS_BUILD_DLL $(am__append_7)
 lib_LTLIBRARIES = libwsutil.la
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-libwsutil_la_LDFLAGS = -version-info 0:0:0 @LDFLAGS_SHAREDLIB@
+libwsutil_la_LDFLAGS = -version-info 5:0:1 @LDFLAGS_SHAREDLIB@
 AM_CPPFLAGS = -I$(srcdir)/.. \
 	$(LIBGCRYPT_CFLAGS) \
 	-DTOP_SRCDIR=\"$(abs_top_srcdir)\"
@@ -710,20 +673,13 @@ libwsutil_la_SOURCES = \
 	$(LIBWSUTIL_SRC)	\
 	$(LIBWSUTIL_INCLUDES)
 
-libwsutil_sse42_la_SOURCES = \
-	ws_mempbrk_sse42.c
-
-libwsutil_sse42_la_CFLAGS = $(AM_CFLAGS) @CFLAGS_SSE42@
 EXTRA_libwsutil_la_SOURCES = \
-	floorl.c		\
-	floorl.h		\
 	inet_aton.c		\
 	inet_aton.h		\
 	inet_ntop.c		\
 	inet_pton.c		\
 	inet_v6defs.h		\
-	popcount.c		\
-	popcount.h		\
+	strncasecmp.c		\
 	strptime.c		\
 	strptime.h		\
 	wsgetopt.c		\
@@ -734,7 +690,6 @@ libwsutil_la_DEPENDENCIES = \
 	$(wsutil_optional_objects)
 
 libwsutil_la_LIBADD = \
-	@COREFOUNDATION_FRAMEWORKS@	\
 	@GLIB_LIBS@		\
 	@LIBGCRYPT_LIBS@	\
 	$(wsutil_optional_objects)
@@ -744,7 +699,7 @@ EXTRA_DIST = \
 	Makefile.common	\
 	Makefile.nmake	\
 	file_util.c	\
-	file_util.h	\
+	file_util.h 	\
 	wsgcrypt.h
 
 CLEANFILES = \
@@ -826,22 +781,8 @@ clean-libLTLIBRARIES:
 	  rm -f $${locs}; \
 	}
 
-clean-noinstLTLIBRARIES:
-	-test -z "$(noinst_LTLIBRARIES)" || rm -f $(noinst_LTLIBRARIES)
-	@list='$(noinst_LTLIBRARIES)'; \
-	locs=`for p in $$list; do echo $$p; done | \
-	      sed 's|^[^/]*$$|.|; s|/[^/]*$$||; s|$$|/so_locations|' | \
-	      sort -u`; \
-	test -z "$$locs" || { \
-	  echo rm -f $${locs}; \
-	  rm -f $${locs}; \
-	}
-
 libwsutil.la: $(libwsutil_la_OBJECTS) $(libwsutil_la_DEPENDENCIES) $(EXTRA_libwsutil_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(libwsutil_la_LINK) -rpath $(libdir) $(libwsutil_la_OBJECTS) $(libwsutil_la_LIBADD) $(LIBS)
-
-libwsutil_sse42.la: $(libwsutil_sse42_la_OBJECTS) $(libwsutil_sse42_la_DEPENDENCIES) $(EXTRA_libwsutil_sse42_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(libwsutil_sse42_la_LINK)  $(libwsutil_sse42_la_OBJECTS) $(libwsutil_sse42_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -855,10 +796,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/base64.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bitswap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buffer.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cfutils.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clopts_common.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmdarg_err.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/copyright_info.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crash_info.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crc10.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crc11.Plo@am__quote@
@@ -868,69 +805,54 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crc6.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crc7.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crc8.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crcdrm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/des.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eax.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/filesystem.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/floorl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/g711.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inet_aton.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inet_ntop.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inet_pton.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwsutil_sse42_la-ws_mempbrk_sse42.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/md4.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/md5.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mpeg-audio.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nstime.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/os_version_info.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/plugins.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/popcount.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/privileges.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rc4.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/report_err.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sha1.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sober128.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/str_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/strnatcmp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/strncasecmp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/strptime.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tempfile.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/time_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/type_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/u3.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/unicode-utils.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ws_mempbrk.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ws_version_info.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wsgetopt.Plo@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
-@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
-
-libwsutil_sse42_la-ws_mempbrk_sse42.lo: ws_mempbrk_sse42.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwsutil_sse42_la_CFLAGS) $(CFLAGS) -MT libwsutil_sse42_la-ws_mempbrk_sse42.lo -MD -MP -MF $(DEPDIR)/libwsutil_sse42_la-ws_mempbrk_sse42.Tpo -c -o libwsutil_sse42_la-ws_mempbrk_sse42.lo `test -f 'ws_mempbrk_sse42.c' || echo '$(srcdir)/'`ws_mempbrk_sse42.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwsutil_sse42_la-ws_mempbrk_sse42.Tpo $(DEPDIR)/libwsutil_sse42_la-ws_mempbrk_sse42.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ws_mempbrk_sse42.c' object='libwsutil_sse42_la-ws_mempbrk_sse42.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwsutil_sse42_la_CFLAGS) $(CFLAGS) -c -o libwsutil_sse42_la-ws_mempbrk_sse42.lo `test -f 'ws_mempbrk_sse42.c' || echo '$(srcdir)/'`ws_mempbrk_sse42.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -1062,7 +984,7 @@ maintainer-clean-generic:
 clean: clean-am
 
 clean-am: clean-generic clean-libLTLIBRARIES clean-libtool \
-	clean-noinstLTLIBRARIES mostlyclean-am
+	mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
@@ -1133,19 +1055,18 @@ uninstall-am: uninstall-libLTLIBRARIES
 .MAKE: install-am install-strip
 
 .PHONY: CTAGS GTAGS TAGS all all-am check check-am clean clean-generic \
-	clean-libLTLIBRARIES clean-libtool clean-noinstLTLIBRARIES \
-	cscopelist-am ctags ctags-am distclean distclean-compile \
-	distclean-generic distclean-libtool distclean-tags distdir dvi \
-	dvi-am html html-am info info-am install install-am \
-	install-data install-data-am install-dvi install-dvi-am \
-	install-exec install-exec-am install-html install-html-am \
-	install-info install-info-am install-libLTLIBRARIES \
-	install-man install-pdf install-pdf-am install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-compile mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-am uninstall \
-	uninstall-am uninstall-libLTLIBRARIES
+	clean-libLTLIBRARIES clean-libtool cscopelist-am ctags \
+	ctags-am distclean distclean-compile distclean-generic \
+	distclean-libtool distclean-tags distdir dvi dvi-am html \
+	html-am info info-am install install-am install-data \
+	install-data-am install-dvi install-dvi-am install-exec \
+	install-exec-am install-html install-html-am install-info \
+	install-info-am install-libLTLIBRARIES install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am uninstall-libLTLIBRARIES
 
 
 .l.c:
@@ -1175,7 +1096,7 @@ abi-descriptor.xml: ../abi-descriptor.template
 dumpabi-libwsutil: all abi-descriptor.xml
 	rm -rf abi-check-headers abi_dumps .libs/*.abi.tar.gz
 	mkdir abi-check-headers
-	cp ../config.h ../ws_symbol_export.h $(libwsutil_abi_INCLUDES) abi-check-headers/
+	cp ../config.h ../ws_symbol_export.h *.h abi-check-headers/
 	abi-compliance-checker -l libwsutil -v1 `readlink .libs/libwsutil.so | sed 's/.*\.so\.//'` \
 		-relpath $(abs_srcdir) -dump-abi abi-descriptor.xml || \
 		cat logs/libwsutil/[0-9]*/log.txt

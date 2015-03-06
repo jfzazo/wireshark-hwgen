@@ -121,16 +121,18 @@ which ATN standard is supported ?
 
 #include "config.h"
 
-#ifndef _MSC_VER
-#include <stdint.h>
-#endif
-
-
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/dissectors/packet-ber.h>
+#include <epan/dissectors/packet-per.h>
+#include <epan/wmem/wmem.h>
 #include <epan/address.h>
 #include <epan/conversation.h>
-#include "packet-ber.h"
-#include "packet-per.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
 #include "packet-atn-ulcs.h"
 
 #define ATN_ACSE_PROTO "ICAO Doc9705 ULCS ACSE (ISO 8649/8650-1:1996)"
@@ -178,11 +180,10 @@ static int dissect_atn_ulcs_T_externalt_encoding_arbitrary(
 		proto_tree *tree _U_,
 		int hf_index _U_);
 
-static int dissect_ACSE_apdu_PDU(
+static void dissect_ACSE_apdu_PDU(
 		tvbuff_t *tvb _U_,
 		packet_info *pinfo _U_,
-		proto_tree *tree _U_,
-    void *data _U_);
+		proto_tree *tree _U_);
 
 guint32 dissect_per_object_descriptor_t(
 		tvbuff_t *tvb,
@@ -276,7 +277,7 @@ static int hf_atn_ulcs_ACSE_requirements_authentication = -1;
 static int hf_atn_ulcs_ACSE_requirements_application_context_negotiation = -1;
 
 /*--- End of included file: packet-atn-ulcs-hf.c ---*/
-#line 194 "../../asn1/atn-ulcs/packet-atn-ulcs-template.c"
+#line 195 "../../asn1/atn-ulcs/packet-atn-ulcs-template.c"
 
 
 /*--- Included file: packet-atn-ulcs-ett.c ---*/
@@ -308,7 +309,7 @@ static gint ett_atn_ulcs_RelativeDistinguishedName = -1;
 static gint ett_atn_ulcs_AttributeTypeAndValue = -1;
 
 /*--- End of included file: packet-atn-ulcs-ett.c ---*/
-#line 196 "../../asn1/atn-ulcs/packet-atn-ulcs-template.c"
+#line 197 "../../asn1/atn-ulcs/packet-atn-ulcs-template.c"
 static gint ett_atn_ulcs = -1;
 static gint ett_atn_acse = -1;
 
@@ -377,6 +378,7 @@ dissect_atn_ulcs_T_pdv_list_presentation_data_values_arbitrary(tvbuff_t *tvb _U_
 
 		packet_info * pinfo = actx->pinfo;
 		tvbuff_t *tvb_usr = NULL;
+		proto_item *ti = NULL;
 		proto_tree *atn_ulcs_tree = NULL;
 		atn_conversation_t *atn_cv = NULL;
 		heur_dtbl_entry_t *hdtbl_entry;
@@ -398,14 +400,18 @@ dissect_atn_ulcs_T_pdv_list_presentation_data_values_arbitrary(tvbuff_t *tvb _U_
 			/* call appropiate dissector for bitstring data */
 			switch(ulcs_context_value){
 					case  1: /* ACSE PDU*/
-							atn_ulcs_tree = proto_tree_add_subtree(
-									root_tree, tvb, offset, 0,
-									ett_atn_acse, NULL, ATN_ACSE_PROTO );
+							ti = proto_tree_add_text(
+									root_tree,
+									tvb,
+									offset,
+									0,
+									ATN_ACSE_PROTO );
+							atn_ulcs_tree = proto_item_add_subtree(ti, ett_atn_acse);
 
 							dissect_ACSE_apdu_PDU(
 									tvb_new_subset_remaining(tvb_usr, 0),
 									pinfo,
-									atn_ulcs_tree, NULL);
+									atn_ulcs_tree);
 							break;
 						case  3: /* USER data; call subdissector for CM, CPDLC ...  */
 
@@ -1580,26 +1586,20 @@ dissect_atn_ulcs_ACSE_apdu(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _
 
 /*--- PDUs ---*/
 
-static int dissect_Fully_encoded_data_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_Fully_encoded_data_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_atn_ulcs_Fully_encoded_data(tvb, offset, &asn1_ctx, tree, hf_atn_ulcs_Fully_encoded_data_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_atn_ulcs_Fully_encoded_data(tvb, 0, &asn1_ctx, tree, hf_atn_ulcs_Fully_encoded_data_PDU);
 }
-static int dissect_ACSE_apdu_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ACSE_apdu_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_atn_ulcs_ACSE_apdu(tvb, offset, &asn1_ctx, tree, hf_atn_ulcs_ACSE_apdu_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_atn_ulcs_ACSE_apdu(tvb, 0, &asn1_ctx, tree, hf_atn_ulcs_ACSE_apdu_PDU);
 }
 
 
 /*--- End of included file: packet-atn-ulcs-fn.c ---*/
-#line 200 "../../asn1/atn-ulcs/packet-atn-ulcs-template.c"
+#line 201 "../../asn1/atn-ulcs/packet-atn-ulcs-template.c"
 
 #if 0
 /* re-implementing external data: packet-per.c */
@@ -1693,7 +1693,6 @@ const value_string atn_ses_type[] =
 #define ATN_PRES_PROTO "ICAO Doc9705 ULCS Presentation (ISO 8822/8823-1:1994)"
 
 static int hf_atn_pres_err	 = -1;
-static int hf_atn_pres_pdu_type = -1;
 static gint ett_atn_pres		= -1;
 
 #define ATN_SES_PRES_MASK 0xf803
@@ -2004,7 +2003,7 @@ dissect_atn_ulcs(
 				dissect_Fully_encoded_data_PDU(
 						tvb,
 						pinfo,
-						atn_ulcs_tree, NULL);
+						atn_ulcs_tree);
 
 				return offset +
 					tvb_reported_length_remaining(tvb, offset ) ;
@@ -2017,9 +2016,16 @@ dissect_atn_ulcs(
 				value_ses_pres = tvb_get_ntohs(tvb, offset);
 
 				/* SPDU: dissect session layer */
-				atn_ulcs_tree = proto_tree_add_subtree(
-						tree, tvb, offset, 0,
-						ett_atn_ses, NULL, ATN_SES_PROTO );
+				ti = proto_tree_add_text(
+						tree,
+						tvb,
+						offset,
+						0,
+						ATN_SES_PROTO );
+
+				atn_ulcs_tree = proto_item_add_subtree(
+						ti,
+						ett_atn_ses);
 
 				/* get SPDU (1 octet) */
 				value_ses = tvb_get_guint8(tvb, offset);
@@ -2069,19 +2075,26 @@ dissect_atn_ulcs(
 				offset++;
 
 				/* PPDU: dissect presentation layer */
-				atn_ulcs_tree = proto_tree_add_subtree(
-						tree, tvb, offset, 0,
-						ett_atn_pres, NULL, ATN_PRES_PROTO );
+				ti = proto_tree_add_text(
+						tree,
+						tvb,
+						offset,
+						0,
+						ATN_PRES_PROTO );
+
+				atn_ulcs_tree = proto_item_add_subtree(ti, ett_atn_pres);
 
 				value_pres = tvb_get_guint8(tvb, offset);
 
 				/* need session context to identify PPDU type */
 				/* note: */
-				proto_tree_add_uint_format(atn_ulcs_tree, hf_atn_pres_pdu_type,
+				/* it is *unfeasible* to use proto_tree_add_item here: */
+				/* presentation type is always the same constant but its type */
+				/* is implicitly determined by preceding session context */
+				proto_tree_add_text(atn_ulcs_tree,
 						tvb,
 						offset,
 						1,
-                        value_ses_pres,
 						"%s (0x%02x)",
 						val_to_str( value_ses_pres & ATN_SES_PRES_MASK , atn_pres_vals, "?"),
 						value_pres);
@@ -2105,14 +2118,21 @@ dissect_atn_ulcs(
 				offset++;
 
 				/* ACSE PDU: dissect application layer */
-				atn_ulcs_tree = proto_tree_add_subtree(
-						tree, tvb, offset, 0,
-						ett_atn_acse, NULL, ATN_ACSE_PROTO );
+				ti = proto_tree_add_text(
+						tree,
+						tvb,
+						offset,
+						0,
+						ATN_ACSE_PROTO );
+
+				atn_ulcs_tree = proto_item_add_subtree(
+						ti,
+						ett_atn_acse);
 
 				dissect_ACSE_apdu_PDU(
 						tvb_new_subset_remaining(tvb, offset),
 						pinfo,
-						atn_ulcs_tree, NULL);
+						atn_ulcs_tree);
 
 				return offset +
 						tvb_reported_length_remaining(tvb, offset );
@@ -2484,7 +2504,7 @@ void proto_register_atn_ulcs (void)
         NULL, HFILL }},
 
 /*--- End of included file: packet-atn-ulcs-hfarr.c ---*/
-#line 792 "../../asn1/atn-ulcs/packet-atn-ulcs-template.c"
+#line 813 "../../asn1/atn-ulcs/packet-atn-ulcs-template.c"
 				{&hf_atn_ses_type,
 				{ "SPDU Type",
 					"atn-ulcs.ses.type",
@@ -2531,14 +2551,6 @@ void proto_register_atn_ulcs (void)
 					PRES_CPR_ER_MASK,
 					NULL,
 					HFILL}},
-			{ &hf_atn_pres_pdu_type,
-				{ "PDU type", "atn-ulcs.pres.pdu_type",
-					FT_UINT8,
-					BASE_HEX,
-					NULL,
-					ATN_SES_PRES_MASK,
-					NULL,
-					HFILL}},
 		};
 
 		static gint *ett[] = {
@@ -2572,7 +2584,7 @@ void proto_register_atn_ulcs (void)
     &ett_atn_ulcs_AttributeTypeAndValue,
 
 /*--- End of included file: packet-atn-ulcs-ettarr.c ---*/
-#line 850 "../../asn1/atn-ulcs/packet-atn-ulcs-template.c"
+#line 863 "../../asn1/atn-ulcs/packet-atn-ulcs-template.c"
 				&ett_atn_ses,
 				&ett_atn_pres,
 				&ett_atn_acse,
@@ -2602,7 +2614,9 @@ void proto_register_atn_ulcs (void)
 		atn_cpdlc_handle = find_dissector("atn-cpdlc");
 
 		/* initiate sub dissector list */
-		atn_ulcs_heur_subdissector_list = register_heur_dissector_list("atn-ulcs");
+		register_heur_dissector_list(
+				"atn-ulcs",
+				&atn_ulcs_heur_subdissector_list);
 
 		/* init aare/aare data */
 		aarq_data_tree = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());

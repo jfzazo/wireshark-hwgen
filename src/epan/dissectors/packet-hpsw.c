@@ -23,7 +23,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/etypes.h>
 #include <epan/expert.h>
 
 #include "packet-hpext.h"
@@ -52,7 +54,6 @@ static int hf_hpsw_config_name = -1;
 static int hf_hpsw_root_mac_addr = -1;
 static int hf_hpsw_device_id = -1;
 static int hf_hpsw_device_id_data = -1;
-static int hf_hpsw_data = -1;
 
 
 static gint ett_hpsw = -1;
@@ -195,7 +196,7 @@ dissect_hpsw_tlv(tvbuff_t *tvb, packet_info *pinfo, int offset, int length,
 
     case HPFOO_FIELD_12:
         if (length == 1) {
-            proto_tree_add_item(tree, hf_hpsw_field_12, tvb, offset, length, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tree, hf_hpsw_field_12, tvb, offset, length, ENC_NA);
         } else {
             expert_add_info_format(pinfo, ti, &ei_hpsw_tlvlength_bad, "Field 12: Bad length %u", length);
         }
@@ -219,7 +220,7 @@ dissect_hpsw_tlv(tvbuff_t *tvb, packet_info *pinfo, int offset, int length,
         break;
 
     default:
-        proto_tree_add_item(tree, hf_hpsw_data, tvb, offset, length, ENC_NA);
+        proto_tree_add_text(tree, tvb, offset, length, "Data");
         break;
     }
 }
@@ -254,18 +255,20 @@ dissect_hpsw(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         length = tvb_get_guint8(tvb, offset+1);
 
         /* make sure still in valid tlv */
-        if (( length < 1 ) || ( length > tvb_reported_length_remaining(tvb, offset+2)))
+        if (( length < 1 ) || ( length > tvb_length_remaining(tvb, offset+2)))
             break;
 
-        tlv_tree = proto_tree_add_subtree(hp_tree, tvb, offset, length+2, ett_hpsw_tlv, NULL,
+        ti = proto_tree_add_text(hp_tree, tvb, offset, length+2, "%s",
                                  val_to_str(type, hpsw_tlv_type_vals, "Unknown TLV type: 0x%02x"));
+
+        tlv_tree = proto_item_add_subtree(ti, ett_hpsw_tlv);
 
         /* type */
         proto_tree_add_uint(tlv_tree, hf_hpsw_tlvtype, tvb, offset, 1, type);
         offset += 1;
 
         /* LENGTH (not inclusive of type and length bytes) */
-        ti = proto_tree_add_uint(tlv_tree, hf_hpsw_tlvlength, tvb, offset, 1, length);
+        proto_tree_add_uint(tlv_tree, hf_hpsw_tlvlength, tvb, offset, 1, length);
         offset += 1;
 
         dissect_hpsw_tlv(tvb, pinfo, offset, length, tlv_tree, ti, type);
@@ -335,9 +338,6 @@ proto_register_hpsw(void)
             NULL, 0x0, NULL, HFILL }},
         { &hf_hpsw_device_id_data,
           { "Data", "hpsw.device_id_data", FT_BYTES, BASE_NONE,
-            NULL, 0x0, NULL, HFILL }},
-        { &hf_hpsw_data,
-          { "Data", "hpsw.data", FT_BYTES, BASE_NONE,
             NULL, 0x0, NULL, HFILL }},
     };
 

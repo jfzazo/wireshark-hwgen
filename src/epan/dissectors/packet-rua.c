@@ -33,6 +33,9 @@
 
 #include "config.h"
 
+#include <glib.h>
+#include <string.h>
+
 #include <epan/packet.h>
 #include <epan/sctpppids.h>
 #include <epan/asn1.h>
@@ -82,7 +85,7 @@ typedef enum _ProtocolIE_ID_enum {
 } ProtocolIE_ID_enum;
 
 /*--- End of included file: packet-rua-val.h ---*/
-#line 49 "../../asn1/rua/packet-rua-template.c"
+#line 52 "../../asn1/rua/packet-rua-template.c"
 
 /* Initialize the protocol and registered fields */
 static int proto_rua = -1;
@@ -159,7 +162,7 @@ static int hf_rua_successfulOutcome_value = -1;   /* SuccessfulOutcome_value */
 static int hf_rua_unsuccessfulOutcome_value = -1;  /* UnsuccessfulOutcome_value */
 
 /*--- End of included file: packet-rua-hf.c ---*/
-#line 54 "../../asn1/rua/packet-rua-template.c"
+#line 57 "../../asn1/rua/packet-rua-template.c"
 
 /* Initialize the subtree pointers */
 static int ett_rua = -1;
@@ -208,7 +211,7 @@ static gint ett_rua_SuccessfulOutcome = -1;
 static gint ett_rua_UnsuccessfulOutcome = -1;
 
 /*--- End of included file: packet-rua-ett.c ---*/
-#line 62 "../../asn1/rua/packet-rua-template.c"
+#line 65 "../../asn1/rua/packet-rua-template.c"
 
 /* Global variables */
 static guint32 ProcedureCode;
@@ -1346,46 +1349,43 @@ static int dissect_PrivateMessage_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_,
   offset += 7; offset >>= 3;
   return offset;
 }
-static int dissect_RUA_PDU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_RUA_PDU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
-  offset = dissect_rua_RUA_PDU(tvb, offset, &asn1_ctx, tree, hf_rua_RUA_PDU_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_rua_RUA_PDU(tvb, 0, &asn1_ctx, tree, hf_rua_RUA_PDU_PDU);
 }
 
 
 /*--- End of included file: packet-rua-fn.c ---*/
-#line 84 "../../asn1/rua/packet-rua-template.c"
+#line 87 "../../asn1/rua/packet-rua-template.c"
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint_new(rua_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree, FALSE, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint_new(rua_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree, FALSE, NULL)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_ProtocolExtensionFieldExtensionValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint_new(rua_extension_dissector_table, ProtocolIE_ID, tvb, pinfo, tree, FALSE, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint_new(rua_extension_dissector_table, ProtocolIE_ID, tvb, pinfo, tree, FALSE, NULL)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_InitiatingMessageValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint_new(rua_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint_new(rua_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_SuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint_new(rua_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint_new(rua_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint_new(rua_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint_new(rua_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree, FALSE, NULL)) ? tvb_length(tvb) : 0;
 }
 
-static int
-dissect_rua(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+static void
+dissect_rua(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     proto_item  *rua_item = NULL;
     proto_tree  *rua_tree = NULL;
@@ -1397,7 +1397,7 @@ dissect_rua(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     rua_item = proto_tree_add_item(tree, proto_rua, tvb, 0, -1, ENC_NA);
     rua_tree = proto_item_add_subtree(rua_item, ett_rua);
 
-    return dissect_RUA_PDU_PDU(tvb, pinfo, rua_tree, data);
+    dissect_RUA_PDU_PDU(tvb, pinfo, rua_tree);
 }
 
 /*--- proto_register_rua -------------------------------------------*/
@@ -1681,7 +1681,7 @@ module_t *rua_module;
         "UnsuccessfulOutcome_value", HFILL }},
 
 /*--- End of included file: packet-rua-hfarr.c ---*/
-#line 135 "../../asn1/rua/packet-rua-template.c"
+#line 138 "../../asn1/rua/packet-rua-template.c"
   };
 
   /* List of subtrees */
@@ -1728,7 +1728,7 @@ module_t *rua_module;
     &ett_rua_UnsuccessfulOutcome,
 
 /*--- End of included file: packet-rua-ettarr.c ---*/
-#line 141 "../../asn1/rua/packet-rua-template.c"
+#line 144 "../../asn1/rua/packet-rua-template.c"
   };
 
 
@@ -1739,7 +1739,7 @@ module_t *rua_module;
   proto_register_subtree_array(ett, array_length(ett));
 
   /* Register dissector */
-  new_register_dissector("rua", dissect_rua, proto_rua);
+  register_dissector("rua", dissect_rua, proto_rua);
 
   /* Register dissector tables */
   rua_ies_dissector_table = register_dissector_table("rua.ies", "RUA-PROTOCOL-IES", FT_UINT32, BASE_DEC);
@@ -1787,7 +1787,7 @@ proto_reg_handoff_rua(void)
 
 
 /*--- End of included file: packet-rua-dis-tab.c ---*/
-#line 180 "../../asn1/rua/packet-rua-template.c"
+#line 183 "../../asn1/rua/packet-rua-template.c"
 
         } else {
                 dissector_delete_uint("sctp.port", sctp_port, rua_handle);

@@ -22,6 +22,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include "str_util.h"
 
 int
@@ -55,10 +56,10 @@ ascii_strdown_inplace(gchar *str)
 	gchar *s;
 
 	for (s = str; *s; s++)
-		/* What 'g_ascii_tolower (gchar c)' does, this should be slightly more efficient */
+        /* What 'g_ascii_tolower (gchar c)' does, this should be slightly more efficient */
 		*s = g_ascii_isupper (*s) ? *s - 'A' + 'a' : *s;
 
-	return (str);
+        return (str);
 }
 
 /* Convert all ASCII letters to upper case, in place. */
@@ -68,10 +69,10 @@ ascii_strup_inplace(gchar *str)
 	gchar *s;
 
 	for (s = str; *s; s++)
-		/* What 'g_ascii_toupper (gchar c)' does, this should be slightly more efficient */
-		*s = g_ascii_islower (*s) ? *s - 'a' + 'A' : *s;
+        /* What 'g_ascii_toupper (gchar c)' does, this should be slightly more efficient */
+        *s = g_ascii_islower (*s) ? *s - 'a' + 'A' : *s;
 
-	return (str);
+        return (str);
 }
 
 /* Check if an entire string is printable. */
@@ -135,7 +136,7 @@ format_size(gint64 size, format_size_flags_e flags)
 		power = 1024;
 	}
 
-	if (size / power / power / power / power >= 10) {
+        if (size / power / power / power / power >= 10) {
 		g_string_printf(human_str, "%" GROUP_FLAG G_GINT64_MODIFIER "d %s", size / power / power / power / power, prefix[pfx_off]);
 	} else if (size / power / power / power >= 10) {
 		g_string_printf(human_str, "%" GROUP_FLAG G_GINT64_MODIFIER "d %s", size / power / power / power, prefix[pfx_off+1]);
@@ -143,8 +144,8 @@ format_size(gint64 size, format_size_flags_e flags)
 		g_string_printf(human_str, "%" GROUP_FLAG G_GINT64_MODIFIER "d %s", size / power / power, prefix[pfx_off+2]);
 	} else if (size / power >= 10) {
 		g_string_printf(human_str, "%" GROUP_FLAG G_GINT64_MODIFIER "d %s", size / power, prefix[pfx_off+3]);
-	} else {
-		g_string_printf(human_str, "%" GROUP_FLAG G_GINT64_MODIFIER "d", size);
+        } else {
+		g_string_printf(human_str, "%" GROUP_FLAG G_GINT64_MODIFIER "d ", size);
 		is_small = TRUE;
 	}
 
@@ -152,29 +153,24 @@ format_size(gint64 size, format_size_flags_e flags)
 		case format_size_unit_none:
 			break;
 		case format_size_unit_bytes:
-			g_string_append(human_str, is_small ? " bytes" : "B");
+			g_string_append(human_str, is_small ? "bytes" : "B");
 			break;
 		case format_size_unit_bits:
-			g_string_append(human_str, is_small ? " bits" : "b");
+			g_string_append(human_str, is_small ? "bits" : "b");
 			break;
 		case format_size_unit_bits_s:
-			g_string_append(human_str, is_small ? " bits/s" : "bps");
+			g_string_append(human_str, is_small ? "bits/s" : "bps");
 			break;
 		case format_size_unit_bytes_s:
-			g_string_append(human_str, is_small ? " bytes/s" : "Bps");
-			break;
-		case format_size_unit_packets:
-			g_string_append(human_str, is_small ? " packets" : "packets");
-			break;
-		case format_size_unit_packets_s:
-			g_string_append(human_str, is_small ? " packets/s" : "packets/s");
+			g_string_append(human_str, is_small ? "bytes/s" : "Bps");
 			break;
 		default:
 			g_assert_not_reached();
 	}
 
-	ret_val = g_string_free(human_str, FALSE);
-	return g_strchomp(ret_val);
+	ret_val = human_str->str;
+	g_string_free(human_str, FALSE);
+	return ret_val;
 }
 
 gchar
@@ -182,16 +178,3 @@ printable_char_or_period(gchar c)
 {
 	return g_ascii_isprint(c) ? c : '.';
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

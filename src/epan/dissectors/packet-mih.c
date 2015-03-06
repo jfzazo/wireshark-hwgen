@@ -34,7 +34,12 @@
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/prefs.h>
+#include <epan/reassemble.h>
+#include <epan/proto.h>
 #include <epan/etypes.h>
+#include <glib.h>
+
 void proto_register_mih(void);
 void proto_reg_handoff_mih(void);
 
@@ -1620,12 +1625,12 @@ static void dissect_mih_tlv(tvbuff_t *tvb,int offset, proto_tree *tlv_tree, guin
                                 proto_tree_add_item(tlv_tree, hf_mihf_id, tvb, offset+1, mihf_id_len, ENC_ASCII|ENC_NA);
                         else
                         {
-                                if(mihf_id_len<tvb_reported_length_remaining(tvb,0) && (mihf_id_len==12 || mihf_id_len==64 || mihf_id_len==128))
+                                if(mihf_id_len<tvb_length_remaining(tvb,0) && (mihf_id_len==12 || mihf_id_len==64 || mihf_id_len==128))
                                 {
                                         tvb_mihf_id = tvb_new_composite();
                                         for(i=0; i < mihf_id_len/2; i++)
                                         {
-                                                tvb_temp = tvb_new_subset_length(tvb, offset + 2 + 2*i, 1);
+                                                tvb_temp = tvb_new_subset(tvb, offset + 2 + 2*i, 1 , 1);
                                                 tvb_composite_append(tvb_mihf_id, tvb_temp);
                                         }
                                         TRY
@@ -1944,7 +1949,7 @@ static void dissect_mih_tlv(tvbuff_t *tvb,int offset, proto_tree *tlv_tree, guin
 
                 case VEND_SPECIFIC_TLV :
                         /*Vendor specific tlv*/
-                        proto_tree_add_text(tlv_tree, tvb, offset, length, "Vendor Specific TLV :%s", tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_ASCII));
+                        proto_tree_add_text(tlv_tree, tvb, offset, length, "Vendor Specific TLV :%s", tvb_get_string(wmem_packet_scope(), tvb, offset, length));
                         break;
 
                 default :/*did not match type*/
@@ -1952,15 +1957,15 @@ static void dissect_mih_tlv(tvbuff_t *tvb,int offset, proto_tree *tlv_tree, guin
 
                         /*RESERVED TLVs*/
                         if(type > 63 && type < 100)
-                                proto_tree_add_text(tlv_tree, tvb, offset, length, "Reserved TLV :%s", tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_ASCII));
+                                proto_tree_add_text(tlv_tree, tvb, offset, length, "Reserved TLV :%s", tvb_get_string(wmem_packet_scope(), tvb, offset, length));
 
                                                 /*EXPERIMENTAL TLVs*/
                         else if(type > 100 && type < 255)
-                                proto_tree_add_text(tlv_tree, tvb, offset, length, "Experimental TLV :%s", tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_ASCII));
+                                proto_tree_add_text(tlv_tree, tvb, offset, length, "Experimental TLV :%s", tvb_get_string(wmem_packet_scope(), tvb, offset, length));
 
                         /*UNKNOWN TLVs*/
                         else
-                                proto_tree_add_text(tlv_tree, tvb, offset, length, "UNKNOWN TLV :%s", tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_ASCII));
+                                proto_tree_add_text(tlv_tree, tvb, offset, length, "UNKNOWN TLV :%s", tvb_get_string(wmem_packet_scope(), tvb, offset, length));
         }
         return;
 }
@@ -1986,14 +1991,16 @@ static void dissect_mih(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         col_set_str(pinfo->cinfo, COL_PROTOCOL, "MIH");
         col_clear(pinfo->cinfo,COL_INFO);
+        if (tree)
+        {
+                /* we are being asked for details */
+                ti = proto_tree_add_item(tree, proto_mih, tvb, 0, -1, ENC_NA);
+        }
 
-        /* we are being asked for details */
-        ti = proto_tree_add_item(tree, proto_mih, tvb, 0, -1, ENC_NA);
         mih_tree = proto_item_add_subtree(ti, ett_mih);
         if(mih_tree)
         {
                 item = proto_tree_add_item(mih_tree, hf_mih_version, tvb, offset, 1, ENC_BIG_ENDIAN);
-
                 ver_flags_tree = proto_item_add_subtree(item, ett_ver_flags);
                 proto_tree_add_item(ver_flags_tree, hf_mih_version, tvb, offset, 1, ENC_BIG_ENDIAN);
                 proto_tree_add_item(ver_flags_tree, hf_mih_ack_req, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -2143,8 +2150,8 @@ static void dissect_mih(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                 if(len <= (guint64)payload_length)
                 {
                         /*for type...*/
-                        tlv_tree = proto_tree_add_subtree_format(mih_tree, tvb, offset, 1 + len_of_len + (guint32)len, ett_tlv, NULL,
-                                                "MIH TLV : %s", val_to_str(tvb_get_guint8(tvb, offset), typevaluenames, "UNKNOWN"));
+                        item = proto_tree_add_text(mih_tree, tvb, offset, 1 + len_of_len + (guint32)len, "MIH TLV : %s", val_to_str(tvb_get_guint8(tvb, offset), typevaluenames, "UNKNOWN"));
+                        tlv_tree = proto_item_add_subtree(item, ett_tlv);
                         if(tlv_tree)
                         {
                                 proto_tree_add_item(tlv_tree, hf_mih_type, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -2162,6 +2169,7 @@ static void dissect_mih(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
                         }
                         offset += 1 + len_of_len;
+
 
                         /*For Value fields*/
                         /*TODO: this assumes the maximum value length is 2^32. Dissecting bigger data fields would require breaking the data into chunks*/
@@ -2206,7 +2214,7 @@ void proto_register_mih(void)
                                 "MIH ACK-Req",
                                 "mih.acq_req",
                                 FT_BOOLEAN,
-                                8,
+                                1,
                                 NULL,
                                 ACKREQ_MASK,
                                 NULL, HFILL
@@ -2218,7 +2226,7 @@ void proto_register_mih(void)
                                 "MIH ACK-Resp",
                                 "mih.acq_resp",
                                 FT_BOOLEAN,
-                                8,
+                                1,
                                 NULL,
                                 ACKRESP_MASK,
                                 NULL, HFILL
@@ -2230,7 +2238,7 @@ void proto_register_mih(void)
                                 "MIH Unauthenticated info request",
                                 "mih.uir",
                                 FT_BOOLEAN,
-                                8,
+                                1,
                                 NULL,
                                 UIR_MASK,
                                 NULL, HFILL
@@ -2242,7 +2250,7 @@ void proto_register_mih(void)
                                 "MIH more fragment",
                                 "mih.more_frag",
                                 FT_BOOLEAN,
-                                8,
+                                1,
                                 NULL,
                                 MORE_FRAG_MASK,
                                 NULL, HFILL
@@ -4751,17 +4759,3 @@ void proto_reg_handoff_mih(void)
         /*Layer 2 handle*/
         dissector_add_uint("ethertype", ETHERTYPE_MIH, mih_handle);
 }
-
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 expandtab:
- * :indentSize=8:tabSize=8:noTabs=true:
- */

@@ -14,11 +14,11 @@ Release-response-reason
 DialoguePDU
 UniDialoguePDU
 
-#.REGISTER_NEW
+#.REGISTER
 DialoguePDU    B "0.0.17.773.1.1.1"  "id-as-dialogue"
 UniDialoguePDU B "0.0.17.773.1.2.1"  "id-as-uniDialogue"
 
-#.PDU_NEW
+#.PDU
 
 
 #.NO_EMIT ONLY_VALS
@@ -89,7 +89,7 @@ gint ind_field;
 comp_offset = dissect_ber_identifier(actx->pinfo, tree, tvb, offset, &ber_class, &pc, &tag);
 comp_offset = dissect_ber_length(actx->pinfo, tree, tvb, comp_offset, &len, &ind_field);
 /* we can believe the length now */
-next_tvb = tvb_new_subset_length(tvb, offset, len+comp_offset-offset);
+next_tvb = tvb_new_subset(tvb, offset, len+comp_offset-offset, len+comp_offset-offset);
 
 if (!next_tvb)
   return comp_offset;
@@ -125,8 +125,10 @@ ENDTRY;
 #.FN_BODY OrigTransactionID
 tvbuff_t *parameter_tvb;
 guint8 len, i;
+proto_item *tid_item;
 proto_tree *subtree;
-subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_otid, NULL, "Source Transaction ID");
+tid_item = proto_tree_add_text(tree, tvb, offset, -1, "Source Transaction ID");
+subtree = proto_item_add_subtree(tid_item, ett_otid);
 
 dissect_ber_octet_string(implicit_tag, actx, subtree, tvb, offset, hf_tcap_tid, NULL);
 PROTO_ITEM_SET_HIDDEN(actx->created_item);
@@ -164,8 +166,10 @@ if (parameter_tvb){
 #.FN_BODY DestTransactionID
 tvbuff_t *parameter_tvb;
 guint8 len , i;
+proto_item *tid_item;
 proto_tree *subtree;
-subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_dtid, NULL, "Destination Transaction ID");
+tid_item = proto_tree_add_text(tree, tvb, offset, -1, "Destination Transaction ID");
+subtree = proto_item_add_subtree(tid_item, ett_dtid);
 
 dissect_ber_octet_string(implicit_tag, actx, subtree, tvb, offset, hf_tcap_tid, NULL);
 PROTO_ITEM_SET_HIDDEN(actx->created_item);

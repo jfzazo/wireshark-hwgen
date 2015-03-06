@@ -3,7 +3,7 @@
  *
  * See
  *
- *    http://stuff.mit.edu/people/jhawk/ctp.html
+ *	http://stuff.mit.edu/people/jhawk/ctp.html
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/etypes.h>
 
@@ -35,7 +36,6 @@ void proto_reg_handoff_loop(void);
 static int proto_loop = -1;
 static int hf_loop_skipcount = -1;
 static int hf_loop_function = -1;
-static int hf_loop_relevant_function = -1;
 static int hf_loop_receipt_number = -1;
 static int hf_loop_forwarding_address = -1;
 
@@ -43,8 +43,8 @@ static gint ett_loop = -1;
 
 static dissector_handle_t data_handle;
 
-#define FUNC_REPLY              1
-#define FUNC_FORWARD_DATA       2
+#define FUNC_REPLY		1
+#define FUNC_FORWARD_DATA	2
 
 static const value_string function_vals[] = {
   { FUNC_REPLY, "Reply" },
@@ -82,22 +82,25 @@ dissect_loop(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       col_add_str(pinfo->cinfo, COL_INFO,
                     val_to_str(function, function_vals, "Unknown function (%u)"));
 
-      proto_tree_add_uint(loop_tree, hf_loop_relevant_function, tvb, offset, 2, function);
+      proto_tree_add_text(loop_tree, tvb, offset, 2, "Relevant function:");
       set_info = FALSE;
     }
-    proto_tree_add_uint(loop_tree, hf_loop_function, tvb, offset, 2, function);
+    if (tree)
+      proto_tree_add_uint(loop_tree, hf_loop_function, tvb, offset, 2, function);
     offset += 2;
     switch (function) {
 
     case FUNC_REPLY:
-      proto_tree_add_item(loop_tree, hf_loop_receipt_number, tvb, offset, 2,
+      if (tree)
+        proto_tree_add_item(loop_tree, hf_loop_receipt_number, tvb, offset, 2,
                             ENC_LITTLE_ENDIAN);
       offset += 2;
       more_function = FALSE;
       break;
 
     case FUNC_FORWARD_DATA:
-      proto_tree_add_item(loop_tree, hf_loop_forwarding_address, tvb, offset,
+      if (tree)
+        proto_tree_add_item(loop_tree, hf_loop_forwarding_address, tvb, offset,
                             6, ENC_NA);
       offset += 6;
       more_function = TRUE;
@@ -125,36 +128,31 @@ proto_register_loop(void)
 {
   static hf_register_info hf[] = {
     { &hf_loop_skipcount,
-      { "skipCount",            "loop.skipcount",
-    FT_UINT16,  BASE_DEC,       NULL,   0x0,
-      NULL, HFILL }},
+      { "skipCount",		"loop.skipcount",
+	FT_UINT16,	BASE_DEC,	NULL,	0x0,
+      	NULL, HFILL }},
 
     { &hf_loop_function,
-      { "Function",             "loop.function",
-    FT_UINT16,  BASE_DEC,       VALS(function_vals),    0x0,
-      NULL, HFILL }},
-
-    { &hf_loop_relevant_function,
-      { "Relevant function",            "loop.relevant_function",
-    FT_UINT16,  BASE_DEC,       VALS(function_vals),    0x0,
-      NULL, HFILL }},
+      { "Function",		"loop.function",
+	FT_UINT16,	BASE_DEC,	VALS(function_vals),	0x0,
+      	NULL, HFILL }},
 
     { &hf_loop_receipt_number,
-      { "Receipt number",       "loop.receipt_number",
-    FT_UINT16,  BASE_DEC,       NULL,   0x0,
-      NULL, HFILL }},
+      { "Receipt number",	"loop.receipt_number",
+	FT_UINT16,	BASE_DEC,	NULL,	0x0,
+      	NULL, HFILL }},
 
     { &hf_loop_forwarding_address,
-      { "Forwarding address",   "loop.forwarding_address",
-    FT_ETHER,   BASE_NONE,      NULL,   0x0,
-      NULL, HFILL }},
+      { "Forwarding address",	"loop.forwarding_address",
+	FT_ETHER,	BASE_NONE,	NULL,	0x0,
+      	NULL, HFILL }},
   };
   static gint *ett[] = {
     &ett_loop,
   };
 
   proto_loop = proto_register_protocol("Configuration Test Protocol (loopback)",
-                                       "LOOP", "loop");
+				      "LOOP", "loop");
   proto_register_field_array(proto_loop, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
 }
@@ -170,16 +168,3 @@ proto_reg_handoff_loop(void)
 
   data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

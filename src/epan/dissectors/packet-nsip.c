@@ -27,7 +27,7 @@
 
 #include <epan/packet.h>
 
-#include <epan/prefs.h>
+#include <prefs.h>
 #include <epan/to_str.h>
 
 void proto_register_nsip(void);
@@ -59,7 +59,6 @@ static int hf_nsip_ip_address_ipv4 = -1;
 static int hf_nsip_ip_address_ipv6 = -1;
 static int hf_nsip_end_flag = -1;
 static int hf_nsip_end_flag_spare = -1;
-static int hf_nsip_control_bits = -1;
 static int hf_nsip_control_bits_r = -1;
 static int hf_nsip_control_bits_c = -1;
 static int hf_nsip_control_bits_spare = -1;
@@ -69,8 +68,7 @@ static int hf_nsip_transaction_id = -1;
 static int hf_nsip_ip_element_udp_port = -1;
 static int hf_nsip_ip_element_signalling_weight = -1;
 static int hf_nsip_ip_element_data_weight = -1;
-static int hf_nsip_ns_pdu = -1;
-static int hf_nsip_ns_sdu = -1;
+
 
 /* Initialize the subtree pointers */
 static gint ett_nsip = -1;
@@ -290,7 +288,7 @@ check_correct_iei(nsip_ie_t *ie, build_info_t *bi) {
 
 #if NSIP_DEBUG
   if (fetched_iei != ie->iei) {
-    proto_tree_add_debug(bi->nsip_tree, bi->tvb, bi->offset, 1,
+    proto_tree_add_text(bi->nsip_tree, bi->tvb, bi->offset, 1,
                         "Tried IEI %s (%#02x), found IEI %s (%#02x)",
                         val_to_str_const(ie->iei, tab_nsip_ieis, "Unknown"),
                         ie->iei,
@@ -339,8 +337,8 @@ static void
 decode_iei_ns_pdu(nsip_ie_t *ie, build_info_t *bi, int ie_start_offset) {
   tvbuff_t * next_tvb;
 
-  proto_tree_add_bytes_format(bi->nsip_tree, hf_nsip_ns_pdu, bi->tvb, ie_start_offset,
-                      ie->total_length, NULL,
+  proto_tree_add_text(bi->nsip_tree, bi->tvb, ie_start_offset,
+                      ie->total_length,
                       "NS PDU (%u bytes)", ie->value_length);
   next_tvb = tvb_new_subset(bi->tvb, bi->offset, ie->value_length, -1);
   if (nsip_handle) {
@@ -383,29 +381,34 @@ decode_iei_bvci(nsip_ie_t *ie, build_info_t *bi, int ie_start_offset) {
 static proto_item *
 decode_ip_element(nsip_ip_element_info_t *element, build_info_t *bi, proto_tree * element_tree) {
   guint16 udp_port;
-  proto_item *tf;
-  proto_tree *field_tree;
+  guint32 ip4_addr;
+  struct e_in6_addr ip6_addr;
+  proto_item *tf = NULL;
+  proto_tree *field_tree = NULL;
 
-  field_tree = proto_tree_add_subtree(element_tree, bi->tvb, bi->offset,
-                             element->total_length, ett_nsip_ip_element, &tf, "IP Element");
   if (bi->nsip_tree) {
+    tf = proto_tree_add_text(element_tree, bi->tvb, bi->offset,
+                             element->total_length, "IP Element");
+    field_tree = proto_item_add_subtree(tf, ett_nsip_ip_element);
 
     /* IP address */
     switch (element->version) {
     case NSIP_IP_VERSION_4:
+      ip4_addr = tvb_get_ipv4(bi->tvb, bi->offset);
       proto_tree_add_item(field_tree, hf_nsip_ip_address_ipv4,
                           bi->tvb, bi->offset, element->address_length,
                           ENC_BIG_ENDIAN);
       proto_item_append_text(tf, ": IP address: %s",
-                             tvb_ip_to_str(bi->tvb, bi->offset));
+                             ip_to_str((guint8 *)&ip4_addr));
 
       break;
     case NSIP_IP_VERSION_6:
+      tvb_get_ipv6(bi->tvb, bi->offset, &ip6_addr);
       proto_tree_add_item(field_tree, hf_nsip_ip_address_ipv6, bi->tvb,
                           bi->offset, element->address_length,
                           ENC_NA);
       proto_item_append_text(tf, ": IP address: %s",
-                             tvb_ip6_to_str(bi->tvb, bi->offset));
+                             ip6_to_str((struct e_in6_addr *)&ip6_addr));
       break;
     default:
       ;
@@ -445,10 +448,11 @@ decode_ip_elements(nsip_ip_element_info_t *element, nsip_ie_t *ie, build_info_t 
   proto_item *tf;
   proto_tree *field_tree;
 
-  field_tree = proto_tree_add_subtree_format(bi->nsip_tree, bi->tvb, ie_start_offset,
-                           ie->total_length, ett_nsip_ip_element_list, &tf,
+  tf = proto_tree_add_text(bi->nsip_tree, bi->tvb, ie_start_offset,
+                           ie->total_length,
                            "List of IP%u Elements (%u Elements)",
                            element->version, num_elements);
+  field_tree = proto_item_add_subtree(tf, ett_nsip_ip_element_list);
 
   for (i = 0; i < num_elements; i++) {
     decode_ip_element(element, bi, field_tree);
@@ -501,15 +505,17 @@ decode_iei_num_ip6_endpoints(nsip_ie_t *ie, build_info_t *bi, int ie_start_offse
 static void
 decode_iei_reset_flag(nsip_ie_t *ie, build_info_t *bi, int ie_start_offset) {
   guint8 flag;
+  proto_item *tf;
   proto_tree *field_tree;
 
   flag = tvb_get_guint8(bi->tvb, bi->offset);
   if (bi->nsip_tree) {
 
-     field_tree = proto_tree_add_subtree_format(bi->nsip_tree, bi->tvb, ie_start_offset,
-                 ie->total_length, ett_nsip_reset_flag, NULL,
+     tf = proto_tree_add_text(bi->nsip_tree, bi->tvb, ie_start_offset,
+                 ie->total_length,
                  "Reset Flag: %#02x", flag);
 
+     field_tree = proto_item_add_subtree(tf, ett_nsip_reset_flag);
      proto_tree_add_boolean(field_tree, hf_nsip_reset_flag, bi->tvb,
                            bi->offset, 1,
                            flag & NSIP_MASK_RESET_FLAG);
@@ -569,15 +575,17 @@ decode_iei_transaction_id(nsip_ie_t *ie, build_info_t *bi, int ie_start_offset) 
 static void
 decode_iei_end_flag(nsip_ie_t *ie, build_info_t *bi, int ie_start_offset) {
   guint8 flag;
+  proto_item *tf;
   proto_tree *field_tree;
 
   if (bi->nsip_tree) {
       flag = tvb_get_guint8(bi->tvb, bi->offset);
 
-      field_tree = proto_tree_add_subtree_format(bi->nsip_tree, bi->tvb, ie_start_offset,
-                     ie->total_length, ett_nsip_end_flag, NULL,
+      tf = proto_tree_add_text(bi->nsip_tree, bi->tvb, ie_start_offset,
+                     ie->total_length,
                      "End Flag: %#02x", flag);
 
+      field_tree = proto_item_add_subtree(tf, ett_nsip_end_flag);
       proto_tree_add_boolean(field_tree, hf_nsip_end_flag, bi->tvb,
                            bi->offset, 1,
                            flag & NSIP_MASK_END_FLAG);
@@ -592,18 +600,29 @@ decode_iei_end_flag(nsip_ie_t *ie, build_info_t *bi, int ie_start_offset) {
 }
 
 static void
-decode_iei_control_bits(nsip_ie_t *ie _U_, build_info_t *bi, int ie_start_offset) {
+decode_iei_control_bits(nsip_ie_t *ie, build_info_t *bi, int ie_start_offset) {
   guint8 control_bits;
-  static const int * flags[] = {
-    &hf_nsip_control_bits_r,
-    &hf_nsip_control_bits_c,
-    &hf_nsip_control_bits_spare,
-    NULL
-  };
+  proto_item *tf;
+  proto_tree *field_tree;
 
   control_bits = tvb_get_guint8(bi->tvb, bi->offset);
-  proto_tree_add_bitmask(bi->nsip_tree, bi->tvb, ie_start_offset, hf_nsip_control_bits,
-			       ett_nsip_control_bits, flags, ENC_NA);
+
+  if (bi->nsip_tree) {
+    tf = proto_tree_add_text(bi->nsip_tree, bi->tvb, ie_start_offset,
+                             ie->total_length,
+                             "NS SDU Control bits: %#02x", control_bits);
+
+    field_tree = proto_item_add_subtree(tf, ett_nsip_control_bits);
+    proto_tree_add_boolean(field_tree, hf_nsip_control_bits_r, bi->tvb,
+                           bi->offset, 1,
+                           control_bits & NSIP_MASK_CONTROL_BITS_R);
+    proto_tree_add_boolean(field_tree, hf_nsip_control_bits_c, bi->tvb,
+                           bi->offset, 1,
+                           control_bits & NSIP_MASK_CONTROL_BITS_C);
+    proto_tree_add_uint(field_tree, hf_nsip_control_bits_spare,
+                           bi->tvb, bi->offset, 1,
+                           control_bits & NSIP_MASK_CONTROL_BITS_SPARE);
+  }
   bi->offset++;
 
   if (control_bits & NSIP_MASK_CONTROL_BITS_R) {
@@ -718,8 +737,8 @@ decode_pdu_ns_unitdata(build_info_t *bi) {
   }
   else {
     sdu_length = tvb_length_remaining(bi->tvb, bi->offset);
-    proto_tree_add_bytes_format(bi->nsip_tree, hf_nsip_ns_sdu, bi->tvb, bi->offset, sdu_length,
-                        NULL, "NS SDU (%u bytes)", sdu_length);
+    proto_tree_add_text(bi->nsip_tree, bi->tvb, bi->offset, sdu_length,
+                        "NS SDU (%u bytes)", sdu_length);
   }
 }
 
@@ -960,7 +979,7 @@ dissect_nsip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     bi.ti = proto_tree_add_item(tree, proto_nsip, tvb, 0, -1,
                              ENC_NA);
     nsip_tree = proto_item_add_subtree(bi.ti, ett_nsip);
-    proto_tree_add_item(nsip_tree, hf_nsip_pdu_type, tvb, 0, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(nsip_tree, hf_nsip_pdu_type, tvb, 0, 1, ENC_NA);
     proto_item_append_text(bi.ti, ", PDU type: %s",
                                val_to_str_const(pdu_type, tab_nsip_pdu_types, "Unknown"));
     bi.nsip_tree = nsip_tree;
@@ -1069,11 +1088,6 @@ proto_register_nsip(void)
         FT_UINT8, BASE_HEX, NULL, NSIP_MASK_END_FLAG_SPARE,
         NULL, HFILL }
     },
-    { &hf_nsip_control_bits,
-      { "NS SDU Control bits", "nsip.control_bits",
-        FT_UINT8, BASE_HEX, NULL, 0x0,
-        NULL, HFILL }
-    },
     { &hf_nsip_control_bits_r,
       { "Request change flow", "nsip.control_bits.r",
         FT_BOOLEAN, 8, TFS(&tfs_set_notset), NSIP_MASK_CONTROL_BITS_R,
@@ -1121,16 +1135,6 @@ proto_register_nsip(void)
     { &hf_nsip_ip_element_data_weight,
       { "Data Weight", "nsip.ip_element.data_weight",
         FT_UINT8, BASE_DEC, NULL, 0x0,
-        NULL, HFILL }
-    },
-    { &hf_nsip_ns_pdu,
-      { "NS PDU", "nsip.ns_pdu",
-        FT_BYTES, BASE_NONE, NULL, 0x0,
-        NULL, HFILL }
-    },
-    { &hf_nsip_ns_sdu,
-      { "NS SDU", "nsip.ns_sdu",
-        FT_BYTES, BASE_NONE, NULL, 0x0,
         NULL, HFILL }
     },
   };

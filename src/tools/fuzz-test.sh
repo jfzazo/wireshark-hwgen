@@ -48,7 +48,7 @@ VALGRIND=0
 # The maximum permitted amount of memory leaked. Eventually this should be
 # worked down to zero, but right now that would fail on every single capture.
 # Only has effect when running under valgrind.
-MAX_LEAK=`expr 1024 \* 100`
+MAX_LEAK=`expr 1024 \* 500`
 
 # To do: add options for file names and limits
 while getopts ":2b:C:d:e:gp:P:" OPTCHAR ; do
@@ -75,9 +75,9 @@ if [ $VALGRIND -eq 1 ]; then
     RUNNER="`dirname $0`/valgrind-wireshark.sh"
     COMMON_ARGS="-b $BIN_DIR $COMMON_ARGS"
     declare -a RUNNER_ARGS=("" "-T")
-    # Valgrind requires more resources, so permit 1.5x memory and 3x time
+    # Valgrind requires more resources, so permit 1.5x memory and 2.5x time
     # (1.5x time is too small for a few large captures in the menagerie)
-    MAX_CPU_TIME=`expr 3 \* $MAX_CPU_TIME`
+    MAX_CPU_TIME=`expr 5 \* $MAX_CPU_TIME / 2`
     MAX_VMEM=`expr 3 \* $MAX_VMEM / 2`
 else
     # Not using valgrind, use regular tshark.

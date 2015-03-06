@@ -25,6 +25,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <errno.h>
 
 #include <epan/packet.h>
@@ -38,6 +39,7 @@
 #include "packet-ieee80211.h"
 #include "packet-ieee80211-radiotap.h"
 #include "packet-ieee80211-radiotap-iter.h"
+#include "packet-ieee80211-radiotap-defs.h"
 
 
 /* protocol */
@@ -398,6 +400,404 @@ static const value_string vht_bandwidth[] = {
 	{ 0, NULL }
 };
 static value_string_ext vht_bandwidth_ext = VALUE_STRING_EXT_INIT(vht_bandwidth);
+
+#define MAX_MCS_INDEX	76
+
+/*
+ * Indices are:
+ *
+ *	the MCS index (0-76);
+ *
+ *	0 for 20 MHz, 1 for 40 MHz;
+ *
+ *	0 for a long guard interval, 1 for a short guard interval.
+ */
+static const float ieee80211_float_htrates[MAX_MCS_INDEX+1][2][2] = {
+	/* MCS  0  */
+	{	/* 20 Mhz */ {    6.5f,		/* SGI */    7.2f, },
+		/* 40 Mhz */ {   13.5f,		/* SGI */   15.0f, },
+	},
+
+	/* MCS  1  */
+	{	/* 20 Mhz */ {   13.0f,		/* SGI */   14.4f, },
+		/* 40 Mhz */ {   27.0f,		/* SGI */   30.0f, },
+	},
+
+	/* MCS  2  */
+	{	/* 20 Mhz */ {   19.5f,		/* SGI */   21.7f, },
+		/* 40 Mhz */ {   40.5f,		/* SGI */   45.0f, },
+	},
+
+	/* MCS  3  */
+	{	/* 20 Mhz */ {   26.0f,		/* SGI */   28.9f, },
+		/* 40 Mhz */ {   54.0f,		/* SGI */   60.0f, },
+	},
+
+	/* MCS  4  */
+	{	/* 20 Mhz */ {   39.0f,		/* SGI */   43.3f, },
+		/* 40 Mhz */ {   81.0f,		/* SGI */   90.0f, },
+	},
+
+	/* MCS  5  */
+	{	/* 20 Mhz */ {   52.0f,		/* SGI */   57.8f, },
+		/* 40 Mhz */ {  108.0f,		/* SGI */  120.0f, },
+	},
+
+	/* MCS  6  */
+	{	/* 20 Mhz */ {   58.5f,		/* SGI */   65.0f, },
+		/* 40 Mhz */ {  121.5f,		/* SGI */  135.0f, },
+	},
+
+	/* MCS  7  */
+	{	/* 20 Mhz */ {   65.0f,		/* SGI */   72.2f, },
+		/* 40 Mhz */ {   135.0f,	/* SGI */  150.0f, },
+	},
+
+	/* MCS  8  */
+	{	/* 20 Mhz */ {   13.0f,		/* SGI */   14.4f, },
+		/* 40 Mhz */ {   27.0f,		/* SGI */   30.0f, },
+	},
+
+	/* MCS  9  */
+	{	/* 20 Mhz */ {   26.0f,		/* SGI */   28.9f, },
+		/* 40 Mhz */ {   54.0f,		/* SGI */   60.0f, },
+	},
+
+	/* MCS 10  */
+	{	/* 20 Mhz */ {   39.0f,		/* SGI */   43.3f, },
+		/* 40 Mhz */ {   81.0f,		/* SGI */   90.0f, },
+	},
+
+	/* MCS 11  */
+	{	/* 20 Mhz */ {   52.0f,		/* SGI */   57.8f, },
+		/* 40 Mhz */ {  108.0f,		/* SGI */  120.0f, },
+	},
+
+	/* MCS 12  */
+	{	/* 20 Mhz */ {   78.0f,		/* SGI */   86.7f, },
+		/* 40 Mhz */ {  162.0f,		/* SGI */  180.0f, },
+	},
+
+	/* MCS 13  */
+	{	/* 20 Mhz */ {  104.0f,		/* SGI */  115.6f, },
+		/* 40 Mhz */ {  216.0f,		/* SGI */  240.0f, },
+	},
+
+	/* MCS 14  */
+	{	/* 20 Mhz */ {  117.0f,		/* SGI */  130.0f, },
+		/* 40 Mhz */ {  243.0f,		/* SGI */  270.0f, },
+	},
+
+	/* MCS 15  */
+	{	/* 20 Mhz */ {  130.0f,		/* SGI */  144.4f, },
+		/* 40 Mhz */ {  270.0f,		/* SGI */  300.0f, },
+	},
+
+	/* MCS 16  */
+	{	/* 20 Mhz */ {   19.5f,		/* SGI */   21.7f, },
+		/* 40 Mhz */ {   40.5f,		/* SGI */   45.0f, },
+	},
+
+	/* MCS 17  */
+	{	/* 20 Mhz */ {   39.0f,		/* SGI */   43.3f, },
+		/* 40 Mhz */ {   81.0f,		/* SGI */   90.0f, },
+	},
+
+	/* MCS 18  */
+	{	/* 20 Mhz */ {   58.5f,		/* SGI */   65.0f, },
+		/* 40 Mhz */ {  121.5f,		/* SGI */  135.0f, },
+	},
+
+	/* MCS 19  */
+	{	/* 20 Mhz */ {   78.0f,		/* SGI */   86.7f, },
+		/* 40 Mhz */ {  162.0f,		/* SGI */  180.0f, },
+	},
+
+	/* MCS 20  */
+	{	/* 20 Mhz */ {  117.0f,		/* SGI */  130.0f, },
+		/* 40 Mhz */ {  243.0f,		/* SGI */  270.0f, },
+	},
+
+	/* MCS 21  */
+	{	/* 20 Mhz */ {  156.0f,		/* SGI */  173.3f, },
+		/* 40 Mhz */ {  324.0f,		/* SGI */  360.0f, },
+	},
+
+	/* MCS 22  */
+	{	/* 20 Mhz */ {  175.5f,		/* SGI */  195.0f, },
+		/* 40 Mhz */ {  364.5f,		/* SGI */  405.0f, },
+	},
+
+	/* MCS 23  */
+	{	/* 20 Mhz */ {  195.0f,		/* SGI */  216.7f, },
+		/* 40 Mhz */ {  405.0f,		/* SGI */  450.0f, },
+	},
+
+	/* MCS 24  */
+	{	/* 20 Mhz */ {   26.0f,		/* SGI */   28.9f, },
+		/* 40 Mhz */ {   54.0f,		/* SGI */   60.0f, },
+	},
+
+	/* MCS 25  */
+	{	/* 20 Mhz */ {   52.0f,		/* SGI */   57.8f, },
+		/* 40 Mhz */ {  108.0f,		/* SGI */  120.0f, },
+	},
+
+	/* MCS 26  */
+	{	/* 20 Mhz */ {   78.0f,		/* SGI */   86.7f, },
+		/* 40 Mhz */ {  162.0f,		/* SGI */  180.0f, },
+	},
+
+	/* MCS 27  */
+	{	/* 20 Mhz */ {  104.0f,		/* SGI */  115.6f, },
+		/* 40 Mhz */ {  216.0f,		/* SGI */  240.0f, },
+	},
+
+	/* MCS 28  */
+	{	/* 20 Mhz */ {  156.0f,		/* SGI */  173.3f, },
+		/* 40 Mhz */ {  324.0f,		/* SGI */  360.0f, },
+	},
+
+	/* MCS 29  */
+	{	/* 20 Mhz */ {  208.0f,		/* SGI */  231.1f, },
+		/* 40 Mhz */ {  432.0f,		/* SGI */  480.0f, },
+	},
+
+	/* MCS 30  */
+	{	/* 20 Mhz */ {  234.0f,		/* SGI */  260.0f, },
+		/* 40 Mhz */ {  486.0f,		/* SGI */  540.0f, },
+	},
+
+	/* MCS 31  */
+	{	/* 20 Mhz */ {  260.0f,		/* SGI */  288.9f, },
+		/* 40 Mhz */ {  540.0f,		/* SGI */  600.0f, },
+	},
+
+	/* MCS 32  */
+	{	/* 20 Mhz */ {    0.0f,		/* SGI */    0.0f, }, /* not valid */
+		/* 40 Mhz */ {    6.0f,		/* SGI */    6.7f, },
+	},
+
+	/* MCS 33  */
+	{	/* 20 Mhz */ {   39.0f,		/* SGI */   43.3f, },
+		/* 40 Mhz */ {   81.0f,		/* SGI */   90.0f, },
+	},
+
+	/* MCS 34  */
+	{	/* 20 Mhz */ {   52.0f,		/* SGI */   57.8f, },
+		/* 40 Mhz */ {  108.0f,		/* SGI */  120.0f, },
+	},
+
+	/* MCS 35  */
+	{	/* 20 Mhz */ {   65.0f,		/* SGI */   72.2f, },
+		/* 40 Mhz */ {  135.0f,		/* SGI */  150.0f, },
+	},
+
+	/* MCS 36  */
+	{	/* 20 Mhz */ {   58.5f,		/* SGI */   65.0f, },
+		/* 40 Mhz */ {  121.5f,		/* SGI */  135.0f, },
+	},
+
+	/* MCS 37  */
+	{	/* 20 Mhz */ {   78.0f,		/* SGI */   86.7f, },
+		/* 40 Mhz */ {  162.0f,		/* SGI */  180.0f, },
+	},
+
+	/* MCS 38  */
+	{	/* 20 Mhz */ {   97.5f,		/* SGI */  108.3f, },
+		/* 40 Mhz */ {  202.5f,		/* SGI */  225.0f, },
+	},
+
+	/* MCS 39  */
+	{	/* 20 Mhz */ {   52.0f,		/* SGI */   57.8f, },
+		/* 40 Mhz */ {  108.0f,		/* SGI */  120.0f, },
+	},
+
+	/* MCS 40  */
+	{	/* 20 Mhz */ {   65.0f,		/* SGI */   72.2f, },
+		/* 40 Mhz */ {  135.0f,		/* SGI */  150.0f, },
+	},
+
+	/* MCS 41  */
+	{	/* 20 Mhz */ {   65.0f,		/* SGI */   72.2f, },
+		/* 40 Mhz */ {  135.0f,		/* SGI */  150.0f, },
+	},
+
+	/* MCS 42  */
+	{	/* 20 Mhz */ {   78.0f,		/* SGI */   86.7f, },
+		/* 40 Mhz */ {  162.0f,		/* SGI */  180.0f, },
+	},
+
+	/* MCS 43  */
+	{	/* 20 Mhz */ {   91.0f,		/* SGI */  101.1f, },
+		/* 40 Mhz */ {  189.0f,		/* SGI */  210.0f, },
+	},
+
+	/* MCS 44  */
+	{	/* 20 Mhz */ {   91.0f,		/* SGI */  101.1f, },
+		/* 40 Mhz */ {  189.0f,		/* SGI */  210.0f, },
+	},
+
+	/* MCS 45  */
+	{	/* 20 Mhz */ {  104.0f,		/* SGI */  115.6f, },
+		/* 40 Mhz */ {  216.0f,		/* SGI */  240.0f, },
+	},
+
+	/* MCS 46  */
+	{	/* 20 Mhz */ {   78.0f,		/* SGI */   86.7f, },
+		/* 40 Mhz */ {  162.0f,		/* SGI */  180.0f, },
+	},
+
+	/* MCS 47  */
+	{	/* 20 Mhz */ {   97.5f,		/* SGI */  108.3f, },
+		/* 40 Mhz */ {  202.5f,		/* SGI */  225.0f, },
+	},
+
+	/* MCS 48  */
+	{	/* 20 Mhz */ {   97.5f,		/* SGI */  108.3f, },
+		/* 40 Mhz */ {  202.5f,		/* SGI */  225.0f, },
+	},
+
+	/* MCS 49  */
+	{	/* 20 Mhz */ {  117.0f,		/* SGI */  130.0f, },
+		/* 40 Mhz */ {  243.0f,		/* SGI */  270.0f, },
+	},
+
+	/* MCS 50  */
+	{	/* 20 Mhz */ {  136.5f,		/* SGI */  151.7f, },
+		/* 40 Mhz */ {  283.5f,		/* SGI */  315.0f, },
+	},
+
+	/* MCS 51  */
+	{	/* 20 Mhz */ {  136.5f,		/* SGI */  151.7f, },
+		/* 40 Mhz */ {  283.5f,		/* SGI */  315.0f, },
+	},
+
+	/* MCS 52  */
+	{	/* 20 Mhz */ {  156.0f,		/* SGI */  173.3f, },
+		/* 40 Mhz */ {  324.0f,		/* SGI */  360.0f, },
+	},
+
+	/* MCS 53  */
+	{	/* 20 Mhz */ {   65.0f,		/* SGI */   72.2f, },
+		/* 40 Mhz */ {  135.0f,		/* SGI */  150.0f, },
+	},
+
+	/* MCS 54  */
+	{	/* 20 Mhz */ {   78.0f,		/* SGI */   86.7f, },
+		/* 40 Mhz */ {  162.0f,		/* SGI */  180.0f, },
+	},
+
+	/* MCS 55  */
+	{	/* 20 Mhz */ {   91.0f,		/* SGI */  101.1f, },
+		/* 40 Mhz */ {  189.0f,		/* SGI */  210.0f, },
+	},
+
+	/* MCS 56  */
+	{	/* 20 Mhz */ {   78.0f,		/* SGI */   86.7f, },
+		/* 40 Mhz */ {  162.0f,		/* SGI */  180.0f, },
+	},
+
+	/* MCS 57  */
+	{	/* 20 Mhz */ {   91.0f,		/* SGI */  101.1f, },
+		/* 40 Mhz */ {  189.0f,		/* SGI */  210.0f, },
+	},
+
+	/* MCS 58  */
+	{	/* 20 Mhz */ {  104.0f,		/* SGI */  115.6f, },
+		/* 40 Mhz */ {  216.0f,		/* SGI */  240.0f, },
+	},
+
+	/* MCS 59  */
+	{	/* 20 Mhz */ {  117.0f,		/* SGI */  130.0f, },
+		/* 40 Mhz */ {  243.0f,		/* SGI */  270.0f, },
+	},
+
+	/* MCS 60  */
+	{	/* 20 Mhz */ {  104.0f,		/* SGI */  115.6f, },
+		/* 40 Mhz */ {  216.0f,		/* SGI */  240.0f, },
+	},
+
+	/* MCS 61  */
+	{	/* 20 Mhz */ {  117.0f,		/* SGI */  130.0f, },
+		/* 40 Mhz */ {  243.0f,		/* SGI */  270.0f, },
+	},
+
+	/* MCS 62  */
+	{	/* 20 Mhz */ {  130.0f,		/* SGI */  144.4f, },
+		/* 40 Mhz */ {  270.0f,		/* SGI */  300.0f, },
+	},
+
+	/* MCS 63  */
+	{	/* 20 Mhz */ {  130.0f,		/* SGI */  144.4f, },
+		/* 40 Mhz */ {  270.0f,		/* SGI */  300.0f, },
+	},
+
+	/* MCS 64  */
+	{	/* 20 Mhz */ {  143.0f,		/* SGI */  158.9f, },
+		/* 40 Mhz */ {  297.0f,		/* SGI */  330.0f, },
+	},
+
+	/* MCS 65  */
+	{	/* 20 Mhz */ {   97.5f,		/* SGI */  108.3f, },
+		/* 40 Mhz */ {  202.5f,		/* SGI */  225.0f, },
+	},
+
+	/* MCS 66  */
+	{	/* 20 Mhz */ {  117.0f,		/* SGI */  130.0f, },
+		/* 40 Mhz */ {  243.0f,		/* SGI */  270.0f, },
+	},
+
+	/* MCS 67  */
+	{	/* 20 Mhz */ {  136.5f,		/* SGI */  151.7f, },
+		/* 40 Mhz */ {  283.5f,		/* SGI */  315.0f, },
+	},
+
+	/* MCS 68  */
+	{	/* 20 Mhz */ {  117.0f,		/* SGI */  130.0f, },
+		/* 40 Mhz */ {  243.0f,		/* SGI */  270.0f, },
+	},
+
+	/* MCS 69  */
+	{	/* 20 Mhz */ {  136.5f,		/* SGI */  151.7f, },
+		/* 40 Mhz */ {  283.5f,		/* SGI */  315.0f, },
+	},
+
+	/* MCS 70  */
+	{	/* 20 Mhz */ {  156.0f,		/* SGI */  173.3f, },
+		/* 40 Mhz */ {  324.0f,		/* SGI */  360.0f, },
+	},
+
+	/* MCS 71  */
+	{	/* 20 Mhz */ {  175.5f,		/* SGI */  195.0f, },
+		/* 40 Mhz */ {  364.5f,		/* SGI */  405.0f, },
+	},
+
+	/* MCS 72  */
+	{	/* 20 Mhz */ {  156.0f,		/* SGI */  173.3f, },
+		/* 40 Mhz */ {  324.0f,		/* SGI */  360.0f, },
+	},
+
+	/* MCS 73  */
+	{	/* 20 Mhz */ {  175.5f,		/* SGI */  195.0f, },
+		/* 40 Mhz */ {  364.5f,		/* SGI */  405.0f, },
+	},
+
+	/* MCS 74  */
+	{	/* 20 Mhz */ {  195.0f,		/* SGI */  216.7f, },
+		/* 40 Mhz */ {  405.0f,		/* SGI */  450.0f, },
+	},
+
+	/* MCS 75  */
+	{	/* 20 Mhz */ {  195.0f,		/* SGI */  216.7f, },
+		/* 40 Mhz */ {  405.0f,		/* SGI */  450.0f, },
+	},
+
+	/* MCS 76  */
+	{	/* 20 Mhz */ {  214.5f,		/* SGI */  238.3f, },
+		/* 40 Mhz */ {  445.5f,		/* SGI */  495.0f, },
+	},
+};
 
 /* In order by value */
 static const value_string phy_type[] = {
@@ -930,23 +1330,10 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 
 		case IEEE80211_RADIOTAP_CHANNEL: {
 			if (tree) {
+				proto_item *it;
+				proto_tree *flags_tree;
 				guint16     flags;
 				gchar	   *chan_str;
-				static const int * channel_flags[] = {
-					&hf_radiotap_channel_flags_turbo,
-					&hf_radiotap_channel_flags_cck,
-					&hf_radiotap_channel_flags_ofdm,
-					&hf_radiotap_channel_flags_2ghz,
-					&hf_radiotap_channel_flags_5ghz,
-					&hf_radiotap_channel_flags_passive,
-					&hf_radiotap_channel_flags_dynamic,
-					&hf_radiotap_channel_flags_gfsk,
-					&hf_radiotap_channel_flags_gsm,
-					&hf_radiotap_channel_flags_sturbo,
-					&hf_radiotap_channel_flags_half,
-					&hf_radiotap_channel_flags_quarter,
-					NULL
-				};
 
 				freq	 = tvb_get_letohs(tvb, offset);
 				flags	 = tvb_get_letohs(tvb, offset + 2);
@@ -959,9 +1346,49 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 							   "%s",
 							   chan_str);
 				g_free(chan_str);
-
 				/* We're already 2-byte aligned. */
-				proto_tree_add_bitmask(radiotap_tree, tvb, offset + 2, hf_radiotap_channel_flags, ett_radiotap_channel_flags, channel_flags, ENC_LITTLE_ENDIAN);
+				it = proto_tree_add_uint(radiotap_tree,
+							 hf_radiotap_channel_flags,
+							 tvb, offset + 2, 2, flags);
+				flags_tree =
+				    proto_item_add_subtree(it,
+							   ett_radiotap_channel_flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_turbo,
+						       tvb, offset + 2, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_cck,
+						       tvb, offset + 2, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_ofdm,
+						       tvb, offset + 2, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_2ghz,
+						       tvb, offset + 2, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_5ghz,
+						       tvb, offset + 3, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_passive,
+						       tvb, offset + 3, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_dynamic,
+						       tvb, offset + 3, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_gfsk,
+						       tvb, offset + 3, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_gsm,
+						       tvb, offset + 3, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_sturbo,
+						       tvb, offset + 3, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_half,
+						       tvb, offset + 3, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_channel_flags_quarter,
+						       tvb, offset + 3, 1, flags);
 				radiotap_info->freq = freq;
 				radiotap_info->flags = flags;
 			}
@@ -1074,56 +1501,103 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 					hdr_fcs_offset = offset;
 				}
 			} else {
-				static const int * rxflags[] = {
-					&hf_radiotap_rxflags_badplcp,
-					NULL
-				};
 
-				proto_tree_add_bitmask(radiotap_tree, tvb, offset, hf_radiotap_rxflags, ett_radiotap_rxflags, rxflags, ENC_LITTLE_ENDIAN);
+				if (tree) {
+					proto_tree *flags_tree;
+					proto_item *it;
+					guint16	    flags;
+					flags = tvb_get_letohs(tvb, offset);
+					it = proto_tree_add_uint(radiotap_tree,
+								 hf_radiotap_rxflags,
+								 tvb, offset, 2, flags);
+					flags_tree =
+					    proto_item_add_subtree(it,
+								   ett_radiotap_rxflags);
+					proto_tree_add_boolean(flags_tree,
+							       hf_radiotap_rxflags_badplcp,
+							       tvb, offset, 1, flags);
+				}
 			}
 			break;
 		}
 
 		case IEEE80211_RADIOTAP_XCHANNEL: {
-			static const int * xchannel_flags[] = {
-				&hf_radiotap_xchannel_flags_turbo,
-				&hf_radiotap_xchannel_flags_cck,
-				&hf_radiotap_xchannel_flags_ofdm,
-				&hf_radiotap_xchannel_flags_2ghz,
-				&hf_radiotap_xchannel_flags_5ghz,
-				&hf_radiotap_xchannel_flags_passive,
-				&hf_radiotap_xchannel_flags_dynamic,
-				&hf_radiotap_xchannel_flags_gfsk,
-				&hf_radiotap_xchannel_flags_gsm,
-				&hf_radiotap_xchannel_flags_sturbo,
-				&hf_radiotap_xchannel_flags_half,
-				&hf_radiotap_xchannel_flags_quarter,
-				&hf_radiotap_xchannel_flags_ht20,
-				&hf_radiotap_xchannel_flags_ht40u,
-				&hf_radiotap_xchannel_flags_ht40d,
-				NULL
-			};
+			if (tree) {
+				proto_item *it;
+				proto_tree *flags_tree;
+				guint32     flags;
+				int	    channel;
 
-			proto_tree_add_item(radiotap_tree,
-						hf_radiotap_xchannel,
-						tvb, offset + 6, 1,
-						ENC_LITTLE_ENDIAN);
-			proto_tree_add_item(radiotap_tree,
-						hf_radiotap_xchannel_frequency,
-						tvb, offset + 4, 2, ENC_LITTLE_ENDIAN);
-
-			proto_tree_add_bitmask(radiotap_tree, tvb, offset, hf_radiotap_xchannel_flags, ett_radiotap_xchannel_flags, xchannel_flags, ENC_LITTLE_ENDIAN);
-
-
+				flags   = tvb_get_letohl(tvb, offset);
+				freq    = tvb_get_letohs(tvb, offset + 4);
+				channel = tvb_get_guint8(tvb, offset + 6);
+				proto_tree_add_uint(radiotap_tree,
+						    hf_radiotap_xchannel,
+						    tvb, offset + 6, 1,
+						    (guint32) channel);
+				proto_tree_add_uint(radiotap_tree,
+						    hf_radiotap_xchannel_frequency,
+						    tvb, offset + 4, 2, freq);
+				it = proto_tree_add_uint(radiotap_tree,
+							 hf_radiotap_xchannel_flags,
+							 tvb, offset + 0, 4, flags);
+				flags_tree =
+				    proto_item_add_subtree(it, ett_radiotap_xchannel_flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_turbo,
+						       tvb, offset + 0, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_cck,
+						       tvb, offset + 0, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_ofdm,
+						       tvb, offset + 0, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_2ghz,
+						       tvb, offset + 0, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_5ghz,
+						       tvb, offset + 1, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_passive,
+						       tvb, offset + 1, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_dynamic,
+						       tvb, offset + 1, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_gfsk,
+						       tvb, offset + 1, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_gsm,
+						       tvb, offset + 1, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_sturbo,
+						       tvb, offset + 1, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_half,
+						       tvb, offset + 1, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_quarter,
+						       tvb, offset + 1, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_ht20,
+						       tvb, offset + 2, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_ht40u,
+						       tvb, offset + 2, 1, flags);
+				proto_tree_add_boolean(flags_tree,
+						       hf_radiotap_xchannel_flags_ht40d,
+						       tvb, offset + 2, 1, flags);
 #if 0
-			proto_tree_add_uint(radiotap_tree,
-						hf_radiotap_xchannel_maxpower,
-						tvb, offset + 7, 1, maxpower);
+				proto_tree_add_uint(radiotap_tree,
+						    hf_radiotap_xchannel_maxpower,
+						    tvb, offset + 7, 1, maxpower);
 #endif
+			}
 			break;
 		}
 		case IEEE80211_RADIOTAP_MCS: {
-			proto_tree *mcs_tree = NULL;
+			proto_tree *mcs_tree = NULL, *mcs_known_tree;
 			guint8	    mcs_known, mcs_flags;
 			guint8	    mcs;
 			guint	    bandwidth;
@@ -1143,26 +1617,31 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 
 			if (tree) {
 				proto_item *it;
-				static const int * mcs_haves[] = {
-					&hf_radiotap_mcs_have_bw,
-					&hf_radiotap_mcs_have_index,
-					&hf_radiotap_mcs_have_gi,
-					&hf_radiotap_mcs_have_format,
-					&hf_radiotap_mcs_have_fec,
-					&hf_radiotap_mcs_have_stbc,
-					NULL
-				};
 
 				it = proto_tree_add_item(radiotap_tree, hf_radiotap_mcs,
 							 tvb, offset, 3, ENC_NA);
 				mcs_tree = proto_item_add_subtree(it, ett_radiotap_mcs);
-
-				proto_tree_add_bitmask(mcs_tree, tvb, offset, hf_radiotap_mcs_known, ett_radiotap_mcs_known, mcs_haves, ENC_LITTLE_ENDIAN);
+				it = proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_known,
+							 tvb, offset, 1, mcs_known);
+				mcs_known_tree = proto_item_add_subtree(it, ett_radiotap_mcs_known);
+				proto_tree_add_item(mcs_known_tree, hf_radiotap_mcs_have_bw,
+					    tvb, offset, 1, ENC_LITTLE_ENDIAN);
+				proto_tree_add_item(mcs_known_tree, hf_radiotap_mcs_have_index,
+						    tvb, offset, 1, ENC_LITTLE_ENDIAN);
+				proto_tree_add_item(mcs_known_tree, hf_radiotap_mcs_have_gi,
+						    tvb, offset, 1, ENC_LITTLE_ENDIAN);
+				proto_tree_add_item(mcs_known_tree, hf_radiotap_mcs_have_format,
+						    tvb, offset, 1, ENC_LITTLE_ENDIAN);
+				proto_tree_add_item(mcs_known_tree, hf_radiotap_mcs_have_fec,
+						    tvb, offset, 1, ENC_LITTLE_ENDIAN);
+				proto_tree_add_item(mcs_known_tree, hf_radiotap_mcs_have_stbc,
+						    tvb, offset, 1, ENC_LITTLE_ENDIAN);
 			}
 			if (mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_BW) {
 				bandwidth = ((mcs_flags & IEEE80211_RADIOTAP_MCS_BW_MASK) == IEEE80211_RADIOTAP_MCS_BW_40) ?
 				    1 : 0;
-				proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_bw,
+				if (mcs_tree)
+					proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_bw,
 							    tvb, offset + 1, 1, mcs_flags);
 			} else {
 				bandwidth = 0;
@@ -1171,26 +1650,31 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 			if (mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_GI) {
 				gi_length = (mcs_flags & IEEE80211_RADIOTAP_MCS_SGI) ?
 				    1 : 0;
-				proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_gi,
+				if (mcs_tree)
+					proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_gi,
 							    tvb, offset + 1, 1, mcs_flags);
 			} else {
 				gi_length = 0;
 				can_calculate_rate = FALSE;	/* no GI width */
 			}
 			if (mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_FMT) {
-				proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_format,
+				if (mcs_tree)
+					proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_format,
 							    tvb, offset + 1, 1, mcs_flags);
 			}
 			if (mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_FEC) {
-				proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_fec,
+				if (mcs_tree)
+					proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_fec,
 							    tvb, offset + 1, 1, mcs_flags);
 			}
 			if (mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_STBC) {
-				proto_tree_add_boolean(mcs_tree, hf_radiotap_mcs_stbc,
+				if (mcs_tree)
+					proto_tree_add_boolean(mcs_tree, hf_radiotap_mcs_stbc,
 							    tvb, offset + 1, 1, mcs_flags);
 			}
 			if (mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_MCS) {
-				proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_index,
+				if (mcs_tree)
+					proto_tree_add_uint(mcs_tree, hf_radiotap_mcs_index,
 							    tvb, offset + 2, 1, mcs);
 			} else
 				can_calculate_rate = FALSE;	/* no MCS index */
@@ -1692,7 +2176,7 @@ void proto_register_radiotap(void)
 		 {"MAC timestamp", "radiotap.mactime",
 		  FT_UINT64, BASE_DEC, NULL, 0x0,
 		  "Value in microseconds of the MAC's Time Synchronization Function timer"
-		  " when the first bit of the MPDU arrived at the MAC.",
+                  " when the first bit of the MPDU arrived at the MAC.",
 		  HFILL}},
 
 		{&hf_radiotap_quality,
@@ -1747,7 +2231,7 @@ void proto_register_radiotap(void)
 		{&hf_radiotap_channel_flags_passive,
 		 {"Passive", "radiotap.channel.type.passive",
 		  FT_BOOLEAN, 16, NULL, 0x0200,
-		  "Channel Type Passive", HFILL}},
+                  "Channel Type Passive", HFILL}},
 
 		{&hf_radiotap_channel_flags_dynamic,
 		 {"Dynamic CCK-OFDM", "radiotap.channel.type.dynamic",
@@ -1762,27 +2246,27 @@ void proto_register_radiotap(void)
 		{&hf_radiotap_channel_flags_gsm,
 		 {"GSM (900MHz)", "radiotap.channel.type.gsm",
 		  FT_BOOLEAN, 16, NULL, 0x1000,
-		  "Channel Type GSM", HFILL}},
+                  "Channel Type GSM", HFILL}},
 
 		{&hf_radiotap_channel_flags_sturbo,
 		 {"Static Turbo", "radiotap.channel.type.sturbo",
 		  FT_BOOLEAN, 16, NULL, 0x2000,
-		  "Channel Type Status Turbo", HFILL}},
+                  "Channel Type Status Turbo", HFILL}},
 
 		{&hf_radiotap_channel_flags_half,
 		 {"Half Rate Channel (10MHz Channel Width)", "radiotap.channel.type.half",
 		  FT_BOOLEAN, 16, NULL, 0x4000,
-		  "Channel Type Half Rate", HFILL}},
+                  "Channel Type Half Rate", HFILL}},
 
 		{&hf_radiotap_channel_flags_quarter,
 		 {"Quarter Rate Channel (5MHz Channel Width)", "radiotap.channel.type.quarter",
 		  FT_BOOLEAN, 16, NULL, 0x8000,
-		  "Channel Type Quarter Rate", HFILL}},
+                  "Channel Type Quarter Rate", HFILL}},
 
 		{&hf_radiotap_rxflags,
 		 {"RX flags", "radiotap.rxflags",
 		  FT_UINT16, BASE_HEX, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_rxflags_badplcp,
 		 {"Bad PLCP", "radiotap.rxflags.badplcp",
@@ -1792,22 +2276,22 @@ void proto_register_radiotap(void)
 		{&hf_radiotap_xchannel,
 		 {"Channel number", "radiotap.xchannel",
 		  FT_UINT32, BASE_DEC, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_xchannel_frequency,
 		 {"Channel frequency", "radiotap.xchannel.freq",
 		  FT_UINT32, BASE_DEC, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_xchannel_flags,
 		 {"Channel type", "radiotap.xchannel.flags",
 		  FT_UINT32, BASE_HEX | BASE_EXT_STRING, &phy_type_ext, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_xchannel_flags_turbo,
 		 {"Turbo", "radiotap.xchannel.type.turbo",
 		  FT_BOOLEAN, 24, NULL, 0x0010,
-		  "Channel Type Turbo", HFILL}},
+                  "Channel Type Turbo", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_cck,
 		 {"Complementary Code Keying (CCK)", "radiotap.xchannel.type.cck",
@@ -1822,17 +2306,17 @@ void proto_register_radiotap(void)
 		{&hf_radiotap_xchannel_flags_2ghz,
 		 {"2 GHz spectrum", "radiotap.xchannel.type.2ghz",
 		  FT_BOOLEAN, 24, NULL, 0x0080,
-		  "Channel Type 2 GHz spectrum", HFILL}},
+                  "Channel Type 2 GHz spectrum", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_5ghz,
 		 {"5 GHz spectrum", "radiotap.xchannel.type.5ghz",
 		  FT_BOOLEAN, 24, NULL, 0x0100,
-		  "Channel Type 5 GHz spectrum", HFILL}},
+                  "Channel Type 5 GHz spectrum", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_passive,
 		 {"Passive", "radiotap.channel.xtype.passive",
 		  FT_BOOLEAN, 24, NULL, 0x0200,
-		  "Channel Type Passive", HFILL}},
+                  "Channel Type Passive", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_dynamic,
 		 {"Dynamic CCK-OFDM", "radiotap.xchannel.type.dynamic",
@@ -1849,42 +2333,42 @@ void proto_register_radiotap(void)
 		{&hf_radiotap_xchannel_flags_gsm,
 		 {"GSM (900MHz)", "radiotap.xchannel.type.gsm",
 		  FT_BOOLEAN, 24, NULL, 0x1000,
-		  "Channel Type GSM", HFILL}},
+                  "Channel Type GSM", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_sturbo,
 		 {"Static Turbo", "radiotap.xchannel.type.sturbo",
 		  FT_BOOLEAN, 24, NULL, 0x2000,
-		  "Channel Type Status Turbo", HFILL}},
+                  "Channel Type Status Turbo", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_half,
 		 {"Half Rate Channel (10MHz Channel Width)", "radiotap.xchannel.type.half",
 		  FT_BOOLEAN, 24, NULL, 0x4000,
-		  "Channel Type Half Rate", HFILL}},
+                  "Channel Type Half Rate", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_quarter,
 		 {"Quarter Rate Channel (5MHz Channel Width)", "radiotap.xchannel.type.quarter",
 		  FT_BOOLEAN, 24, NULL, 0x8000,
-		  "Channel Type Quarter Rate", HFILL}},
+                  "Channel Type Quarter Rate", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_ht20,
 		 {"HT Channel (20MHz Channel Width)", "radiotap.xchannel.type.ht20",
 		  FT_BOOLEAN, 24, NULL, 0x10000,
-		  "Channel Type HT/20", HFILL}},
+                  "Channel Type HT/20", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_ht40u,
 		 {"HT Channel (40MHz Channel Width with Extension channel above)", "radiotap.xchannel.type.ht40u",
 		  FT_BOOLEAN, 24, NULL, 0x20000,
-		  "Channel Type HT/40+", HFILL}},
+                  "Channel Type HT/40+", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_ht40d,
 		 {"HT Channel (40MHz Channel Width with Extension channel below)", "radiotap.xchannel.type.ht40d",
 		  FT_BOOLEAN, 24, NULL, 0x40000,
-		  "Channel Type HT/40-", HFILL}},
+                  "Channel Type HT/40-", HFILL}},
 #if 0
 		{&hf_radiotap_xchannel_maxpower,
 		 {"Max transmit power", "radiotap.xchannel.maxpower",
 		  FT_UINT32, BASE_DEC, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 #endif
 		{&hf_radiotap_fhss_hopset,
 		 {"FHSS Hop Set", "radiotap.fhss.hopset",
@@ -1910,7 +2394,7 @@ void proto_register_radiotap(void)
 		 {"SSI Signal", "radiotap.dbm_antsignal",
 		  FT_INT32, BASE_DEC, NULL, 0x0,
 		  "RF signal power at the antenna from a fixed,"
-		  " arbitrary value in decibels from one milliwatt", HFILL}},
+                  " arbitrary value in decibels from one milliwatt", HFILL}},
 
 		{&hf_radiotap_db_antsignal,
 		 {"SSI Signal", "radiotap.db_antsignal",
@@ -1921,25 +2405,25 @@ void proto_register_radiotap(void)
 		 {"SSI Noise", "radiotap.dbm_antnoise",
 		  FT_INT32, BASE_DEC, NULL, 0x0,
 		  "RF noise power at the antenna from a fixed, arbitrary value"
-		  " in decibels per one milliwatt", HFILL}},
+                  " in decibels per one milliwatt", HFILL}},
 
 		{&hf_radiotap_db_antnoise,
 		 {"SSI Noise", "radiotap.db_antnoise",
 		  FT_UINT32, BASE_DEC, NULL, 0x0,
 		  "RF noise power at the antenna from a fixed, arbitrary value"
-		  " in decibels", HFILL}},
+                  " in decibels", HFILL}},
 
 		{&hf_radiotap_tx_attenuation,
 		 {"Transmit attenuation", "radiotap.txattenuation",
 		  FT_UINT16, BASE_DEC, NULL, 0x0,
 		  "Transmit power expressed as unitless distance from max power"
-		  " set at factory (0 is max power)", HFILL}},
+                  " set at factory (0 is max power)", HFILL}},
 
 		{&hf_radiotap_db_tx_attenuation,
 		 {"Transmit attenuation (dB)", "radiotap.db_txattenuation",
 		  FT_UINT16, BASE_DEC, NULL, 0x0,
 		  "Transmit power expressed as decibels from max power"
-		  " set at factory (0 is max power)", HFILL}},
+                  " set at factory (0 is max power)", HFILL}},
 
 		{&hf_radiotap_txpower,
 		 {"Transmit power", "radiotap.txpower",
@@ -1949,7 +2433,7 @@ void proto_register_radiotap(void)
 		{&hf_radiotap_mcs,
 		 {"MCS information", "radiotap.mcs",
 		  FT_NONE, BASE_NONE, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_mcs_known,
 		 {"Known MCS information", "radiotap.mcs.known",
@@ -2014,17 +2498,17 @@ void proto_register_radiotap(void)
 		{&hf_radiotap_mcs_index,
 		 {"MCS index", "radiotap.mcs.index",
 		  FT_UINT8, BASE_DEC, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_ampdu,
 		 {"A-MPDU status", "radiotap.ampdu",
 		  FT_NONE, BASE_NONE, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_ampdu_ref,
 		 {"A-MPDU reference number", "radiotap.ampdu.reference",
 		  FT_UINT32, BASE_DEC, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_ampdu_flags,
 		 {"A-MPDU flags", "radiotap.ampdu.flags",
@@ -2034,37 +2518,37 @@ void proto_register_radiotap(void)
 		{&hf_radiotap_ampdu_flags_report_zerolen,
 		 {"Driver reports 0-length subframes in this A-MPDU", "radiotap.ampdu.flags.report_zerolen",
 		  FT_BOOLEAN, 16, NULL, IEEE80211_RADIOTAP_AMPDU_REPORT_ZEROLEN,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_ampdu_flags_is_zerolen,
 		 {"This is a 0-length subframe", "radiotap.ampdu.flags.is_zerolen",
 		  FT_BOOLEAN, 16, NULL, IEEE80211_RADIOTAP_AMPDU_IS_ZEROLEN,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_ampdu_flags_last_known,
 		 {"Last subframe of this A-MPDU is known", "radiotap.ampdu.flags.lastknown",
 		  FT_BOOLEAN, 16, NULL, IEEE80211_RADIOTAP_AMPDU_LAST_KNOWN,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_ampdu_flags_is_last,
 		 {"This is the last subframe of this A-MPDU", "radiotap.ampdu.flags.last",
 		  FT_BOOLEAN, 16, NULL, IEEE80211_RADIOTAP_AMPDU_IS_LAST,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_ampdu_flags_delim_crc_error,
 		 {"Delimiter CRC error on this subframe", "radiotap.ampdu.flags.delim_crc_error",
 		  FT_BOOLEAN, 16, NULL, IEEE80211_RADIOTAP_AMPDU_DELIM_CRC_ERR,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_ampdu_delim_crc,
 		 {"A-MPDU subframe delimiter CRC", "radiotap.ampdu.delim_crc",
 		  FT_UINT8, BASE_HEX, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_vht,
 		 {"VHT information", "radiotap.vht",
 		  FT_NONE, BASE_NONE, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_vht_known,
 		 {"Known VHT information", "radiotap.vht.known",
@@ -2074,7 +2558,7 @@ void proto_register_radiotap(void)
 		{&hf_radiotap_vht_user,
 		 {"User", "radiotap.vht.user",
 		  FT_NONE, BASE_NONE, NULL, 0x0,
-		  NULL, HFILL}},
+                  NULL, HFILL}},
 
 		{&hf_radiotap_vht_have_stbc,
 		 {"STBC", "radiotap.vht.have_stbc",

@@ -65,7 +65,7 @@ static void dissect_sipfrag(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     sipfrag_tree = proto_item_add_subtree(ti, ett_sipfrag);
 
     /* Show the sipfrag message a line at a time. */
-    while (tvb_reported_length_remaining(tvb, offset) > 0)
+    while (tvb_offset_exists(tvb, offset))
     {
         /* Find the end of the line. */
         linelen = tvb_find_line_end_unquoted(tvb, offset, -1, &next_offset);
@@ -73,7 +73,7 @@ static void dissect_sipfrag(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         /* For now, add all lines as unparsed strings */
 
         /* Extract & add the string. */
-        string = (char*)tvb_get_string_enc(wmem_packet_scope(), tvb, offset, linelen, ENC_ASCII);
+        string = (char*)tvb_get_string(wmem_packet_scope(), tvb, offset, linelen);
         proto_tree_add_string_format(sipfrag_tree, hf_sipfrag_line,
                                      tvb, offset,
                                      linelen, string,
@@ -124,15 +124,4 @@ void proto_reg_handoff_sipfrag(void)
     dissector_add_string("media_type", "message/sipfrag", sipfrag_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+

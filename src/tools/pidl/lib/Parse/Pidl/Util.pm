@@ -43,7 +43,6 @@ unless we actually need it
 sub MyDumper($)
 {
 	require Data::Dumper;
-	$Data::Dumper::Sortkeys = 1;
 	my $s = shift;
 	return Data::Dumper::Dumper($s);
 }

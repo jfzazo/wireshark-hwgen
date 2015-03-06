@@ -61,7 +61,7 @@ free_tvb_data(void *data)
 }
 
 static gboolean
-val_from_string(fvalue_t *fv, const char *s, gchar **err_msg _U_)
+val_from_string(fvalue_t *fv, const char *s, LogFunc logfunc _U_)
 {
 	tvbuff_t *new_tvb;
 	guint8 *private_data;
@@ -85,7 +85,7 @@ val_from_string(fvalue_t *fv, const char *s, gchar **err_msg _U_)
 }
 
 static gboolean
-val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, gchar **err_msg)
+val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, LogFunc logfunc)
 {
 	fvalue_t *fv_bytes;
 	tvbuff_t *new_tvb;
@@ -114,11 +114,11 @@ val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_,
 	}
 
 	/* Treat it as a string. */
-	return val_from_string(fv, s, err_msg);
+	return val_from_string(fv, s, logfunc);
 }
 
 static int
-val_repr_len(fvalue_t *fv, ftrepr_t rtype, int field_display _U_)
+val_repr_len(fvalue_t *fv, ftrepr_t rtype)
 {
 	volatile guint length = 0;
 
@@ -138,7 +138,7 @@ val_repr_len(fvalue_t *fv, ftrepr_t rtype, int field_display _U_)
 }
 
 static void
-val_to_repr(fvalue_t *fv, ftrepr_t rtype, int field_display _U_, char * volatile buf)
+val_to_repr(fvalue_t *fv, ftrepr_t rtype, char * volatile buf)
 {
 	guint length;
 	const guint8 *c;

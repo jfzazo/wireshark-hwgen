@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 void proto_register_rmcp(void);
@@ -45,7 +46,6 @@ static int hf_rmcp_version = -1;
 static int hf_rmcp_sequence = -1;
 static int hf_rmcp_class = -1;
 static int hf_rmcp_type = -1;
-static int hf_rmcp_trailer = -1;
 
 static int proto_rsp = -1;
 static int hf_rsp_session_id = -1;
@@ -88,7 +88,7 @@ static int
 dissect_rmcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
 	proto_tree	*rmcp_tree = NULL, *field_tree;
-	proto_item	*ti;
+	proto_item	*ti, *tf;
 	tvbuff_t	*next_tvb;
 	guint8		rmcp_class;
 	const gchar	*class_str;
@@ -125,10 +125,11 @@ dissect_rmcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 		proto_tree_add_item(rmcp_tree, hf_rmcp_version, tvb, 0, 1, ENC_LITTLE_ENDIAN);
 		proto_tree_add_item(rmcp_tree, hf_rmcp_sequence, tvb, 2, 1, ENC_LITTLE_ENDIAN);
 
-		field_tree = proto_tree_add_subtree_format(rmcp_tree, tvb, 3, 1,
-			 ett_rmcp_typeclass, NULL, "Type: %s, Class: %s",
+		tf = proto_tree_add_text(rmcp_tree, tvb, 3, 1, "Type: %s, Class: %s",
 			 val_to_str(type, rmcp_type_vals, "Unknown (0x%02x)"),
 			 class_str);
+
+		field_tree = proto_item_add_subtree(tf, ett_rmcp_typeclass);
 
 		proto_tree_add_item(field_tree, hf_rmcp_class, tvb, 3, 1, ENC_LITTLE_ENDIAN);
 		proto_tree_add_item(field_tree, hf_rmcp_type, tvb, 3, 1, ENC_LITTLE_ENDIAN);
@@ -142,7 +143,8 @@ dissect_rmcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 			tree)) {
 			len = call_dissector(data_handle, next_tvb, pinfo, tree);
 			if (len < tvb_length(next_tvb)) {
-				proto_tree_add_item(tree, hf_rmcp_trailer, tvb, 4 + len, -1, ENC_NA);
+			proto_tree_add_text(tree, tvb, 4 + len, -1,
+				"RSP Trailer (%d bytes):", tvb_length(next_tvb) - len);
 			}
 		}
 	}
@@ -200,11 +202,7 @@ proto_register_rmcp(void)
 			"Message Type", "rmcp.type",
 			FT_UINT8, BASE_HEX,
 			VALS(rmcp_type_vals), RMCP_TYPE_MASK,
-			"RMCP Message Type", HFILL }},
-		{ &hf_rmcp_trailer, {
-			"RSP Trailer", "rmcp.trailer",
-			FT_BYTES, BASE_NONE, NULL, 0,
-			NULL, HFILL }},
+			"RMCP Message Type", HFILL }}
 	};
 	static gint *ett[] = {
 		&ett_rmcp,
@@ -263,16 +261,3 @@ proto_reg_handoff_rsp(void)
 	rsp_handle = new_create_dissector_handle(dissect_rsp, proto_rsp);
 	dissector_add_uint("udp.port", UDP_PORT_RMCP_SECURE, rsp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

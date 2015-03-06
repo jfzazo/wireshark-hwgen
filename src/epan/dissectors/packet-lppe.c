@@ -33,6 +33,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/asn1.h>
 
@@ -1753,7 +1754,7 @@ static int hf_lppe_T_srnMeasurements_rssi = -1;
 static int hf_lppe_T_srnMeasurements_rtd = -1;
 
 /*--- End of included file: packet-lppe-hf.c ---*/
-#line 50 "../../asn1/lppe/packet-lppe-template.c"
+#line 51 "../../asn1/lppe/packet-lppe-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_lppe = -1;
@@ -2447,7 +2448,7 @@ static gint ett_lppe_OMA_LPPe_SRN_MeasurementMask = -1;
 static gint ett_lppe_T_srnMeasurements = -1;
 
 /*--- End of included file: packet-lppe-ett.c ---*/
-#line 54 "../../asn1/lppe/packet-lppe-template.c"
+#line 55 "../../asn1/lppe/packet-lppe-template.c"
 
 /* Include constants */
 
@@ -2494,7 +2495,7 @@ static gint ett_lppe_T_srnMeasurements = -1;
 #define maxChannels                    512
 
 /*--- End of included file: packet-lppe-val.h ---*/
-#line 57 "../../asn1/lppe/packet-lppe-template.c"
+#line 58 "../../asn1/lppe/packet-lppe-template.c"
 
 
 
@@ -16446,7 +16447,7 @@ static int dissect_OMA_LPPe_MessageExtension_PDU(tvbuff_t *tvb _U_, packet_info 
 
 
 /*--- End of included file: packet-lppe-fn.c ---*/
-#line 60 "../../asn1/lppe/packet-lppe-template.c"
+#line 61 "../../asn1/lppe/packet-lppe-template.c"
 
 
 /*--- proto_register_lpp -------------------------------------------*/
@@ -23232,7 +23233,7 @@ void proto_register_lppe(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-lppe-hfarr.c ---*/
-#line 69 "../../asn1/lppe/packet-lppe-template.c"
+#line 70 "../../asn1/lppe/packet-lppe-template.c"
   };
 
   /* List of subtrees */
@@ -23928,7 +23929,7 @@ void proto_register_lppe(void) {
     &ett_lppe_T_srnMeasurements,
 
 /*--- End of included file: packet-lppe-ettarr.c ---*/
-#line 75 "../../asn1/lppe/packet-lppe-template.c"
+#line 76 "../../asn1/lppe/packet-lppe-template.c"
   };
 
 

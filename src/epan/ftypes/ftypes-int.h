@@ -34,7 +34,6 @@ ftype_register(enum ftenum ftype, ftype_t *ft);
  * that I don't mind doing it by hand for now. */
 void ftype_register_bytes(void);
 void ftype_register_double(void);
-void ftype_register_fc(void);
 void ftype_register_integers(void);
 void ftype_register_ipv4(void);
 void ftype_register_ipv6(void);
@@ -48,10 +47,10 @@ void ftype_register_pcre(void);
 typedef void (*FvalueNewFunc)(fvalue_t*);
 typedef void (*FvalueFreeFunc)(fvalue_t*);
 
-typedef gboolean (*FvalueFromUnparsed)(fvalue_t*, const char*, gboolean, gchar **);
-typedef gboolean (*FvalueFromString)(fvalue_t*, const char*, gchar **);
-typedef void (*FvalueToStringRepr)(fvalue_t*, ftrepr_t, int field_display, char*volatile);
-typedef int (*FvalueStringReprLen)(fvalue_t*, ftrepr_t, int field_display);
+typedef gboolean (*FvalueFromUnparsed)(fvalue_t*, const char*, gboolean, LogFunc);
+typedef gboolean (*FvalueFromString)(fvalue_t*, const char*, LogFunc);
+typedef void (*FvalueToStringRepr)(fvalue_t*, ftrepr_t, char*volatile);
+typedef int (*FvalueStringReprLen)(fvalue_t*, ftrepr_t);
 
 typedef void (*FvalueSetByteArrayFunc)(fvalue_t*, GByteArray *);
 typedef void (*FvalueSetBytesFunc)(fvalue_t*, const guint8 *);

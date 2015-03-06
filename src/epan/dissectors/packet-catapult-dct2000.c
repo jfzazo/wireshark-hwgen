@@ -22,13 +22,18 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <epan/packet.h>
 #include <epan/conversation.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+#include <epan/ipproto.h>
 #include <epan/prefs.h>
+#include <epan/strutil.h>
 #include <epan/addr_resolv.h>
 
 #include <wiretap/catapult_dct2000.h>
@@ -235,7 +240,6 @@ static const value_string rlc_rbid_vals[] = {
     { 25,    "MTCH"},
     { 0,     NULL}
 };
-static value_string_ext rlc_rbid_vals_ext = VALUE_STRING_EXT_INIT(rlc_rbid_vals);
 
 static const value_string ueid_type_vals[] = {
     { 0,     "URNTI"},
@@ -1085,7 +1089,7 @@ static void dissect_ccpri_lte(tvbuff_t *tvb, gint offset,
        set to call cpri C&M dissector instead of X.25) */
     protocol_handle = find_dissector("lapb");
     if ((protocol_handle != NULL) && (tvb_length_remaining(tvb, offset) > 0)) {
-        ccpri_tvb = tvb_new_subset_length(tvb, offset, length);
+        ccpri_tvb = tvb_new_subset(tvb, offset, length, length);
         call_dissector_only(protocol_handle, ccpri_tvb, pinfo, tree, NULL);
     }
 }
@@ -1910,14 +1914,14 @@ static void dissect_tty_lines(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     tty_tree = proto_item_add_subtree(ti, ett_catapult_dct2000_tty);
 
     /* Show the tty lines one at a time. */
-    while (tvb_reported_length_remaining(tvb, offset) > 0) {
+    while (tvb_offset_exists(tvb, offset)) {
         /* Find the end of the line. */
         int linelen = tvb_find_line_end_unquoted(tvb, offset, -1, &next_offset);
 
         /* Extract & add the string. */
-        char *string = (char*)tvb_get_string_enc(wmem_packet_scope(), tvb, offset, linelen, ENC_ASCII);
+        char *string = (char*)tvb_get_string(wmem_packet_scope(), tvb, offset, linelen);
         if (g_ascii_isprint(string[0])) {
-            /* If the first byte of the string is printable ASCII treat as string... */
+            /* If looks printable treat as string... */
             proto_tree_add_string_format(tty_tree, hf_catapult_dct2000_tty_line,
                                          tvb, offset,
                                          linelen, string,
@@ -2458,7 +2462,7 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             if (strcmp(protocol_name, "comment") == 0) {
                 /* Extract & add the string. */
                 proto_item *string_ti;
-                char *string = (char*)tvb_get_string_enc(wmem_packet_scope(), tvb, offset, tvb_length_remaining(tvb, offset), ENC_ASCII);
+                char *string = (char*)tvb_get_string(wmem_packet_scope(), tvb, offset, tvb_length_remaining(tvb, offset));
 
                 /* Show comment string */
                 string_ti = proto_tree_add_item(dct2000_tree, hf_catapult_dct2000_comment, tvb,
@@ -2485,7 +2489,7 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             else
             if (strcmp(protocol_name, "sprint") == 0) {
                 /* Extract & add the string. */
-                char *string = (char*)tvb_get_string_enc(wmem_packet_scope(), tvb, offset, tvb_length_remaining(tvb, offset), ENC_ASCII);
+                char *string = (char*)tvb_get_string(wmem_packet_scope(), tvb, offset, tvb_length_remaining(tvb, offset));
 
                 /* Show sprint string */
                 proto_tree_add_item(dct2000_tree, hf_catapult_dct2000_sprint, tvb,
@@ -2593,6 +2597,16 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
                     /* Try to add right stuff to pinfo so conversation stuff works... */
                     pinfo->ptype = type_of_port;
+                    switch (type_of_port) {
+                        case PT_UDP:
+                            pinfo->ipproto = IP_PROTO_UDP;
+                            break;
+                        case PT_TCP:
+                            pinfo->ipproto = IP_PROTO_TCP;
+                            break;
+                        default:
+                            pinfo->ipproto = IP_PROTO_NONE;
+                    }
 
                     /* Add addresses & ports into ipprim tree.
                        Also set address info in pinfo for conversations... */
@@ -2748,6 +2762,8 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
                     /* Add these SCTPPRIM fields inside an SCTPPRIM subtree */
                     sctpprim_tree = proto_item_add_subtree(ti_local, ett_catapult_dct2000_sctpprim);
+
+                    pinfo->ipproto = IP_PROTO_SCTP;
 
                     /* Destination address */
                     if (dest_addr_offset != 0) {
@@ -3199,7 +3215,7 @@ void proto_register_catapult_dct2000(void)
         },
         { &hf_catapult_dct2000_rbid,
             { "Channel",
-              "dct2000.rbid", FT_UINT8, BASE_DEC | BASE_EXT_STRING, &rlc_rbid_vals_ext, 0x0,
+              "dct2000.rbid", FT_UINT8, BASE_DEC, VALS(rlc_rbid_vals), 0x0,
               "Channel (rbid)", HFILL
             }
         },
@@ -3360,15 +3376,3 @@ void proto_register_catapult_dct2000(void)
                                    &catapult_dct2000_dissect_mac_lte_oob_messages);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

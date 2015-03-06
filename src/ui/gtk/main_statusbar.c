@@ -38,8 +38,9 @@
 #include "../file.h"
 #ifdef HAVE_LIBPCAP
 #include "../capture_opts.h"
-#include <capchild/capture_session.h>
-#include "ui/capture.h"
+#include "../capture_session.h"
+#include "../capture_ui_utils.h"
+#include "../capture.h"
 #endif
 
 #include <wsutil/str_util.h>
@@ -47,9 +48,6 @@
 #include "ui/main_statusbar.h"
 #include "ui/recent.h"
 #include "ui/utf8_entities.h"
-#ifdef HAVE_LIBPCAP
-#include "ui/capture_ui_utils.h"
-#endif
 
 #include "ui/gtk/main.h"
 #include "ui/gtk/main_statusbar_private.h"

@@ -1,4 +1,4 @@
--- 3GPP TS 36.413 V12.2.0 (2014-06)
+-- 3GPP TS 36.413 V11.6.0 (2013-12)
 -- 9.3.4	Information Element Definitions
 -- **************************************************************
 --
@@ -33,7 +33,6 @@ IMPORTS
 	id-ULCOUNTValueExtended,
 	id-DLCOUNTValueExtended,
 	id-ReceiveStatusOfULPDCPSDUsExtended,
-	id-eNBIndirectX2TransportLayerAddresses,
 	maxnoofCSGs,
 	maxnoofE-RABs,
 	maxnoofErrors,
@@ -58,10 +57,7 @@ IMPORTS
 	maxnoofMMECs,
 	maxnoofTAforMDT,
 	maxnoofCellIDforMDT,
-	maxnoofMDTPLMNs,
-	maxnoofCellsforRestart,
-	maxnoofRestartTAIs,
-	maxnoofRestartEmergencyAreaIDs
+	maxnoofMDTPLMNs
 
 
 
@@ -394,12 +390,6 @@ CSFallbackIndicator ::= ENUMERATED {
 	cs-fallback-high-priority 
 }
 
-AdditionalCSFallbackIndicator ::= ENUMERATED { 
-	no-restriction,
-	restriction,
-	...
-}
-
 CSG-Id		::= BIT STRING (SIZE (27))
 
 
@@ -534,8 +524,6 @@ CompletedCellinEAI-Item ::= SEQUENCE {
 CompletedCellinEAI-Item-ExtIEs S1AP-PROTOCOL-EXTENSION ::= {
 	...
 }
-
-EmergencyAreaIDListForRestart	::= SEQUENCE (SIZE(1..maxnoofRestartEmergencyAreaIDs)) OF EmergencyAreaID
 
 ENB-ID ::= CHOICE {
 	macroENB-ID			BIT STRING (SIZE(20)),
@@ -779,8 +767,6 @@ HFNModified ::= INTEGER (0..131071)
 
 -- I
 
-Masked-IMEISV ::= BIT STRING (SIZE (64))
-
 ImmediateMDT ::= SEQUENCE { 
 	measurementsToActivate		MeasurementsToActivate,
 	m1reportingTrigger			M1ReportingTrigger,
@@ -810,9 +796,6 @@ InterfacesToTrace ::= BIT STRING (SIZE (8))
 
 -- J
 -- K
-
-KillAllWarningMessages ::= ENUMERATED {true}
-
 -- L
 
 
@@ -859,8 +842,6 @@ L3-Information				::= OCTET STRING
 -- This is a dummy IE used only as a reference to the actual definition in relevant specification.
 
 LPPa-PDU ::=  OCTET STRING
-
-LHN-ID ::=  OCTET STRING(SIZE (32..256))
 
 Links-to-log ::= ENUMERATED {uplink, downlink, both-uplink-and-downlink, ...}
 
@@ -1129,8 +1110,7 @@ RIMInformation ::= OCTET STRING
 RIMRoutingAddress ::= CHOICE {
 	gERAN-Cell-ID			GERAN-Cell-ID,
 	...,
-	targetRNC-ID			TargetRNC-ID,
-	eHRPD-Sector-ID			OCTET STRING (SIZE(16))
+	targetRNC-ID			TargetRNC-ID
 }
 
 ReportArea ::= ENUMERATED {
@@ -1154,8 +1134,6 @@ RRC-Establishment-Cause ::= ENUMERATED {
 	...,
 	delay-TolerantAccess
 }
-
-ECGIListForRestart ::= SEQUENCE (SIZE(1..maxnoofCellsforRestart)) OF EUTRAN-CGI
 
 Routing-ID		::= INTEGER (0..255)
 
@@ -1483,12 +1461,6 @@ Time-UE-StayedInCell ::= INTEGER (0..4095)
 
 Time-UE-StayedInCell-EnhancedGranularity ::= INTEGER (0..40950)
 
-TransportInformation ::= SEQUENCE {
-	transportLayerAddress				TransportLayerAddress,
-	uL-GTP-TEID							GTP-TEID,
-	...
-}
-
 TransportLayerAddress		::= BIT STRING (SIZE(1..160, ...))
 
 TraceActivation ::= SEQUENCE {
@@ -1536,8 +1508,6 @@ TypeOfError ::= ENUMERATED {
 	missing,
 	...
 }
-
-TAIListForRestart ::= SEQUENCE (SIZE(1..maxnoofRestartTAIs)) OF TAI
 
 -- U
 
@@ -1606,17 +1576,6 @@ UESecurityCapabilities-ExtIEs S1AP-PROTOCOL-EXTENSION ::= {
 	...
 }
 
-UserLocationInformation ::= SEQUENCE {
-	eutran-cgi 				EUTRAN-CGI,
-	tai						TAI,
-	iE-Extensions			ProtocolExtensionContainer { { UserLocationInformation-ExtIEs} }	OPTIONAL,
-	...
-}
-
-UserLocationInformation-ExtIEs S1AP-PROTOCOL-EXTENSION ::= {
-	...
-}
-
 -- V
 
 VoiceSupportMatchIndicator ::= ENUMERATED { 
@@ -1654,9 +1613,7 @@ X2TNLConfigurationInfo ::= SEQUENCE {
 
 X2TNLConfigurationInfo-ExtIEs S1AP-PROTOCOL-EXTENSION ::= {
 -- Extension for Release 10 to transfer the IPsec and U-plane addresses during ANR action --
-	{ID id-eNBX2ExtendedTransportLayerAddresses		CRITICALITY ignore	EXTENSION ENBX2ExtTLAs	PRESENCE optional}|
--- Extension for Release 12 to transfer the IP addresses of the X2 GW --
-	{ID id-eNBIndirectX2TransportLayerAddresses	CRITICALITY ignore	EXTENSION ENBIndirectX2TransportLayerAddresses	PRESENCE optional},
+	{ID id-eNBX2ExtendedTransportLayerAddresses		CRITICALITY ignore	EXTENSION ENBX2ExtTLAs	PRESENCE optional},
 	...
 }
 
@@ -1675,9 +1632,9 @@ ENBX2ExtTLA-ExtIEs S1AP-PROTOCOL-EXTENSION ::= {
 
 ENBX2GTPTLAs ::= SEQUENCE (SIZE(1.. maxnoofeNBX2GTPTLAs)) OF TransportLayerAddress
 
-ENBIndirectX2TransportLayerAddresses ::= SEQUENCE (SIZE(1..maxnoofeNBX2TLAs)) OF TransportLayerAddress
 
 -- Y
 -- Z
 
 END
+

@@ -23,6 +23,8 @@
 
 #include "config.h"
 
+#include <epan/emem.h>
+
 #include "tvbuff.h"
 #include "tvbuff-int.h"
 #include "proto.h"	/* XXX - only used for DISSECTOR_ASSERT, probably a new header file? */
@@ -122,16 +124,3 @@ tvb_new_child_real_data(tvbuff_t *parent, const guint8* data, const guint length
 
 	return tvb;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

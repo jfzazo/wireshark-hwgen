@@ -23,6 +23,10 @@
 
 #include "config.h"
 
+#include <ctype.h>
+
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/to_str.h>
 #include <epan/expert.h>
@@ -122,7 +126,7 @@ static gint xdmcp_add_string(proto_tree *tree, gint hf,
   guint len;
 
   len = tvb_get_ntohs(tvb, offset);
-  str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+2, len, ENC_ASCII);
+  str = tvb_get_string(wmem_packet_scope(), tvb, offset+2, len);
   proto_tree_add_string(tree, hf, tvb, offset, len+2, str);
 
   return len+2;
@@ -148,10 +152,12 @@ static gint xdmcp_add_authentication_names(proto_tree *tree,
 
   anames_start_offset = offset;
   anames_len = tvb_get_guint8(tvb, offset);
-  anames_tree = proto_tree_add_subtree_format(tree, tvb,
+  anames_ti = proto_tree_add_text(tree, tvb,
                                   anames_start_offset, -1,
-                                  ett_xdmcp_authentication_names, &anames_ti, "Authentication names (%d)",
+                                  "Authentication names (%d)",
                                   anames_len);
+  anames_tree = proto_item_add_subtree(anames_ti,
+                                       ett_xdmcp_authentication_names);
 
   anames_len = tvb_get_guint8(tvb, offset);
   offset++;
@@ -173,10 +179,12 @@ static gint xdmcp_add_authorization_names(proto_tree *tree,
 
   anames_start_offset = offset;
   anames_len = tvb_get_guint8(tvb, offset);
-  anames_tree = proto_tree_add_subtree_format(tree, tvb,
+  anames_ti = proto_tree_add_text(tree, tvb,
                                   anames_start_offset, -1,
-                                  ett_xdmcp_authorization_names, &anames_ti, "Authorization names (%d)",
+                                  "Authorization names (%d)",
                                   anames_len);
+  anames_tree = proto_item_add_subtree(anames_ti,
+                                       ett_xdmcp_authorization_names);
 
   anames_len = tvb_get_guint8(tvb, offset);
   offset++;
@@ -306,10 +314,11 @@ static int dissect_xdmcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
         return offset;
       }
 
-      clist_tree = proto_tree_add_subtree_format(xdmcp_tree,
+      clist_ti = proto_tree_add_text(xdmcp_tree,
                                      tvb, ctypes_start_offset, -1,
-                                     ett_xdmcp_connections, &clist_ti, "Connections (%d)",
+                                     "Connections (%d)",
                                      ctypes_len);
+      clist_tree = proto_item_add_subtree(clist_ti, ett_xdmcp_connections);
 
       offset++;
       caddrs_offset++;
@@ -325,8 +334,10 @@ static int dissect_xdmcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
         alen = tvb_get_ntohs(tvb, caddrs_offset);
         caddrs_offset += 2;
 
-        connection_tree = proto_tree_add_subtree_format(clist_tree, NULL, 0, 0,
-                                            ett_xdmcp_connection, &connection_ti, "Connection %d", n);
+        connection_ti = proto_tree_add_text(clist_tree, NULL, 0, 0,
+                                            "Connection %d", n);
+        connection_tree = proto_item_add_subtree(connection_ti,
+                                                 ett_xdmcp_connection);
 
     proto_tree_add_item(connection_tree, hf_xdmcp_connection_type, tvb, offset-2, 2, ENC_BIG_ENDIAN);
 

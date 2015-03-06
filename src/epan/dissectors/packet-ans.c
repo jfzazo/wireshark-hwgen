@@ -43,9 +43,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/to_str.h>
-#include <epan/etypes.h>
+#include <etypes.h>
 
 void proto_register_ans(void);
 void proto_reg_handoff_ans(void);
@@ -70,14 +72,16 @@ dissect_ans(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	proto_tree  *ans_tree = NULL;
 	guint16      sender_id;
 	guint32      seq_num;
+	guint8       team_id[6];
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "Intel ANS probe");
 
 	seq_num = tvb_get_ntohl(tvb, 4);
 	sender_id = tvb_get_ntohs(tvb, 8);
+	tvb_memcpy(tvb, team_id, 10, 6);
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "Sequence: %u, Sender ID %u, Team ID %s",
-		seq_num, sender_id, tvb_ether_to_str(tvb, 10));
+		seq_num, sender_id, ether_to_str(team_id));
 
 	if (tree) {
 		ti = proto_tree_add_item(tree, proto_ans, tvb, 0, -1, ENC_NA);
@@ -142,15 +146,3 @@ proto_reg_handoff_ans(void)
 	dissector_add_uint("ethertype", ETHERTYPE_INTEL_ANS, ans_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

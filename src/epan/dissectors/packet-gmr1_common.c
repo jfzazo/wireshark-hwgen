@@ -32,6 +32,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include "packet-gmr1_common.h"
@@ -104,7 +105,6 @@ static int hf_com_cm2_cm3_presence = -1;
 static int hf_com_cm2_spare4 = -1;
 static int hf_com_cm2_a5_3 = -1;
 static int hf_com_cm2_a5_2_gmr1 = -1;
-static int hf_com_spare_nibble = -1;
 
 /* [1] 11.5.1.6 - Mobile Earth Station Classmark 2 */
 static const value_string com_cm2_revision_vals[] = {
@@ -229,7 +229,7 @@ GMR1_IE_FUNC(gmr1_ie_com_cm2)
 /* [1] 11.5.1.8 - Spare Half Octet */
 GMR1_IE_FUNC(gmr1_ie_com_spare_nibble)
 {
-	proto_tree_add_item(tree, hf_com_spare_nibble, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 1, "Spare Half Octet");
 
 	return 1;
 }
@@ -246,7 +246,7 @@ elem_fcn gmr1_ie_common_func[NUM_GMR1_IE_COMMON] = {
 
 void
 gmr1_get_msg_params(gmr1_pd_e pd, guint8 oct, const gchar **msg_str,
-		    int *ett_tree, int *hf_idx, gmr1_msg_func_t *msg_func_p)
+                    int *ett_tree, int *hf_idx, gmr1_msg_func_t *msg_func_p)
 {
 	switch (pd) {
 	case GMR1_PD_RR:
@@ -360,11 +360,6 @@ proto_register_gmr1_common(void)
 		    FT_UINT8, BASE_DEC, VALS(com_cm2_a5_2_gmr1_vals), 0x01,
 		    NULL, HFILL }
 		},
-		{ &hf_com_spare_nibble,
-		  { "Spare Half Octet", "gmr1.common.spare_nibble",
-		    FT_UINT8, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
-		},
 	};
 
 	/* Register the protocol name and field description */
@@ -372,16 +367,3 @@ proto_register_gmr1_common(void)
 
 	proto_register_field_array(proto_gmr1_common, hf, array_length(hf));
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

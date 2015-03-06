@@ -27,9 +27,11 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/reassemble.h>
+#include <epan/wmem/wmem.h>
 #include <wiretap/wtap.h>
 
-#include "packet-bluetooth.h"
+#include "packet-usb.h"
+#include "packet-bluetooth-hci.h"
 
 static int proto_hci_usb = -1;
 static int hf_bthci_usb_data = -1;
@@ -56,7 +58,11 @@ static int hf_msg_fragment_count = -1;
 static int hf_msg_reassembled_in = -1;
 static int hf_msg_reassembled_length = -1;
 
-static wmem_tree_t *fragment_info_table = NULL;
+static wmem_tree_t *chandle_to_bdaddr_table = NULL;
+static wmem_tree_t *bdaddr_to_name_table    = NULL;
+static wmem_tree_t *localhost_name          = NULL;
+static wmem_tree_t *localhost_bdaddr        = NULL;
+static wmem_tree_t *fragment_info_table     = NULL;
 
 static reassembly_table hci_usb_reassembly_table;
 
@@ -109,24 +115,21 @@ void proto_reg_handoff_hci_usb(void);
 static gint
 dissect_hci_usb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
-    proto_item        *ttree = NULL;
-    proto_tree        *titem = NULL;
-    proto_item        *pitem = NULL;
-    gint               offset = 0;
-    usb_conv_info_t   *usb_conv_info;
-    tvbuff_t          *next_tvb = NULL;
-    bluetooth_data_t  *bluetooth_data;
-    gint               p2p_dir_save;
-    guint32            session_id;
-    fragment_head     *reassembled;
-
-    bluetooth_data = (bluetooth_data_t *) data;
+    proto_item     *ttree = NULL;
+    proto_tree     *titem = NULL;
+    proto_item     *pitem = NULL;
+    gint            offset = 0;
+    usb_conv_info_t *usb_conv_info;
+    tvbuff_t       *next_tvb = NULL;
+    hci_data_t     *hci_data;
+    gint            p2p_dir_save;
+    guint32         session_id;
+    fragment_head  *reassembled;
 
     /* Reject the packet if data is NULL */
     if (data == NULL)
         return 0;
-
-    usb_conv_info = bluetooth_data->previous_protocol_data.usb_conv_info;
+    usb_conv_info = (usb_conv_info_t *)data;
 
     titem = proto_tree_add_item(tree, proto_hci_usb, tvb, offset, -1, ENC_NA);
     ttree = proto_item_add_subtree(titem, ett_hci_usb);
@@ -147,7 +150,7 @@ dissect_hci_usb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         break;
 
     default:
-        col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection");
+        col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction");
         break;
     }
 
@@ -167,9 +170,18 @@ dissect_hci_usb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 
     session_id = usb_conv_info->bus_id << 16 | usb_conv_info->device_address << 8 | ((pinfo->p2p_dir == P2P_DIR_RECV) ? 1 : 0 ) << 7 | usb_conv_info->endpoint;
 
-    bluetooth_data->adapter_id = usb_conv_info->bus_id << 8 | usb_conv_info->device_address;
-/* TODO: adapter disconnect on some USB action, for now do not support adapter disconnection */
-    bluetooth_data->adapter_disconnect_in_frame = &max_disconnect_in_frame;
+    hci_data = (hci_data_t *) wmem_new(wmem_packet_scope(), hci_data_t);
+    if (pinfo->phdr->presence_flags & WTAP_HAS_INTERFACE_ID)
+        hci_data->interface_id = pinfo->phdr->interface_id;
+    else
+        hci_data->interface_id = HCI_INTERFACE_DEFAULT;
+    hci_data->adapter_id = usb_conv_info->bus_id << 8 | usb_conv_info->device_address;
+    hci_data->chandle_to_bdaddr_table = chandle_to_bdaddr_table;
+    hci_data->bdaddr_to_name_table = bdaddr_to_name_table;
+    hci_data->localhost_bdaddr = localhost_bdaddr;
+    hci_data->localhost_name = localhost_name;
+
+    pinfo->ptype = PT_BLUETOOTH;
 
     next_tvb = tvb_new_subset_remaining(tvb, offset);
     if (!pinfo->fd->flags.visited && usb_conv_info->endpoint <= 0x02) {
@@ -230,13 +242,13 @@ dissect_hci_usb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         switch(usb_conv_info->endpoint)
         {
         case 0:
-            call_dissector_with_data(bthci_cmd_handle, next_tvb, pinfo, tree, bluetooth_data);
+            call_dissector_with_data(bthci_cmd_handle, next_tvb, pinfo, tree, hci_data);
             break;
         case 1:
-            call_dissector_with_data(bthci_evt_handle, next_tvb, pinfo, tree, bluetooth_data);
+            call_dissector_with_data(bthci_evt_handle, next_tvb, pinfo, tree, hci_data);
             break;
         case 2:
-            call_dissector_with_data(bthci_acl_handle, next_tvb, pinfo, tree, bluetooth_data);
+            call_dissector_with_data(bthci_acl_handle, next_tvb, pinfo, tree, hci_data);
             break;
         }
     } else {
@@ -245,7 +257,7 @@ dissect_hci_usb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     }
 
     if (usb_conv_info->endpoint == 0x03) {
-        call_dissector_with_data(bthci_sco_handle, next_tvb, pinfo, tree, bluetooth_data);
+        call_dissector_with_data(bthci_sco_handle, next_tvb, pinfo, tree, hci_data);
     } else if (usb_conv_info->endpoint > 0x03) {
         proto_tree_add_item(ttree, hf_bthci_usb_data, tvb, offset, -1, ENC_NA);
     }
@@ -364,6 +376,11 @@ proto_register_hci_usb(void)
                           &addresses_reassembly_table_functions);
     fragment_info_table = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
 
+    chandle_to_bdaddr_table = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope()); /* adapter, chandle: bdaddr */
+    bdaddr_to_name_table = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope()); /* bdaddr: name */
+    localhost_bdaddr = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope()); /* adapter, frame: bdaddr */
+    localhost_name = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope()); /* adapter, frame: name */
+
     proto_hci_usb = proto_register_protocol("Bluetooth HCI USB Transport", "HCI_USB", "hci_usb");
     proto_register_field_array(proto_hci_usb, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
@@ -383,10 +400,18 @@ proto_reg_handoff_hci_usb(void)
     bthci_acl_handle = find_dissector("bthci_acl");
     bthci_sco_handle = find_dissector("bthci_sco");
 
-    dissector_add_uint("bluetooth.encap", WTAP_ENCAP_USB,  hci_usb_handle);
-    dissector_add_uint("bluetooth.encap", WTAP_ENCAP_USB_LINUX,  hci_usb_handle);
-    dissector_add_uint("bluetooth.encap", WTAP_ENCAP_USB_LINUX_MMAPPED,  hci_usb_handle);
-    dissector_add_uint("bluetooth.encap", WTAP_ENCAP_USBPCAP,  hci_usb_handle);
+    dissector_add_uint("usb.product", (0x0a5c << 16) | 0x21e8, hci_usb_handle);
+    dissector_add_uint("usb.product", (0x1131 << 16) | 0x1001, hci_usb_handle);
+    dissector_add_uint("usb.product", (0x050d << 16) | 0x0081, hci_usb_handle);
+    dissector_add_uint("usb.product", (0x0a5c << 16) | 0x2198, hci_usb_handle);
+    dissector_add_uint("usb.product", (0x0a5c << 16) | 0x21e8, hci_usb_handle);
+    dissector_add_uint("usb.product", (0x04bf << 16) | 0x0320, hci_usb_handle);
+    dissector_add_uint("usb.product", (0x13d3 << 16) | 0x3375, hci_usb_handle);
+
+    dissector_add_uint("usb.protocol", 0xE00101, hci_usb_handle);
+    dissector_add_uint("usb.protocol", 0xE00104, hci_usb_handle);
+
+    dissector_add_handle("usb.device", hci_usb_handle);
 }
 
 /*

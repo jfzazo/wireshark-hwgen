@@ -38,6 +38,7 @@
 #endif
 
 #include "../log.h"
+#include "../version_info.h"
 #include "../register.h"
 
 #include "ui/text_import_scanner.h"
@@ -49,8 +50,6 @@
 #include "wsutil/file_util.h"
 #include "wsutil/tempfile.h"
 #include "wsutil/plugins.h"
-#include "wsutil/copyright_info.h"
-#include "wsutil/ws_version_info.h"
 
 #include "qt_ui_utils.h"
 
@@ -58,6 +57,7 @@
 #include <QTextStream>
 #include <QUrl>
 
+#include "wireshark_application.h"
 
 // To do:
 // - Tweak and enhance ui...
@@ -124,10 +124,8 @@ AboutDialog::AboutDialog(QWidget *parent) :
     QFile f_license;
     const char *constpath;
     QString message;
-#if defined(HAVE_LIBSMI) || defined(HAVE_GEOIP) || defined(HAVE_EXTCAP)
-#if defined(HAVE_LIBSMI) || defined(HAVE_GEOIP)
+#if defined (HAVE_LIBSMI) || defined (HAVE_GEOIP)
     char *path = NULL;
-#endif
     gint i;
     gchar **resultArray;
 #endif
@@ -137,7 +135,7 @@ AboutDialog::AboutDialog(QWidget *parent) :
 
     /* Construct the message string */
     message = QString(
-        "Version %1\n"
+        "Version " VERSION "%1\n"
         "\n"
         "%2"
         "\n"
@@ -148,7 +146,7 @@ AboutDialog::AboutDialog(QWidget *parent) :
         "Wireshark is Open Source Software released under the GNU General Public License.\n"
         "\n"
         "Check the man page and http://www.wireshark.org for more information.")
-        .arg(get_ws_vcs_version_info()).arg(get_copyright_info()).arg(comp_info_str->str)
+        .arg(wireshark_gitversion).arg(get_copyright_info()).arg(comp_info_str->str)
         .arg(runtime_info_str->str);
 
     ui->label_wireshark->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -212,6 +210,11 @@ AboutDialog::AboutDialog(QWidget *parent) :
     message += about_folders_row("Global Plugins", get_plugin_dir(), "dissector plugins");
 #endif
 
+#ifdef HAVE_PYTHON
+    /* global python bindings */
+    message += about_folders_row("Python Bindings", get_wspython_dir(), "python bindings");
+#endif
+
 #ifdef HAVE_GEOIP
     /* GeoIP */
     path = geoip_db_get_paths();
@@ -238,19 +241,6 @@ AboutDialog::AboutDialog(QWidget *parent) :
     }
     g_strfreev(resultArray);
     g_free(path);
-#endif
-
-#ifdef HAVE_EXTCAP
-    /* Extcap */
-    constpath = get_extcap_dir();
-
-    resultArray = g_strsplit(constpath, G_SEARCHPATH_SEPARATOR_S, 10);
-
-    for(i = 0; resultArray[i]; i++) {
-        message += about_folders_row("Extcap path", g_strstrip(resultArray[i]),
-                                     "Extcap Plugins search path");
-    }
-    g_strfreev(resultArray);
 #endif
 
     message += "</table>";

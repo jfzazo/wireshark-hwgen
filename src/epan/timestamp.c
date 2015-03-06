@@ -28,7 +28,7 @@
  * and distinguish it from a command line value */
 static ts_type timestamp_type = TS_NOT_SET;
 
-static int timestamp_precision = TS_PREC_AUTO;
+static int timestamp_precision = TS_PREC_AUTO_USEC;
 
 static ts_seconds_type timestamp_seconds_type = TS_SECONDS_NOT_SET;
 
@@ -63,16 +63,3 @@ void timestamp_set_seconds_type(ts_seconds_type ts_t)
 {
 	timestamp_seconds_type = ts_t;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

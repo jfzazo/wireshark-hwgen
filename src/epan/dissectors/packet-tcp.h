@@ -28,7 +28,10 @@ extern "C" {
 
 #include "ws_symbol_export.h"
 
+#ifndef __CONVERSATION_H__
 #include <epan/conversation.h>
+#endif
+
 #include <epan/wmem/wmem.h>
 
 /* TCP flags */
@@ -74,7 +77,8 @@ typedef struct tcpheader {
 } tcp_info_t;
 
 /*
- * Private data passed from the TCP dissector to subdissectors.
+ * Private data passed from the TCP dissector to subdissectors. Passed to the
+ * subdissectors in pinfo->private_data
  */
 struct tcpinfo {
 	guint32 seq;             /* Sequence number of first byte in the data */
@@ -106,7 +110,7 @@ struct tcpinfo {
 WS_DLL_PUBLIC void
 tcp_dissect_pdus(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		 gboolean proto_desegment, guint fixed_len,
-		 guint (*get_pdu_len)(packet_info *, tvbuff_t *, int, void*),
+		 guint (*get_pdu_len)(packet_info *, tvbuff_t *, int),
 		 new_dissector_t dissect_pdu, void* dissector_data);
 
 extern struct tcp_multisegment_pdu *
@@ -147,8 +151,9 @@ struct tcp_multisegment_pdu {
 };
 
 typedef struct _tcp_flow_t {
-	gboolean base_seq_set; /* true if base seq set */
-	guint32 base_seq;	/* base seq number (used by relative sequence numbers)*/
+	guint32 base_seq;	/* base seq number (used by relative sequence numbers)
+				 * or 0 if not yet known.
+				 */
 	tcp_unacked_t *segments;
 	guint32 fin;		/* frame number of the final FIN */
 	guint32 lastack;	/* last seen ack */
@@ -167,7 +172,7 @@ typedef struct _tcp_flow_t {
 				 * fast retransmissions and outoforder
 				 */
 	guint32 window;		/* last seen window */
-	gint16	win_scale;	/* -1 is we don't know, -2 is window scaling is not used */
+	gint16	win_scale;	/* -1 is we dont know, -2 is window scaling is not used */
 	gint16  scps_capable;   /* flow advertised scps capabilities */
 	guint16 maxsizeacked;   /* 0 if not yet known */
 	gboolean valid_bif;     /* if lost pkts, disable BiF until ACK is recvd */

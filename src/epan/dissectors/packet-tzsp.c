@@ -26,6 +26,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 
@@ -163,6 +165,7 @@ add_option_info(tvbuff_t *tvb, int pos, proto_tree *tree, proto_item *ti)
 {
     guint8      tag, length, fcs_err = 0, encr = 0, seen_fcs_err = 0;
     proto_tree *tag_tree;
+    proto_item *tag_item;
 
     /*
      * Read all option tags in an endless loop. If the packet is malformed this
@@ -172,16 +175,18 @@ add_option_info(tvbuff_t *tvb, int pos, proto_tree *tree, proto_item *ti)
         tag = tvb_get_guint8(tvb, pos);
         if ((tag != TZSP_HDR_PAD) && (tag != TZSP_HDR_END)) {
             length = tvb_get_guint8(tvb, pos+1);
-            tag_tree = proto_tree_add_subtree(tree, tvb, pos, 2+length, ett_tag, NULL, val_to_str_const(tag, option_tag_vals, "Unknown"));
+            tag_item = proto_tree_add_text(tree, tvb, pos, 2+length, "%s", val_to_str_const(tag, option_tag_vals, "Unknown"));
         } else {
-            tag_tree = proto_tree_add_subtree(tree, tvb, pos, 1, ett_tag, NULL, val_to_str_const(tag, option_tag_vals, "Unknown"));
+            tag_item = proto_tree_add_text(tree, tvb, pos, 1, "%s", val_to_str_const(tag, option_tag_vals, "Unknown"));
             length = 0;
         }
 
-        proto_tree_add_item(tag_tree, hf_option_tag, tvb, pos, 1, ENC_BIG_ENDIAN);
+        tag_tree = proto_item_add_subtree(tag_item, ett_tag);
+
+        proto_tree_add_item(tag_tree, hf_option_tag, tvb, pos, 1, ENC_NA);
         pos++;
         if ((tag != TZSP_HDR_PAD) && (tag != TZSP_HDR_END)) {
-            proto_tree_add_item(tag_tree, hf_option_length, tvb, pos, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tag_tree, hf_option_length, tvb, pos, 1, ENC_NA);
             pos++;
         }
 
@@ -201,15 +206,15 @@ add_option_info(tvbuff_t *tvb, int pos, proto_tree *tree, proto_item *ti)
             break;
 
         case WLAN_RADIO_HDR_SIGNAL:
-            proto_tree_add_item(tag_tree, hf_signal, tvb, pos, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tag_tree, hf_signal, tvb, pos, 1, ENC_NA);
             break;
 
         case WLAN_RADIO_HDR_NOISE:
-            proto_tree_add_item(tag_tree, hf_silence, tvb, pos, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tag_tree, hf_silence, tvb, pos, 1, ENC_NA);
             break;
 
         case WLAN_RADIO_HDR_RATE:
-            proto_tree_add_item(tag_tree, hf_rate, tvb, pos, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tag_tree, hf_rate, tvb, pos, 1, ENC_NA);
             break;
 
         case WLAN_RADIO_HDR_TIMESTAMP:
@@ -217,7 +222,7 @@ add_option_info(tvbuff_t *tvb, int pos, proto_tree *tree, proto_item *ti)
             break;
 
         case WLAN_RADIO_HDR_MSG_TYPE:
-            proto_tree_add_item(tag_tree, hf_status_msg_type, tvb, pos, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tag_tree, hf_status_msg_type, tvb, pos, 1, ENC_NA);
             break;
 
         case WLAN_RADIO_HDR_CF:
@@ -236,7 +241,7 @@ add_option_info(tvbuff_t *tvb, int pos, proto_tree *tree, proto_item *ti)
             break;
 
         case WLAN_RADIO_HDR_CHANNEL:
-            proto_tree_add_item(tag_tree, hf_channel, tvb, pos, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tag_tree, hf_channel, tvb, pos, 1, ENC_NA);
             break;
 
         case TZSP_HDR_SENSOR:

@@ -28,6 +28,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
@@ -421,7 +422,7 @@ void proto_reg_handoff_brp(void)
     static guint              saved_brp_port;
 
     if (!initialized) {
-        dissector_add_for_decode_as("udp.port", brp_handle);
+        dissector_add_handle("udp.port", brp_handle);
         initialized = TRUE;
     } else {
         if (saved_brp_port != 0) {
@@ -436,15 +437,3 @@ void proto_reg_handoff_brp(void)
     saved_brp_port = global_brp_port;
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

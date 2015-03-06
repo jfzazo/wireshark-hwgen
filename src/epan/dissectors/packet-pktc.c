@@ -32,15 +32,14 @@
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
-#include <epan/expert.h>
 #include <epan/to_str.h>
 #include <epan/asn1.h>
 #include "packet-pktc.h"
 #include "packet-kerberos.h"
 #include "packet-snmp.h"
 
-#define PKTC_PORT               1293
-#define PKTC_MTAFQDN_PORT       2246
+#define PKTC_PORT	1293
+#define PKTC_MTAFQDN_PORT	2246
 
 void proto_register_pktc(void);
 void proto_reg_handoff_pktc(void);
@@ -88,50 +87,46 @@ static gint ett_pktc = -1;
 static gint ett_pktc_app_spec_data = -1;
 static gint ett_pktc_list_of_ciphersuites = -1;
 static gint ett_pktc_engineid = -1;
-static gint ett_pktc_version = -1;
 
 static gint ett_pktc_mtafqdn = -1;
 
-static expert_field ei_pktc_unknown_kmmid = EI_INIT;
-static expert_field ei_pktc_unknown_doi = EI_INIT;
-
-#define KMMID_WAKEUP            0x01
-#define KMMID_AP_REQUEST        0x02
-#define KMMID_AP_REPLY          0x03
-#define KMMID_SEC_PARAM_REC     0x04
-#define KMMID_REKEY             0x05
-#define KMMID_ERROR_REPLY       0x06
+#define KMMID_WAKEUP		0x01
+#define KMMID_AP_REQUEST	0x02
+#define KMMID_AP_REPLY		0x03
+#define KMMID_SEC_PARAM_REC	0x04
+#define KMMID_REKEY		0x05
+#define KMMID_ERROR_REPLY	0x06
 static const value_string kmmid_types[] = {
-    { KMMID_WAKEUP              , "Wake Up" },
-    { KMMID_AP_REQUEST          , "AP Request" },
-    { KMMID_AP_REPLY            , "AP Reply" },
-    { KMMID_SEC_PARAM_REC       , "Security Parameter Recovered" },
-    { KMMID_REKEY               , "Rekey" },
-    { KMMID_ERROR_REPLY         , "Error Reply" },
+    { KMMID_WAKEUP		, "Wake Up" },
+    { KMMID_AP_REQUEST		, "AP Request" },
+    { KMMID_AP_REPLY		, "AP Reply" },
+    { KMMID_SEC_PARAM_REC	, "Security Parameter Recovered" },
+    { KMMID_REKEY		, "Rekey" },
+    { KMMID_ERROR_REPLY		, "Error Reply" },
     { 0, NULL }
 };
 
-#define DOI_IPSEC        0x01
-#define DOI_SNMPv3       0x02
-#define SNMPv3_NULL      0x20
-#define SNMPv3_DES       0x21
-#define SNMPv3_HMAC_MD5  0x21
+#define DOI_IPSEC	1
+#define DOI_SNMPv3	2
+#define SNMPv3_NULL    0x20
+#define SNMPv3_DES     0x21
+#define SNMPv3_HMAC_MD5        0x21
 #define SNMPv3_HMAC_SHA1 0x22
-#define ESP_3DES         0x03
-#define ESP_RC5          0x04
-#define ESP_IDEA         0x05
-#define ESP_CAST         0x06
-#define ESP_BLOWFISH     0x07
-#define ESP_NULL         0x0b
-#define ESP_AES          0x0c
-#define HMAC_MD5_96      0x01
-#define HMAC_SHA1_96     0x02
+#define ESP_3DES       0x03
+#define ESP_RC5                0x04
+#define ESP_IDEA       0x05
+#define ESP_CAST       0x06
+#define ESP_BLOWFISH   0x07
+#define ESP_NULL       0x0b
+#define ESP_AES                0x0c
+#define HMAC_MD5_96    0x01
+#define HMAC_SHA1_96   0x02
 
 
 /* Domain of Interpretation */
 static const value_string doi_types[] = {
-    { DOI_IPSEC         , "IPsec" },
-    { DOI_SNMPv3        , "SNMPv3" },
+    { DOI_IPSEC                , "IPsec" },
+    { DOI_SNMPv3	, "SNMPv3" },
     { 0, NULL }
 };
 
@@ -156,7 +151,7 @@ static const value_string ipsec_transform_id_vals[] = {
     { ESP_BLOWFISH     , "BLOWFISH" },
     { ESP_NULL         , "NULL" }, /* no encryption, RFC 2410 */
     { ESP_AES          , "AES-128" },
-    { 0 , NULL }
+    { 0	, NULL }
 };
 
 static const value_string ipsec_authentication_algorithm_vals[] = {
@@ -173,26 +168,28 @@ static const value_string pktc_mtafqdn_msgtype_vals[] = {
     { PKTC_MTAFQDN_REQ,        "MTA FQDN Request" },
     { PKTC_MTAFQDN_REP,        "MTA FQDN Reply" },
     { PKTC_MTAFQDN_ERR,        "MTA FQDN Error Reply" },
-    { 0 , NULL }
+    { 0	, NULL }
 };
 
 static int
-dissect_pktc_app_specific_data(packet_info *pinfo, proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint8 doi, guint8 kmmid)
+dissect_pktc_app_specific_data(packet_info *pinfo _U_, proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint8 doi, guint8 kmmid)
 {
     int old_offset=offset;
-    proto_tree *tree;
+    proto_tree *tree = NULL;
     proto_tree *engineid_tree = NULL;
-    proto_item *item;
+    proto_item *item = NULL;
     proto_item *engineid_item = NULL;
     guint8 len;
 
-    item = proto_tree_add_item(parent_tree, hf_pktc_app_spec_data, tvb, offset, -1, ENC_NA);
-    tree = proto_item_add_subtree(item, ett_pktc_app_spec_data);
+    if (parent_tree) {
+        item = proto_tree_add_item(parent_tree, hf_pktc_app_spec_data, tvb, offset, -1, ENC_NA);
+        tree = proto_item_add_subtree(item, ett_pktc_app_spec_data);
+    }
 
     switch(doi){
     case DOI_SNMPv3:
         switch(kmmid){
-        /* we don't distinguish between manager and agent engineid.
+        /* we dont distinguish between manager and agent engineid.
            feel free to add separation for this if it is imporant enough
            for you. */
         case KMMID_AP_REQUEST:
@@ -204,8 +201,8 @@ dissect_pktc_app_specific_data(packet_info *pinfo, proto_tree *parent_tree, tvbu
 
             /* snmpEngineID */
             engineid_item = proto_tree_add_item(tree, hf_pktc_snmpEngineID, tvb, offset, len, ENC_NA);
-            engineid_tree = proto_item_add_subtree(engineid_item, ett_pktc_engineid);
-            dissect_snmp_engineid(engineid_tree, pinfo, tvb, offset, len);
+	    engineid_tree = proto_item_add_subtree(engineid_item, ett_pktc_engineid);
+	    dissect_snmp_engineid(engineid_tree, tvb, offset, len);
             offset+=len;
 
             /* boots */
@@ -227,15 +224,15 @@ dissect_pktc_app_specific_data(packet_info *pinfo, proto_tree *parent_tree, tvbu
 
             break;
         default:
-            proto_tree_add_expert(tree, pinfo, &ei_pktc_unknown_kmmid, tvb, offset, 1);
-            THROW(ReportedBoundsError); /* bail out and inform user we can't dissect the packet */
+            proto_tree_add_text(tree, tvb, offset, 1, "Unknown KMMID");
+            tvb_get_guint8(tvb, 9999); /* bail out and inform user we cant dissect the packet */
         };
         break;
     case DOI_IPSEC:
         switch(kmmid){
-        /* we don't distinguish between SPIs for inbound Security Associations
-           of the client (AP-REQ) vs. server (AP-REP, REKEY). Feel free to add
-           separation for this if it is imporant enough for you. */
+        /* we dont distinguish between SPIs for inbound Security Associations
+	   of the client (AP-REQ) vs. server (AP-REP, REKEY). Feel free to add
+	   separation for this if it is imporant enough for you. */
         case KMMID_AP_REQUEST:
         case KMMID_AP_REPLY:
         case KMMID_REKEY:
@@ -243,15 +240,15 @@ dissect_pktc_app_specific_data(packet_info *pinfo, proto_tree *parent_tree, tvbu
             proto_tree_add_item(tree, hf_pktc_ipsec_spi, tvb, offset, 4, ENC_BIG_ENDIAN);
             offset+=4;
 
-            break;
+	    break;
         default:
-            proto_tree_add_expert(tree, pinfo, &ei_pktc_unknown_kmmid, tvb, offset, 1);
-            THROW(ReportedBoundsError); /* bail out and inform user we can't dissect the packet */
+            proto_tree_add_text(tree, tvb, offset, 1, "Unknown KMMID");
+            tvb_get_guint8(tvb, 9999); /* bail out and inform user we cant dissect the packet */
         };
-        break;
+	break;
     default:
-        proto_tree_add_expert(tree, pinfo, &ei_pktc_unknown_doi, tvb, offset, 1);
-        THROW(ReportedBoundsError); /* bail out and inform user we can't dissect the packet */
+        proto_tree_add_text(tree, tvb, offset, 1, "Unknown DOI");
+        tvb_get_guint8(tvb, 9999); /* bail out and inform user we cant dissect the packet */
     }
 
     proto_item_set_len(item, offset-old_offset);
@@ -262,12 +259,15 @@ static int
 dissect_pktc_list_of_ciphersuites(packet_info *pinfo _U_, proto_tree *parent_tree, tvbuff_t *tvb, int offset, guint8 doi)
 {
     int old_offset=offset;
-    proto_tree *tree;
-    proto_item *item, *hidden_item;
+    proto_tree *tree = NULL;
+    proto_item *item = NULL, *hidden_item;
     guint8 len, i;
 
-    item = proto_tree_add_item(parent_tree, hf_pktc_list_of_ciphersuites, tvb, offset, -1, ENC_NA);
-    tree = proto_item_add_subtree(item, ett_pktc_list_of_ciphersuites);
+    if (parent_tree) {
+        item = proto_tree_add_item(parent_tree, hf_pktc_list_of_ciphersuites, tvb, offset, -1, ENC_NA);
+        tree = proto_item_add_subtree(item, ett_pktc_list_of_ciphersuites);
+    }
+
 
     /* number of ciphersuites */
     len=tvb_get_guint8(tvb, offset);
@@ -290,8 +290,8 @@ dissect_pktc_list_of_ciphersuites(packet_info *pinfo _U_, proto_tree *parent_tre
             proto_tree_add_item(tree, hf_pktc_snmpEncryptionTransformID, tvb, offset, 1, ENC_BIG_ENDIAN);
             proto_item_append_text(tree, "/%s", val_to_str(tvb_get_guint8(tvb, offset), snmp_transform_id_vals, "%0x"));
             offset+=1;
-        }
-        break;
+	}
+	break;
     case DOI_IPSEC:
         for(i=0;i<len;i++){
             /* IPsec authentication algorithm */
@@ -303,11 +303,11 @@ dissect_pktc_list_of_ciphersuites(packet_info *pinfo _U_, proto_tree *parent_tre
             proto_tree_add_item(tree, hf_pktc_ipsecEncryptionTransformID, tvb, offset, 1, ENC_BIG_ENDIAN);
             proto_item_append_text(tree, "/%s", val_to_str(tvb_get_guint8(tvb, offset), ipsec_transform_id_vals, "%0x"));
             offset+=1;
-        }
+	}
         break;
     default:
-        proto_tree_add_expert(tree, pinfo, &ei_pktc_unknown_doi, tvb, offset, 1);
-            THROW(ReportedBoundsError); /* bail out and inform user we can't dissect the packet */
+        proto_tree_add_text(tree, tvb, offset, 1, "Unknown DOI");
+	tvb_get_guint8(tvb, 9999); /* bail out and inform user we cant dissect the packet */
     }
 
     proto_item_set_len(item, offset-old_offset);
@@ -384,7 +384,7 @@ dissect_pktc_ap_reply(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int o
     proto_tree_add_uint_format(tree, hf_pktc_sec_param_lifetime, tvb, offset, 4,
                                tvb_get_ntohl(tvb, offset), "%s: %s",
                                proto_registrar_get_name(hf_pktc_sec_param_lifetime),
-                               time_secs_to_str(wmem_packet_scope(), tvb_get_ntohl(tvb, offset)));
+                               time_secs_to_ep_str(tvb_get_ntohl(tvb, offset)));
     offset+=4;
 
     /* grace period */
@@ -438,7 +438,7 @@ dissect_pktc_rekey(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int offs
     timestr=tvb_get_ptr(tvb, offset, 13);
     proto_tree_add_string_format_value(tree, hf_pktc_timestamp, tvb, offset, 13, timestr,
                                 "%.2s-%.2s-%.2s %.2s:%.2s:%.2s",
-                                 timestr, timestr+2, timestr+4, timestr+6, timestr+8, timestr+10);
+				 timestr, timestr+2, timestr+4, timestr+6, timestr+8, timestr+10);
     offset+=13;
 
     /* app specific data */
@@ -550,14 +550,16 @@ static void
 dissect_pktc_mtafqdn(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     int offset=0;
-    proto_tree *pktc_mtafqdn_tree;
-    proto_item *item;
+    proto_tree *pktc_mtafqdn_tree = NULL;
+    proto_item *item = NULL;
     tvbuff_t *pktc_mtafqdn_tvb;
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "PKTC");
 
-    item = proto_tree_add_item(tree, proto_pktc, tvb, 0, 0, ENC_NA);
-    pktc_mtafqdn_tree = proto_item_add_subtree(item, ett_pktc_mtafqdn);
+    if (tree) {
+        item = proto_tree_add_item(tree, proto_pktc, tvb, 0, 0, ENC_NA);
+        pktc_mtafqdn_tree = proto_item_add_subtree(item, ett_pktc_mtafqdn);
+    }
 
     col_add_fstr(pinfo->cinfo, COL_INFO, "MTA FQDN %s",
                     pinfo->srcport == pinfo->match_uint ? "Reply":"Request");
@@ -579,13 +581,15 @@ dissect_pktc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     guint8 kmmid, doi, version;
     int offset=0;
-    proto_tree *pktc_tree, *version_tree;
-    proto_item *item;
+    proto_tree *pktc_tree = NULL;
+    proto_item *item = NULL, *hidden_item;
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "PKTC");
 
-    item = proto_tree_add_item(tree, proto_pktc, tvb, 0, 3, ENC_NA);
-    pktc_tree = proto_item_add_subtree(item, ett_pktc);
+    if (tree) {
+        item = proto_tree_add_item(tree, proto_pktc, tvb, 0, 3, ENC_NA);
+        pktc_tree = proto_item_add_subtree(item, ett_pktc);
+    }
 
     /* key management message id */
     kmmid=tvb_get_guint8(tvb, offset);
@@ -599,22 +603,23 @@ dissect_pktc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     /* version */
     version=tvb_get_guint8(tvb, offset);
-    version_tree = proto_tree_add_subtree_format(pktc_tree, tvb, offset, 1, ett_pktc_version, NULL,
-                "Version: %d.%d", (version>>4)&0x0f, (version)&0x0f);
-    proto_tree_add_item(version_tree, hf_pktc_version_major, tvb, offset, 1, ENC_BIG_ENDIAN);
-    proto_tree_add_item(version_tree, hf_pktc_version_minor, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_text(pktc_tree, tvb, offset, 1, "Version: %d.%d", (version>>4)&0x0f, (version)&0x0f);
+    hidden_item = proto_tree_add_uint(pktc_tree, hf_pktc_version_major, tvb, offset, 1, (version>>4)&0x0f);
+    PROTO_ITEM_SET_HIDDEN(hidden_item);
+    hidden_item = proto_tree_add_uint(pktc_tree, hf_pktc_version_minor, tvb, offset, 1, (version)&0x0f);
+    PROTO_ITEM_SET_HIDDEN(hidden_item);
     offset+=1;
 
     /* fill COL_INFO */
     col_add_str(pinfo->cinfo, COL_INFO,
-                    val_to_str(kmmid, kmmid_types, "Unknown KMMID %#x"));
-        col_append_fstr(pinfo->cinfo, COL_INFO, " (%s)",
-                        val_to_str(doi, doi_types, "Unknown DOI %#x"));
+		    val_to_str(kmmid, kmmid_types, "Unknown KMMID %#x"));
+	col_append_fstr(pinfo->cinfo, COL_INFO, " (%s)",
+		        val_to_str(doi, doi_types, "Unknown DOI %#x"));
 
     switch(kmmid){
     case KMMID_WAKEUP:
         offset=dissect_pktc_wakeup(pktc_tree, tvb, offset);
-        break;
+	break;
     case KMMID_AP_REQUEST:
         offset=dissect_pktc_ap_request(pinfo, pktc_tree, tvb, offset, doi);
         break;
@@ -623,13 +628,13 @@ dissect_pktc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         break;
     case KMMID_SEC_PARAM_REC:
         offset=dissect_pktc_sec_param_rec(pktc_tree, tvb, offset);
-        break;
+	break;
     case KMMID_REKEY:
         offset=dissect_pktc_rekey(pinfo, pktc_tree, tvb, offset, doi);
-        break;
+	break;
     case KMMID_ERROR_REPLY:
         offset=dissect_pktc_error_reply(pinfo, pktc_tree, tvb, offset);
-        break;
+	break;
     };
 
     proto_item_set_len(item, offset);
@@ -639,91 +644,90 @@ void
 proto_register_pktc(void)
 {
     static hf_register_info hf[] = {
-        { &hf_pktc_kmmid, {
-            "Key Management Message ID", "pktc.kmmid", FT_UINT8, BASE_HEX,
-            VALS(kmmid_types), 0, NULL, HFILL }},
-        { &hf_pktc_doi, {
-            "Domain of Interpretation", "pktc.doi", FT_UINT8, BASE_DEC,
-            VALS(doi_types), 0, NULL, HFILL }},
-        { &hf_pktc_version_major, {
-            "Major version", "pktc.version.major", FT_UINT8, BASE_DEC,
-            NULL, 0xF0, "Major version of PKTC", HFILL }},
-        { &hf_pktc_version_minor, {
-            "Minor version", "pktc.version.minor", FT_UINT8, BASE_DEC,
-            NULL, 0x0F, "Minor version of PKTC", HFILL }},
-        { &hf_pktc_server_nonce, {
-            "Server Nonce", "pktc.server_nonce", FT_UINT32, BASE_HEX,
-            NULL, 0, "Server Nonce random number", HFILL }},
-        { &hf_pktc_server_principal, {
-            "Server Kerberos Principal Identifier", "pktc.server_principal", FT_STRING, BASE_NONE,
-            NULL, 0, NULL, HFILL }},
-        { &hf_pktc_timestamp, {
-            "Timestamp", "pktc.timestamp", FT_STRING, BASE_NONE,
-            NULL, 0, "Timestamp (UTC)", HFILL }},
-        { &hf_pktc_app_spec_data, {
-            "Application Specific Data", "pktc.asd", FT_NONE, BASE_NONE,
-            NULL, 0, "KMMID/DOI application specific data", HFILL }},
-        { &hf_pktc_list_of_ciphersuites, {
+	{ &hf_pktc_kmmid, {
+	    "Key Management Message ID", "pktc.kmmid", FT_UINT8, BASE_HEX,
+	    VALS(kmmid_types), 0, NULL, HFILL }},
+	{ &hf_pktc_doi, {
+	    "Domain of Interpretation", "pktc.doi", FT_UINT8, BASE_DEC,
+	    VALS(doi_types), 0, NULL, HFILL }},
+	{ &hf_pktc_version_major, {
+	    "Major version", "pktc.version.major", FT_UINT8, BASE_DEC,
+	    NULL, 0, "Major version of PKTC", HFILL }},
+	{ &hf_pktc_version_minor, {
+	    "Minor version", "pktc.version.minor", FT_UINT8, BASE_DEC,
+	    NULL, 0, "Minor version of PKTC", HFILL }},
+	{ &hf_pktc_server_nonce, {
+	    "Server Nonce", "pktc.server_nonce", FT_UINT32, BASE_HEX,
+	    NULL, 0, "Server Nonce random number", HFILL }},
+	{ &hf_pktc_server_principal, {
+	    "Server Kerberos Principal Identifier", "pktc.server_principal", FT_STRING, BASE_NONE,
+	    NULL, 0, NULL, HFILL }},
+	{ &hf_pktc_timestamp, {
+	    "Timestamp", "pktc.timestamp", FT_STRING, BASE_NONE,
+	    NULL, 0, "Timestamp (UTC)", HFILL }},
+	{ &hf_pktc_app_spec_data, {
+	    "Application Specific Data", "pktc.asd", FT_NONE, BASE_NONE,
+	    NULL, 0, "KMMID/DOI application specific data", HFILL }},
+	{ &hf_pktc_list_of_ciphersuites, {
             "List of Ciphersuites", "pktc.ciphers", FT_NONE, BASE_NONE,
-            NULL, 0, NULL, HFILL }},
-        { &hf_pktc_list_of_ciphersuites_len, {
+	    NULL, 0, NULL, HFILL }},
+	{ &hf_pktc_list_of_ciphersuites_len, {
             "Number of Ciphersuites", "pktc.ciphers.len", FT_UINT8, BASE_DEC,
-            NULL, 0, NULL, HFILL }},
-        { &hf_pktc_snmpAuthenticationAlgorithm, {
+	    NULL, 0, NULL, HFILL }},
+	{ &hf_pktc_snmpAuthenticationAlgorithm, {
            "SNMPv3 Authentication Algorithm", "pktc.asd.snmp_auth_alg", FT_UINT8, BASE_HEX,
            VALS(snmp_authentication_algorithm_vals), 0, NULL, HFILL }},
-        { &hf_pktc_snmpEncryptionTransformID, {
+	{ &hf_pktc_snmpEncryptionTransformID, {
            "SNMPv3 Encryption Transform ID", "pktc.asd.snmp_enc_alg", FT_UINT8, BASE_HEX,
            VALS(snmp_transform_id_vals), 0, NULL, HFILL }},
-        { &hf_pktc_ipsecAuthenticationAlgorithm, {
+	{ &hf_pktc_ipsecAuthenticationAlgorithm, {
            "IPsec Authentication Algorithm", "pktc.asd.ipsec_auth_alg", FT_UINT8, BASE_HEX,
            VALS(ipsec_authentication_algorithm_vals), 0, NULL, HFILL }},
-        { &hf_pktc_ipsecEncryptionTransformID, {
+	{ &hf_pktc_ipsecEncryptionTransformID, {
            "IPsec Encryption Transform ID", "pktc.asd.ipsec_enc_alg", FT_UINT8, BASE_HEX,
            VALS(ipsec_transform_id_vals), 0, NULL, HFILL }},
-        { &hf_pktc_snmpEngineID_len, {
+	{ &hf_pktc_snmpEngineID_len, {
            "SNMPv3 Engine ID Length", "pktc.asd.snmp_engine_id.len", FT_UINT8, BASE_DEC,
            NULL, 0, "Length of SNMPv3 Engine ID", HFILL }},
-        { &hf_pktc_snmpEngineID, {
+	{ &hf_pktc_snmpEngineID, {
            "SNMPv3 Engine ID", "pktc.asd.snmp_engine_id", FT_BYTES, BASE_NONE,
            NULL, 0, NULL, HFILL }},
-        { &hf_pktc_snmpEngineBoots, {
+	{ &hf_pktc_snmpEngineBoots, {
            "SNMPv3 Engine Boots", "pktc.asd.snmp_engine_boots", FT_UINT32, BASE_DEC,
            NULL, 0, NULL, HFILL }},
-        { &hf_pktc_snmpEngineTime, {
+	{ &hf_pktc_snmpEngineTime, {
            "SNMPv3 Engine Time", "pktc.asd.snmp_engine_time", FT_UINT32, BASE_DEC,
            NULL, 0, "SNMPv3 Engine ID Time", HFILL }},
-        { &hf_pktc_usmUserName_len, {
+	{ &hf_pktc_usmUserName_len, {
            "SNMPv3 USM User Name Length", "pktc.asd.snmp_usm_username.len", FT_UINT8, BASE_DEC,
            NULL, 0, "Length of SNMPv3 USM User Name", HFILL }},
-        { &hf_pktc_usmUserName, {
+	{ &hf_pktc_usmUserName, {
            "SNMPv3 USM User Name", "pktc.asd.snmp_usm_username", FT_STRING, BASE_NONE,
            NULL, 0, NULL, HFILL }},
-        { &hf_pktc_ipsec_spi, {
+	{ &hf_pktc_ipsec_spi, {
            "IPsec Security Parameter Index", "pktc.asd.ipsec_spi", FT_UINT32, BASE_HEX,
            NULL, 0, "Security Parameter Index for inbound Security Association (IPsec)", HFILL }},
-        { &hf_pktc_reestablish_flag, {
-            "Re-establish Flag", "pktc.reestablish", FT_BOOLEAN, BASE_NONE,
-            NULL, 0x0, NULL, HFILL }},
-        { &hf_pktc_ack_required_flag, {
-            "ACK Required Flag", "pktc.ack_required", FT_BOOLEAN, BASE_NONE,
-            NULL, 0x0, NULL, HFILL }},
-        { &hf_pktc_sec_param_lifetime, {
-            "Security Parameter Lifetime", "pktc.spl", FT_UINT32, BASE_DEC,
-            NULL, 0, "Lifetime in seconds of security parameter", HFILL }},
+	{ &hf_pktc_reestablish_flag, {
+	    "Re-establish Flag", "pktc.reestablish", FT_BOOLEAN, BASE_NONE,
+	    NULL, 0x0, NULL, HFILL }},
+	{ &hf_pktc_ack_required_flag, {
+	    "ACK Required Flag", "pktc.ack_required", FT_BOOLEAN, BASE_NONE,
+	    NULL, 0x0, NULL, HFILL }},
+	{ &hf_pktc_sec_param_lifetime, {
+	    "Security Parameter Lifetime", "pktc.spl", FT_UINT32, BASE_DEC,
+	    NULL, 0, "Lifetime in seconds of security parameter", HFILL }},
         { &hf_pktc_sha1_hmac, {
            "SHA-1 HMAC", "pktc.sha1_hmac", FT_BYTES, BASE_NONE,
            NULL, 0, NULL, HFILL }},
-        { &hf_pktc_grace_period, {
-            "Grace Period", "pktc.grace_period", FT_UINT32, BASE_DEC,
-            NULL, 0, "Grace Period in seconds", HFILL }},
+	{ &hf_pktc_grace_period, {
+	    "Grace Period", "pktc.grace_period", FT_UINT32, BASE_DEC,
+	    NULL, 0, "Grace Period in seconds", HFILL }},
     };
     static gint *ett[] = {
         &ett_pktc,
         &ett_pktc_app_spec_data,
         &ett_pktc_list_of_ciphersuites,
-        &ett_pktc_engineid,
-        &ett_pktc_version,
+	&ett_pktc_engineid,
     };
 
     proto_pktc = proto_register_protocol("PacketCable", "PKTC", "pktc");
@@ -776,17 +780,8 @@ proto_register_pktc_mtafqdn(void)
         &ett_pktc_mtafqdn,
     };
 
-    static ei_register_info ei[] = {
-        { &ei_pktc_unknown_kmmid, { "pktc.unknown_kmmid", PI_PROTOCOL, PI_WARN, "Unknown KMMID", EXPFILL }},
-        { &ei_pktc_unknown_doi, { "pktc.unknown_doi", PI_PROTOCOL, PI_WARN, "Unknown DOI", EXPFILL }},
-    };
-
-    expert_module_t* expert_pktc;
-
     proto_register_field_array(proto_pktc, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-    expert_pktc = expert_register_protocol(proto_pktc);
-    expert_register_field_array(expert_pktc, ei, array_length(ei));
 }
 
 void
@@ -797,16 +792,3 @@ proto_reg_handoff_pktc_mtafqdn(void)
     pktc_mtafqdn_handle = create_dissector_handle(dissect_pktc_mtafqdn, proto_pktc);
     dissector_add_uint("udp.port", PKTC_MTAFQDN_PORT, pktc_mtafqdn_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

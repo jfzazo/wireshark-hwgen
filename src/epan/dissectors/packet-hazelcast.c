@@ -34,7 +34,7 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/tap.h>
-#include "packet-tcp.h"
+#include <packet-tcp.h>
 
 void proto_register_hazelcast(void);
 void proto_reg_handoff_hazelcast(void);
@@ -236,9 +236,7 @@ static value_string_ext responseTypes_ext = VALUE_STRING_EXT_INIT(responseTypes)
 
 
 /* Get the length of a single HAZELCAST message */
-static guint get_hazelcast_message_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                                       int offset, void *data _U_)
-{
+static guint get_hazelcast_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset) {
 
     guint messageLength;
     guint headerKeyLength;
@@ -288,7 +286,7 @@ static int dissect_hazelcast_message(tvbuff_t *tvb, packet_info *pinfo _U_, prot
 
     if (tree) {
 
-        proto_item *ti;
+        proto_item *ti = NULL;
         ti = proto_tree_add_item(tree, proto_hazelcast, tvb, 0, -1, ENC_NA);
 
         hcast_tree = proto_item_add_subtree(ti, ett_hazelcast);

@@ -22,11 +22,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <locale.h>
 #include <limits.h>
 
@@ -44,20 +45,10 @@
 #include <fcntl.h>
 #endif
 
-#ifndef _WIN32
 #include <signal.h>
-#endif
 
 #ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
-#endif
-
-#ifdef HAVE_LIBZ
-#include <zlib.h>      /* to get the libz version number */
-#endif
-
-#ifdef HAVE_LIBCAP
-# include <sys/capability.h>
 #endif
 
 #ifndef HAVE_GETOPT_LONG
@@ -69,15 +60,11 @@
 #include <epan/exceptions.h>
 #include <epan/epan-int.h>
 #include <epan/epan.h>
-
-#include <wsutil/clopts_common.h>
-#include <wsutil/cmdarg_err.h>
 #include <wsutil/crash_info.h>
 #include <wsutil/privileges.h>
 #include <wsutil/file_util.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/report_err.h>
-#include <wsutil/ws_version_info.h>
 
 #include "globals.h"
 #include <epan/timestamp.h>
@@ -92,37 +79,31 @@
 #include <epan/column.h>
 #include <epan/print.h>
 #include <epan/addr_resolv.h>
-#ifdef HAVE_LIBPCAP
-#include "ui/capture_ui_utils.h"
-#endif
 #include "ui/util.h"
 #include "ui/ui_util.h"
-#include "ui/cli/tshark-tap.h"
+#include "clopts_common.h"
+#include "cmdarg_err.h"
+#include "version_info.h"
 #include "register.h"
 #include <epan/epan_dissect.h>
 #include <epan/tap.h>
-#include <epan/stat_tap_ui.h>
-#include <epan/conversation_table.h>
+#include <epan/stat_cmd_args.h>
+#include <epan/timestamp.h>
 #include <epan/ex-opt.h>
-
-#if defined(HAVE_HEIMDAL_KERBEROS) || defined(HAVE_MIT_KERBEROS)
-#include <epan/asn1.h>
-#include <epan/dissectors/packet-kerberos.h>
-#endif
 
 #include "capture_opts.h"
 
-#include "caputils/capture-pcap-util.h"
-
 #ifdef HAVE_LIBPCAP
-#include "caputils/capture_ifinfo.h"
+#include "capture_ui_utils.h"
+#include "capture_ifinfo.h"
+#include "capture-pcap-util.h"
 #ifdef _WIN32
-#include "caputils/capture-wpcap.h"
-#include <wsutil/os_version_info.h>
+#include "capture-wpcap.h"
 #include <wsutil/unicode-utils.h>
 #endif /* _WIN32 */
-#include <capchild/capture_session.h>
-#include <capchild/capture_sync.h>
+#include "capture_session.h"
+#include "capture_sync.h"
+#include "capture_opts.h"
 #endif /* HAVE_LIBPCAP */
 #include "log.h"
 #include <epan/funnel.h>
@@ -224,11 +205,8 @@ static void open_failure_message(const char *filename, int err,
 static void failure_message(const char *msg_format, va_list ap);
 static void read_failure_message(const char *filename, int err);
 static void write_failure_message(const char *filename, int err);
-static void failure_message_cont(const char *msg_format, va_list ap);
 
 capture_file cfile;
-
-static GHashTable *output_only_tables = NULL;
 
 struct string_elem {
   const char *sstr;   /* The short string */
@@ -294,8 +272,22 @@ list_read_capture_types(void) {
 }
 
 static void
-print_usage(FILE *output)
+print_usage(gboolean print_ver)
 {
+  FILE *output;
+
+  if (print_ver) {
+    output = stdout;
+    fprintf(output,
+        "TShark " VERSION "%s\n"
+        "Dump and analyze network traffic.\n"
+        "See http://www.wireshark.org for more information.\n"
+        "\n"
+        "%s",
+         wireshark_gitversion, get_copyright_info());
+  } else {
+    output = stderr;
+  }
   fprintf(output, "\n");
   fprintf(output, "Usage: tshark [options] ...\n");
   fprintf(output, "\n");
@@ -398,11 +390,11 @@ print_usage(FILE *output)
   fprintf(output, "                           default report=\"fields\"\n");
   fprintf(output, "                           use \"-G ?\" for more help\n");
 #ifdef __linux__
-  fprintf(output, "\n");
-  fprintf(output, "WARNING: dumpcap will enable kernel BPF JIT compiler if available.\n");
-  fprintf(output, "You might want to reset it\n");
-  fprintf(output, "By doing \"echo 0 > /proc/sys/net/core/bpf_jit_enable\"\n");
-  fprintf(output, "\n");
+    fprintf(output, "\n");
+    fprintf(output, "WARNING: dumpcap will enable kernel BPF JIT compiler if available.\n");
+    fprintf(output, "You might want to reset it\n");
+    fprintf(output, "By doing \"echo 0 > /proc/sys/net/core/bpf_jit_enable\"\n");
+    fprintf(output, "\n");
 #endif
 
 }
@@ -414,7 +406,7 @@ glossary_option_help(void)
 
   output = stdout;
 
-  fprintf(output, "TShark (Wireshark) %s\n", get_ws_vcs_version_info());
+  fprintf(output, "TShark " VERSION "%s\n", wireshark_gitversion);
 
   fprintf(output, "\n");
   fprintf(output, "Usage: tshark -G [report]\n");
@@ -422,7 +414,6 @@ glossary_option_help(void)
   fprintf(output, "Glossary table reports:\n");
   fprintf(output, "  -G column-formats        dump column format codes and exit\n");
   fprintf(output, "  -G decodes               dump \"layer type\"/\"decode as\" associations and exit\n");
-  fprintf(output, "  -G dissector-tables      dump dissector table names, types, and properties\n");
   fprintf(output, "  -G fields                dump fields glossary and exit\n");
   fprintf(output, "  -G ftypes                dump field type basic and descriptive names\n");
   fprintf(output, "  -G heuristic-decodes     dump heuristic dissector tables\n");
@@ -904,41 +895,29 @@ print_current_user(void) {
 }
 
 static void
-get_tshark_compiled_version_info(GString *str)
-{
-  /* Capture libraries */
-  get_compiled_caplibs_version(str);
-
-  /* LIBZ */
-  g_string_append(str, ", ");
-#ifdef HAVE_LIBZ
-  g_string_append(str, "with libz ");
-#ifdef ZLIB_VERSION
-  g_string_append(str, ZLIB_VERSION);
-#else /* ZLIB_VERSION */
-  g_string_append(str, "(version unknown)");
-#endif /* ZLIB_VERSION */
-#else /* HAVE_LIBZ */
-  g_string_append(str, "without libz");
-#endif /* HAVE_LIBZ */
+check_capture_privs(void) {
+#ifdef _WIN32
+  load_wpcap();
+  /* Warn the user if npf.sys isn't loaded. */
+  if (!npf_sys_is_running() && get_os_major_version() >= 6) {
+    fprintf(stderr, "The NPF driver isn't running.  You may have trouble "
+      "capturing or\nlisting interfaces.\n");
+  }
+#endif
 }
 
 static void
-get_tshark_runtime_version_info(GString *str)
+show_version(GString *comp_info_str, GString *runtime_info_str)
 {
-#ifdef HAVE_LIBPCAP
-    /* Capture libraries */
-    g_string_append(str, ", ");
-    get_runtime_caplibs_version(str);
-#endif
-
-    /* zlib */
-#if defined(HAVE_LIBZ) && !defined(_WIN32)
-    g_string_append_printf(str, ", with libz %s", zlibVersion());
-#endif
-
-    /* stuff used by libwireshark */
-    epan_get_runtime_version_info(str);
+  printf("TShark " VERSION "%s\n"
+         "\n"
+         "%s"
+         "\n"
+         "%s"
+         "\n"
+         "%s",
+         wireshark_gitversion, get_copyright_info(), comp_info_str->str,
+         runtime_info_str->str);
 }
 
 int
@@ -948,10 +927,8 @@ main(int argc, char *argv[])
   GString             *runtime_info_str;
   char                *init_progfile_dir_error;
   int                  opt;
-  static const struct option long_options[] = {
-    {(char *)"help", no_argument, NULL, 'h'},
-    {(char *)"version", no_argument, NULL, 'v'},
-    LONGOPT_CAPTURE_COMMON
+  struct option        long_options[] = {
+    {(char *)"capture-comment", required_argument, NULL, LONGOPT_NUM_CAP_COMMENT },
     {0, 0, 0, 0 }
   };
   gboolean             arg_error = FALSE;
@@ -993,11 +970,31 @@ main(int argc, char *argv[])
 #endif
   dfilter_t           *rfcode = NULL;
   dfilter_t           *dfcode = NULL;
-  gchar               *err_msg;
   e_prefs             *prefs_p;
   char                 badopt;
   int                  log_flags;
   gchar               *output_only = NULL;
+
+#ifdef HAVE_PCAP_REMOTE
+#define OPTSTRING_A "A:"
+#else
+#define OPTSTRING_A ""
+#endif
+#ifdef HAVE_LIBPCAP
+#if defined(_WIN32) || defined(HAVE_PCAP_CREATE)
+#define OPTSTRING_B "B:"
+#else
+#define OPTSTRING_B ""
+#endif  /* _WIN32 or HAVE_PCAP_CREATE */
+#else /* HAVE_LIBPCAP */
+#define OPTSTRING_B ""
+#endif  /* HAVE_LIBPCAP */
+
+#ifdef HAVE_PCAP_CREATE
+#define OPTSTRING_I "I"
+#else
+#define OPTSTRING_I ""
+#endif
 
 /*
  * The leading + ensures that getopt_long() does not permute the argv[]
@@ -1018,14 +1015,25 @@ main(int argc, char *argv[])
  * We do *not* use a leading - because the behavior of a leading - is
  * platform-dependent.
  */
-#define OPTSTRING "+2" OPTSTRING_CAPTURE_COMMON "C:d:e:E:F:gG:hH:" "K:lnN:o:O:PqQr:R:S:t:T:u:vVw:W:xX:Y:z:"
+#define OPTSTRING "+2a:" OPTSTRING_A "b:" OPTSTRING_B "c:C:d:De:E:f:F:gG:hH:i:" OPTSTRING_I "K:lLnN:o:O:pPqQr:R:s:S:t:T:u:vVw:W:xX:y:Y:z:"
 
   static const char    optstring[] = OPTSTRING;
 
-  /* Set the C-language locale to the native environment. */
-  setlocale(LC_ALL, "");
+  /* Assemble the compile-time version information string */
+  comp_info_str = g_string_new("Compiled ");
+  get_compiled_version_info(comp_info_str, NULL, epan_get_compiled_version_info);
 
-  cmdarg_err_init(failure_message, failure_message_cont);
+  /* Assemble the run-time version information string */
+  runtime_info_str = g_string_new("Running ");
+  get_runtime_version_info(runtime_info_str, NULL);
+
+  /* Add it to the information to be reported on a crash. */
+  ws_add_crash_info("TShark " VERSION "%s\n"
+         "\n"
+         "%s"
+         "\n"
+         "%s",
+      wireshark_gitversion, comp_info_str->str, runtime_info_str->str);
 
 #ifdef _WIN32
   arg_list_utf_16to8(argc, argv);
@@ -1036,13 +1044,9 @@ main(int argc, char *argv[])
 #endif /* _WIN32 */
 
   /*
-   * Get credential information for later use, and drop privileges
-   * before doing anything else.
-   * Let the user know if anything happened.
+   * Get credential information for later use.
    */
   init_process_policies();
-  relinquish_special_privs_perm();
-  print_current_user();
 
   /*
    * Attempt to get the pathname of the executable file.
@@ -1052,34 +1056,6 @@ main(int argc, char *argv[])
     fprintf(stderr, "tshark: Can't get pathname of tshark program: %s.\n",
             init_progfile_dir_error);
   }
-
-  initialize_funnel_ops();
-
-#ifdef _WIN32
-  /* Load wpcap if possible. Do this before collecting the run-time version information */
-  load_wpcap();
-
-  /* Warn the user if npf.sys isn't loaded. */
-  if (!npf_sys_is_running() && get_windows_major_version() >= 6) {
-    fprintf(stderr, "The NPF driver isn't running.  You may have trouble "
-      "capturing or\nlisting interfaces.\n");
-  }
-#endif
-
-  /* Get the compile-time version information string */
-  comp_info_str = get_compiled_version_info(get_tshark_compiled_version_info,
-                                            epan_get_compiled_version_info);
-
-  /* Get the run-time version information string */
-  runtime_info_str = get_runtime_version_info(get_tshark_runtime_version_info);
-
-  /* Add it to the information to be reported on a crash. */
-  ws_add_crash_info("TShark (Wireshark) %s\n"
-         "\n"
-         "%s"
-         "\n"
-         "%s",
-      get_ws_vcs_version_info(), comp_info_str->str, runtime_info_str->str);
 
   /*
    * In order to have the -X opts assigned before the wslua machine starts
@@ -1167,12 +1143,14 @@ main(int argc, char *argv[])
                     tshark_log_handler, NULL /* user_data */);
 #endif
 
+  initialize_funnel_ops();
+
   init_report_err(failure_message, open_failure_message, read_failure_message,
                   write_failure_message);
 
 #ifdef HAVE_LIBPCAP
   capture_opts_init(&global_capture_opts);
-  capture_session_init(&global_capture_session, &cfile);
+  capture_session_init(&global_capture_session, (void *)&cfile);
 #endif
 
   timestamp_set_type(TS_RELATIVE);
@@ -1210,8 +1188,6 @@ main(int argc, char *argv[])
   register_all_plugin_tap_listeners();
 #endif
   register_all_tap_listeners();
-  conversation_table_set_gui_info(init_iousers);
-  hostlist_table_set_gui_info(init_hostlists);
 
   /* If invoked with the "-G" flag, we dump out information based on
      the argument to the "-G" flag; if no argument is specified,
@@ -1238,8 +1214,6 @@ main(int argc, char *argv[])
         dissector_dump_decodes();
       else if (strcmp(argv[2], "defaultprefs") == 0)
         write_prefs(NULL);
-      else if (strcmp(argv[2], "dissector-tables") == 0)
-        dissector_dump_dissector_tables();
       else if (strcmp(argv[2], "fields") == 0)
         proto_registrar_dump_fields();
       else if (strcmp(argv[2], "ftypes") == 0)
@@ -1269,6 +1243,9 @@ main(int argc, char *argv[])
     }
     return 0;
   }
+
+  /* Set the C-language locale to the native environment. */
+  setlocale(LC_ALL, "");
 
   prefs_p = read_prefs(&gpf_open_errno, &gpf_read_errno, &gpf_path,
                      &pf_open_errno, &pf_read_errno, &pf_path);
@@ -1322,6 +1299,8 @@ main(int argc, char *argv[])
     }
     g_free(dp_path);
   }
+
+  check_capture_privs();
 
   cap_file_init(&cfile);
 
@@ -1412,11 +1391,16 @@ main(int argc, char *argv[])
 #ifdef HAVE_LIBPCAP
       if_list = capture_interface_list(&err, &err_str,NULL);
       if (if_list == NULL) {
-        if (err == 0)
-          cmdarg_err("There are no interfaces on which a capture can be done");
-        else {
+        switch (err) {
+        case CANT_GET_INTERFACE_LIST:
+        case DONT_HAVE_PCAP:
           cmdarg_err("%s", err_str);
           g_free(err_str);
+          break;
+
+        case NO_INTERFACES_FOUND:
+          cmdarg_err("There are no interfaces on which a capture can be done");
+          break;
         }
         return 2;
       }
@@ -1468,11 +1452,7 @@ main(int argc, char *argv[])
       break;
 
     case 'h':        /* Print help and exit */
-      printf("TShark (Wireshark) %s\n"
-             "Dump and analyze network traffic.\n"
-             "See http://www.wireshark.org for more information.\n",
-             get_ws_vcs_version_info());
-      print_usage(stdout);
+      print_usage(TRUE);
       return 0;
       break;
     case 'l':        /* "Line-buffer" standard output */
@@ -1646,7 +1626,7 @@ main(int argc, char *argv[])
       break;
     case 'v':         /* Show version and exit */
     {
-      show_version("TShark (Wireshark)", comp_info_str, runtime_info_str);
+      show_version(comp_info_str, runtime_info_str);
       g_string_free(comp_info_str, TRUE);
       g_string_free(runtime_info_str, TRUE);
       /* We don't really have to cleanup here, but it's a convenient way to test
@@ -1678,12 +1658,12 @@ main(int argc, char *argv[])
          by the preferences set callback) from being used as
          part of a tap filter.  Instead, we just add the argument
          to a list of stat arguments. */
-      if (strcmp("help", optarg) == 0) {
-        fprintf(stderr, "tshark: The available statistics for the \"-z\" option are:\n");
-        list_stat_cmd_args();
-        return 0;
-      }
       if (!process_stat_cmd_arg(optarg)) {
+        if (strcmp("help", optarg)==0) {
+          fprintf(stderr, "tshark: The available statistics for the \"-z\" option are:\n");
+          list_stat_cmd_args();
+          return 0;
+        }
         cmdarg_err("Invalid -z argument \"%s\"; it must be one of:", optarg);
         list_stat_cmd_args();
         return 1;
@@ -1696,7 +1676,7 @@ main(int argc, char *argv[])
         list_capture_types();
         break;
       default:
-        print_usage(stderr);
+        print_usage(TRUE);
       }
       return 1;
       break;
@@ -1786,7 +1766,7 @@ main(int argc, char *argv[])
     cmdarg_err("This version of TShark was not built with support for capturing packets.");
 #endif
   if (arg_error) {
-    print_usage(stderr);
+    print_usage(FALSE);
     return 1;
   }
 
@@ -2027,9 +2007,8 @@ main(int argc, char *argv[])
 #endif
 
   if (rfilter != NULL) {
-    if (!dfilter_compile(rfilter, &rfcode, &err_msg)) {
-      cmdarg_err("%s", err_msg);
-      g_free(err_msg);
+    if (!dfilter_compile(rfilter, &rfcode)) {
+      cmdarg_err("%s", dfilter_error_msg);
       epan_cleanup();
 #ifdef HAVE_PCAP_OPEN_DEAD
       {
@@ -2052,9 +2031,8 @@ main(int argc, char *argv[])
   cfile.rfcode = rfcode;
 
   if (dfilter != NULL) {
-    if (!dfilter_compile(dfilter, &dfcode, &err_msg)) {
-      cmdarg_err("%s", err_msg);
-      g_free(err_msg);
+    if (!dfilter_compile(dfilter, &dfcode)) {
+      cmdarg_err("%s", dfilter_error_msg);
       epan_cleanup();
 #ifdef HAVE_PCAP_OPEN_DEAD
       {
@@ -2111,9 +2089,43 @@ main(int argc, char *argv[])
     /*
      * We're reading a capture file.
      */
+
+    /*
+     * Immediately relinquish any special privileges we have; we must not
+     * be allowed to read any capture files the user running TShark
+     * can't open.
+     */
+    relinquish_special_privs_perm();
+    print_current_user();
+
     if (cf_open(&cfile, cf_name, in_file_type, FALSE, &err) != CF_OK) {
       epan_cleanup();
       return 2;
+    }
+
+    /* Set timestamp precision; there should arguably be a command-line
+       option to let the user set this. */
+    switch(wtap_file_tsprecision(cfile.wth)) {
+    case(WTAP_FILE_TSPREC_SEC):
+      timestamp_set_precision(TS_PREC_AUTO_SEC);
+      break;
+    case(WTAP_FILE_TSPREC_DSEC):
+      timestamp_set_precision(TS_PREC_AUTO_DSEC);
+      break;
+    case(WTAP_FILE_TSPREC_CSEC):
+      timestamp_set_precision(TS_PREC_AUTO_CSEC);
+      break;
+    case(WTAP_FILE_TSPREC_MSEC):
+      timestamp_set_precision(TS_PREC_AUTO_MSEC);
+      break;
+    case(WTAP_FILE_TSPREC_USEC):
+      timestamp_set_precision(TS_PREC_AUTO_USEC);
+      break;
+    case(WTAP_FILE_TSPREC_NSEC):
+      timestamp_set_precision(TS_PREC_AUTO_NSEC);
+      break;
+    default:
+      g_assert_not_reached();
     }
 
     /* Process the packets in the file */
@@ -2128,11 +2140,11 @@ main(int argc, char *argv[])
     }
     CATCH(OutOfMemoryError) {
       fprintf(stderr,
-              "Out Of Memory.\n"
+              "Out Of Memory!\n"
               "\n"
-              "Sorry, but TShark has to terminate now.\n"
+              "Sorry, but TShark has to terminate now!\n"
               "\n"
-              "More information and workarounds can be found at\n"
+              "Some infos / workarounds can be found at:\n"
               "http://wiki.wireshark.org/KnownBugs/OutOfMemory\n");
       err = ENOMEM;
     }
@@ -2212,11 +2224,14 @@ main(int argc, char *argv[])
       print_packet_counts = TRUE;
 
     if (print_packet_info) {
-      if (!write_preamble(&cfile)) {
+      if (!write_preamble(NULL)) {
         show_print_file_io_error(errno);
         return 2;
       }
     }
+
+    /* For now, assume libpcap gives microsecond precision. */
+    timestamp_set_precision(TS_PREC_AUTO_USEC);
 
     /*
      * XXX - this returns FALSE if an error occurred, but it also
@@ -2423,6 +2438,30 @@ capture(void)
   struct sigaction  action, oldaction;
 #endif
 
+  /*
+   * XXX - dropping privileges is still required, until code cleanup is done
+   *
+   * remove all dependencies to pcap specific code and using only dumpcap is almost done.
+   * when it's done, we don't need special privileges to run tshark at all,
+   * therefore we don't need to drop these privileges
+   * The only thing we might want to keep is a warning if tshark is run as root,
+   * as it's no longer necessary and potentially dangerous.
+   *
+   * THE FOLLOWING IS THE FORMER COMMENT WHICH IS NO LONGER REALLY VALID:
+   * We've opened the capture device, so we shouldn't need any special
+   * privileges any more; relinquish those privileges.
+   *
+   * XXX - if we have saved set-user-ID support, we should give up those
+   * privileges immediately, and then reclaim them long enough to get
+   * a list of network interfaces and to open one, and then give them
+   * up again, so that stuff we do while processing the argument list,
+   * reading the user's preferences, loading and starting plugins
+   * (especially *user* plugins), etc. is done with the user's privileges,
+   * not special privileges.
+   */
+  relinquish_special_privs_perm();
+  print_current_user();
+
   /* Create new dissection section. */
   epan_free(cfile.epan);
   cfile.epan = tshark_epan_new(&cfile);
@@ -2558,11 +2597,11 @@ capture(void)
   }
   CATCH(OutOfMemoryError) {
     fprintf(stderr,
-            "Out Of Memory.\n"
+            "Out Of Memory!\n"
             "\n"
-            "Sorry, but TShark has to terminate now.\n"
+            "Sorry, but TShark has to terminate now!\n"
             "\n"
-            "More information and workarounds can be found at\n"
+            "Some infos / workarounds can be found at:\n"
             "http://wiki.wireshark.org/KnownBugs/OutOfMemory\n");
     exit(1);
   }
@@ -2590,9 +2629,9 @@ capture_input_cfilter_error_message(capture_session *cap_session, guint i, char 
   g_assert(i < capture_opts->ifaces->len);
   interface_opts = g_array_index(capture_opts->ifaces, interface_options, i);
 
-  if (dfilter_compile(interface_opts.cfilter, &rfcode, NULL) && rfcode != NULL) {
+  if (dfilter_compile(interface_opts.cfilter, &rfcode) && rfcode != NULL) {
     cmdarg_err(
-      "Invalid capture filter \"%s\" for interface '%s'.\n"
+      "Invalid capture filter \"%s\" for interface '%s'!\n"
       "\n"
       "That string looks like a valid display filter; however, it isn't a valid\n"
       "capture filter (%s).\n"
@@ -2605,7 +2644,7 @@ capture_input_cfilter_error_message(capture_session *cap_session, guint i, char 
     dfilter_free(rfcode);
   } else {
     cmdarg_err(
-      "Invalid capture filter \"%s\" for interface '%s'.\n"
+      "Invalid capture filter \"%s\" for interface '%s'!\n"
       "\n"
       "That string isn't a valid capture filter (%s).\n"
       "See the User's Guide for a description of the capture filter syntax.",
@@ -2619,12 +2658,11 @@ gboolean
 capture_input_new_file(capture_session *cap_session, gchar *new_file)
 {
   capture_options *capture_opts = cap_session->capture_opts;
-  capture_file *cf = (capture_file *) cap_session->cf;
   gboolean is_tempfile;
   int      err;
 
   if (cap_session->state == CAPTURE_PREPARING) {
-    g_log(LOG_DOMAIN_CAPTURE, G_LOG_LEVEL_MESSAGE, "Capture started.");
+    g_log(LOG_DOMAIN_CAPTURE, G_LOG_LEVEL_MESSAGE, "Capture started!");
   }
   g_log(LOG_DOMAIN_CAPTURE, G_LOG_LEVEL_MESSAGE, "File: \"%s\"", new_file);
 
@@ -2634,19 +2672,16 @@ capture_input_new_file(capture_session *cap_session, gchar *new_file)
   if (capture_opts->save_file != NULL) {
 
     /* we start a new capture file, close the old one (if we had one before) */
-    if (cf->state != FILE_CLOSED) {
-      if (cf->wth != NULL) {
-        wtap_close(cf->wth);
-        cf->wth = NULL;
+    if ( ((capture_file *) cap_session->cf)->state != FILE_CLOSED) {
+      if ( ((capture_file *) cap_session->cf)->wth != NULL) {
+        wtap_close(((capture_file *) cap_session->cf)->wth);
+	((capture_file *) cap_session->cf)->wth = NULL;
       }
-      cf->state = FILE_CLOSED;
+      ((capture_file *) cap_session->cf)->state = FILE_CLOSED;
     }
 
     g_free(capture_opts->save_file);
     is_tempfile = FALSE;
-
-    epan_free(cf->epan);
-    cf->epan = tshark_epan_new(cf);
   } else {
     /* we didn't had a save_file before, must be a tempfile */
     is_tempfile = TRUE;
@@ -3097,12 +3132,12 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
   guint        tap_flags;
   wtapng_section_t            *shb_hdr;
   wtapng_iface_descriptions_t *idb_inf;
-  char         *appname = NULL;
+  char         appname[100];
   struct wtap_pkthdr phdr;
   Buffer       buf;
   epan_dissect_t *edt = NULL;
 
-  wtap_phdr_init(&phdr);
+  memset(&phdr, 0, sizeof(struct wtap_pkthdr));
 
   shb_hdr = wtap_file_get_shb_info(cf->wth);
   idb_inf = wtap_file_get_idb_info(cf->wth);
@@ -3127,7 +3162,7 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
     }
     /* If we don't have an application name add Tshark */
     if (shb_hdr->shb_user_appl == NULL) {
-        appname = g_strdup_printf("TShark (Wireshark) %s", get_ws_vcs_version_info());
+        g_snprintf(appname, sizeof(appname), "TShark " VERSION "%s", wireshark_gitversion);
         shb_hdr->shb_user_appl = appname;
     }
 
@@ -3146,11 +3181,11 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
       /* We couldn't set up to write to the capture file. */
       switch (err) {
 
-      case WTAP_ERR_UNWRITABLE_FILE_TYPE:
+      case WTAP_ERR_UNSUPPORTED_FILE_TYPE:
         cmdarg_err("Capture files can't be written in that format.");
         break;
 
-      case WTAP_ERR_UNWRITABLE_ENCAP:
+      case WTAP_ERR_UNSUPPORTED_ENCAP:
       case WTAP_ERR_ENCAP_PER_PACKET_UNSUPPORTED:
         cmdarg_err("The capture file being read can't be written as a "
           "\"%s\" file.", wtap_file_type_subtype_short_string(out_file_type));
@@ -3240,7 +3275,7 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
 
     prev_dis = NULL;
     prev_cap = NULL;
-    ws_buffer_init(&buf, 1500);
+    buffer_init(&buf, 1500);
 
     if (do_dissection) {
       gboolean create_proto_tree;
@@ -3268,11 +3303,11 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
              filter, so, if we're writing to a capture file, write
              this packet out. */
           if (pdh != NULL) {
-            if (!wtap_dump(pdh, &phdr, ws_buffer_start_ptr(&buf), &err, &err_info)) {
+            if (!wtap_dump(pdh, &phdr, buffer_start_ptr(&buf), &err)) {
               /* Error writing to a capture file */
               switch (err) {
 
-              case WTAP_ERR_UNWRITABLE_ENCAP:
+              case WTAP_ERR_UNSUPPORTED_ENCAP:
                 /*
                  * This is a problem with the particular frame we're writing
                  * and the file type and subtype we're writing; note that,
@@ -3302,45 +3337,12 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
                         wtap_file_type_subtype_short_string(out_file_type));
                 break;
 
-              case WTAP_ERR_UNWRITABLE_REC_TYPE:
-                /*
-                 * This is a problem with the particular record we're writing
-                 * and the file type and subtype we're writing; note that,
-                 * and report the record number and file type/subtype.
-                 *
-                 * XXX - framenum is not necessarily the record number in
-                 * the input file if there was a read filter.
-                 */
-                fprintf(stderr,
-                        "Record %u of \"%s\" has a record type that can't be saved in a \"%s\" file.\n",
-                        framenum, cf->filename,
-                        wtap_file_type_subtype_short_string(out_file_type));
-                break;
-
-              case WTAP_ERR_UNWRITABLE_REC_DATA:
-                /*
-                 * This is a problem with the particular record we're writing
-                 * and the file type and subtype we're writing; note that,
-                 * and report the record number and file type/subtype.
-                 *
-                 * XXX - framenum is not necessarily the record number in
-                 * the input file if there was a read filter.
-                 */
-                fprintf(stderr,
-                        "Record %u of \"%s\" has data that can't be saved in a \"%s\" file.\n(%s)\n",
-                        framenum, cf->filename,
-                        wtap_file_type_subtype_short_string(out_file_type),
-                        err_info != NULL ? err_info : "no information supplied");
-                g_free(err_info);
-                break;
-
               default:
                 show_capture_file_io_error(save_file, err, FALSE);
                 break;
               }
               wtap_dump_close(pdh, &err);
               g_free(shb_hdr);
-              g_free(appname);
               exit(2);
             }
           }
@@ -3353,7 +3355,7 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
       edt = NULL;
     }
 
-    ws_buffer_free(&buf);
+    buffer_free(&buf);
   }
   else {
     framenum = 0;
@@ -3384,11 +3386,11 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
            filter, so, if we're writing to a capture file, write
            this packet out. */
         if (pdh != NULL) {
-          if (!wtap_dump(pdh, wtap_phdr(cf->wth), wtap_buf_ptr(cf->wth), &err, &err_info)) {
+          if (!wtap_dump(pdh, wtap_phdr(cf->wth), wtap_buf_ptr(cf->wth), &err)) {
             /* Error writing to a capture file */
             switch (err) {
 
-            case WTAP_ERR_UNWRITABLE_ENCAP:
+            case WTAP_ERR_UNSUPPORTED_ENCAP:
               /*
                * This is a problem with the particular frame we're writing
                * and the file type and subtype we're writing; note that,
@@ -3412,39 +3414,12 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
                       wtap_file_type_subtype_short_string(out_file_type));
               break;
 
-            case WTAP_ERR_UNWRITABLE_REC_TYPE:
-              /*
-               * This is a problem with the particular record we're writing
-               * and the file type and subtype we're writing; note that,
-               * and report the record number and file type/subtype.
-               */
-              fprintf(stderr,
-                      "Record %u of \"%s\" has a record type that can't be saved in a \"%s\" file.\n",
-                      framenum, cf->filename,
-                      wtap_file_type_subtype_short_string(out_file_type));
-              break;
-
-            case WTAP_ERR_UNWRITABLE_REC_DATA:
-              /*
-               * This is a problem with the particular record we're writing
-               * and the file type and subtype we're writing; note that,
-               * and report the record number and file type/subtype.
-               */
-              fprintf(stderr,
-                      "Record %u of \"%s\" has data that can't be saved in a \"%s\" file.\n(%s)\n",
-                      framenum, cf->filename,
-                      wtap_file_type_subtype_short_string(out_file_type),
-                      err_info != NULL ? err_info : "no information supplied");
-              g_free(err_info);
-              break;
-
             default:
               show_capture_file_io_error(save_file, err, FALSE);
               break;
             }
             wtap_dump_close(pdh, &err);
             g_free(shb_hdr);
-            g_free(appname);
             exit(2);
           }
         }
@@ -3466,8 +3441,6 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
     }
   }
 
-  wtap_phdr_cleanup(&phdr);
-
   if (err != 0) {
     /*
      * Print a message noting that the read failed somewhere along the line.
@@ -3482,9 +3455,9 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
      */
 #ifndef _WIN32
     if (print_packet_info) {
-      ws_statb64 stat_stdout, stat_stderr;
+      struct stat stat_stdout, stat_stderr;
 
-      if (ws_fstat64(1, &stat_stdout) == 0 && ws_fstat64(2, &stat_stderr) == 0) {
+      if (fstat(1, &stat_stdout) == 0 && fstat(2, &stat_stderr) == 0) {
         if (stat_stdout.st_dev == stat_stderr.st_dev &&
             stat_stdout.st_ino == stat_stderr.st_ino) {
           fflush(stdout);
@@ -3497,9 +3470,19 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
 
     case WTAP_ERR_UNSUPPORTED:
       cmdarg_err("The file \"%s\" contains record data that TShark doesn't support.\n(%s)",
-                 cf->filename,
-                 err_info != NULL ? err_info : "no information supplied");
+                 cf->filename, err_info);
       g_free(err_info);
+      break;
+
+    case WTAP_ERR_UNSUPPORTED_ENCAP:
+      cmdarg_err("The file \"%s\" has a packet with a network type that TShark doesn't support.\n(%s)",
+                 cf->filename, err_info);
+      g_free(err_info);
+      break;
+
+    case WTAP_ERR_CANT_READ:
+      cmdarg_err("An attempt to read from the file \"%s\" failed for some unknown reason.",
+                 cf->filename);
       break;
 
     case WTAP_ERR_SHORT_READ:
@@ -3509,15 +3492,13 @@ load_cap_file(capture_file *cf, char *save_file, int out_file_type,
 
     case WTAP_ERR_BAD_FILE:
       cmdarg_err("The file \"%s\" appears to be damaged or corrupt.\n(%s)",
-                 cf->filename,
-                 err_info != NULL ? err_info : "no information supplied");
+                 cf->filename, err_info);
       g_free(err_info);
       break;
 
     case WTAP_ERR_DECOMPRESS:
       cmdarg_err("The compressed file \"%s\" appears to be damaged or corrupt.\n"
-                 "(%s)", cf->filename,
-                 err_info != NULL ? err_info : "no information supplied");
+                 "(%s)", cf->filename, err_info);
       g_free(err_info);
       break;
 
@@ -3558,7 +3539,6 @@ out:
 
   g_free(save_file_string);
   g_free(shb_hdr);
-  g_free(appname);
 
   return err;
 }
@@ -3682,13 +3662,13 @@ write_preamble(capture_file *cf)
   switch (output_action) {
 
   case WRITE_TEXT:
-    return print_preamble(print_stream, cf->filename, get_ws_vcs_version_info());
+    return print_preamble(print_stream, cf ? cf->filename : NULL, wireshark_gitversion);
 
   case WRITE_XML:
     if (print_details)
-      write_pdml_preamble(stdout, cf->filename);
+      write_pdml_preamble(stdout, cf ? cf->filename : NULL);
     else
-      write_psml_preamble(&cf->cinfo, stdout);
+      write_psml_preamble(stdout);
     return !ferror(stdout);
 
   case WRITE_FIELDS:
@@ -3993,7 +3973,7 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
         break;
 
       case WRITE_XML:
-        write_psml_columns(edt, stdout);
+        proto_tree_write_psml(edt, stdout);
         return !ferror(stdout);
       case WRITE_FIELDS: /*No non-verbose "fields" format */
         g_assert_not_reached();
@@ -4018,7 +3998,7 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
       print_args.print_hex = print_hex;
       print_args.print_dissections = print_details ? print_dissections_expanded : print_dissections_none;
 
-      if (!proto_tree_print(&print_args, edt, output_only_tables, print_stream))
+      if (!proto_tree_print(&print_args, edt, print_stream))
         return FALSE;
       if (!print_hex) {
         if (!print_line(print_stream, 0, separator))
@@ -4027,11 +4007,11 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
       break;
 
     case WRITE_XML:
-      write_pdml_proto_tree(edt, stdout);
+      proto_tree_write_pdml(edt, stdout);
       printf("\n");
       return !ferror(stdout);
     case WRITE_FIELDS:
-      write_fields_proto_tree(output_fields, edt, &cf->cinfo, stdout);
+      proto_tree_write_fields(output_fields, edt, &cf->cinfo, stdout);
       printf("\n");
       return !ferror(stdout);
     }
@@ -4235,8 +4215,7 @@ cf_open_error_message(int err, gchar *err_info, gboolean for_writing,
       /* Seen only when opening a capture file for reading. */
       g_snprintf(errmsg_errno, sizeof(errmsg_errno),
                  "The file \"%%s\" contains record data that TShark doesn't support.\n"
-                 "(%s)",
-                 err_info != NULL ? err_info : "no information supplied");
+                 "(%s)", err_info);
       g_free(err_info);
       errmsg = errmsg_errno;
       break;
@@ -4249,16 +4228,22 @@ cf_open_error_message(int err, gchar *err_info, gboolean for_writing,
       errmsg = errmsg_errno;
       break;
 
-    case WTAP_ERR_UNWRITABLE_FILE_TYPE:
+    case WTAP_ERR_UNSUPPORTED_FILE_TYPE:
       /* Seen only when opening a capture file for writing. */
       errmsg = "TShark doesn't support writing capture files in that format.";
       break;
 
-    case WTAP_ERR_UNWRITABLE_ENCAP:
-      /* Seen only when opening a capture file for writing. */
-      g_snprintf(errmsg_errno, sizeof(errmsg_errno),
-                 "TShark can't save this capture as a \"%s\" file.",
-                 wtap_file_type_subtype_short_string(file_type));
+    case WTAP_ERR_UNSUPPORTED_ENCAP:
+      if (for_writing) {
+        g_snprintf(errmsg_errno, sizeof(errmsg_errno),
+                   "TShark can't save this capture as a \"%s\" file.",
+                   wtap_file_type_subtype_short_string(file_type));
+      } else {
+        g_snprintf(errmsg_errno, sizeof(errmsg_errno),
+                 "The file \"%%s\" is a capture for a network type that TShark doesn't support.\n"
+                 "(%s)", err_info);
+        g_free(err_info);
+      }
       errmsg = errmsg_errno;
       break;
 
@@ -4275,9 +4260,8 @@ cf_open_error_message(int err, gchar *err_info, gboolean for_writing,
     case WTAP_ERR_BAD_FILE:
       /* Seen only when opening a capture file for reading. */
       g_snprintf(errmsg_errno, sizeof(errmsg_errno),
-                 "The file \"%%s\" appears to be damaged or corrupt.\n"
-                 "(%s)",
-                 err_info != NULL ? err_info : "no information supplied");
+               "The file \"%%s\" appears to be damaged or corrupt.\n"
+               "(%s)", err_info);
       g_free(err_info);
       errmsg = errmsg_errno;
       break;
@@ -4306,8 +4290,7 @@ cf_open_error_message(int err, gchar *err_info, gboolean for_writing,
       /* Seen only when opening a capture file for reading. */
       g_snprintf(errmsg_errno, sizeof(errmsg_errno),
                  "The compressed file \"%%s\" appears to be damaged or corrupt.\n"
-                 "(%s)",
-                 err_info != NULL ? err_info : "no information supplied");
+                 "(%s)", err_info);
       g_free(err_info);
       errmsg = errmsg_errno;
       break;
@@ -4335,6 +4318,7 @@ open_failure_message(const char *filename, int err, gboolean for_writing)
   fprintf(stderr, file_open_error_message(err, for_writing), filename);
   fprintf(stderr, "\n");
 }
+
 
 /*
  * General errors are reported with an console message in TShark.
@@ -4368,14 +4352,32 @@ write_failure_message(const char *filename, int err)
 }
 
 /*
+ * Report an error in command-line arguments.
+ */
+void
+cmdarg_err(const char *fmt, ...)
+{
+  va_list ap;
+
+  va_start(ap, fmt);
+  failure_message(fmt, ap);
+  va_end(ap);
+}
+
+/*
  * Report additional information for an error in command-line arguments.
  */
-static void
-failure_message_cont(const char *msg_format, va_list ap)
+void
+cmdarg_err_cont(const char *fmt, ...)
 {
-  vfprintf(stderr, msg_format, ap);
+  va_list ap;
+
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
   fprintf(stderr, "\n");
+  va_end(ap);
 }
+
 
 /*
  * Editor modelines  -  http://www.wireshark.org/tools/modelines.html

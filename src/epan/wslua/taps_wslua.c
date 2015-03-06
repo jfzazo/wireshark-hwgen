@@ -220,7 +220,7 @@ tap_extractor_t wslua_get_tap_extractor(const gchar* name) {
 	for(t = tappables; t->name; t++ ) {
 		if (g_str_equal(t->name,name)) return t->extractor;
 	}
-
+	
 	return NULL;
 }
 

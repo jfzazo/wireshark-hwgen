@@ -21,7 +21,8 @@
 
 project(Wireshark C CXX)
 
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 2.6)
+set(CMAKE_BACKWARDS_COMPATIBILITY 2.6)
 
 # Needs to be set after cmake_minimum_required or cmake_policy(VERSION)
 # Policy since 2.6.1
@@ -30,30 +31,13 @@ cmake_policy(SET CMP0008 NEW)
 # Backward compatibility for versions < 2.6.3
 cmake_policy(SET CMP0011 OLD)
 # Policy since 2.8.1
-cmake_policy(SET CMP0015 NEW)
-
-# If our target platform is enforced by our generator, set
-# WIRESHARK_TARGET_PLATFORM accordingly. Otherwise use
-# %WIRESHARK_TARGET_PLATFORM%.
-if(WIN32)
-	if("${CMAKE_GENERATOR}" MATCHES ".*Win64$")
-		set(WIRESHARK_TARGET_PLATFORM win64)
-		set(PROCESSOR_ARCHITECTURE amd64)
-		message("Building for x64")
-	elseif("${CMAKE_GENERATOR}" MATCHES "Visual Studio.*")
-		set(WIRESHARK_TARGET_PLATFORM win32)
-		set(PROCESSOR_ARCHITECTURE x86)
-		message("Building for x86")
-	else()
-		set(WIRESHARK_TARGET_PLATFORM $ENV{WIRESHARK_TARGET_PLATFORM})
-	endif()
-endif(WIN32)
-
-#Where to find local cmake scripts
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
-
-include(UseCustomIncludes)
-ADD_CUSTOM_CMAKE_INCLUDE()
+#cmake_policy(SET CMP0015 NEW)
+# Policy since 2.8.11
+if( ${CMAKE_MAJOR_VERSION} GREATER 2 OR ${CMAKE_MINOR_VERSION} GREATER 8 OR
+	(${CMAKE_MINOR_VERSION} EQUAL 8 AND ${CMAKE_PATCH_VERSION} GREATER 10) )
+	# Don't: Automatically link Qt executable to qtmain target on Windows
+	cmake_policy(SET CMP0020 OLD)
+endif()
 
 # This cannot be implemented via option(...)
 if( NOT CMAKE_BUILD_TYPE )
@@ -62,19 +46,79 @@ if( NOT CMAKE_BUILD_TYPE )
 		FORCE)
 endif()
 message(STATUS "Configuration types: ${CMAKE_CONFIGURATION_TYPES}")
-
-# Override optimization and other flags for make based generators
-foreach (_BT DEBUG RELEASE RELWITHDEBINFO SIZEREL)
-	set( CMAKE_C_FLAGS_${_BT} "${CMAKE_C_FLAGS_${_BT}} ${CMAKE_C_FLAGS}" )
-	set( CMAKE_CXX_FLAGS_${_BT} "${CMAKE_C_FLAGS_${_BT}} ${CMAKE_C_FLAGS}" )
-endforeach()
-
 message(STATUS "${CMAKE_BUILD_TYPE}: ${CMAKE_C_FLAGS_RELWITHDEBINFO}")
 
-# Where to put executables and libraries in the build tree
-# Note: Executables and libraries might end end up in a configuration
-# subdirectory, e.g. run/Debug or run/Release. We try to set DATAFILE_DIR
-# to a corresponding value below.
+# set(PROJECT_MAJOR_VERSION 1)
+# set(PROJECT_MINOR_VERSION 9)
+# set(PROJECT_PATCH_VERSION 0)
+# set(PROJECT_VERSION_EXTENSION "-rc5")
+# If not set, copy over Wireshark version from configure.ac
+if(NOT PROJECT_MAJOR_VERSION)
+	file(STRINGS
+		${CMAKE_SOURCE_DIR}/configure.ac
+		PROJECT_MAJOR_VERSION_TMP
+		REGEX "^m4_define\\(\\[?version_major\\]?, *\\[?[0-9]+\\]?\\)"
+	)
+	file(STRINGS
+		${CMAKE_SOURCE_DIR}/configure.ac
+		PROJECT_MINOR_VERSION_TMP
+		REGEX "^m4_define\\(\\[?version_minor\\]?, *\\[?[0-9]+\\]?\\)"
+	)
+	file(STRINGS
+		${CMAKE_SOURCE_DIR}/configure.ac
+		PROJECT_PATCH_VERSION_TMP
+		REGEX "^m4_define\\(\\[?version_micro\\]?, *\\[?[0-9]+\\]?\\)"
+	)
+	# XXX pull VERSION_EXTENSION out of configure.ac ?
+
+	string(REGEX REPLACE "m4_define\\(\\[?version_major\\]?, *\\[?([0-9]+)\\]?\\)"
+		"\\1"
+		PROJECT_MAJOR_VERSION
+		${PROJECT_MAJOR_VERSION_TMP}
+	)
+	string(REGEX REPLACE "m4_define\\(\\[?version_minor\\]?, *\\[?([0-9]+)\\]?\\)"
+		"\\1"
+		PROJECT_MINOR_VERSION
+		${PROJECT_MINOR_VERSION_TMP}
+	)
+	string(REGEX REPLACE "m4_define\\(\\[?version_micro\\]?, *\\[?([0-9]+)\\]?\\)"
+		"\\1"
+		PROJECT_PATCH_VERSION
+		${PROJECT_PATCH_VERSION_TMP}
+	)
+endif()
+
+
+if(PROJECT_VERSION_EXTENSION)
+	set(PROJECT_VERSION ${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION}.${PROJECT_PATCH_VERSION}${PROJECT_VERSION_EXTENSION})
+else()
+	set(PROJECT_VERSION ${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION}.${PROJECT_PATCH_VERSION})
+endif()
+
+message(STATUS "V: ${PROJECT_VERSION}, MaV: ${PROJECT_MAJOR_VERSION}, MiV: ${PROJECT_MINOR_VERSION}, PL: ${PROJECT_PATCH_VERSION}, EV: ${PROJECT_VERSION_EXTENSION}.")
+
+#Where to find local cmake scripts
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
+include(UseLemon)
+include(UseMakeDissectorReg)
+include(UseMakeTapReg)
+include(UseAsn2Wrs)
+
+# Under linux the release mode (CMAKE_BUILD_TYPE=release) defines NDEBUG
+
+#Defines CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_DATADIR, etc ...
+include(CMakeInstallDirs)
+
+include_directories(
+	${CMAKE_BINARY_DIR}
+	${CMAKE_SOURCE_DIR}
+	${CMAKE_SOURCE_DIR}/epan
+	${CMAKE_SOURCE_DIR}/filetap
+	${CMAKE_SOURCE_DIR}/tools/lemon
+	${CMAKE_SOURCE_DIR}/wiretap
+)
+
+#Where to put executables and libraries in the build tree
 if(NOT ARCHIVE_OUTPUT_PATH)
 	set(ARCHIVE_OUTPUT_PATH ${Wireshark_BINARY_DIR}/run CACHE INTERNAL
 		   "Single output directory for building all archives.")
@@ -87,37 +131,6 @@ if(NOT LIBRARY_OUTPUT_PATH)
 	set(LIBRARY_OUTPUT_PATH ${Wireshark_BINARY_DIR}/run CACHE INTERNAL
 		   "Single output directory for building all libraries.")
 endif()
-
-# Under linux the release mode (CMAKE_BUILD_TYPE=release) defines NDEBUG
-#Defines CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_DATADIR, etc ...
-include(CMakeInstallDirs)
-
-set(PROJECT_MAJOR_VERSION 1)
-set(PROJECT_MINOR_VERSION 99)
-set(PROJECT_PATCH_VERSION 2)
-set(PROJECT_VERSION_EXTENSION "$ENV{WIRESHARK_VERSION_EXTRA}")
-set(PROJECT_VERSION ${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION}.${PROJECT_PATCH_VERSION}${PROJECT_VERSION_EXTENSION})
-
-# These are required in .rc files and manifests
-set(VERSION_MAJOR ${PROJECT_MAJOR_VERSION})
-set(VERSION_MINOR ${PROJECT_MINOR_VERSION})
-set(VERSION_MICRO ${PROJECT_PATCH_VERSION})
-set(RC_VERSION ${PROJECT_MAJOR_VERSION},${PROJECT_MINOR_VERSION},${PROJECT_PATCH_VERSION},0)
-
-message(STATUS "V: ${PROJECT_VERSION}, MaV: ${PROJECT_MAJOR_VERSION}, MiV: ${PROJECT_MINOR_VERSION}, PL: ${PROJECT_PATCH_VERSION}, EV: ${PROJECT_VERSION_EXTENSION}.")
-
-include(UseLemon)
-include(UseMakeDissectorReg)
-include(UseMakeTapReg)
-include(UseAsn2Wrs)
-
-include_directories(
-	${CMAKE_BINARY_DIR}
-	${CMAKE_SOURCE_DIR}
-	${CMAKE_SOURCE_DIR}/epan
-	${CMAKE_SOURCE_DIR}/tools/lemon
-	${CMAKE_SOURCE_DIR}/wiretap
-)
 
 include( CMakeOptions.txt )
 if( DUMPCAP_INSTALL_OPTION STREQUAL "suid" )
@@ -142,6 +155,9 @@ if( CMAKE_C_COMPILER_ID MATCHES "MSVC")
 		message(FATAL_ERROR "You are using an unsupported version of MSVC")
 	endif()
 	set(LOCAL_CFLAGS
+		/Zi
+		/W3
+		/MDd
 		/DWIN32_LEAN_AND_MEAN
 		"/DMSC_VER_REQUIRED=${MSC_VER_REQUIRED}"
 		/D_CRT_SECURE_NO_DEPRECATE
@@ -150,85 +166,26 @@ if( CMAKE_C_COMPILER_ID MATCHES "MSVC")
 		# NOMINMAX keeps windows.h from defining "min" and "max" via windef.h.
 		# This avoids conflicts with the C++ standard library.
 		/DNOMINMAX
-		# -DPSAPI_VERSION=1                 Programs that must run on earlier versions of Windows as well as Windows 7 and later
-		#                                   versions should always call this function as GetProcessMemoryInfo. To ensure correct
-		#                                   resolution of symbols, add Psapi.lib to the TARGETLIBS macro and compile the program
-		#                                   with -DPSAPI_VERSION=1.To use run-time dynamic linking, load Psapi.dll.
-		#                                   http://msdn.microsoft.com/en-us/library/windows/desktop/ms683219(v=vs.85).aspx
-		# -DBUILD_WINDOWS                   Starting from VS2013, GetVersionEx is deprecated and we are recommended to use
-		#                                   VerifyVersionInfo instead
-		#                                   http://msdn.microsoft.com/en-us/library/windows/desktop/ms724429(v=vs.85).aspx
-		#                                   http://msdn.microsoft.com/en-us/library/windows/desktop/ms725491(v=vs.85).aspx
-		#                                   To continue to use GetVersionEx, we can define BUILD_WINDOWS
-		# -D_ALLOW_KEYWORD_MACROS           For VS2012 onwards the, C++ STL does not permit macro redefinitions of keywords
-		#                                   (see http://msdn.microsoft.com/en-us/library/bb531344(v=vs.110).aspx)
-		#                                   This definition prevents the complaint about the redefinition of inline by WinPCap
-		#                                   in pcap-stdinc.h when compiling CPP files, e.g. the Qt UI
-		/DPSAPI_VERSION=1
-		/DBUILD_WINDOWS
-		/D_ALLOW_KEYWORD_MACROS
 	)
-
-	if(MSVC12)
-		# /Zo                               Enhanced debugging of optimised codem for VS2013 Update 3 and beyond,
-		#                                   Assume all VS2013 builds are at least Update 3.
-		#                                   See http://msdn.microsoft.com/en-us/library/dn785163.aspx
-		set(LOCAL_CFLAGS ${LOCAL_CFLAGS} "/Zo")
-	endif()
 
 	if(NOT WIN64)
 		set(LOCAL_CFLAGS ${LOCAL_CFLAGS} "/D_BIND_TO_CURRENT_CRT_VERSION=1")
 	endif()
 
-	if(ENABLE_CODE_ANALYSIS)
-		set(LOCAL_CFLAGS ${LOCAL_CFLAGS} "/analyze:WX-")
-	endif()
-
 	# Additional compiler warnings to be treated as "Level 3"
 	#  when compiling Wireshark sources. (Selected from "level 4" warnings).
 	## 4295: array is too small to include a terminating null character
-	## 4189: local variable is initialized but not referenced
-	set(WARNINGS_CFLAGS "/w34295 /w34189")
+	set(WARNINGS_CFLAGS "/w34295")
 
 	# FIXME: WINPCAP_VERSION cannot be determined from source or executable.
 	set(WINPCAP_VERSION "unknown")
-	set(WIRESHARK_COMMON_FLAGS
+	set(WIRESHARK_C_FLAGS
 		"/DWINPCAP_VERSION=${WINPCAP_VERSION}"
 		${LOCAL_CFLAGS}
 		${WARNINGS_CFLAGS}
 	)
-
-	# Set in Makefile.nmake
-	set(WS_LINK_FLAGS "/LARGEADDRESSAWARE /MANIFEST:NO /INCREMENTAL:NO /RELEASE")
-
 else()
-	if(CMAKE_OSX_DEPLOYMENT_TARGET)
-		if(APPLE)
-			if(${CMAKE_OSX_DEPLOYMENT_TARGET} STREQUAL "10.0")
-				message(FATAL_ERROR "We don't support building for OS X 10.0")
-			elseif(${CMAKE_OSX_DEPLOYMENT_TARGET} STREQUAL "10.1")
-				message(FATAL_ERROR "We don't support building for OS X 10.1")
-			elseif(${CMAKE_OSX_DEPLOYMENT_TARGET} STREQUAL "10.2")
-				message(FATAL_ERROR "We don't support building for OS X 10.2")
-			elseif(${CMAKE_OSX_DEPLOYMENT_TARGET} STREQUAL "10.4" OR ${CMAKE_OSX_DEPLOYMENT_TARGET} STREQUAL "10.5")
-				#
-				# Only 32-bit builds are supported.  10.5
-				# (and 10.4?) had a bug that causes some BPF
-				# functions not to work with 64-bit userland
-				# code, so capturing won't work.
-				#
-				set(CMAKE_C_FLAGS "-m32 ${CMAKE_C_FLAGS}")
-				set(CMAKE_CXX_FLAGS "-m32 ${CMAKE_CXX_FLAGS}")
-				set(WS_LINK_FLAGS "-m32 ${WS_LINK_FLAGS}")
-			endif()
-			message(STATUS "Building for OS X ${CMAKE_OSX_DEPLOYMENT_TARGET}")
-		else()
-			message(FATAL_ERROR "CMAKE_OSX_DEPLOYMENT_TARGET only applies when building for OS X")
-		endif()
-	endif()
-
-	set(WIRESHARK_COMMON_FLAGS
-		# The following are for C and C++
+	set(WIRESHARK_C_FLAGS
 		# -O<X> and -g get set by the CMAKE_BUILD_TYPE
 		-Wall
 		-W
@@ -237,14 +194,6 @@ else()
 		-Wpointer-arith
 		-Warray-bounds
 		-Wformat-security
-		-fwrapv
-		-fno-strict-overflow
-		-fno-delete-null-pointer-checks
-		-fsanitize=undefined # compile and runtime checks
-		# -fsanitize=float-divide-by-zero
-		# -fsanitize=float-cast-overflow
-		# -fsanitize=address
-		# -fno-sanitize-recover # Abort during runtime
 		-Wvla
 		-Waddress
 		-Wattributes
@@ -255,7 +204,6 @@ else()
 		-Wwrite-strings
 		-Wno-long-long
 		-Wheader-guard
-		-Wunused-const-variable
 	)
 
 	set(WIRESHARK_C_ONLY_FLAGS
@@ -276,13 +224,12 @@ else()
 	set(WIRESHARK_CPP_ONLY_FLAGS
 	)
 
-	set(WIRESHARK_EXTRA_COMPILER_COMMON_FLAGS
-		# The following are for C and C++
+	set(WIRESHARK_EXTRA_COMPILER_C_FLAGS
 		-pedantic
+		-Woverflow
 		#
 		# Various code blocks this one.
 		#
-		-Woverflow
 		-fstrict-overflow -Wstrict-overflow=4
 		#
 		# Due to various places where APIs we don't control
@@ -302,9 +249,8 @@ else()
 		#
 		-Wunsafe-loop-optimizations
 		#
-		# All the registration functions block these for now.
+		# All the registration functions block this for now.
 		#
-		-Wmissing-prototypes
 		-Wmissing-declarations
 		#
 		# A bunch of "that might not work on SPARC" code blocks
@@ -320,6 +266,9 @@ else()
 		# (about glib library not using Doxygen)
 		#
 		-Wdocumentation
+		-fwrapv
+		-fno-strict-overflow
+		-fno-delete-null-pointer-checks
 	)
 
 	set(WIRESHARK_EXTRA_COMPILER_C_ONLY_FLAGS
@@ -330,23 +279,25 @@ else()
 		# never enable this one with -Werror.
 		#
 		-Wbad-function-cast
+		#
+		# All the registration functions block this for now.
+		#
+		-Wmissing-prototypes
 	)
 
 	set(WIRESHARK_EXTRA_COMPILER_CPP_ONLY_FLAGS
 	)
 
-	if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-		set(WIRESHARK_COMMON_FLAGS ${WIRESHARK_COMMON_FLAGS}
-			#-fcolor-diagnostics
-		)
+	# With clang some tests don't fail properly during testing but only
+	# during real compiles
 
-		# ccache + clang++ can result in "argument unused during
-		# compilation" warnings.
-		set(WIRESHARK_CPP_ONLY_FLAGS ${WIRESHARK_CPP_ONLY_FLAGS}
+	if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+		set(WIRESHARK_C_FLAGS ${WIRESHARK_C_FLAGS}
 			-Qunused-arguments
-		)
+			#-fcolor-diagnostics
+	)
 	else()
-		set(WIRESHARK_COMMON_FLAGS ${WIRESHARK_COMMON_FLAGS}
+		set(WIRESHARK_C_FLAGS ${WIRESHARK_C_FLAGS}
 			-fexcess-precision=fast
 		)
 
@@ -355,7 +306,7 @@ else()
 	endif()
 
 	if(ENABLE_EXTRA_COMPILER_WARNINGS)   # This overrides -Werror
-		set(WIRESHARK_COMMON_FLAGS ${WIRESHARK_COMMON_FLAGS} ${WIRESHARK_EXTRA_COMPILER_COMMON_FLAGS})
+		set(WIRESHARK_C_FLAGS ${WIRESHARK_C_FLAGS} ${WIRESHARK_EXTRA_COMPILER_C_FLAGS})
 		set(WIRESHARK_C_ONLY_FLAGS ${WIRESHARK_C_ONLY_FLAGS} ${WIRESHARK_EXTRA_COMPILER_C_ONLY_FLAGS})
 		set(WIRESHARK_CPP_ONLY_FLAGS ${WIRESHARK_CPP_ONLY_FLAGS} ${WIRESHARK_EXTRA_COMPILER_CPP_ONLY_FLAGS})
 	endif()
@@ -366,17 +317,23 @@ else()
 	)
 endif()
 
-set( C_FLAG_TESTS ${WIRESHARK_COMMON_FLAGS} ${WIRESHARK_C_ONLY_FLAGS} )
-set( CPP_FLAG_TESTS ${WIRESHARK_COMMON_FLAGS} ${WIRESHARK_CPP_ONLY_FLAGS} )
+set( C_FLAG_TESTS ${WIRESHARK_C_FLAGS} ${WIRESHARK_C_ONLY_FLAGS} )
+set( CPP_FLAG_TESTS ${WIRESHARK_C_FLAGS} ${WIRESHARK_CPP_ONLY_FLAGS} )
 
 # Counterhack to work around some cache magic in CHECK_C_SOURCE_COMPILES
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
 
 if(NOT DISABLE_WERROR AND NOT ENABLE_EXTRA_COMPILER_WARNINGS)
+	check_c_compiler_flag(-Werror=unknown-warning-option WERR_UNKNOWN)
 	check_c_compiler_flag(-Werror WERROR)
 else()
+	set(WERR_UNKNOWN FALSE)
 	set(WERROR FALSE)
+endif()
+# string of additional compile command line flags for check_c_compiler_flag
+if(WERR_UNKNOWN)
+	set(CMAKE_REQUIRED_FLAGS -Werror=unknown-warning-option )
 endif()
 
 # Sigh: Have to use THIS_FLAG instead of ${F} for some reason
@@ -385,7 +342,7 @@ foreach(THIS_FLAG ${C_FLAG_TESTS})
 	set(${F} ${THIS_FLAG})
 	set(V C_${F}_VALID)
 	message(STATUS "Checking for c-compiler flag: ${THIS_FLAG}")
-	check_c_compiler_flag("${ADDED_CMAKE_C_FLAGS} ${${F}}" ${V})
+	check_c_compiler_flag(${${F}} ${V})
 	if (${${V}})
 		set(ADDED_CMAKE_C_FLAGS "${ADDED_CMAKE_C_FLAGS} ${${F}}")
 	endif()
@@ -397,47 +354,21 @@ foreach(THIS_FLAG ${CPP_FLAG_TESTS})
 	set(${F} ${THIS_FLAG})
 	set(V CPP_${F}_VALID)
 	message(STATUS "Checking for c++-compiler flag: ${THIS_FLAG}")
-	check_cxx_compiler_flag("${ADDED_CMAKE_CXX_FLAGS} ${${F}}" ${V})
+	check_cxx_compiler_flag(${${F}} ${V})
 	if (${${V}})
 		set(ADDED_CMAKE_CXX_FLAGS "${ADDED_CMAKE_CXX_FLAGS} ${${F}}")
 	endif()
 endforeach()
 set(CMAKE_CXX_FLAGS "${ADDED_CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
 
-#
-# Try to have the compiler default to hiding symbols, so that only
-# symbols explicitly exported with WS_DLL_PUBLIC will be visible
-# outside (shared) libraries; that way, more UN*X builds will catch
-# failures to export symbols, rather than having that fail only on
-# Windows.
-#
-# We don't need that with MSVC, as that's the default.
-#
-if( NOT CMAKE_C_COMPILER_ID MATCHES "MSVC")
-	#
-	# Try the GCC-and-copatible -fvisibility-hidden first.
-	#
-	check_c_compiler_flag(-fvisibility=hidden FVHIDDEN)
-	if(FVHIDDEN)
-		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
-	else()
-		#
-		# OK, try the Sun^WOracle C -xldscope=hidden
-		#
-		check_c_compiler_flag(-xldscope=hidden XLDSCOPEHIDDEN)
-		if(XLDSCOPEHIDDEN)
-			set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -xldscope=hidden")
-		else()
-			#
-			# Anything else?
-			# If there is anything else, we might want to
-			# make a list of options to try, and try them
-			# in a loop.
-			#
-			message(WARNING "Hiding shared library symbols is not supported by the compiler."
-				" All shared library symbols will be exported.")
-		endif()
-	endif()
+message(STATUS "C-Flags: ${CMAKE_C_FLAGS}\nCXX-Flags: ${CMAKE_CXX_FLAGS}")
+
+check_c_compiler_flag(-fvisibility=hidden FVHIDDEN)
+if(FVHIDDEN)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+else() # TODO add alternate compiler flags for hiding symbols
+	message(WARNING "Hiding shared library symbols is not supported by the compiler."
+		" All shared library symbols will be exported.")
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
@@ -447,7 +378,12 @@ else()
 endif()
 
 
-if(NOT CMAKE_C_COMPILER_ID MATCHES "MSVC")
+if( CMAKE_C_COMPILER_ID MATCHES "MSVC")
+	# Set in Makefile.nmake
+	set(WIRESHARK_LD_FLAGS
+		/LARGEADDRESSAWARE
+	)
+else()
 	set(WIRESHARK_LD_FLAGS
 		-Wl,--as-needed
 		# -flto
@@ -465,7 +401,7 @@ foreach(THIS_FLAG ${WIRESHARK_LD_FLAGS})
 	set(V WS_LD_FLAG_VALID${C})
 	check_c_linker_flag(${${F}} ${V})
 	if (${${V}})
-		set(WS_LINK_FLAGS "${WS_LINK_FLAGS} ${${F}}")
+		set(WS_LINK_FLAGS ${WS_LINK_FLAGS} ${${F}})
 	endif()
 	math(EXPR C "${C} + 1")
 endforeach()
@@ -493,22 +429,14 @@ endif()
 # - set HAVE_XXX
 
 #The minimum package list
-set(PACKAGELIST Gettext M GLIB2 GMODULE2 GTHREAD2 LEX YACC Perl SED SH PythonInterp)
-set(LEX_REQUIRED TRUE)
+set(PACKAGELIST Gettext GLIB2 GMODULE2 GTHREAD2 M LEX YACC Perl SED SH PythonInterp)
 set(GLIB2_REQUIRED TRUE)
 set(GLIB2_FIND_REQUIRED TRUE)
 set(GLIB2_MIN_VERSION 2.14.0)
 set(GTHREAD2_REQUIRED TRUE)
+set(M_REQUIRED TRUE)
 set(PythonInterp_FIND_VERSION 2)
 set(Python_ADDITIONAL_VERSIONS 3)
-set(YACC_REQUIRED TRUE)
-
-if (WIN32)
-	set(PACKAGELIST ${PACKAGELIST} PowerShell)
-	set(PowerShell_REQUIRED TRUE)
-else()
-	set(M_REQUIRED TRUE)
-endif()
 
 set(PACKAGELIST ${PACKAGELIST} HtmlViewer)
 
@@ -521,7 +449,7 @@ if(ENABLE_AIRPCAP)
 endif()
 
 # Build the GTK-GUI?
-if(BUILD_wireshark_gtk)
+if(BUILD_wireshark)
 	if(ENABLE_GTK3)
 		set(PACKAGELIST ${PACKAGELIST} GTK3)
 	else()
@@ -533,31 +461,22 @@ if(BUILD_wireshark_gtk)
 endif()
 
 # Build the Qt GUI?
-if(BUILD_wireshark)
+if(BUILD_qtshark)
 	if(ENABLE_QT5)
+		set(PACKAGELIST ${PACKAGELIST} Qt5Widgets Qt5PrintSupport Qt5LinguistTools)
+		if (APPLE)
+			set(PACKAGELIST ${PACKAGELIST} Qt5MacExtras)
+		endif()
+		set(QT_VERSION 5)
 		# Untested, may not work if CMAKE_PREFIX_PATH gets overwritten
 		# somewhere. The if WIN32 in this place is annoying as well.
 		if( WIN32 )
 			set( QT5_BASE_PATH "$ENV{QT5_BASE_DIR}" )
 			set( CMAKE_PREFIX_PATH "${QT5_BASE_PATH}" )
 			# Used for the creation of setpath.bat
-			set( QT5_DLL_PATH "${QT5_BASE_PATH}/bin" )
+			set( QT5_DLL_PATH "${CMAKE_PREFIX_PATH}/bin/dummy" )
 			set( WS_ALL_LIBS ${WS_ALL_LIBS} ${QT5_DLL_PATH} )
 		endif()
-		set(PACKAGELIST ${PACKAGELIST}
-			Qt5Core
-			Qt5LinguistTools
-			Qt5MultimediaWidgets
-			Qt5PrintSupport
-			Qt5Widgets
-		)
-		if (APPLE)
-			set(PACKAGELIST ${PACKAGELIST} Qt5MacExtras)
-		endif()
-		if( WIN32 )
-			set(PACKAGELIST ${PACKAGELIST} Qt5WinExtras)
-		endif()
-		set(QT_VERSION 5)
 	else()
 		set(PACKAGELIST ${PACKAGELIST} Qt4)
 		# set(Qt4_OPTIONS 4.7.1 REQUIRED QtCore QtGui)
@@ -586,7 +505,7 @@ if(ENABLE_KERBEROS)
 endif()
 
 # Portable audio
-if(ENABLE_PORTAUDIO AND BUILD_wireshark_gtk)
+if(ENABLE_PORTAUDIO AND BUILD_wireshark)
 	set(PACKAGELIST ${PACKAGELIST} PORTAUDIO)
 endif()
 
@@ -603,7 +522,7 @@ if(ENABLE_ZLIB)
 	set(PACKAGELIST ${PACKAGELIST} ZLIB)
 endif()
 
-# Embedded Lua interpreter
+# Lua 5.1 dissectors
 if(ENABLE_LUA)
 	set(PACKAGELIST ${PACKAGELIST} LUA)
 endif()
@@ -626,20 +545,19 @@ if(ENABLE_CAP)
 	set(PACKAGELIST ${PACKAGELIST} CAP SETCAP)
 endif()
 
-# Windows version updates
-if(ENABLE_WINSPARKLE)
-	set(PACKAGELIST ${PACKAGELIST} WINSPARKLE)
+if(ENABLE_PYTHON)
+	set(PACKAGELIST ${PACKAGELIST} PythonLibs)
 endif()
 
 set(PACKAGELIST ${PACKAGELIST} YAPP)
 
 set(PACKAGELIST ${PACKAGELIST} POD)
 
-if(ENABLE_HTML_GUIDES)
+if(ENABLE_GUIDES)
 	set(PACKAGELIST ${PACKAGELIST} DOXYGEN)
 endif()
 
-set(PROGLIST)
+set(PROGLIST text2pcap mergecap capinfos captype editcap reordercap dumpcap)
 
 #Sort the package list
 list(SORT PACKAGELIST)
@@ -650,14 +568,14 @@ foreach(PACKAGE ${PACKAGELIST})
 		set(PACKAGE_VAR "QT")
 	elseif(${PACKAGE} STREQUAL "PythonInterp")
 		set(PACKAGE_VAR "PYTHONINTERP")
+	elseif(${PACKAGE} STREQUAL "PythonLibs")
+		set(PACKAGE_VAR "PYTHONLIBS")
 	elseif(${PACKAGE} STREQUAL "Gettext")
 		set(PACKAGE_VAR "GETTEXT")
 	elseif(${PACKAGE} STREQUAL "HtmlViewer")
-		set(PACKAGE_VAR "HTML_VIEWER")
+		set(PACKAGE_VAR "HTMLVIEWER")
 	elseif(${PACKAGE} STREQUAL "Perl")
 		set(PACKAGE_VAR "PERL")
-	elseif(${PACKAGE} STREQUAL "PowerShell")
-		set(PACKAGE_VAR "POWERSHELL")
 	else()
 		set(PACKAGE_VAR ${PACKAGE})
 	endif()
@@ -704,8 +622,9 @@ WSExtendPath( "${WS_ALL_LIBS}" "${CMAKE_BINARY_DIR}/setpath.bat" )
 #packaging
 include(CPackConfig.txt)
 
-if(HAVE_LIBAIRPCAP)
-	set(HAVE_AIRPCAP 1)
+if(HAVE_LIBPYTHON)
+	set(HAVE_PYTHON 1)
+	set(PYTHON_DIR "${CMAKE_INSTALL_PREFIX}/lib/wireshark/python/${CPACK_PACKAGE_VERSION}")
 endif()
 if(HAVE_LIBLUA)
 	set(HAVE_LUA_H 1)
@@ -732,11 +651,6 @@ endif()
 if(HAVE_LIBSBC)
 	set(HAVE_SBC 1)
 endif()
-
-if (HAVE_LIBWINSPARKLE)
-	set(HAVE_SOFTWARE_UPDATE 1)
-endif()
-
 # No matter which version of GTK is present
 if(GTK2_FOUND OR GTK3_FOUND)
 	set(GTK_FOUND ON)
@@ -755,19 +669,10 @@ if (Qt5Widgets_FOUND)
 	endif()
 	set (QT_FOUND ON)
 	set (QT_LIBRARIES ${Qt5Widgets_LIBRARIES} ${Qt5PrintSupport_LIBRARIES})
-	if(Qt5MultimediaWidgets_FOUND)
-		set (QT_LIBRARIES ${QT_LIBRARIES} ${Qt5MultimediaWidgets_LIBRARIES})
-		# That's the name autofoo uses
-		set(QT_MULTIMEDIAWIDGETS_LIB 1)
-	endif()
 	if(Qt5MacExtras_FOUND)
 		set (QT_LIBRARIES ${QT_LIBRARIES} ${Qt5MacExtras_LIBRARIES})
 		# That's the name autofoo uses
 		set(QT_MACEXTRAS_LIB 1)
-	endif()
-	if(Qt5WinExtras_FOUND)
-		set (QT_LIBRARIES ${QT_LIBRARIES} ${Qt5WinExtras_LIBRARIES})
-		# set(QT_WINEXTRAS_LIB 1) # Not needed?
 	endif()
 # If Qt4: QT_LIBRARIES and QT_INCLUDES are not set above. They require extra magic
 elseif(QT_FOUND)
@@ -776,101 +681,20 @@ elseif(QT_FOUND)
 	message(STATUS "QT includes: ${QT_INCLUDE_DIR}")
 	message(STATUS "QT libs: ${QT_LIBRARIES}")
 endif()
-
-message(STATUS "C-Flags: ${CMAKE_C_FLAGS}")
-message(STATUS "CXX-Flags: ${CMAKE_CXX_FLAGS}")
-
-if(APPLE)
-	#
-	# We assume that APPLE means OS X so that we have the OS X
-	# frameworks.
-	#
-	set(HAVE_OS_X_FRAMEWORKS 1)
-	FIND_LIBRARY (APPLE_APPLICATION_SERVICES_LIBRARY ApplicationServices)
-	FIND_LIBRARY (APPLE_CORE_FOUNDATION_LIBRARY CoreFoundation)
-	FIND_LIBRARY (APPLE_SYSTEM_CONFIGURATION_LIBRARY SystemConfiguration)
-endif()
-
 include(ConfigureChecks.cmake)
 
 #Big or little endian ?
 include(TestBigEndian)
 test_big_endian(WORDS_BIGENDIAN)
 
+set(DATAFILE_DIR "${CMAKE_INSTALL_PREFIX}/share/${CPACK_PACKAGE_NAME}")
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-ADD_CUSTOM_TARGET(
-	gitversion ALL
-	COMMAND ${PERL_EXECUTABLE}
-		${CMAKE_CURRENT_SOURCE_DIR}/make-version.pl
-		${CMAKE_CURRENT_SOURCE_DIR}
-	DEPENDS
-		${CMAKE_CURRENT_SOURCE_DIR}/make-version.pl
-)
-set_target_properties(gitversion PROPERTIES FOLDER "Auxiliary")
-
-ADD_CUSTOM_COMMAND(
-	OUTPUT	${CMAKE_BINARY_DIR}/version.h
-	COMMAND ${PERL_EXECUTABLE}
-		${CMAKE_CURRENT_SOURCE_DIR}/make-version.pl
-		${CMAKE_CURRENT_SOURCE_DIR}
-	DEPENDS
-		${CMAKE_CURRENT_SOURCE_DIR}/make-version.pl
-)
-
-add_subdirectory( asn1 EXCLUDE_FROM_ALL )
-add_subdirectory( capchild )
-add_subdirectory( caputils )
-add_subdirectory( codecs )
-add_subdirectory( docbook )
-add_subdirectory( epan )
-add_subdirectory( tools/lemon )
-add_subdirectory( ui )
-add_subdirectory( wiretap )
-add_subdirectory( wsutil )
-
-if(NOT WIN32)
-	add_custom_target(dumpabi DEPENDS dumpabi-libwireshark dumpabi-libwiretap dumpabi-libwsutil color.h)
-endif()
-
-if(ENABLE_ECHLD)
-	add_subdirectory( echld )
-endif()
-
-if(BUILD_wireshark_gtk AND GTK_FOUND)
-	add_subdirectory( ui/gtk )
-endif()
-
-if(BUILD_wireshark AND QT_FOUND)
-	add_subdirectory( ui/qt )
-endif()
-
-# Location of our data files. This should be set to a value that allows
-# running from the build directory on Windows, on OS X when building an
-# application bundle, and on UNIX if WIRESHARK_RUN_FROM_BUILD_DIRECTORY
-# is set.
-if(ENABLE_APPLICATION_BUNDLE)
-	set(_datafile_dir "${CMAKE_BINARY_DIR}/run/Wireshark.app/Contents/Resources/share/wireshark")
-else()
-	get_target_property(_libwireshark_location epan LOCATION)
-	get_filename_component(_datafile_dir "${_libwireshark_location}" PATH)
-endif()
-set (DATAFILE_DIR ${_datafile_dir} CACHE INTERNAL "Build time data file location.")
-
-if(ENABLE_EXTCAP)
-	set(HAVE_EXTCAP 1)
-	set(EXTCAP_DIR "${DATAFILE_DIR}/extcap/")
-endif()
-
-# Location of our plugins. PLUGIN_DIRECTORY should allow running
-# from the build directory similar to DATAFILE_DIR above.
 if(ENABLE_PLUGINS)
 	set(HAVE_PLUGINS 1)
-	if(IS_ABSOLUTE ${CMAKE_INSTALL_LIBDIR})
-		set(PLUGIN_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}")
-	else()
-		set(PLUGIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}")
-	endif()
+	set(PLUGIN_DIR "${DATAFILE_DIR}/plugins/${CPACK_PACKAGE_VERSION}")
+	set(PLUGIN_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}")
 	set(PLUGIN_SRC_DIRS
 		plugins/docsis
 		plugins/ethercat
@@ -885,7 +709,6 @@ if(ENABLE_PLUGINS)
 		plugins/wimax
 		plugins/wimaxasncp
 		plugins/wimaxmacphy
-		${CUSTOM_PLUGIN_SRC_DIR}
 	)
 # It seems this stuff doesn't build with autofoo either...
 #	if(YAPP_FOUND)
@@ -898,24 +721,43 @@ else()
 	set(PLUGIN_SRC_DIRS )
 endif()
 
-if(ENABLE_APPLICATION_BUNDLE)
-	set(_plugin_dir "${CMAKE_BINARY_DIR}/run/Wireshark.app/Contents/PlugIns/wireshark")
-else()
-	get_target_property(_libwireshark_location epan LOCATION)
-	get_filename_component(_plugin_dir "${_libwireshark_location}" PATH)
-	set(_plugin_dir "${_plugin_dir}/plugins")
-endif()
-# XXX The NMake environment appends the version. Should we do so here?
-set (PLUGIN_DIR ${_plugin_dir} CACHE INTERNAL "Build time plugin location.")
-
-foreach(_plugin_src_dir ${PLUGIN_SRC_DIRS})
-	add_subdirectory( ${_plugin_src_dir} )
+foreach(PLUGIN_DIR ${PLUGIN_SRC_DIRS})
+	add_subdirectory( ${PLUGIN_DIR} )
 endforeach()
+
+add_subdirectory( asn1 EXCLUDE_FROM_ALL )
+add_subdirectory( codecs )
+add_subdirectory( epan )
+add_subdirectory( filetap )
+add_subdirectory( tools/lemon )
+add_subdirectory( ui )
+add_subdirectory( wiretap )
+add_subdirectory( wsutil )
+
+if(NOT WIN32)
+	add_custom_target(dumpabi DEPENDS dumpabi-libwireshark dumpabi-libfiletap dumpabi-libwiretap dumpabi-libwsutil color.h)
+endif()
+
+if(ENABLE_ECHLD)
+	add_subdirectory( echld )
+endif()
+
+if(BUILD_wireshark AND GTK_FOUND)
+	add_subdirectory( ui/gtk )
+endif()
+
+if(BUILD_qtshark AND QT_FOUND)
+	add_subdirectory( ui/qt )
+endif()
 
 
 # Basedir where to install guides
 set(DOC_DIR "$ENV{docdir}" CACHE FILEPATH "Installation directory for ug and dg pdfs.")
 message(STATUS "docdir: ${DOC_DIR}")
+
+if(ENABLE_GUIDES)
+	add_subdirectory( docbook )
+endif()
 
 if(ENABLE_PCAP_NG_DEFAULT)
 	set(PCAP_NG_DEFAULT 1)
@@ -926,6 +768,17 @@ include(gmxTestLargeFiles)
 gmx_test_large_files(GMX_LARGEFILES)
 
 add_definitions( -DTOP_SRCDIR=\"${CMAKE_SOURCE_DIR}\" )
+
+if(APPLE)
+	#
+	# We assume that APPLE means OS X so that we have the OS X
+	# frameworks.
+	#
+	set(HAVE_OS_X_FRAMEWORKS 1)
+	FIND_LIBRARY (APPLE_APPLICATION_SERVICES_LIBRARY ApplicationServices)
+	FIND_LIBRARY (APPLE_CORE_FOUNDATION_LIBRARY CoreFoundation)
+	FIND_LIBRARY (APPLE_SYSTEM_CONFIGURATION_LIBRARY SystemConfiguration)
+endif()
 
 if(WIN32)
 	set(WS_MSVC_NORETURN "__declspec(noreturn)")
@@ -938,90 +791,118 @@ else()
 	set(WS_MSVC_NORETURN " ")
 endif()
 
-set( VERSION ${PROJECT_VERSION} )
-set( configure_input "Built with CMake ${CMAKE_VERSION}" )
 configure_file(${CMAKE_SOURCE_DIR}/cmakeconfig.h.in ${CMAKE_BINARY_DIR}/config.h)
-set(ICON_PATH "${CMAKE_SOURCE_DIR}/image/")
-set( IN_FILES
-	adns_dll.rc
-	capchild/doxygen.cfg.in
-	caputils/doxygen.cfg.in
-	doxygen.cfg.in
-	doxygen_global.cfg
-	epan/doxygen.cfg.in
-	image/libwireshark.rc.in
-	image/text2pcap.rc.in
-	image/capinfos.rc.in
-	image/wireshark.rc.in
-	image/mergecap.rc.in
-	image/tshark.rc.in
-	image/dumpcap.rc.in
-	image/reordercap.rc.in
-	image/rawshark.rc.in
-	image/file_dlg_win32.rc
-	image/tfshark.rc.in
-	image/editcap.rc.in
-	image/captype.rc.in
-	image/libwsutil.rc.in
-	image/wiretap.rc.in
-	image/wireshark.exe.manifest.in
-	packaging/macosx/Info.plist.in
-	${CUSTOM_PLUGIN_IN_FILES}
-	ui/doxygen.cfg.in
-	ui/gtk/doxygen.cfg.in
-	ui/qt/doxygen.cfg.in
-	wireshark.pc.in
-)
-foreach( _in_file ${IN_FILES} )
-	get_filename_component( _path ${_in_file} PATH )
-	string( REGEX REPLACE "(.*)\\.in" "\\1" _outfile ${_in_file}  )
-	configure_file( ${CMAKE_SOURCE_DIR}/${_in_file} ${CMAKE_BINARY_DIR}/${_outfile} @ONLY )
-endforeach()
+configure_file(${CMAKE_SOURCE_DIR}/wireshark.pc.in ${CMAKE_BINARY_DIR}/wireshark.pc @ONLY)
+if( ENABLE_GUIDES )
+	configure_file(
+		${CMAKE_SOURCE_DIR}/doxygen_global.cfg
+		${CMAKE_BINARY_DIR}/doxygen_global.cfg
+	)
+	configure_file(
+		${CMAKE_SOURCE_DIR}/ui/qt/doxygen.cfg.in
+		${CMAKE_BINARY_DIR}/ui/qt/doxygen.cfg
+	)
+	configure_file(
+		${CMAKE_SOURCE_DIR}/ui/gtk/doxygen.cfg.in
+		${CMAKE_BINARY_DIR}/ui/gtk/doxygen.cfg
+	)
+	configure_file(
+		${CMAKE_SOURCE_DIR}/ui/doxygen.cfg.in
+		${CMAKE_BINARY_DIR}/ui/doxygen.cfg
+	)
+	configure_file(
+		${CMAKE_SOURCE_DIR}/epan/doxygen.cfg.in
+		${CMAKE_BINARY_DIR}/epan/doxygen.cfg
+	)
+	configure_file(
+		${CMAKE_SOURCE_DIR}/doxygen.cfg.in
+		${CMAKE_BINARY_DIR}/doxygen.cfg
+	)
+endif()
+
+set( configure_input "Built with CMake ${CMAKE_VERSION}" )
+set( VERSION ${PROJECT_VERSION} )
+
+configure_file(
+	${CMAKE_SOURCE_DIR}/packaging/macosx/Info.plist.in
+	${CMAKE_BINARY_DIR}/packaging/macosx/Info.plist
+	@ONLY)
 
 include(FeatureSummary)
-#SET_FEATURE_INFO(NAME DESCRIPTION [URL [COMMENT] ])
-SET_FEATURE_INFO(SBC "SBC Codec for Bluetooth A2DP stream playing" "www: http://git.kernel.org/cgit/bluetooth/sbc.git" )
-
-FEATURE_SUMMARY(WHAT ALL)
+#SET_FEATURE_INFO(NAME DESCRIPTION [URL [COMMENT] ]
+#FEATURE_SUMMARY(WHAT ALL) Requires removal of our local copy of FeatureSummary
+PRINT_ENABLED_FEATURES()
+PRINT_DISABLED_FEATURES()
 
 link_directories(
 	${CMAKE_BINARY_DIR}/ui
 	${CMAKE_BINARY_DIR}/ui/gtk
 	${CMAKE_BINARY_DIR}/ui/qt
-	${CMAKE_BINARY_DIR}/capchild
-	${CMAKE_BINARY_DIR}/caputils
 	${CMAKE_BINARY_DIR}/codecs
 	${CMAKE_BINARY_DIR}/epan
+	${CMAKE_BINARY_DIR}/filetap
 	${CMAKE_BINARY_DIR}/wiretap
 	${CMAKE_BINARY_DIR}/wsutil
 )
 
+ADD_CUSTOM_TARGET(
+	gitversion ALL
+	COMMAND ${PERL_EXECUTABLE}
+		${CMAKE_CURRENT_SOURCE_DIR}/make-version.pl
+		${CMAKE_CURRENT_SOURCE_DIR}
+	DEPENDS
+		${CMAKE_CURRENT_SOURCE_DIR}/make-version.pl
+)
+set_target_properties(gitversion PROPERTIES FOLDER "Auxiliary")
+
+ADD_CUSTOM_COMMAND(
+	OUTPUT	version.h
+	COMMAND ${PERL_EXECUTABLE}
+		${CMAKE_CURRENT_SOURCE_DIR}/make-version.pl
+		${CMAKE_CURRENT_SOURCE_DIR}
+	DEPENDS
+		${CMAKE_CURRENT_SOURCE_DIR}/make-version.pl
+)
+
+if(UNIX)
+	set(PLATFORM_PCAP_SRC
+		capture-pcap-util-unix.c
+	)
+endif()
+
 if(WIN32)
+	set(PLATFORM_PCAP_SRC
+		capture_win_ifnames.c
+		capture-wpcap.c
+		capture_wpcap_packet.c
+	)
 	set(PLATFORM_UI_SRC
 		ui/win32/console_win32.c
 		ui/win32/file_dlg_win32.c
 		ui/win32/print_win32.c
 	)
-	set(PLATFORM_UI_RC_FILES
-		image/file_dlg_win32.rc
-	)
 endif()
 
 # sources common for wireshark, tshark, and rawshark
 set(SHARK_COMMON_SRC
+	${PLATFORM_PCAP_SRC}
+	capture-pcap-util.c
 	cfile.c
+	cfutils.c
+	clopts_common.c
 	frame_tvbuff.c
+	version.h
 	sync_pipe_write.c
+	version_info.c
 )
 
-# sources for external capture interfaces
-if(ENABLE_EXTCAP)
-	set(SHARK_COMMON_SRC
-		${SHARK_COMMON_SRC}
-		extcap.c
-		extcap_parser.c
-	)
-endif()
+# sources common for wireshark and tshark, but not rawshark;
+# these are for programs that capture traffic by running dumpcap
+set(SHARK_COMMON_CAPTURE_SRC
+	capture_ifinfo.c
+	capture_sync.c
+	capture_ui_utils.c
+)
 
 set(TSHARK_TAP_SRC
 	ui/cli/tap-afpstat.c
@@ -1033,7 +914,6 @@ set(TSHARK_TAP_SRC
 	ui/cli/tap-dcerpcstat.c
 	ui/cli/tap-diameter-avp.c
 	ui/cli/tap-expert.c
-	ui/cli/tap-endpoints.c
 	ui/cli/tap-follow.c
 	ui/cli/tap-funnel.c
 	ui/cli/tap-gsm_astat.c
@@ -1077,6 +957,7 @@ set(INSTALL_DIRS
 
 set(INSTALL_FILES
 	${CMAKE_BINARY_DIR}/AUTHORS-SHORT
+	COPYING
 	${CMAKE_BINARY_DIR}/capinfos.html
 	${CMAKE_BINARY_DIR}/captype.html
 	cfilters
@@ -1104,32 +985,6 @@ set(INSTALL_FILES
 	docbook/ws.css
 )
 
-if(WIN32)
-	set(INSTALL_FILES ${CMAKE_BINARY_DIR}/COPYING.txt ${INSTALL_FILES})
-else()
-	set(INSTALL_FILES COPYING ${INSTALL_FILES})
-endif()
-
-set(MAN1_FILES
-	${CMAKE_BINARY_DIR}/capinfos.1
-	${CMAKE_BINARY_DIR}/captype.1
-	${CMAKE_BINARY_DIR}/dftest.1
-	${CMAKE_BINARY_DIR}/dumpcap.1
-	${CMAKE_BINARY_DIR}/editcap.1
-	${CMAKE_BINARY_DIR}/idl2wrs.1
-	${CMAKE_BINARY_DIR}/mergecap.1
-	${CMAKE_BINARY_DIR}/randpkt.1
-	${CMAKE_BINARY_DIR}/rawshark.1
-	${CMAKE_BINARY_DIR}/reordercap.1
-	${CMAKE_BINARY_DIR}/text2pcap.1
-	${CMAKE_BINARY_DIR}/tshark.1
-	${CMAKE_BINARY_DIR}/wireshark.1
-)
-
-set(MAN4_FILES
-	${CMAKE_BINARY_DIR}/wireshark-filter.4
-)
-
 set(LIBEPAN_LIBS
 #		@NSL_LIBS@	# -lnsl
 #		@SOCKET_LIBS@	# -lsocket
@@ -1150,512 +1005,32 @@ set(LIBEPAN_LIBS
 		${ZLIB_LIBRARIES}
 		${M_LIBRARIES}
 		${SBC_LIBRARIES}
-		${WINSPARKLE_LIBRARIES}
 )
 
-if(WIN32)
-	# According to http://stackoverflow.com/questions/14474659/cmake-how-to-have-a-target-for-copying-files
-	# we can't just use "set(_dll_output_dir "$<TARGET_FILE_DIR:epan>")"
-	# DATAFILE_DIR is set using the same property. We could probably
-	# get away with using it here.
-	get_target_property(_libwireshark_location epan LOCATION)
-	get_filename_component(_dll_output_dir "${_libwireshark_location}" PATH)
-	add_custom_target(copy_cli_dlls)
-	set_target_properties(copy_cli_dlls PROPERTIES FOLDER "Copy Tasks")
-	add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-		COMMAND ${CMAKE_COMMAND} -E make_directory "${_dll_output_dir}"
-	)
-
-	# XXX Can (and should) we iterate over these similar to the way
-	# the top-level CMakeLists.txt iterates over the package list?
-
-	# Required
-	foreach( _dll ${GLIB2_DLLS} )
-		add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${GLIB2_DLL_DIR}/${_dll}"
-				"${_dll_output_dir}"
-		)
-	endforeach(_dll)
-
-	# Optional
-	if (AIRPCAP_FOUND)
-		add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${AIRPCAP_DLL_DIR}/${AIRPCAP_DLL}"
-				"${_dll_output_dir}"
-		)
-	endif(AIRPCAP_FOUND)
-	if (CARES_FOUND)
-		add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${CARES_DLL_DIR}/${CARES_DLL}"
-				"${_dll_output_dir}"
-		)
-	endif(CARES_FOUND)
-	if (GEOIP_FOUND)
-		add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${GEOIP_DLL_DIR}/${GEOIP_DLL}"
-				"${_dll_output_dir}"
-		)
-	endif(GEOIP_FOUND)
-	if(GCRYPT_FOUND)
-		foreach( _dll ${GCRYPT_DLLS} )
-			add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different
-					"${GCRYPT_DLL_DIR}/${_dll}"
-					"${_dll_output_dir}"
-			)
-		endforeach(_dll)
-	endif(GCRYPT_FOUND)
-	if(GNUTLS_FOUND)
-		foreach( _dll ${GNUTLS_DLLS} )
-			add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different
-					"${GNUTLS_DLL_DIR}/${_dll}"
-					"${_dll_output_dir}"
-			)
-		endforeach(_dll)
-	endif(GNUTLS_FOUND)
-	if(KERBEROS_FOUND)
-		foreach( _dll ${KERBEROS_DLLS} )
-			add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different
-					"${KERBEROS_DLL_DIR}/${_dll}"
-					"${_dll_output_dir}"
-			)
-		endforeach(_dll)
-	endif(KERBEROS_FOUND)
-	if (LUA_FOUND)
-		add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${LUA_DLL_DIR}/${LUA_DLL}"
-				"${_dll_output_dir}"
-		)
-	endif(LUA_FOUND)
-	if (SMI_FOUND)
-		add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${SMI_DLL_DIR}/${SMI_DLL}"
-				"${_dll_output_dir}"
-			COMMAND ${CMAKE_COMMAND} -E make_directory
-				"${_dll_output_dir}/snmp"
-			COMMAND ${CMAKE_COMMAND} -E make_directory
-				"${_dll_output_dir}/snmp/mibs"
-			COMMAND ${CMAKE_COMMAND} -E copy_directory
-				"${SMI_SHARE_DIR}/${SMI_DLL}/mibs/iana"
-				"${_dll_output_dir}/snmp/mibs"
-			COMMAND ${CMAKE_COMMAND} -E copy_directory
-				"${SMI_SHARE_DIR}/${SMI_DLL}/mibs/ietf"
-				"${_dll_output_dir}/snmp/mibs"
-			COMMAND ${CMAKE_COMMAND} -E copy_directory
-				"${SMI_SHARE_DIR}/${SMI_DLL}/mibs/irtf"
-				"${_dll_output_dir}/snmp/mibs"
-			COMMAND ${CMAKE_COMMAND} -E copy_directory
-				"${SMI_SHARE_DIR}/${SMI_DLL}/mibs/site"
-				"${_dll_output_dir}/snmp/mibs"
-			COMMAND ${CMAKE_COMMAND} -E copy_directory
-				"${SMI_SHARE_DIR}/${SMI_DLL}/mibs/tubs"
-				"${_dll_output_dir}/snmp/mibs"
-			COMMAND ${CMAKE_COMMAND} -E copy_directory
-				"${SMI_SHARE_DIR}/${SMI_DLL}/pibs"
-				"${_dll_output_dir}/snmp/mibs"
-			COMMAND ${CMAKE_COMMAND} -E copy_directory
-				"${SMI_SHARE_DIR}/${SMI_DLL}/yang"
-				"${_dll_output_dir}/snmp/mibs"
-		)
-	endif(SMI_FOUND)
-	if (WINSPARKLE_FOUND)
-		add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${WINSPARKLE_DLL_DIR}/${WINSPARKLE_DLL}"
-				"${_dll_output_dir}"
-		)
-	endif(WINSPARKLE_FOUND)
-	if (ZLIB_FOUND)
-		add_custom_command(TARGET copy_cli_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${ZLIB_DLL_DIR}/${ZLIB_DLL}"
-				"${_dll_output_dir}"
-		)
-	endif(ZLIB_FOUND)
-
-	add_dependencies(epan copy_cli_dlls)
-
-	# We have a lot of choices for creating zip archives:
-	# - 7z, WinZip, etc., which require a separate download+install.
-	# - Cygwin's zip, which requires Cygwin.
-	# - "CMake -E tar cz", which creates a tar file.
-	# - CPack, which requires a CPack configuration.
-	# - PowerShell via PSCX or System.IO.Compression.FileSystem.
-	# - Python via zipfile.
-	# For now, just look for 7z. It's installed on the Windows builders,
-	# which might be the only systems that use this target.
-	find_program(ZIP_EXECUTABLE 7z
-		PATH "$ENV{PROGRAMFILES}/7-Zip" "$ENV{PROGRAMW6432}/7-Zip"
-		DOC "Path to the 7z utility."
-	)
-	# XXX "if(ZIP_EXECUTABLE)" doesn't work here. It looks like the
-	# absence of "-NOTFOUND" doesn't equal "true".
-	if (NOT "${ZIP_EXECUTABLE}" STREQUAL "ZIP_EXECUTABLE-NOTFOUND")
-		add_custom_target(pdb_zip_package)
-		set_target_properties(pdb_zip_package PROPERTIES FOLDER "Packaging")
-		set(_pdb_zip "${CMAKE_BINARY_DIR}/Wireshark-pdb-${WIRESHARK_TARGET_PLATFORM}-${VERSION}.zip")
-		file(TO_NATIVE_PATH "${_pdb_zip}" _pdb_zip_win)
-		add_custom_command(TARGET pdb_zip_package POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E remove -f "${_pdb_zip}"
-			COMMAND ${ZIP_EXECUTABLE} a -tzip -mmt=on "${_pdb_zip_win}" *.pdb *.lib
-			WORKING_DIRECTORY "${_dll_output_dir}"
-		)
-		add_dependencies(pdb_zip_package epan)
-	endif()
-endif(WIN32)
-
-# Copy ${INSTALL_FILES} and ${INSTALL_DIRS} to ${DATAFILE_DIR}
-add_custom_target(copy_data_files ALL DEPENDS ${INSTALL_FILES})
-set_target_properties(copy_data_files PROPERTIES FOLDER "Copy Tasks")
-if(ENABLE_APPLICATION_BUNDLE)
-	add_custom_command(TARGET copy_data_files PRE_BUILD
-		COMMAND ${CMAKE_COMMAND} -E make_directory "${DATAFILE_DIR}"
-	)
-endif()
-
-if(WIN32)
-	add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/COPYING.txt
-		COMMAND ${POWERSHELL_COMMAND} "${CMAKE_SOURCE_DIR}/tools/textify.ps1"
-			-Destination ${CMAKE_BINARY_DIR}
-			${CMAKE_SOURCE_DIR}/COPYING
-		DEPENDS
-			${CMAKE_SOURCE_DIR}/COPYING
-	)
-endif()
-
-foreach(_install_file ${INSTALL_FILES})
-	get_filename_component(_install_basename "${_install_file}" NAME)
-	add_custom_command(TARGET copy_data_files POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${_install_file}"
-			"${DATAFILE_DIR}/${_install_basename}"
-		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-	)
-endforeach()
-
-if(ENABLE_EXTCAP)
-	add_custom_command(TARGET copy_data_files PRE_BUILD
-		COMMAND ${CMAKE_COMMAND} -E make_directory
-			"${DATAFILE_DIR}/extcap"
-	)
-endif()
-add_custom_command(TARGET copy_data_files PRE_BUILD
-	COMMAND ${CMAKE_COMMAND} -E make_directory
-		"${DATAFILE_DIR}/help"
-)
-add_custom_command(TARGET copy_data_files PRE_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"${CMAKE_SOURCE_DIR}/help/toc"
-		"${DATAFILE_DIR}/help/toc"
-)
-if(WIN32)
-	file(TO_NATIVE_PATH ${DATAFILE_DIR}/help _help_dest_dir)
-	add_custom_command(TARGET copy_data_files PRE_BUILD
-		COMMAND ${POWERSHELL_COMMAND} "${CMAKE_SOURCE_DIR}/tools/textify.ps1"
-			-Destination ${_help_dest_dir}
-			${CMAKE_SOURCE_DIR}/help/*.txt
-	)
-else()
-	file(GLOB _help_files
-		"${CMAKE_SOURCE_DIR}/help/*.txt"
-	)
-	foreach(_help_file ${_help_files})
-		add_custom_command(TARGET copy_data_files PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${_help_file}"
-				"${DATAFILE_DIR}/help/"
-		)
-	endforeach()
-endif(WIN32)
-if(LUA_FOUND)
-	add_custom_command(TARGET copy_data_files PRE_BUILD
-		COMMAND ${CMAKE_COMMAND} -E make_directory
-			"${DATAFILE_DIR}/lua"
-	)
-	add_custom_command(TARGET copy_data_files PRE_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${CMAKE_BINARY_DIR}/epan/init.lua"
-			"${DATAFILE_DIR}/lua"
-	)
-	add_custom_command(TARGET copy_data_files PRE_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${CMAKE_SOURCE_DIR}/epan/wslua/console.lua"
-			"${DATAFILE_DIR}/lua"
-	)
-	add_custom_command(TARGET copy_data_files PRE_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${CMAKE_SOURCE_DIR}/epan/wslua/dtd_gen.lua"
-			"${DATAFILE_DIR}/lua"
-	)
-	add_dependencies(copy_data_files wsluaauxiliary)
-endif(LUA_FOUND)
-# doc/*.html handled elsewhere.
-add_custom_command(TARGET copy_data_files PRE_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${CMAKE_SOURCE_DIR}/dtds"
-		"${DATAFILE_DIR}/dtds"
-)
-# Skipping asn1 default.tt
-add_custom_command(TARGET copy_data_files PRE_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${CMAKE_SOURCE_DIR}/radius"
-		"${DATAFILE_DIR}/radius"
-)
-add_custom_command(TARGET copy_data_files PRE_BUILD
-	COMMAND ${CMAKE_COMMAND} -E make_directory
-		"${DATAFILE_DIR}/diameter"
-)
-file(GLOB _diameter_files
-	"${CMAKE_SOURCE_DIR}/diameter/*.dtd"
-	"${CMAKE_SOURCE_DIR}/diameter/*.xml"
-)
-foreach(_diameter_file ${_diameter_files})
-	add_custom_command(TARGET copy_data_files PRE_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${_diameter_file}"
-			"${DATAFILE_DIR}/diameter/"
-	)
-endforeach()
-add_custom_command(TARGET copy_data_files PRE_BUILD
-	COMMAND ${CMAKE_COMMAND} -E make_directory
-		"${DATAFILE_DIR}/tpncp"
-)
-add_custom_command(TARGET copy_data_files PRE_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"${CMAKE_SOURCE_DIR}/tpncp/tpncp.dat"
-		"${DATAFILE_DIR}/tpncp/tpncp.dat"
-)
-add_custom_command(TARGET copy_data_files PRE_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${CMAKE_SOURCE_DIR}/wimaxasncp"
-		"${DATAFILE_DIR}/wimaxasncp"
-)
-
-if( (BUILD_wireshark AND QT_FOUND) OR (BUILD_wireshark_gtk AND GTK_FOUND) )
-	set(WIRESHARK_SRC
+if( (BUILD_wireshark AND GTK_FOUND) OR (BUILD_qtshark AND QT_FOUND) )
+	set(wireshark_FILES
+		airpcap_loader.c
+		capture.c
 		capture_info.c
 		capture_opts.c
 		color_filters.c
 		file.c
 		fileset.c
+		filters.c
+		iface_monitor.c
+		proto_hier_stats.c
 		summary.c
+		ws80211_utils.c
+		${SHARK_COMMON_CAPTURE_SRC}
 		${SHARK_COMMON_SRC}
 		${PLATFORM_UI_SRC}
 	)
-	set(wireshark_FILES
-		${WIRESHARK_SRC}
-		${CMAKE_BINARY_DIR}/image/wireshark.rc
-		${PLATFORM_UI_RC_FILES}
-	)
 endif()
 
-if(ENABLE_APPLICATION_BUNDLE)
-	#
-	# Add -Wl,-single_module to the LDFLAGS used with shared
-	# libraries, to fix some error that show up in some cases;
-	# some Apple documentation recommends it for most shared
-	# libraries.
-	#
-	set( CMAKE_SHARED_LINKER_FLAGS "-Wl,-single_module ${CMAKE_SHARED_LINKER_FLAGS}" )
-	#
-	# Add -Wl,-headerpad_max_install_names to the LDFLAGS, as
-	# code-signing issues is running out of padding space.
-	#
-	# Add -Wl,-search_paths_first to make sure that if we search
-	# directories A and B, in that order, for a given library, a
-	# non-shared version in directory A, rather than a shared
-	# version in directory B, is chosen (so we can use
-	# --with-pcap=/usr/local to force all programs to be linked
-	# with a static version installed in /usr/local/lib rather than
-	# the system version in /usr/lib).
-	#
-	# Also add -Wl,-rpath,@executable_path/../Frameworks,
-	# -Wl,-rpath,@executable_path/../lib and
-	# -Wl,-rpath,/usr/local/lib, so that, if we build an app
-	# bundle, we can tweak all the executable images, shared
-	# libraries, and plugins in the bundle to look for non-system
-	# libraries in the rpath, rather than having a script tweak
-	# DYLD_LIBRARY_PATH.
-	#
-
-	set(CMAKE_EXE_LINKER_FLAGS
-	"-Wl,-headerpad_max_install_names -Wl,-search_paths_first -Wl,-rpath,@executable_path/../Frameworks -Wl,-rpath,@executable_path/../lib -Wl,-rpath,/usr/local/lib ${CMAKE_EXE_LINKER_FLAGS}"
-	)
-
-	# Add files to the app bundle
-	# Wireshark.app/Contents
-	file(WRITE ${CMAKE_BINARY_DIR}/packaging/macosx/PkgInfo "APPLWshk\n")
-	set(BUNDLE_CONTENTS_FILES
-		${CMAKE_BINARY_DIR}/packaging/macosx/PkgInfo
-	)
-	set_source_files_properties(${BUNDLE_CONTENTS_FILES} PROPERTIES
-		MACOSX_PACKAGE_LOCATION .
-	)
-
-	# Wireshark.app/Contents/Resources
-	set(BUNDLE_RESOURCE_FILES
-		${CMAKE_SOURCE_DIR}/packaging/macosx/Resources/Wireshark.icns
-		${CMAKE_SOURCE_DIR}/packaging/macosx/Resources/Wiresharkdoc.icns
-	)
-	set_source_files_properties(${BUNDLE_RESOURCE_FILES} PROPERTIES
-		MACOSX_PACKAGE_LOCATION Resources
-	)
-
-	# Wireshark.app/Contents/Resources/share/man/man1
-	set(BUNDLE_RESOURCE_SHARE_MAN1_FILES ${MAN1_FILES})
-	set_source_files_properties(${BUNDLE_RESOURCE_SHARE_MAN1_FILES} PROPERTIES
-		MACOSX_PACKAGE_LOCATION Resources/share/man/man1
-	)
-
-	# Wireshark.app/Contents/Resources/share/man/man1
-	set(BUNDLE_RESOURCE_SHARE_MAN4_FILES ${MAN4_FILES})
-	set_source_files_properties(${BUNDLE_RESOURCE_SHARE_MAN4_FILES} PROPERTIES
-		MACOSX_PACKAGE_LOCATION Resources/share/man/man4
-	)
-
-	# INSTALL_FILES and INSTALL_DIRS are handled by copy_data_files
-
-	set(EXTRA_BUNDLE_FILES
-		${BUNDLE_CONTENTS_FILES}
-		${BUNDLE_RESOURCE_FILES}
-		${BUNDLE_RESOURCE_SHARE_MAN1_FILES}
-		${BUNDLE_RESOURCE_SHARE_MAN4_FILES}
-	)
-else()
-	set(EXTRA_BUNDLE_FILES)
-endif()
-
-if(BUILD_wireshark AND QT_FOUND)
+if(BUILD_wireshark AND GTK_FOUND)
 	set(wireshark_LIBS
-		qtui
-		ui
-		capchild
-		caputils
-		${QT_LIBRARIES}
-		${GTHREAD2_LIBRARIES}
-		codecs
-		${LIBEPAN_LIBS}
-		${APPLE_APPLICATION_SERVICES_LIBRARY}
-		${APPLE_CORE_FOUNDATION_LIBRARY}
-		${APPLE_SYSTEM_CONFIGURATION_LIBRARY}
-		${NL_LIBRARIES}
-	)
-	# wireshark and wireshark-gtk share wireshark_FILES
-
-	# Policy since 2.8.11
-	if (POLICY CMP0020)
-		cmake_policy(SET CMP0020 OLD)
-	endif()
-
-	add_executable(wireshark MACOSX_BUNDLE wireshark-qt.cpp ${wireshark_FILES} ${EXTRA_BUNDLE_FILES})
-	set(PROGLIST ${PROGLIST} wireshark)
-	set_target_properties(wireshark PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
-	set_target_properties(wireshark PROPERTIES FOLDER "Executables")
-	if(ENABLE_APPLICATION_BUNDLE OR WIN32)
-		set_target_properties(wireshark PROPERTIES OUTPUT_NAME Wireshark)
-	endif()
-
-	if(ENABLE_APPLICATION_BUNDLE)
-		set_target_properties(
-			wireshark PROPERTIES
-				MACOSX_BUNDLE_INFO_PLIST ${CMAKE_BINARY_DIR}/packaging/macosx/Info.plist
-		)
-		# Add a wrapper script which opens the bundle. This adds
-		# convenience but makes debugging more difficult.
-		file(REMOVE ${CMAKE_BINARY_DIR}/run/wireshark)
-		file(WRITE ${CMAKE_BINARY_DIR}/run/wireshark "#!/bin/sh\n")
-		file(APPEND ${CMAKE_BINARY_DIR}/run/wireshark "open ${CMAKE_BINARY_DIR}/run/Wireshark.app --args \"\$\@\"\n")
-		execute_process(COMMAND chmod a+x ${CMAKE_BINARY_DIR}/run/wireshark)
-	endif()
-
-	target_link_libraries(wireshark ${wireshark_LIBS})
-	install(
-		TARGETS wireshark
-		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-		BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}
-	)
-
-	if(NOT ENABLE_APPLICATION_BUNDLE)
-		# Map for endpoints dialog
-		ADD_CUSTOM_COMMAND(
-			TARGET wireshark
-			POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${PROJECT_SOURCE_DIR}/ipmap.html"
-				$<TARGET_FILE_DIR:wireshark>
-		)
-	endif()
-
-	if(WIN32 AND Qt5Core_FOUND)
-		# Use windeployqt to copy our required DLLs to the run path.
-		# Ideally one of the modules in ${QTDIR}/lib/cmake would expose
-		# the path to windeployqt. For that matter having a reliable
-		# path to qmake would be *amazingly convenient*. We don't have
-		# either of those so we try to discover the path via Qt5Core.
-		# http://stackoverflow.com/questions/24650936/qt5-with-cmake-how-to-find-qt-translations-dir
-
-		get_target_property(_qmake_location Qt5::qmake IMPORTED_LOCATION)
-		get_filename_component(_qt_bindir "${_qmake_location}" DIRECTORY)
-		find_program(QT_WINDEPLOYQT_EXECUTABLE windeployqt
-			HINTS "${_qmake_location}"
-			DOC "Path to the windeployqt utility."
-		)
-		if (NOT "${QT_WINDEPLOYQT_EXECUTABLE}" STREQUAL "QT_WINDEPLOYQT_EXECUTABLE-NOTFOUND")
-			add_custom_target(copy_qt_dlls ALL)
-			set_target_properties(copy_qt_dlls PROPERTIES FOLDER "Copy Tasks")
-			# Will we ever need to use --debug? Windeployqt seems to
-			# be smart enough to copy debug DLLs when needed.
-			add_custom_command(TARGET copy_qt_dlls
-				POST_BUILD
-				COMMAND set "PATH=%PATH%;${_qt_bindir}"
-				COMMAND "${QT_WINDEPLOYQT_EXECUTABLE}"
-					$<$<CONFIG:Debug>:--debug>
-					$<$<NOT:$<CONFIG:Debug>>:--release>
-					--no-compiler-runtime
-					"$<TARGET_FILE:wireshark>"
-			)
-			add_dependencies(copy_qt_dlls wireshark)
-		endif()
-	endif(WIN32 AND Qt5Core_FOUND)
-endif()
-
-# Common properties for CLI executables
-macro(set_extra_executable_properties _executable _folder)
-	set_target_properties(${_executable} PROPERTIES
-		LINK_FLAGS "${WS_LINK_FLAGS}"
-		FOLDER ${_folder}
-	)
-
-	set(PROGLIST ${PROGLIST} ${_executable})
-
-	if(ENABLE_APPLICATION_BUNDLE)
-		set_target_properties(${_executable} PROPERTIES
-			RUNTIME_OUTPUT_DIRECTORY run/Wireshark.app/Contents/MacOS
-		)
-		# Add a wrapper script which runs each executable from the
-		# correct location. This adds convenience but makes debugging
-		# more difficult.
-		file(REMOVE ${CMAKE_BINARY_DIR}/run/${_executable})
-		file(WRITE ${CMAKE_BINARY_DIR}/run/${_executable} "#!/bin/sh\n")
-		file(APPEND ${CMAKE_BINARY_DIR}/run/${_executable} "exec ${CMAKE_BINARY_DIR}/run/Wireshark.app/Contents/MacOS/${_executable} \"\$\@\"\n")
-		execute_process(COMMAND chmod a+x ${CMAKE_BINARY_DIR}/run/${_executable})
-	endif()
-endmacro()
-
-if(BUILD_wireshark_gtk AND GTK_FOUND)
-	set(wireshark_gtk_LIBS
 		gtkui
 		ui
-		capchild
-		caputils
 		${GTK2_LIBRARIES}
 		${GTK3_LIBRARIES}
 		${GTHREAD2_LIBRARIES}
@@ -1668,106 +1043,47 @@ if(BUILD_wireshark_gtk AND GTK_FOUND)
 		${NL_LIBRARIES}
 		${WIN_COMCTL32_LIBRARY}
 	)
-	# wireshark and wireshark-gtk share wireshark_FILES
+	# qtshark and wireshark share wireshark_FILES
 
-	add_executable(wireshark-gtk ${wireshark_FILES})
-	set(PROGLIST ${PROGLIST} wireshark-gtk)
-	set_target_properties(wireshark-gtk PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
-	set_target_properties(wireshark-gtk PROPERTIES FOLDER "Executables")
-	target_link_libraries(wireshark-gtk ${wireshark_gtk_LIBS})
-	install(TARGETS wireshark-gtk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+	add_executable(wireshark ${wireshark_FILES})
+	add_dependencies(wireshark gitversion)
+	set_target_properties(wireshark PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(wireshark PROPERTIES FOLDER "Executables")
+	target_link_libraries(wireshark ${wireshark_LIBS})
+	install(TARGETS wireshark RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
-	# Map for endpoints dialog
-	ADD_CUSTOM_COMMAND(
-		TARGET wireshark-gtk
-		POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${PROJECT_SOURCE_DIR}/ipmap.html"
-			$<TARGET_FILE_DIR:wireshark-gtk>
+if(BUILD_qtshark AND QT_FOUND)
+	set(qtshark_LIBS
+		qtui
+		ui
+		${QT_LIBRARIES}
+		${GTHREAD2_LIBRARIES}
+		codecs
+		${LIBEPAN_LIBS}
+		${APPLE_APPLICATION_SERVICES_LIBRARY}
+		${APPLE_CORE_FOUNDATION_LIBRARY}
+		${APPLE_SYSTEM_CONFIGURATION_LIBRARY}
+		${NL_LIBRARIES}
 	)
+	# qtshark and wireshark share wireshark_FILES
 
-	if(WIN32)
-		get_target_property(_wsgtk_location wireshark-gtk LOCATION)
-		get_filename_component(_dll_output_dir "${_wsgtk_location}" PATH)
-		add_custom_target(copy_gtk_dlls)
-		set_target_properties(copy_gtk_dlls PROPERTIES FOLDER "Copy Tasks")
-		add_custom_command(TARGET copy_gtk_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E make_directory "${_dll_output_dir}"
-		)
-
-		if(GTK2_FOUND)
-			set(_gtk_dll_dir "${GTK2_DLL_DIR}")
-			set(_gtk_etc_dir "${GTK2_ETC_DIR}")
-			set(_gtk_dlls "${GTK2_DLLS}")
-			set(_gtk_etc_dir "${GTK2_ETC_DIR}")
-		else()
-			set(_gtk_dll_dir "${GTK3_DLL_DIR}")
-			set(_gtk_dlls "${GTK3_DLLS}")
-			set(_gtk_etc_dir "${GTK3_ETC_DIR}")
-		endif()
-
-		foreach(_dll ${_gtk_dlls})
-			add_custom_command(TARGET copy_gtk_dlls PRE_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different
-					"${_gtk_dll_dir}/${_dll}" "${_dll_output_dir}"
-			)
-		endforeach(_dll)
-
-		# /etc
-		add_custom_command(TARGET copy_gtk_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E make_directory "${_dll_output_dir}/etc"
-		)
-		add_custom_command(TARGET copy_gtk_dlls PRE_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_directory
-				"${_gtk_etc_dir}" "${_dll_output_dir}/etc"
-		)
-
-		# XXX - Omitting ${GTK2_LIB_DIR}\loaders copying from Makefile.nmake
-		if(GTK2_FOUND)
-			# Engines
-			set (_engines_output_dir "${_dll_output_dir}/lib/gtk-2.0/2.10.0/engines")
-			add_custom_command(TARGET copy_gtk_dlls PRE_BUILD
-				COMMAND ${CMAKE_COMMAND} -E make_directory "${_engines_output_dir}"
-			)
-			foreach(_dll ${GTK2_ENGINES_DLLS})
-				add_custom_command(TARGET copy_gtk_dlls PRE_BUILD
-					COMMAND ${CMAKE_COMMAND} -E copy_if_different
-						"${GTK2_ENGINES_DLL_DIR}/${_dll}" "${_engines_output_dir}"
-				)
-			endforeach(_dll)
-
-			# Themes
-			add_custom_command(TARGET copy_gtk_dlls PRE_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different
-					"${GTK2_THEMES_DIR}/gtkrc" "${_dll_output_dir}/etc/gtk-2.0"
-			)
-
-			# Modules
-			add_custom_command(TARGET copy_gtk_dlls PRE_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_directory
-					"${GTK2_LIB_DIR}" "${_dll_output_dir}/lib/gtk-2.0"
-			)
-		else()
-			add_custom_command(TARGET copy_gtk_dlls PRE_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_directory
-					"${CMAKE_SOURCE_DIR}/ui/win32/settings.ini" "${_dll_output_dir}/etc"
-			)
-		endif()
-
-		add_dependencies(wireshark-gtk copy_gtk_dlls copy_cli_dlls)
-	endif(WIN32)
+	add_executable(qtshark ${wireshark_FILES})
+	add_dependencies(qtshark gitversion)
+	set_target_properties(qtshark PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(qtshark PROPERTIES FOLDER "Executables")
+	target_link_libraries(qtshark ${qtshark_LIBS})
+	install(TARGETS qtshark RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 register_tap_files(tshark-tap-register.c
-	tshark-taps
+		tshark-taps
 	${TSHARK_TAP_SRC}
 )
 
 if(BUILD_tshark)
 	set(tshark_LIBS
 		ui
-		capchild
-		caputils
 		${LIBEPAN_LIBS}
 		${APPLE_CORE_FOUNDATION_LIBRARY}
 		${APPLE_SYSTEM_CONFIGURATION_LIBRARY}
@@ -1777,17 +1093,20 @@ if(BUILD_tshark)
 		tshark-tap-register.c
 		tshark.c
 		${TSHARK_TAP_SRC}
+		${SHARK_COMMON_CAPTURE_SRC}
 		${SHARK_COMMON_SRC}
-		${CMAKE_BINARY_DIR}/image/tshark.rc
 	)
 	add_executable(tshark ${tshark_FILES})
-	set_extra_executable_properties(tshark "Executables")
+	add_dependencies(tshark gitversion)
+	set_target_properties(tshark PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(tshark PROPERTIES FOLDER "Executables")
 	target_link_libraries(tshark ${tshark_LIBS})
 	install(TARGETS tshark RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(BUILD_tfshark)
 	set(tfshark_LIBS
+		filetap
 		ui
 		${LIBEPAN_LIBS}
 		${APPLE_CORE_FOUNDATION_LIBRARY}
@@ -1797,17 +1116,17 @@ if(BUILD_tfshark)
 		tfshark.c
 		${TSHARK_TAP_SRC}
 		${SHARK_COMMON_SRC}
-		${CMAKE_BINARY_DIR}/image/tfshark.rc
 	)
 	add_executable(tfshark ${tfshark_FILES})
-	set_extra_executable_properties(tfshark "Executables")
+	add_dependencies(tfshark gitversion)
+	set_target_properties(tfshark PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(tfshark PROPERTIES FOLDER "Executables")
 	target_link_libraries(tfshark ${tfshark_LIBS})
 	install(TARGETS tfshark RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(BUILD_rawshark AND PCAP_FOUND)
 	set(rawshark_LIBS
-		caputils
 		${LIBEPAN_LIBS}
 		${APPLE_CORE_FOUNDATION_LIBRARY}
 		${APPLE_SYSTEM_CONFIGURATION_LIBRARY}
@@ -1816,10 +1135,11 @@ if(BUILD_rawshark AND PCAP_FOUND)
 		${SHARK_COMMON_SRC}
 		rawshark.c
 		ui/util.c
-		${CMAKE_BINARY_DIR}/image/rawshark.rc
 	)
 	add_executable(rawshark ${rawshark_FILES})
-	set_extra_executable_properties(rawshark "Executables")
+	add_dependencies(rawshark gitversion)
+	set_target_properties(rawshark PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(rawshark PROPERTIES FOLDER "Executables")
 	target_link_libraries(rawshark ${rawshark_LIBS})
 	install(TARGETS rawshark RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -1833,7 +1153,8 @@ if(BUILD_dftest)
 		ui/util.c
 	)
 	add_executable(dftest ${dftest_FILES})
-	set_extra_executable_properties(dftest "Tests")
+	set_target_properties(dftest PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(dftest PROPERTIES FOLDER "Executables")
 	target_link_libraries(dftest ${dftest_LIBS})
 	install(TARGETS dftest RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -1854,7 +1175,8 @@ if(BUILD_randpkt)
 		randpkt.c
 	)
 	add_executable(randpkt ${randpkt_FILES})
-	set_extra_executable_properties(randpkt "Executables")
+	set_target_properties(randpkt PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(randpkt PROPERTIES FOLDER "Executables")
 	target_link_libraries(randpkt ${randpkt_LIBS})
 	install(TARGETS randpkt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -1871,13 +1193,14 @@ if(BUILD_text2pcap)
 	)
 	set(text2pcap_FILES
 		${text2pcap_CLEAN_FILES}
-		${CMAKE_BINARY_DIR}/image/text2pcap.rc
 	)
 	add_lex_files(text2pcap_FILES
 		text2pcap-scanner.l
 	)
 	add_executable(text2pcap ${text2pcap_FILES})
-	set_extra_executable_properties(text2pcap "Executables")
+	add_dependencies(text2pcap gitversion)
+	set_target_properties(text2pcap PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(text2pcap PROPERTIES FOLDER "Executables")
 	target_link_libraries(text2pcap ${text2pcap_LIBS})
 	install(TARGETS text2pcap RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -1890,10 +1213,12 @@ if(BUILD_mergecap)
 	)
 	set(mergecap_FILES
 		mergecap.c
-		${CMAKE_BINARY_DIR}/image/mergecap.rc
+		version.h
 	)
 	add_executable(mergecap ${mergecap_FILES})
-	set_extra_executable_properties(mergecap "Executables")
+	add_dependencies(mergecap gitversion)
+	set_target_properties(mergecap PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(mergecap PROPERTIES FOLDER "Executables")
 	target_link_libraries(mergecap ${mergecap_LIBS})
 	install(TARGETS mergecap RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -1906,10 +1231,12 @@ if(BUILD_reordercap)
 	)
 	set(reordercap_FILES
 		reordercap.c
-		${CMAKE_BINARY_DIR}/image/reordercap.rc
+		version.h
 	)
 	add_executable(reordercap ${reordercap_FILES})
-	set_extra_executable_properties(reordercap "Executables")
+	add_dependencies(reordercap gitversion)
+	set_target_properties(reordercap PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(reordercap PROPERTIES FOLDER "Executables")
 	target_link_libraries(reordercap ${reordercap_LIBS})
 	install(TARGETS reordercap RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -1924,10 +1251,11 @@ if(BUILD_capinfos)
 	)
 	set(capinfos_FILES
 		capinfos.c
-		${CMAKE_BINARY_DIR}/image/capinfos.rc
 	)
 	add_executable(capinfos ${capinfos_FILES})
-	set_extra_executable_properties(capinfos "Executables")
+	add_dependencies(capinfos gitversion)
+	set_target_properties(capinfos PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(capinfos PROPERTIES FOLDER "Executables")
 	target_link_libraries(capinfos ${capinfos_LIBS})
 	install(TARGETS capinfos RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -1941,10 +1269,11 @@ if(BUILD_captype)
 	)
 	set(captype_FILES
 		captype.c
-		${CMAKE_BINARY_DIR}/image/captype.rc
 	)
 	add_executable(captype ${captype_FILES})
-	set_extra_executable_properties(captype "Executables")
+	add_dependencies(captype gitversion)
+	set_target_properties(captype PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(captype PROPERTIES FOLDER "Executables")
 	target_link_libraries(captype ${captype_LIBS})
 	install(TARGETS captype RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -1957,10 +1286,11 @@ if(BUILD_editcap)
 	)
 	set(editcap_FILES
 		editcap.c
-		${CMAKE_BINARY_DIR}/image/editcap.rc
 	)
 	add_executable(editcap ${editcap_FILES})
-	set_extra_executable_properties(editcap "Executables")
+	add_dependencies(editcap gitversion)
+	set_target_properties(editcap PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(editcap PROPERTIES FOLDER "Executables")
 	target_link_libraries(editcap ${editcap_LIBS})
 	install(TARGETS editcap RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -1968,7 +1298,6 @@ endif()
 if(BUILD_dumpcap AND PCAP_FOUND)
 	set(dumpcap_LIBS
 		wsutil
-		caputils
 		${PCAP_LIBRARIES}
 		${CAP_LIBRARIES}
 #		@SOCKET_LIBS@
@@ -1981,20 +1310,29 @@ if(BUILD_dumpcap AND PCAP_FOUND)
 		${NL_LIBRARIES}
 	)
 	set(dumpcap_FILES
+		version.h
 		capture_opts.c
+		capture-pcap-util.c
 		capture_stop_conditions.c
+		cfutils.c
+		clopts_common.c
 		conditions.c
 		dumpcap.c
 		pcapio.c
 		ringbuffer.c
 		sync_pipe_write.c
-		${CMAKE_BINARY_DIR}/image/dumpcap.rc
+		version_info.c
+		ws80211_utils.c
+		${PLATFORM_PCAP_SRC}
 	)
 	add_executable(dumpcap ${dumpcap_FILES})
-	set_extra_executable_properties(dumpcap "Executables")
+	add_dependencies(dumpcap gitversion)
+	set_target_properties(dumpcap PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+	set_target_properties(dumpcap PROPERTIES FOLDER "Executables")
 	target_link_libraries(dumpcap ${dumpcap_LIBS})
 	install(TARGETS dumpcap
-			RUNTIME	DESTINATION ${CMAKE_INSTALL_BINDIR}
+			RUNTIME
+			DESTINATION ${CMAKE_INSTALL_BINDIR}
 			PERMISSIONS ${DUMPCAP_SETUID}
 				OWNER_READ OWNER_WRITE OWNER_EXECUTE
 				GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
@@ -2030,52 +1368,22 @@ ADD_CUSTOM_COMMAND(
 
 ADD_CUSTOM_COMMAND(
 	OUTPUT	${CMAKE_BINARY_DIR}/AUTHORS-SHORT-FORMAT
+		${CMAKE_BINARY_DIR}/wireshark.pod
 	COMMAND ${PERL_EXECUTABLE}
 		${CMAKE_SOURCE_DIR}/doc/perlnoutf.pl
 		${CMAKE_SOURCE_DIR}/doc/make-authors-format.pl
 		< ${CMAKE_BINARY_DIR}/AUTHORS-SHORT
 		> ${CMAKE_BINARY_DIR}/AUTHORS-SHORT-FORMAT
-	DEPENDS
-		${CMAKE_SOURCE_DIR}/doc/perlnoutf.pl
-		${CMAKE_SOURCE_DIR}/doc/make-authors-format.pl
-		${CMAKE_BINARY_DIR}/AUTHORS-SHORT
-)
-
-if(WIN32)
-FILE(TO_NATIVE_PATH ${CMAKE_SOURCE_DIR}/doc/wireshark.pod.template WPT_WIN_PATH)
-FILE(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/AUTHORS-SHORT-FORMAT ASF_WIN_PATH)
-FILE(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/wireshark.pod WP_WIN_PATH)
-ADD_CUSTOM_COMMAND(
-	OUTPUT	${CMAKE_BINARY_DIR}/wireshark.pod
-	COMMAND copy /B ${WPT_WIN_PATH} + ${ASF_WIN_PATH} ${WP_WIN_PATH}
-	DEPENDS
-		${CMAKE_SOURCE_DIR}/doc/wireshark.pod.template
-		${CMAKE_BINARY_DIR}/AUTHORS-SHORT-FORMAT
-)
-else()
-
-ADD_CUSTOM_COMMAND(
-	OUTPUT	${CMAKE_BINARY_DIR}/wireshark.pod
 	COMMAND cat
 		${CMAKE_SOURCE_DIR}/doc/wireshark.pod.template
 		${CMAKE_BINARY_DIR}/AUTHORS-SHORT-FORMAT
 		> ${CMAKE_BINARY_DIR}/wireshark.pod
 	DEPENDS
+		${CMAKE_SOURCE_DIR}/doc/perlnoutf.pl
+		${CMAKE_SOURCE_DIR}/doc/make-authors-format.pl
+		${CMAKE_BINARY_DIR}/AUTHORS-SHORT
 		${CMAKE_SOURCE_DIR}/doc/wireshark.pod.template
-		${CMAKE_BINARY_DIR}/AUTHORS-SHORT-FORMAT
 )
-endif()
-
-if(ENABLE_APPLICATION_BUNDLE)
-	add_custom_target(app_bundle)
-	set_target_properties(app_bundle PROPERTIES FOLDER "Copy Tasks")
-	add_custom_command(TARGET app_bundle
-		POST_BUILD
-		COMMAND "${CMAKE_SOURCE_DIR}/packaging/macosx/osx-app.sh"
-		WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/run"
-	)
-	add_dependencies(app_bundle ${PROGLIST})
-endif()
 
 pod2manhtml( ${CMAKE_SOURCE_DIR}/doc/capinfos 1 )
 pod2manhtml( ${CMAKE_SOURCE_DIR}/doc/captype 1 )
@@ -2095,9 +1403,9 @@ pod2manhtml( ${CMAKE_BINARY_DIR}/wireshark 1 )
 pod2manhtml( ${CMAKE_SOURCE_DIR}/doc/wireshark-filter 4 )
 
 add_custom_target(
-	html_docs ALL
+	auxiliary ALL
 	DEPENDS
-		${CMAKE_BINARY_DIR}/AUTHORS-SHORT
+		AUTHORS-SHORT
 		capinfos.html
 		captype.html
 		dftest.html
@@ -2115,7 +1423,27 @@ add_custom_target(
 		wireshark.html
 		wireshark-filter.html
 )
-set_target_properties(html_docs PROPERTIES FOLDER "Docs")
+set_target_properties(auxiliary PROPERTIES FOLDER "Docs")
+
+set(MAN1_FILES
+	${CMAKE_BINARY_DIR}/capinfos.1
+	${CMAKE_BINARY_DIR}/captype.1
+	${CMAKE_BINARY_DIR}/dftest.1
+	${CMAKE_BINARY_DIR}/dumpcap.1
+	${CMAKE_BINARY_DIR}/editcap.1
+	${CMAKE_BINARY_DIR}/idl2wrs.1
+	${CMAKE_BINARY_DIR}/mergecap.1
+	${CMAKE_BINARY_DIR}/randpkt.1
+	${CMAKE_BINARY_DIR}/rawshark.1
+	${CMAKE_BINARY_DIR}/reordercap.1
+	${CMAKE_BINARY_DIR}/text2pcap.1
+	${CMAKE_BINARY_DIR}/tshark.1
+	${CMAKE_BINARY_DIR}/wireshark.1
+)
+
+set(MAN4_FILES
+	${CMAKE_BINARY_DIR}/wireshark-filter.4
+)
 
 set(CLEAN_FILES
 	${wireshark_FILES}
@@ -2185,24 +1513,7 @@ install(
 include( UseCheckAPI )
 CHECKAPI(
 	${TSHARK_TAP_SRC}
-	${WIRESHARK_SRC}
-)
-
-set(CMAKE_INSTALL_MODULES_DIR ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@)
-configure_file("${CMAKE_MODULE_PATH}/WiresharkConfig.cmake.in" "${CMAKE_BINARY_DIR}/WiresharkConfig.cmake" @ONLY)
-configure_file("${CMAKE_MODULE_PATH}/WiresharkConfigVersion.cmake.in" "${CMAKE_BINARY_DIR}/WiresharkConfigVersion.cmake" @ONLY)
-install(
-	FILES
-		${CMAKE_MODULE_PATH}/FindGLIB2.cmake
-		${CMAKE_MODULE_PATH}/FindWireshark.cmake
-		${CMAKE_MODULE_PATH}/FindWSWinLibs.cmake
-		${CMAKE_MODULE_PATH}/UseAsn2Wrs.cmake
-		${CMAKE_MODULE_PATH}/LocatePythonModule.cmake
-		${CMAKE_MODULE_PATH}/UseMakeDissectorReg.cmake
-		${CMAKE_BINARY_DIR}/WiresharkConfig.cmake
-		${CMAKE_BINARY_DIR}/WiresharkConfigVersion.cmake
-	DESTINATION
-		${CMAKE_INSTALL_MODULES_DIR}
+	${wireshark_FILES}
 )
 
 if(DOC_DIR)
@@ -2220,16 +1531,3 @@ if(DOC_DIR)
 		PATTERN "*.pdf"
 	)
 endif()
-
-#
-# Editor modelines  -  http://www.wireshark.org/tools/modelines.html
-#
-# Local variables:
-# c-basic-offset: 8
-# tab-width: 8
-# indent-tabs-mode: t
-# End:
-#
-# vi: set shiftwidth=8 tabstop=8 noexpandtab:
-# :indentSize=8:tabSize=8:noTabs=false:
-#

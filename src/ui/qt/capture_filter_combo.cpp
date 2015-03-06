@@ -36,7 +36,7 @@ CaptureFilterCombo::CaptureFilterCombo(QWidget *parent) :
     QComboBox(parent),
     cf_edit_(NULL)
 {
-    cf_edit_ = new CaptureFilterEdit(this, true);
+    cf_edit_ = new CaptureFilterEdit();
 
     setEditable(true);
     setLineEdit(cf_edit_);
@@ -110,13 +110,11 @@ void CaptureFilterCombo::rebuildFilterList(bool insert_edit_text)
         recent_add_cfilter(NULL, currentText().toUtf8().constData());
     }
 
-    lineEdit()->blockSignals(true);
     clear();
     for (GList *li = g_list_first(cfilter_list); li != NULL; li = g_list_next(li)) {
         insertItem(0, (const gchar *) li->data);
     }
-    lineEdit()->setText(cur_filter);
-    lineEdit()->blockSignals(false);
+    setEditText(cur_filter);
 }
 
 /*

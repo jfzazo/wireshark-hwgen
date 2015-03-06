@@ -23,6 +23,7 @@
 #include <string.h>
 #include "wtap-int.h"
 #include "file_wrappers.h"
+#include <wsutil/buffer.h>
 #include "atm.h"
 #include "pcap-encap.h"
 #include "netmon.h"
@@ -182,11 +183,12 @@ static gboolean netmon_read_atm_pseudoheader(FILE_T fh,
     union wtap_pseudo_header *pseudo_header, int *err, gchar **err_info);
 static void netmon_sequential_close(wtap *wth);
 static gboolean netmon_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
-    const guint8 *pd, int *err, gchar **err_info);
+    const guint8 *pd, int *err);
 static gboolean netmon_dump_close(wtap_dumper *wdh, int *err);
 
-wtap_open_return_val netmon_open(wtap *wth, int *err, gchar **err_info)
+int netmon_open(wtap *wth, int *err, gchar **err_info)
 {
+	int bytes_read;
 	char magic[MAGIC_SIZE];
 	struct netmon_hdr hdr;
 	int file_type;
@@ -202,20 +204,29 @@ wtap_open_return_val netmon_open(wtap *wth, int *err, gchar **err_info)
 
 	/* Read in the string that should be at the start of a Network
 	 * Monitor file */
-	if (!wtap_read_bytes(wth->fh, magic, MAGIC_SIZE, err, err_info)) {
-		if (*err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(magic, MAGIC_SIZE, wth->fh);
+	if (bytes_read != MAGIC_SIZE) {
+		*err = file_error(wth->fh, err_info);
+		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+			return -1;
+		return 0;
 	}
 
 	if (memcmp(magic, netmon_1_x_magic, MAGIC_SIZE) != 0 &&
 	    memcmp(magic, netmon_2_x_magic, MAGIC_SIZE) != 0) {
-		return WTAP_OPEN_NOT_MINE;
+		return 0;
 	}
 
 	/* Read the rest of the header. */
-	if (!wtap_read_bytes(wth->fh, &hdr, sizeof hdr, err, err_info))
-		return WTAP_OPEN_ERROR;
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(&hdr, sizeof hdr, wth->fh);
+	if (bytes_read != sizeof hdr) {
+		*err = file_error(wth->fh, err_info);
+		if (*err == 0)
+			*err = WTAP_ERR_SHORT_READ;
+		return -1;
+	}
 
 	switch (hdr.ver_major) {
 
@@ -230,7 +241,7 @@ wtap_open_return_val netmon_open(wtap *wth, int *err, gchar **err_info)
 	default:
 		*err = WTAP_ERR_UNSUPPORTED;
 		*err_info = g_strdup_printf("netmon: major version %u unsupported", hdr.ver_major);
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 
 	hdr.network = pletoh16(&hdr.network);
@@ -239,7 +250,7 @@ wtap_open_return_val netmon_open(wtap *wth, int *err, gchar **err_info)
 		*err = WTAP_ERR_UNSUPPORTED;
 		*err_info = g_strdup_printf("netmon: network type %u unknown or unsupported",
 		    hdr.network);
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 
 	/* This is a netmon file */
@@ -320,13 +331,13 @@ wtap_open_return_val netmon_open(wtap *wth, int *err, gchar **err_info)
 		*err = WTAP_ERR_BAD_FILE;
 		*err_info = g_strdup_printf("netmon: frame table length is %u, which is not a multiple of the size of an entry",
 		    frame_table_length);
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 	if (frame_table_size == 0) {
 		*err = WTAP_ERR_BAD_FILE;
 		*err_info = g_strdup_printf("netmon: frame table length is %u, which means it's less than one entry in size",
 		    frame_table_length);
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 	/*
 	 * XXX - clamp the size of the frame table, so that we don't
@@ -345,20 +356,24 @@ wtap_open_return_val netmon_open(wtap *wth, int *err, gchar **err_info)
 		*err = WTAP_ERR_BAD_FILE;
 		*err_info = g_strdup_printf("netmon: frame table length is %u, which is larger than we support",
 		    frame_table_length);
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 	if (file_seek(wth->fh, frame_table_offset, SEEK_SET, err) == -1) {
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 	frame_table = (guint32 *)g_try_malloc(frame_table_length);
 	if (frame_table_length != 0 && frame_table == NULL) {
 		*err = ENOMEM;	/* we assume we're out of memory */
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
-	if (!wtap_read_bytes(wth->fh, frame_table, frame_table_length,
-	    err, err_info)) {
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(frame_table, frame_table_length, wth->fh);
+	if ((guint32)bytes_read != frame_table_length) {
+		*err = file_error(wth->fh, err_info);
+		if (*err == 0)
+			*err = WTAP_ERR_SHORT_READ;
 		g_free(frame_table);
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 	netmon->frame_table_size = frame_table_size;
 	netmon->frame_table = frame_table;
@@ -380,7 +395,7 @@ wtap_open_return_val netmon_open(wtap *wth, int *err, gchar **err_info)
 		 * Version 1.x of the file format supports
 		 * millisecond precision.
 		 */
-		wth->file_tsprec = WTAP_TSPREC_MSEC;
+		wth->tsprecision = WTAP_FILE_TSPREC_MSEC;
 		break;
 
 	case 2:
@@ -390,10 +405,10 @@ wtap_open_return_val netmon_open(wtap *wth, int *err, gchar **err_info)
 		 * currently support that, so say
 		 * "nanosecond precision" for now.
 		 */
-		wth->file_tsprec = WTAP_TSPREC_NSEC;
+		wth->tsprecision = WTAP_FILE_TSPREC_NSEC;
 		break;
 	}
-	return WTAP_OPEN_MINE;
+	return 1;
 }
 
 static void
@@ -406,7 +421,7 @@ netmon_set_pseudo_header_info(struct wtap_pkthdr *phdr, Buffer *buf)
 		 * Attempt to guess from the packet data, the VPI, and
 		 * the VCI information about the type of traffic.
 		 */
-		atm_guess_traffic_type(phdr, ws_buffer_start_ptr(buf));
+		atm_guess_traffic_type(phdr, buffer_start_ptr(buf));
 		break;
 
 	case WTAP_ENCAP_ETHERNET:
@@ -423,7 +438,6 @@ netmon_set_pseudo_header_info(struct wtap_pkthdr *phdr, Buffer *buf)
 		 * I'm not sure about control frames.  An
 		 * "FCS length" of -2 means "NetMon weirdness".
 		 */
-		phdr->pseudo_header.ieee_802_11.presence_flags = 0; /* radio data is in the packet data */
 		phdr->pseudo_header.ieee_802_11.fcs_len = -2;
 		phdr->pseudo_header.ieee_802_11.decrypted = FALSE;
 		break;
@@ -460,6 +474,7 @@ netmon_process_record(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr,
 		struct netmonrec_1_x_hdr hdr_1_x;
 		struct netmonrec_2_x_hdr hdr_2_x;
 	}	hdr;
+	int	bytes_read;
 	gint64	delta = 0;	/* signed - frame times can be before the nominal start */
 	gint64	t;
 	time_t	secs;
@@ -486,8 +501,16 @@ netmon_process_record(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr,
 		hdr_size = sizeof (struct netmonrec_2_x_hdr);
 		break;
 	}
-	if (!wtap_read_bytes_or_eof(fh, &hdr, hdr_size, err, err_info))
+	errno = WTAP_ERR_CANT_READ;
+
+	bytes_read = file_read(&hdr, hdr_size, fh);
+	if (bytes_read != hdr_size) {
+		*err = file_error(fh, err_info);
+		if (*err == 0 && bytes_read != 0) {
+			*err = WTAP_ERR_SHORT_READ;
+		}
 		return FAILURE;
+	}
 
 	switch (netmon->version_major) {
 
@@ -656,8 +679,15 @@ netmon_process_record(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr,
 			}
 		}
 
-		if (!wtap_read_bytes(fh, &trlr, trlr_size, err, err_info))
+		errno = WTAP_ERR_CANT_READ;
+		bytes_read = file_read(&trlr, trlr_size, fh);
+		if (bytes_read != trlr_size) {
+			*err = file_error(fh, err_info);
+			if (*err == 0 && bytes_read != 0) {
+				*err = WTAP_ERR_SHORT_READ;
+			}
 			return FAILURE;
+		}
 
 		network = pletoh16(trlr.trlr_2_1.network);
 		if ((network & 0xF000) == NETMON_NET_PCAP_BASE) {
@@ -869,11 +899,17 @@ netmon_read_atm_pseudoheader(FILE_T fh, union wtap_pseudo_header *pseudo_header,
     int *err, gchar **err_info)
 {
 	struct netmon_atm_hdr atm_phdr;
+	int	bytes_read;
 	guint16	vpi, vci;
 
-	if (!wtap_read_bytes(fh, &atm_phdr, sizeof (struct netmon_atm_hdr),
-	    err, err_info))
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(&atm_phdr, sizeof (struct netmon_atm_hdr), fh);
+	if (bytes_read != sizeof (struct netmon_atm_hdr)) {
+		*err = file_error(fh, err_info);
+		if (*err == 0)
+			*err = WTAP_ERR_SHORT_READ;
 		return FALSE;
+	}
 
 	vpi = g_ntohs(atm_phdr.vpi);
 	vci = g_ntohs(atm_phdr.vci);
@@ -941,7 +977,7 @@ int netmon_dump_can_write_encap_1_x(int encap)
 	 * format.
 	 */
 	if (encap < 0 || (unsigned) encap >= NUM_WTAP_ENCAPS || wtap_encap[encap] == -1)
-		return WTAP_ERR_UNWRITABLE_ENCAP;
+		return WTAP_ERR_UNSUPPORTED_ENCAP;
 
 	return 0;
 }
@@ -956,7 +992,7 @@ int netmon_dump_can_write_encap_2_x(int encap)
 		return 0;
 
 	if (encap < 0 || (unsigned) encap >= NUM_WTAP_ENCAPS || wtap_encap[encap] == -1)
-		return WTAP_ERR_UNWRITABLE_ENCAP;
+		return WTAP_ERR_UNSUPPORTED_ENCAP;
 
 	return 0;
 }
@@ -992,7 +1028,7 @@ gboolean netmon_dump_open(wtap_dumper *wdh, int *err)
 /* Write a record for a packet to a dump file.
    Returns TRUE on success, FALSE on failure. */
 static gboolean netmon_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
-    const guint8 *pd, int *err, gchar **err_info _U_)
+    const guint8 *pd, int *err)
 {
 	const union wtap_pseudo_header *pseudo_header = &phdr->pseudo_header;
 	netmon_dump_t *netmon = (netmon_dump_t *)wdh->priv;
@@ -1009,7 +1045,7 @@ static gboolean netmon_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
 
 	/* We can only write packet records. */
 	if (phdr->rec_type != REC_TYPE_PACKET) {
-		*err = WTAP_ERR_UNWRITABLE_REC_TYPE;
+		*err = WTAP_ERR_REC_TYPE_UNSUPPORTED;
 		return FALSE;
 	}
 
@@ -1037,7 +1073,7 @@ static gboolean netmon_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
 	default:
 		/* We should never get here - our open routine
 		   should only get called for the types above. */
-		*err = WTAP_ERR_UNWRITABLE_FILE_TYPE;
+		*err = WTAP_ERR_UNSUPPORTED_FILE_TYPE;
 		return FALSE;
 	}
 
@@ -1051,7 +1087,7 @@ static gboolean netmon_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
 			/*
 			 * No.  Fail.
 			 */
-			*err = WTAP_ERR_UNWRITABLE_ENCAP;
+			*err = WTAP_ERR_UNSUPPORTED_ENCAP;
 			return FALSE;
 		}
 
@@ -1142,7 +1178,7 @@ static gboolean netmon_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
 	default:
 		/* We should never get here - our open routine
 		   should only get called for the types above. */
-		*err = WTAP_ERR_UNWRITABLE_FILE_TYPE;
+		*err = WTAP_ERR_UNSUPPORTED_FILE_TYPE;
 		return FALSE;
 	}
 
@@ -1295,7 +1331,7 @@ static gboolean netmon_dump_close(wtap_dumper *wdh, int *err)
 		/* We should never get here - our open routine
 		   should only get called for the types above. */
 		if (err != NULL)
-			*err = WTAP_ERR_UNWRITABLE_FILE_TYPE;
+			*err = WTAP_ERR_UNSUPPORTED_FILE_TYPE;
 		return FALSE;
 	}
 	if (!wtap_dump_file_write(wdh, magicp, magic_size, err))
@@ -1337,16 +1373,3 @@ static gboolean netmon_dump_close(wtap_dumper *wdh, int *err)
 
 	return TRUE;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

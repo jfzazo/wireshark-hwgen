@@ -24,7 +24,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/conversation.h>
 #include <epan/prefs.h>
 
 #include "packet-tcp.h"
@@ -44,7 +46,6 @@ static int hf_passwd = -1;
 static int hf_salt = -1;
 static int hf_statement = -1;
 static int hf_portal = -1;
-static int hf_return = -1;
 static int hf_tag = -1;
 static int hf_status = -1;
 static int hf_copydata = -1;
@@ -163,6 +164,7 @@ static void dissect_pgsql_fe_msg(guchar type, guint length, tvbuff_t *tvb,
     guchar c;
     gint i, siz;
     char *s;
+    proto_item *ti, *hidden_item;
     proto_tree *shrub;
 
     switch (type) {
@@ -189,7 +191,8 @@ static void dissect_pgsql_fe_msg(guchar type, guint length, tvbuff_t *tvb,
         n += siz;
 
         i = tvb_get_ntohs(tvb, n);
-        shrub = proto_tree_add_subtree_format(tree, tvb, n, 2, ett_values, NULL, "Parameters: %d", i);
+        ti = proto_tree_add_text(tree, tvb, n, 2, "Parameters: %d", i);
+        shrub = proto_item_add_subtree(ti, ett_values);
         n += 2;
         while (i-- > 0) {
             proto_tree_add_item(shrub, hf_typeoid, tvb, n, 4, ENC_BIG_ENDIAN);
@@ -208,7 +211,8 @@ static void dissect_pgsql_fe_msg(guchar type, guint length, tvbuff_t *tvb,
         n += siz;
 
         i = tvb_get_ntohs(tvb, n);
-        shrub = proto_tree_add_subtree_format(tree, tvb, n, 2, ett_values, NULL, "Parameter formats: %d", i);
+        ti = proto_tree_add_text(tree, tvb, n, 2, "Parameter formats: %d", i);
+        shrub = proto_item_add_subtree(ti, ett_values);
         n += 2;
         while (i-- > 0) {
             proto_tree_add_item(shrub, hf_format, tvb, n, 2, ENC_BIG_ENDIAN);
@@ -216,7 +220,8 @@ static void dissect_pgsql_fe_msg(guchar type, guint length, tvbuff_t *tvb,
         }
 
         i = tvb_get_ntohs(tvb, n);
-        shrub = proto_tree_add_subtree_format(tree, tvb, n, 2, ett_values, NULL, "Parameter values: %d", i);
+        ti = proto_tree_add_text(tree, tvb, n, 2, "Parameter values: %d", i);
+        shrub = proto_item_add_subtree(ti, ett_values);
         n += 2;
         while (i-- > 0) {
             siz = tvb_get_ntohl(tvb, n);
@@ -229,7 +234,8 @@ static void dissect_pgsql_fe_msg(guchar type, guint length, tvbuff_t *tvb,
         }
 
         i = tvb_get_ntohs(tvb, n);
-        shrub = proto_tree_add_subtree_format(tree, tvb, n, 2, ett_values, NULL, "Result formats: %d", i);
+        ti = proto_tree_add_text(tree, tvb, n, 2, "Result formats: %d", i);
+        shrub = proto_item_add_subtree(ti, ett_values);
         n += 2;
         while (i-- > 0) {
             proto_tree_add_item(shrub, hf_format, tvb, n, 2, ENC_BIG_ENDIAN);
@@ -243,11 +249,13 @@ static void dissect_pgsql_fe_msg(guchar type, guint length, tvbuff_t *tvb,
         proto_tree_add_item(tree, hf_portal, tvb, n, siz, ENC_ASCII|ENC_NA);
         n += siz;
 
+        ti = proto_tree_add_text(tree, tvb, n, 4, "Returns: ");
         i = tvb_get_ntohl(tvb, n);
         if (i == 0)
-            proto_tree_add_uint_format_value(tree, hf_return, tvb, n, 4, i, "all rows");
+            proto_item_append_text(ti, "all");
         else
-            proto_tree_add_uint_format_value(tree, hf_return, tvb, n, 4, i, "%d rows", i);
+            proto_item_append_text(ti, "%d", i);
+        proto_item_append_text(ti, " rows");
         break;
 
     /* Describe, Close */
@@ -259,9 +267,16 @@ static void dissect_pgsql_fe_msg(guchar type, guint length, tvbuff_t *tvb,
         else
             i = hf_statement;
 
-        n += 1;
-        s = tvb_get_stringz_enc(wmem_packet_scope(), tvb, n, &siz, ENC_ASCII);
-        proto_tree_add_string(tree, i, tvb, n, siz, s);
+        if (i != 0) {
+            n += 1;
+            s = tvb_get_stringz(wmem_packet_scope(), tvb, n, &siz);
+            hidden_item = proto_tree_add_string(tree, i, tvb, n, siz, s);
+            PROTO_ITEM_SET_HIDDEN(hidden_item);
+            proto_tree_add_text(
+                tree, tvb, n-1, siz, "%s: %s",
+                (c == 'P' ? "Portal" : "Statement"), s
+            );
+        }
         break;
 
     /* Messages without a type identifier */
@@ -320,7 +335,8 @@ static void dissect_pgsql_fe_msg(guchar type, guint length, tvbuff_t *tvb,
         n += 4;
 
         i = tvb_get_ntohs(tvb, n);
-        shrub = proto_tree_add_subtree_format(tree, tvb, n, 2, ett_values, NULL, "Parameter formats: %d", i);
+        ti = proto_tree_add_text(tree, tvb, n, 2, "Parameter formats: %d", i);
+        shrub = proto_item_add_subtree(ti, ett_values);
         n += 2;
         while (i-- > 0) {
             proto_tree_add_item(shrub, hf_format, tvb, n, 2, ENC_BIG_ENDIAN);
@@ -328,7 +344,8 @@ static void dissect_pgsql_fe_msg(guchar type, guint length, tvbuff_t *tvb,
         }
 
         i = tvb_get_ntohs(tvb, n);
-        shrub = proto_tree_add_subtree_format(tree, tvb, n, 2, ett_values, NULL, "Parameter values: %d", i);
+        ti = proto_tree_add_text(tree, tvb, n, 2, "Parameter values: %d", i);
+        shrub = proto_item_add_subtree(ti, ett_values);
         n += 2;
         while (i-- > 0) {
             siz = tvb_get_ntohl(tvb, n);
@@ -352,7 +369,7 @@ static void dissect_pgsql_be_msg(guchar type, guint length, tvbuff_t *tvb,
     guchar c;
     gint i, siz;
     char *s, *t;
-    proto_item *ti;
+    proto_item *ti, *hidden_item;
     proto_tree *shrub;
 
     switch (type) {
@@ -376,20 +393,23 @@ static void dissect_pgsql_be_msg(guchar type, guint length, tvbuff_t *tvb,
 
     /* Parameter status */
     case 'S':
-        s = tvb_get_stringz_enc(wmem_packet_scope(), tvb, n, &siz, ENC_ASCII);
-        proto_tree_add_string(tree, hf_parameter_name, tvb, n, siz, s);
+        s = tvb_get_stringz(wmem_packet_scope(), tvb, n, &siz);
+        hidden_item = proto_tree_add_string(tree, hf_parameter_name, tvb, n, siz, s);
+        PROTO_ITEM_SET_HIDDEN(hidden_item);
         n += siz;
-        t = tvb_get_stringz_enc(wmem_packet_scope(), tvb, n, &i, ENC_ASCII);
-        proto_tree_add_string(tree, hf_parameter_value, tvb, n, i, t);
+        t = tvb_get_stringz(wmem_packet_scope(), tvb, n, &i);
+        hidden_item = proto_tree_add_string(tree, hf_parameter_value, tvb, n, i, t);
+        PROTO_ITEM_SET_HIDDEN(hidden_item);
+        proto_tree_add_text(tree, tvb, n-siz, siz+i, "%s: %s", s, t);
         break;
 
     /* Parameter description */
     case 't':
         i = tvb_get_ntohs(tvb, n);
-        shrub = proto_tree_add_subtree_format(tree, tvb, n, 2, ett_values, NULL, "Parameters: %d", i);
+        proto_tree_add_text(tree, tvb, n, 2, "Parameters: %d", i);
         n += 2;
         while (i-- > 0) {
-            proto_tree_add_item(shrub, hf_typeoid, tvb, n, 4, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tree, hf_typeoid, tvb, n, 4, ENC_BIG_ENDIAN);
             n += 4;
         }
         break;
@@ -446,7 +466,7 @@ static void dissect_pgsql_be_msg(guchar type, guint length, tvbuff_t *tvb,
 
     /* Ready */
     case 'Z':
-        proto_tree_add_item(tree, hf_status, tvb, n, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(tree, hf_status, tvb, n, 1, ENC_NA);
         break;
 
     /* Error, Notice */
@@ -457,7 +477,7 @@ static void dissect_pgsql_be_msg(guchar type, guint length, tvbuff_t *tvb,
             c = tvb_get_guint8(tvb, n);
             if (c == '\0')
                 break;
-            s = tvb_get_stringz_enc(wmem_packet_scope(), tvb, n+1, &siz, ENC_ASCII);
+            s = tvb_get_stringz(wmem_packet_scope(), tvb, n+1, &siz);
             i = hf_text;
             switch (c) {
             case 'S': i = hf_severity;          break;
@@ -502,7 +522,8 @@ static void dissect_pgsql_be_msg(guchar type, guint length, tvbuff_t *tvb,
         proto_tree_add_item(tree, hf_format, tvb, n, 1, ENC_BIG_ENDIAN);
         n += 1;
         i = tvb_get_ntohs(tvb, n);
-        shrub = proto_tree_add_subtree_format(tree, tvb, n, 2, ett_values, NULL, "Columns: %d", i);
+        ti = proto_tree_add_text(tree, tvb, n, 2, "Columns: %d", i);
+        shrub = proto_item_add_subtree(ti, ett_values);
         n += 2;
         while (i-- > 2) {
             proto_tree_add_item(shrub, hf_format, tvb, n, 2, ENC_BIG_ENDIAN);
@@ -528,7 +549,7 @@ static void dissect_pgsql_be_msg(guchar type, guint length, tvbuff_t *tvb,
 /* This function is called by tcp_dissect_pdus() to find the size of the
    message starting at tvb[offset]. */
 static guint
-pgsql_length(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+pgsql_length(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     gint n = 0;
     guchar type;
@@ -603,7 +624,9 @@ dissect_pgsql_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
         n = 1;
         if (type == '\0')
             n = 0;
-        proto_tree_add_string(ptree, hf_type, tvb, 0, n, typestr);
+        proto_tree_add_text(ptree, tvb, 0, n, "Type: %s", typestr);
+        hidden_item = proto_tree_add_item(ptree, hf_type, tvb, 0, n, ENC_ASCII|ENC_NA);
+        PROTO_ITEM_SET_HIDDEN(hidden_item);
         proto_tree_add_item(ptree, hf_length, tvb, n, 4, ENC_BIG_ENDIAN);
         hidden_item = proto_tree_add_boolean(ptree, hf_frontend, tvb, 0, 0, fe);
         PROTO_ITEM_SET_HIDDEN(hidden_item);
@@ -694,11 +717,6 @@ proto_register_pgsql(void)
         { &hf_portal,
           { "Portal", "pgsql.portal", FT_STRINGZ, BASE_NONE, NULL, 0,
             "The name of a portal.", HFILL }
-        },
-        { &hf_return,
-          { "Returns", "pgsql.returns", FT_UINT32, BASE_DEC,
-            NULL, 0,
-            NULL, HFILL }
         },
         { &hf_tag,
           { "Tag", "pgsql.tag", FT_STRINGZ, BASE_NONE, NULL, 0,
@@ -879,15 +897,4 @@ proto_reg_handoff_pgsql(void)
     saved_pgsql_port = pgsql_port;
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+

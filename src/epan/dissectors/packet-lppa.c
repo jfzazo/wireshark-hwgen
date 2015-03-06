@@ -34,6 +34,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/asn1.h>
 
@@ -186,7 +187,7 @@ static int hf_lppa_oTDOA_Information_Type_Item = -1;  /* OTDOA_Information_Item 
 static int hf_lppa_privateIEs = -1;               /* PrivateIE_Container */
 
 /*--- End of included file: packet-lppa-hf.c ---*/
-#line 45 "../../asn1/lppa/packet-lppa-template.c"
+#line 46 "../../asn1/lppa/packet-lppa-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_lppa = -1;
@@ -247,7 +248,7 @@ static gint ett_lppa_ErrorIndication = -1;
 static gint ett_lppa_PrivateMessage = -1;
 
 /*--- End of included file: packet-lppa-ett.c ---*/
-#line 49 "../../asn1/lppa/packet-lppa-template.c"
+#line 50 "../../asn1/lppa/packet-lppa-template.c"
 
 /* Global variables */
 static guint32 ProcedureCode;
@@ -303,7 +304,7 @@ typedef enum _ProtocolIE_ID_enum {
 } ProtocolIE_ID_enum;
 
 /*--- End of included file: packet-lppa-val.h ---*/
-#line 62 "../../asn1/lppa/packet-lppa-template.c"
+#line 63 "../../asn1/lppa/packet-lppa-template.c"
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *);
 static int dissect_InitiatingMessageValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *);
@@ -2303,26 +2304,26 @@ static int dissect_PrivateMessage_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_,
 
 
 /*--- End of included file: packet-lppa-fn.c ---*/
-#line 69 "../../asn1/lppa/packet-lppa-template.c"
+#line 70 "../../asn1/lppa/packet-lppa-template.c"
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(lppa_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(lppa_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_InitiatingMessageValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(lppa_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(lppa_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_SuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(lppa_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(lppa_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(lppa_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(lppa_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 /*--- proto_register_lppa -------------------------------------------*/
@@ -2864,7 +2865,7 @@ void proto_register_lppa(void) {
         "PrivateIE_Container", HFILL }},
 
 /*--- End of included file: packet-lppa-hfarr.c ---*/
-#line 97 "../../asn1/lppa/packet-lppa-template.c"
+#line 98 "../../asn1/lppa/packet-lppa-template.c"
   };
 
   /* List of subtrees */
@@ -2927,7 +2928,7 @@ void proto_register_lppa(void) {
     &ett_lppa_PrivateMessage,
 
 /*--- End of included file: packet-lppa-ettarr.c ---*/
-#line 103 "../../asn1/lppa/packet-lppa-template.c"
+#line 104 "../../asn1/lppa/packet-lppa-template.c"
   };
 
   /* Register protocol */
@@ -2984,5 +2985,5 @@ proto_reg_handoff_lppa(void)
 
 
 /*--- End of included file: packet-lppa-dis-tab.c ---*/
-#line 125 "../../asn1/lppa/packet-lppa-template.c"
+#line 126 "../../asn1/lppa/packet-lppa-template.c"
 }

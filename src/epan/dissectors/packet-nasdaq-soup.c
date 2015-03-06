@@ -30,6 +30,7 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 
+#include "packet-tcp.h"
 
 void proto_register_nasdaq_soup(void);
 void proto_reg_handoff_nasdaq_soup(void);
@@ -107,7 +108,7 @@ dissect_nasdaq_soup_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent
     case 'U': /* unsequenced data packed */
     case 'S': /* sequenced data packed */
         if (linelen > 1 && nasdaq_itch_handle) {
-            new_tvb = tvb_new_subset_length(tvb, offset,linelen -1);
+            new_tvb = tvb_new_subset(tvb, offset,linelen -1,linelen -1);
         } else {
             proto_tree_add_item(tree, hf_nasdaq_soup_message, tvb, offset, linelen -1, ENC_ASCII|ENC_NA);
         }
@@ -291,18 +292,6 @@ proto_reg_handoff_nasdaq_soup(void)
 {
     nasdaq_soup_handle = create_dissector_handle(dissect_nasdaq_soup, proto_nasdaq_soup);
     nasdaq_itch_handle = find_dissector("nasdaq-itch");
-    dissector_add_for_decode_as("tcp.port", nasdaq_soup_handle);
+    dissector_add_handle("tcp.port", nasdaq_soup_handle); /* for "decode-as" */
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

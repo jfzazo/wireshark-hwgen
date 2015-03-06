@@ -23,10 +23,13 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/conversation.h>
+#include <epan/tap.h>
 #include "packet-scsi.h"
+#include "packet-fc.h"
 #include "packet-scsi-mmc.h"
 #include "packet-scsi-sbc.h"
 
@@ -193,16 +196,6 @@ static int hf_scsi_mmc_disk_flags = -1;
 static int hf_scsi_mmc_format_flags = -1;
 static int hf_scsi_mmc_track_flags = -1;
 static int hf_scsi_mmc_data_flags = -1;
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_scsi_mmc_getperformance_data_type = -1;
-static int hf_scsi_mmc_setcdspeed_logical_unit_read_speed = -1;
-static int hf_scsi_mmc_read_dvd_agid = -1;
-static int hf_scsi_mmc_read_dvd_layer_number = -1;
-static int hf_scsi_mmc_getperformance_starting_lba = -1;
-static int hf_scsi_mmc_getperformance_max_num_descriptors = -1;
-static int hf_scsi_mmc_getperformance_type = -1;
-static int hf_scsi_mmc_setcdspeed_logical_unit_write_speed = -1;
-static int hf_scsi_mmc_read_dvd_address = -1;
 
 static gint ett_scsi_mmc_profile   = -1;
 static gint ett_scsi_notifications = -1;
@@ -211,13 +204,6 @@ static gint ett_scsi_disk_flags = -1;
 static gint ett_scsi_format_flags = -1;
 static gint ett_scsi_track_flags = -1;
 static gint ett_scsi_data_flags = -1;
-
-/* Generated from convert_proto_tree_add_text.pl */
-static expert_field ei_scsi_mmc_unknown_read_dvd_format = EI_INIT;
-static expert_field ei_scsi_mmc_unknown_setstreaming_type = EI_INIT;
-static expert_field ei_scsi_mmc_unknown_format_class = EI_INIT;
-static expert_field ei_scsi_mmc_unknown_read_toc_format = EI_INIT;
-static expert_field ei_scsi_mmc_unknown_feature_data = EI_INIT;
 
 static const true_false_string scsi_gesn_path = {
     "POLLED operation requested",
@@ -443,12 +429,15 @@ dissect_mmc4_getconfiguration (tvbuff_t *tvb_a, packet_info *pinfo,
             switch(feature){
             case 0x0000: /* profile list */
                 while(try_offset<(old_offset+additional_length)){
-                    proto_item *it;
-                    proto_tree *tr;
+                    proto_item *it=NULL;
+                    proto_tree *tr=NULL;
                     guint16 profile;
                     guint8  cur_profile;
 
-                    tr=proto_tree_add_subtree(tree, try_tvb, try_offset, 4, ett_scsi_mmc_profile, &it, "Profile:");
+                    if(tree){
+                        it=proto_tree_add_text(tree, try_tvb, try_offset, 4, "Profile:");
+                        tr=proto_item_add_subtree(it, ett_scsi_mmc_profile);
+                    }
 
                     profile=tvb_get_ntohs(try_tvb, try_offset);
                     proto_tree_add_item (tr, hf_scsi_mmc_feature_profile, try_tvb, try_offset, 2, ENC_BIG_ENDIAN);
@@ -521,7 +510,8 @@ dissect_mmc4_getconfiguration (tvbuff_t *tvb_a, packet_info *pinfo,
                 proto_tree_add_item (tree, hf_scsi_mmc_feature_lun_sn, try_tvb, try_offset, additional_length, ENC_ASCII|ENC_NA);
                 break;
             default:
-                proto_tree_add_expert(tree, pinfo, &ei_scsi_mmc_unknown_feature_data, try_tvb, try_offset, additional_length);
+                proto_tree_add_text (tree, try_tvb, try_offset, additional_length,
+                                     "SCSI/MMC Unknown Feature data");
                 break;
             }
             try_offset=old_offset+additional_length;
@@ -631,7 +621,8 @@ dissect_mmc4_readtocpmaatip (tvbuff_t *tvb_a, packet_info *pinfo, proto_tree *tr
             }
             break;
         default:
-            proto_tree_add_expert_format(tree, pinfo, &ei_scsi_mmc_unknown_read_toc_format, try_tvb, try_offset, len, "SCSI/MMC Unknown READ TOC Format:0x%04x", cdata->itlq->flags&0x000f);
+            proto_tree_add_text (tree, try_tvb, try_offset, len,
+                "SCSI/MMC Unknown READ TOC Format:0x%04x",cdata->itlq->flags&0x000f);
             break;
         }
         END_TRY_SCSI_CDB_ALLOC_LEN;
@@ -739,16 +730,26 @@ dissect_mmc4_readdiscstructure (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
                      guint offset, gboolean isreq, gboolean iscdb,
                      guint payload_len _U_, scsi_task_data_t *cdata)
 
-{    if (tree && isreq && iscdb) {
-        proto_tree_add_item(tree, hf_scsi_mmc_read_dvd_address, tvb, offset+1, 4, ENC_BIG_ENDIAN);
-        proto_tree_add_item(tree, hf_scsi_mmc_read_dvd_layer_number, tvb, offset+5, 1, ENC_BIG_ENDIAN);
+{
+    guint8 flags;
+
+    if (tree && isreq && iscdb) {
+        proto_tree_add_text (tree, tvb, offset+1, 4,
+                             "Address: %u",
+                             tvb_get_ntohl (tvb, offset+1));
+        proto_tree_add_text (tree, tvb, offset+5, 1,
+                             "Layer Number: %u",
+                             tvb_get_guint8 (tvb, offset+5));
 
         cdata->itlq->flags=tvb_get_guint8 (tvb, offset+6);
         proto_tree_add_uint (tree, hf_scsi_mmc_read_dvd_format, tvb, offset+6, 1, cdata->itlq->flags);
 
         proto_tree_add_item (tree, hf_scsi_alloclen16, tvb, offset+7, 2, ENC_BIG_ENDIAN);
 
-        proto_tree_add_item(tree, hf_scsi_mmc_read_dvd_agid, tvb, offset+9, 1, ENC_BIG_ENDIAN);
+        flags = tvb_get_guint8 (tvb, offset+9);
+        proto_tree_add_text (tree, tvb, offset+9, 1,
+                             "AGID: %u",
+                             flags & 0xc0);
 
         proto_tree_add_bitmask(tree, tvb, offset+10, hf_scsi_control,
             ett_scsi_control, cdb_control_fields, ENC_BIG_ENDIAN);
@@ -828,7 +829,10 @@ dissect_mmc4_readdiscstructure (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
 
         break;
         default:
-            proto_tree_add_expert_format(tree, pinfo, &ei_scsi_mmc_unknown_read_dvd_format, tvb, 0, 0, "SCSI/MMC Unknown Read DVD Format:0x%02x", cdata->itlq->flags);
+            ti = proto_tree_add_text (tree, tvb, 0, 0,
+                "SCSI/MMC Unknown Read DVD Format:0x%02x",
+                cdata->itlq->flags);
+            PROTO_ITEM_SET_GENERATED(ti);
         }
     }
 }
@@ -840,12 +844,24 @@ proto_tree *tree,
                      guint payload_len _U_, scsi_task_data_t *cdata _U_)
 
 {
-    if (tree && isreq && iscdb) {
-        proto_tree_add_item(tree, hf_scsi_mmc_getperformance_data_type, tvb, offset, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(tree, hf_scsi_mmc_getperformance_starting_lba, tvb, offset+1, 4, ENC_BIG_ENDIAN);
-        proto_tree_add_item(tree, hf_scsi_mmc_getperformance_max_num_descriptors, tvb, offset+7, 2, ENC_BIG_ENDIAN);
+    guint8 flags;
 
-        proto_tree_add_item(tree, hf_scsi_mmc_getperformance_type, tvb, offset+9, 1, ENC_BIG_ENDIAN);
+    if (tree && isreq && iscdb) {
+        flags = tvb_get_guint8 (tvb, offset);
+        proto_tree_add_text (tree, tvb, offset, 1,
+                             "Data Type: %u",
+                             flags & 0x1f);
+        proto_tree_add_text (tree, tvb, offset+1, 4,
+                             "Starting LBA: %u",
+                             tvb_get_ntohl (tvb, offset+1));
+        proto_tree_add_text (tree, tvb, offset+7, 2,
+                             "Maximum Number of Descriptors: %u",
+                             tvb_get_ntohs (tvb, offset+7));
+
+        flags = tvb_get_guint8 (tvb, offset+9);
+        proto_tree_add_text (tree, tvb, offset+9, 1,
+                             "Type: %u",
+                             flags);
 
         proto_tree_add_bitmask(tree, tvb, offset+10, hf_scsi_control,
             ett_scsi_control, cdb_control_fields, ENC_BIG_ENDIAN);
@@ -904,6 +920,7 @@ dissect_mmc4_reportkey (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 
 {
     guint8      agid, key_format, key_class;
+    proto_item *ti;
 
     if (tree && isreq && iscdb) {
         proto_tree_add_item (tree, hf_scsi_mmc_lba, tvb, offset+1,
@@ -942,9 +959,10 @@ dissect_mmc4_reportkey (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
             proto_tree_add_item (tree, hf_scsi_mmc_report_key_rpc_scheme, tvb, offset+6, 1, ENC_BIG_ENDIAN);
             break;
         default:
-            proto_tree_add_expert_format(tree, pinfo, &ei_scsi_mmc_unknown_format_class, tvb, 0, 0,
+            ti = proto_tree_add_text (tree, tvb, 0, 0,
                 "SCSI/MMC Unknown Format:0x%02x/Class:0x%02x combination",
                 cdata->itlq->flags>>8,cdata->itlq->flags&0xff);
+            PROTO_ITEM_SET_GENERATED(ti);
             break;
         }
     }
@@ -1181,8 +1199,12 @@ dissect_mmc4_setcdspeed (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 {
     if (tree && isreq && iscdb) {
         proto_tree_add_item (tree, hf_scsi_mmc_setcdspeed_rc, tvb, offset+0, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(tree, hf_scsi_mmc_setcdspeed_logical_unit_read_speed, tvb, offset+1, 2, ENC_BIG_ENDIAN);
-        proto_tree_add_item(tree, hf_scsi_mmc_setcdspeed_logical_unit_write_speed, tvb, offset+3, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_text (tree, tvb, offset+1, 2,
+                             "Logical Unit Read Speed(bytes/sec): %u",
+                             tvb_get_ntohs (tvb, offset+1));
+        proto_tree_add_text (tree, tvb, offset+3, 2,
+                             "Logical Unit Write Speed(bytes/sec): %u",
+                             tvb_get_ntohs (tvb, offset+3));
         proto_tree_add_bitmask(tree, tvb, offset+10, hf_scsi_control,
             ett_scsi_control, cdb_control_fields, ENC_BIG_ENDIAN);
     }
@@ -1202,6 +1224,7 @@ dissect_mmc4_setstreaming (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
 
 {
     guint8      type;
+    proto_item *ti;
 
     if (tree && isreq && iscdb) {
         type=tvb_get_guint8(tvb, offset+7);
@@ -1226,8 +1249,9 @@ dissect_mmc4_setstreaming (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
             proto_tree_add_item (tree, hf_scsi_mmc_setstreaming_write_time, tvb, offset+24, 4, ENC_BIG_ENDIAN);
             break;
         default:
-            proto_tree_add_expert_format(tree, pinfo, &ei_scsi_mmc_unknown_setstreaming_type, tvb, 0, 0,
+            ti = proto_tree_add_text (tree, tvb, 0, 0,
                 "SCSI/MMC Unknown SetStreaming Type:0x%02x",cdata->itlq->flags);
+            PROTO_ITEM_SET_GENERATED(ti);
             break;
         }
     }
@@ -2080,16 +2104,6 @@ proto_register_scsi_mmc(void)
         { &hf_scsi_mmc_data_flags,
           {"Data Flags", "scsi_mmc.data.flags", FT_UINT8, BASE_HEX, NULL, 0,
            NULL, HFILL}},
-      /* Generated from convert_proto_tree_add_text.pl */
-      { &hf_scsi_mmc_read_dvd_address, { "Address", "scsi_mmc.read_dvd.address", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_scsi_mmc_read_dvd_layer_number, { "Layer Number", "scsi_mmc.read_dvd.layer_number", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_scsi_mmc_read_dvd_agid, { "AGID", "scsi_mmc.read_dvd.agid", FT_UINT8, BASE_DEC, NULL, 0xc0, NULL, HFILL }},
-      { &hf_scsi_mmc_getperformance_data_type, { "Data Type", "scsi_mmc.getperformance.data_type", FT_UINT8, BASE_DEC, NULL, 0x1f, NULL, HFILL }},
-      { &hf_scsi_mmc_getperformance_starting_lba, { "Starting LBA", "scsi_mmc.getperformance.starting_lba", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_scsi_mmc_getperformance_max_num_descriptors, { "Maximum Number of Descriptors", "scsi_mmc.getperformance.max_num_descriptors", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_scsi_mmc_getperformance_type, { "Type", "scsi_mmc.getperformance.type", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_scsi_mmc_setcdspeed_logical_unit_read_speed, { "Logical Unit Read Speed(bytes/sec)", "scsi_mmc.setcdspeed.logical_unit_read_speed", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_scsi_mmc_setcdspeed_logical_unit_write_speed, { "Logical Unit Write Speed(bytes/sec)", "scsi_mmc.setcdspeed.logical_unit_write_speed", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
     };
 
     /* Setup protocol subtree array */
@@ -2103,25 +2117,12 @@ proto_register_scsi_mmc(void)
         &ett_scsi_data_flags,
     };
 
-    static ei_register_info ei[] = {
-        /* Generated from convert_proto_tree_add_text.pl */
-        { &ei_scsi_mmc_unknown_feature_data, { "scsi_mmc.unknown_feature_data", PI_PROTOCOL, PI_WARN, "SCSI/MMC Unknown Feature data", EXPFILL }},
-        { &ei_scsi_mmc_unknown_read_toc_format, { "scsi_mmc.unknown_read_toc_format", PI_PROTOCOL, PI_WARN, "SCSI/MMC Unknown READ TOC Format", EXPFILL }},
-        { &ei_scsi_mmc_unknown_read_dvd_format, { "scsi_mmc.unknown_read_dvd_format", PI_PROTOCOL, PI_WARN, "SCSI/MMC Unknown Read DVD Format", EXPFILL }},
-        { &ei_scsi_mmc_unknown_format_class, { "scsi_mmc.unknown_format_class", PI_PROTOCOL, PI_WARN, "SCSI/MMC Unknown Format/Class combination", EXPFILL }},
-        { &ei_scsi_mmc_unknown_setstreaming_type, { "scsi_mmc.unknown_setstreaming_type", PI_PROTOCOL, PI_WARN, "SCSI/MMC Unknown SetStreaming Type", EXPFILL }},
-    };
-
-    expert_module_t* expert_scsi_mmc;
-
     /* Register the protocol name and description */
     proto_scsi_mmc = proto_register_protocol("SCSI_MMC", "SCSI_MMC", "scsi_mmc");
 
     /* Required function calls to register the header fields and subtrees used */
     proto_register_field_array(proto_scsi_mmc, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-    expert_scsi_mmc = expert_register_protocol(proto_scsi_mmc);
-    expert_register_field_array(expert_scsi_mmc, ei, array_length(ei));
 }
 
 

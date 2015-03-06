@@ -43,6 +43,7 @@
 
 #include <glib.h>
 
+#include <epan/emem.h>
 #include <epan/wmem/wmem.h>
 
 #include "ipv4.h"
@@ -102,7 +103,7 @@ typedef struct _protocol protocol_t;
  * the Info column and the protocol tree.
  *
  * If that string is dynamically allocated, it should be allocated with
- * wmem_alloc() with wmem_packet_scope(); using wmem_strdup_printf() would work.
+ * ep_alloc(); using ep_strdup_printf() would work.
  *
  * If the WIRESHARK_ABORT_ON_DISSECTOR_BUG environment variable is set,
  * it will call abort(), instead, to make it easier to get a stack trace.
@@ -135,20 +136,6 @@ WS_DLL_PUBLIC WS_MSVC_NORETURN void proto_report_dissector_bug(const char *messa
  *
  * @param expression expression to test in the assertion
  */
-
-#define __DISSECTOR_ASSERT_STRINGIFY(s)	# s
-
-#define __DISSECTOR_ASSERT(expression, file, lineno)  \
-  (REPORT_DISSECTOR_BUG( \
-    wmem_strdup_printf(wmem_packet_scope(), \
-        "%s:%u: failed assertion \"%s\"", \
-        file, lineno, __DISSECTOR_ASSERT_STRINGIFY(expression))))
-
-#define __DISSECTOR_ASSERT_HINT(expression, file, lineno, hint)  \
-  (REPORT_DISSECTOR_BUG( \
-    wmem_strdup_printf(wmem_packet_scope(), \
-        "%s:%u: failed assertion \"%s\" (%s)", \
-        file, lineno, __DISSECTOR_ASSERT_STRINGIFY(expression), hint)))
 
 #define DISSECTOR_ASSERT(expression)  \
   ((void) ((expression) ? (void)0 : \
@@ -184,111 +171,20 @@ WS_DLL_PUBLIC WS_MSVC_NORETURN void proto_report_dissector_bug(const char *messa
  */
 #define DISSECTOR_ASSERT_NOT_REACHED()  \
   (REPORT_DISSECTOR_BUG( \
-    wmem_strdup_printf(wmem_packet_scope(), \
-        "%s:%u: failed assertion \"DISSECTOR_ASSERT_NOT_REACHED\"", \
-        __FILE__, __LINE__)))
+    ep_strdup_printf("%s:%u: failed assertion \"DISSECTOR_ASSERT_NOT_REACHED\"", \
+     __FILE__, __LINE__)))
 
-/** Compare two integers.
- *
- * This is functionally the same as `DISSECTOR_ASSERT(a op b)` except that it
- * will display the values of a and b upon failure.
- *
- *     DISSECTOR_ASSERT_CMPINT(a, ==, b);
- *     DISSECTOR_ASSERT_CMPINT(min, <=, max);
- *
- * This function can currently compare values that fit inside a gint64.
- *
- * WARNING: The number of times the arguments are evaluated is undefined.  Do
- * not use expressions with side effects as arguments.
- *
- * @param a  The first integer.
- * @param op Any binary operator.
- * @param b  The second integer.
- */
-#define __DISSECTOR_ASSERT_CMPINT(a, op, b, type, fmt) \
+#define __DISSECTOR_ASSERT_STRINGIFY(s)	# s
+
+#define __DISSECTOR_ASSERT(expression, file, lineno)  \
   (REPORT_DISSECTOR_BUG( \
-    wmem_strdup_printf(wmem_packet_scope(), \
-        "%s:%u: failed assertion "#a" "#op" "#b" ("fmt" "#op" "fmt")", \
-        __FILE__, __LINE__, (type)a, (type)b)))
+    ep_strdup_printf("%s:%u: failed assertion \"%s\"", \
+     file, lineno, __DISSECTOR_ASSERT_STRINGIFY(expression))))
 
-#define DISSECTOR_ASSERT_CMPINT(a, op, b)  \
-  ((void) ((a op b) ? (void)0 : \
-   __DISSECTOR_ASSERT_CMPINT (a, op, b, gint64, "%"G_GINT64_MODIFIER"d"))) \
-   __DISSECTOR_ASSERT_STATIC_ANALYSIS_HINT(a op b)
-
-/** Like DISSECTOR_ASSERT_CMPINT() except the arguments are treated as
- * unsigned values.
- *
- * This function can currently compare values that fit inside a guint64.
- */
-#define DISSECTOR_ASSERT_CMPUINT(a, op, b)  \
-  ((void) ((a op b) ? (void)0 : \
-   __DISSECTOR_ASSERT_CMPINT (a, op, b, guint64, "%"G_GINT64_MODIFIER"u"))) \
-   __DISSECTOR_ASSERT_STATIC_ANALYSIS_HINT(a op b)
-
-/** Like DISSECTOR_ASSERT_CMPUINT() except the values are displayed in
- * hexadecimal upon assertion failure.
- */
-#define DISSECTOR_ASSERT_CMPUINTHEX(a, op, b)  \
-  ((void) ((a op b) ? (void)0 : \
-   __DISSECTOR_ASSERT_CMPINT (a, op, b, guint64, "0x%"G_GINT64_MODIFIER"X"))) \
-  __DISSECTOR_ASSERT_STATIC_ANALYSIS_HINT(a op b)
-
-/*
- * This is similar to DISSECTOR_ASSERT(hfinfo->type == type) except that
- * it will report the name of the field with the wrong type as well as
- * the type.
- *
- * @param hfinfo  The hfinfo for the field being tested
- * @param type    The type it's expected to have
- */
-#define __DISSECTOR_ASSERT_FIELD_TYPE(hfinfo, t) \
+#define __DISSECTOR_ASSERT_HINT(expression, file, lineno, hint)  \
   (REPORT_DISSECTOR_BUG( \
-    wmem_strdup_printf(wmem_packet_scope(), \
-        "%s:%u: field %s is not of type "#t, \
-        __FILE__, __LINE__, (hfinfo)->abbrev)))
-
-#define DISSECTOR_ASSERT_FIELD_TYPE(hfinfo, t)  \
-  ((void) (((hfinfo)->type == t) ? (void)0 : \
-   __DISSECTOR_ASSERT_FIELD_TYPE ((hfinfo), t))) \
-   __DISSECTOR_ASSERT_STATIC_ANALYSIS_HINT((hfinfo)->type == t)
-
-#define DISSECTOR_ASSERT_FIELD_TYPE_IS_INTEGRAL(hfinfo)  \
-  ((void) ((IS_FT_INT((hfinfo)->type) || \
-            IS_FT_UINT((hfinfo)->type)) ? (void)0 : \
-   REPORT_DISSECTOR_BUG( \
-     wmem_strdup_printf(wmem_packet_scope(), \
-         "%s:%u: field %s is not of an FT_{U}INTn type", \
-         __FILE__, __LINE__, (hfinfo)->abbrev)))) \
-   __DISSECTOR_ASSERT_STATIC_ANALYSIS_HINT(IS_FT_INT((hfinfo)->type) || \
-                                           IS_FT_UINT((hfinfo)->type))
-
-#define DISSECTOR_ASSERT_FIELD_TYPE_IS_TIME(hfinfo)  \
-  ((void) (((hfinfo)->type == FT_ABSOLUTE_TIME || \
-            (hfinfo)->type == FT_RELATIVE_TIME) ? (void)0 : \
-   __DISSECTOR_ASSERT_FIELD_TYPE_IS_TIME ((hfinfo)))) \
-   __DISSECTOR_ASSERT_STATIC_ANALYSIS_HINT((hfinfo)->type == FT_ABSOLUTE_TIME || \
-                                           (hfinfo)->type == FT_RELATIVE_TIME)
-
-#define __DISSECTOR_ASSERT_FIELD_TYPE_IS_STRING(hfinfo) \
-  (REPORT_DISSECTOR_BUG( \
-    wmem_strdup_printf(wmem_packet_scope(), \
-        "%s:%u: field %s is not of type FT_STRING, FT_STRINGZ, or FT_STRINGZPAD", \
-        __FILE__, __LINE__, (hfinfo)->abbrev)))
-
-#define DISSECTOR_ASSERT_FIELD_TYPE_IS_STRING(hfinfo)  \
-  ((void) (((hfinfo)->type == FT_STRING || (hfinfo)->type == FT_STRINGZ || \
-            (hfinfo)->type == FT_STRINGZPAD) ? (void)0 : \
-   __DISSECTOR_ASSERT_FIELD_TYPE_IS_STRING ((hfinfo)))) \
-   __DISSECTOR_ASSERT_STATIC_ANALYSIS_HINT((hfinfo)->type == FT_STRING || \
-                                           (hfinfo)->type == FT_STRINGZ || \
-                                           (hfinfo)->type == FT_STRINGZPAD)
-
-#define __DISSECTOR_ASSERT_FIELD_TYPE_IS_TIME(hfinfo) \
-  (REPORT_DISSECTOR_BUG( \
-    wmem_strdup_printf(wmem_packet_scope(), \
-        "%s:%u: field %s is not of type FT_ABSOLUTE_TIME or FT_RELATIVE_TIME", \
-        __FILE__, __LINE__, (hfinfo)->abbrev)))
+    ep_strdup_printf("%s:%u: failed assertion \"%s\" (%s)", \
+     file, lineno, __DISSECTOR_ASSERT_STRINGIFY(expression), hint)))
 
 /*
  * The encoding of a field of a particular type may involve more
@@ -501,13 +397,7 @@ typedef enum {
 /* String types */
 	STR_ASCII    = BASE_NONE, /**< shows non-printable ASCII characters as C-style escapes */
 	/* XXX, support for format_text_wsp() ? */
-	STR_UNICODE  = 7,         /**< shows non-printable UNICODE characters as \\uXXXX (XXX for now non-printable characters display depends on UI) */
-
-/* Byte types */
-	SEP_DOT = 8,        /**< hexadecimal bytes with a period (.) between each byte */
-	SEP_DASH  = 9,      /**< hexadecimal bytes with a dash (-) between each byte */
-	SEP_COLON = 10,     /**< hexadecimal bytes with a colon (:) between each byte */
-	SEP_SPACE  = 11     /**< hexadecimal bytes with a space between each byte */
+	STR_UNICODE  = 7          /**< shows non-printable UNICODE characters as \\uXXXX (XXX for now non-printable characters display depends on UI) */
 } field_display_e;
 
 /* Following constants have to be ORed with a field_display_e when dissector
@@ -542,7 +432,7 @@ struct _header_field_info {
 				                      typically converted by VALS(), RVALS() or TFS().
 				                      If this is an FT_PROTOCOL then it points to the
 				                      associated protocol_t structure */
-	guint64			 bitmask;        /**< [BITMASK] bitmask of interesting bits */
+	guint32			 bitmask;        /**< [BITMASK] bitmask of interesting bits */
 	const char		*blurb;          /**< [FIELDDESCR] Brief description of field */
 
 	/* ------- set by proto routines (prefilled by HFILL macro, see below) ------ */
@@ -928,11 +818,6 @@ proto_tree_prime_hfid(proto_tree *tree, const int hfid);
  @return parent item */
 WS_DLL_PUBLIC proto_item* proto_tree_get_parent(proto_tree *tree);
 
-/** Get the parent tree of a subtree.
- @param tree the tree to get the parent from
- @return parent tree */
-WS_DLL_PUBLIC proto_tree *proto_tree_get_parent_tree(proto_tree *tree);
-
 /** Get the root tree from any subtree.
  @param tree the tree to get the root from
  @return root tree */
@@ -970,7 +855,7 @@ WS_DLL_PUBLIC proto_item *
 proto_tree_add_item(proto_tree *tree, int hfindex, tvbuff_t *tvb,
 		    const gint start, gint length, const guint encoding);
 
-/** (DEPRECATED) Add a text-only node to a proto_tree.
+/** Add a text-only node to a proto_tree.
  @param tree the tree to append this item to
  @param tvb the tv buffer of the current data
  @param start start of data in tvb
@@ -982,7 +867,7 @@ WS_DLL_PUBLIC proto_item *
 proto_tree_add_text(proto_tree *tree, tvbuff_t *tvb, gint start, gint length, const char *format,
 	...) G_GNUC_PRINTF(5,6);
 
-/** (DEPRECATED) Add a text-only node to a proto_tree using a variable argument list.
+/** Add a text-only node to a proto_tree using a variable argument list.
  @param tree the tree to append this item to
  @param tvb the tv buffer of the current data
  @param start start of data in tvb
@@ -995,40 +880,10 @@ proto_tree_add_text_valist(proto_tree *tree, tvbuff_t *tvb, gint start,
 	gint length, const char *format, va_list ap)
 	G_GNUC_PRINTF(5, 0);
 
-/** Add a text-only node that creates a subtree underneath.
- proto_tree_add_text + proto_item_add_subtree
- @param tree the tree to append this item to
- @param tvb the tv buffer of the current data
- @param start start of data in tvb
- @param length length of data in tvb
- @param idx one of the ett_ array elements registered with proto_register_subtree_array()
- @param tree_item item returned with tree creation. Can be NULL if going to be unused
- @param text label for the tree
- @return the newly created tree */
-WS_DLL_PUBLIC proto_tree *
-proto_tree_add_subtree(proto_tree *tree, tvbuff_t *tvb, gint start, gint length, gint idx, proto_item **tree_item, const char *text);
-
-/** Add a text-only node that creates a subtree underneath.
- proto_tree_add_text + proto_item_add_subtree
- @param tree the tree to append this item to
- @param tvb the tv buffer of the current data
- @param start start of data in tvb
- @param length length of data in tvb
- @param idx one of the ett_ array elements registered with proto_register_subtree_array()
- @param tree_item item returned with tree creation. Can be NULL if going to be unused
- @param format printf like format string
- @param ... printf like parameters
- @return the newly created tree */
-WS_DLL_PUBLIC proto_tree *
-proto_tree_add_subtree_format(proto_tree *tree, tvbuff_t *tvb, gint start, gint length, gint idx, proto_item **tree_item, const char *format, ...) G_GNUC_PRINTF(7,8);
 
 /** Add a text-only node to a proto_tree with tvb_format_text() string. */
 proto_item *
 proto_tree_add_format_text(proto_tree *tree, tvbuff_t *tvb, gint start, gint length);
-
-/** Add a text-only node to a proto_tree with tvb_format_text_wsp() string. */
-proto_item *
-proto_tree_add_format_wsp_text(proto_tree *tree, tvbuff_t *tvb, gint start, gint length);
 
 /** Add a FT_NONE field to a proto_tree.
  @param tree the tree to append this item to
@@ -1353,6 +1208,18 @@ proto_tree_add_ipv6_format_value(proto_tree *tree, int hfindex, tvbuff_t *tvb,
 WS_DLL_PUBLIC proto_item *
 proto_tree_add_ipv6_format(proto_tree *tree, int hfindex, tvbuff_t *tvb, gint start,
 	gint length, const guint8* value_ptr, const char *format, ...) G_GNUC_PRINTF(7,8);
+
+/** Add a FT_AX25 to a proto_tree.
+ @param tree the tree to append this item to
+ @param hfindex field index
+ @param tvb the tv buffer of the current data
+ @param start start of data in tvb
+ @param length length of data in tvb
+ @param value data to display
+ @return the newly created item */
+extern proto_item *
+proto_tree_add_ax25(proto_tree *tree, int hfindex, tvbuff_t *tvb, gint start,
+	gint length, const guint8* value);
 
 /** Add a FT_ETHER to a proto_tree.
  @param tree the tree to append this item to
@@ -1972,24 +1839,19 @@ proto_register_field_array(const int parent, hf_register_info *hf, const int num
 
 /** Unregister an already registered field.
  @param parent the protocol handle from proto_register_protocol()
- @param hf_id the field to deregister */
+ @param hf_id the field to unregister */
 WS_DLL_PUBLIC void
 proto_unregister_field (const int parent, gint hf_id);
-
-/** Add data to be freed when deregistered fields are freed.
- @param data a pointer to data to free */
-WS_DLL_PUBLIC void
-proto_add_deregistered_data (void *data);
-
-/** Free fields deregistered in proto_unregister_field(). */
-WS_DLL_PUBLIC void
-proto_free_deregistered_fields (void);
 
 /** Register a protocol subtree (ett) array.
  @param indices array of ett indices
  @param num_indices the number of records in indices */
 WS_DLL_PUBLIC void
 proto_register_subtree_array(gint *const *indices, const int num_indices);
+
+/** Returns number of items (protocols or header fields) registered.
+ @return the number of items */
+WS_DLL_PUBLIC int proto_registrar_n(void);
 
 /** Get name of registered header_field number n.
  @param n item # n (0-indexed)
@@ -2051,11 +1913,6 @@ WS_DLL_PUBLIC header_field_info *proto_get_next_protocol_field(const int proto_i
  @return proto_id */
 WS_DLL_PUBLIC int proto_get_id_by_filter_name(const gchar* filter_name);
 
-/** Given a protocol's short name.
- @param short_name the protocol short name to search for
- @return proto_id */
-WS_DLL_PUBLIC int proto_get_id_by_short_name(const gchar* short_name);
-
 /** Can item # n decoding be disabled?
  @param proto_id protocol id (0-indexed)
  @return TRUE if it's a protocol, FALSE if it's not */
@@ -2106,12 +1963,6 @@ WS_DLL_PUBLIC const char *proto_get_protocol_filter_name(const int proto_id);
  */
 WS_DLL_PUBLIC void proto_get_frame_protocols(const wmem_list_t *layers,
       gboolean *is_ip, gboolean *is_tcp, gboolean *is_udp, gboolean *is_sctp, gboolean *is_ssl);
-
-/** Find a protocol by name in a layer list.
- * @param layers Protocol layer list
- * @param proto_name Name of protocol to find
- */
-WS_DLL_PUBLIC gboolean proto_is_frame_protocol(const wmem_list_t *layers, const char* proto_name);
 
 /** Enable / Disable protocol of the given item number.
  @param proto_id protocol id (0-indexed)
@@ -2209,7 +2060,7 @@ proto_can_match_selected(field_info *finfo, struct epan_dissect *edt);
 /** Construct a "match selected" display filter string.
  @param finfo field_info
  @param edt epan dissecting
- @return the wmem NULL alloced display filter string.  Needs to be freed with wmem_free(NULL, ...) */
+ @return the display filter string */
 WS_DLL_PUBLIC char*
 proto_construct_match_selected_string(field_info *finfo, struct epan_dissect *edt);
 
@@ -2242,32 +2093,6 @@ proto_find_field_from_offset(proto_tree *tree, guint offset, tvbuff_t *tvb);
 WS_DLL_PUBLIC proto_item *
 proto_tree_add_bitmask(proto_tree *tree, tvbuff_t *tvb, const guint offset,
 		const int hf_hdr, const gint ett, const int **fields, const guint encoding);
-
-/** This function will dissect a sequence of bytes that describe a bitmask.
-*   This has "filterable" bitmask header functionality of proto_tree_add_bitmask
-*   with the ability to control what data is appended to the header like
-*   proto_tree_add_bitmask_text
- @param tree the tree to append this item to
- @param tvb the tv buffer of the current data
- @param offset start of data in tvb
- @param hf_hdr an 8/16/24/32 bit integer that describes the bitmask to be dissected.
-        This field will form an expansion under which the individual fields of the
-        bitmask is dissected and displayed.
-        This field must be of the type FT_[U]INT{8|16|24|32}.
- @param ett subtree index
- @param fields an array of pointers to int that lists all the fields of the
-        bitmask. These fields can be either of the type FT_BOOLEAN for flags
-        or another integer of the same type/size as hf_hdr with a mask specified.
-        This array is terminated by a NULL entry.
-        FT_BOOLEAN bits that are set to 1 will have the name added to the expansion.
-        FT_integer fields that have a value_string attached will have the
-        matched string displayed on the expansion line.
- @param encoding big or little endian byte representation (ENC_BIG_ENDIAN/ENC_LITTLE_ENDIAN/ENC_HOST_ENDIAN)
- @param flags bitmask field using BMT_NO_* flags to determine behavior
- @return the newly created item */
-WS_DLL_PUBLIC proto_item *
-proto_tree_add_bitmask_with_flags(proto_tree *tree, tvbuff_t *tvb, const guint offset,
-		const int hf_hdr, const gint ett, const int **fields, const guint encoding, const int flags);
 
 /** This function will dissect a sequence of bytes that describe a bitmask.
  @param tree the tree to append this item to
@@ -2480,7 +2305,7 @@ proto_check_field_name(const gchar *field_name);
  @param expr the filter expression
  @param size the size of the string buffer */
 const gchar *
-proto_custom_set(proto_tree* tree, GSList *field_id,
+proto_custom_set(proto_tree* tree, const int field_id,
                              gint occurrence,
                              gchar *result,
                              gchar *expr, const int size );

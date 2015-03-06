@@ -21,19 +21,18 @@
 
 #include "export_object_dialog.h"
 #include "ui_export_object_dialog.h"
-
-#include <ui/alert_box.h>
-#include <ui/utf8_entities.h>
-
-#include <wsutil/filesystem.h>
-#include <wsutil/str_util.h>
-
 #include "wireshark_application.h"
 
 #include <QDialogButtonBox>
 #include <QPushButton>
 #include <QMessageBox>
 #include <QFileDialog>
+
+#include <ui/alert_box.h>
+
+#include <wsutil/filesystem.h>
+
+#include <wsutil/str_util.h>
 
 extern "C" {
 
@@ -60,9 +59,10 @@ eo_reset(void *tapdata)
 
 } // extern "C"
 
-ExportObjectDialog::ExportObjectDialog(QWidget &parent, CaptureFile &cf, ObjectType object_type) :
-    WiresharkDialog(parent, cf),
+ExportObjectDialog::ExportObjectDialog(QWidget *parent, capture_file *cf, ObjectType object_type) :
+    QDialog(parent),
     eo_ui_(new Ui::ExportObjectDialog),
+    cap_file_(cf),
     save_bt_(NULL),
     save_all_bt_(NULL),
     tap_name_(NULL),
@@ -99,24 +99,20 @@ ExportObjectDialog::ExportObjectDialog(QWidget &parent, CaptureFile &cf, ObjectT
         tap_packet_ = eo_smb_packet;
         eo_protocoldata_resetfn_ = eo_smb_cleanup;
         break;
-    case Tftp:
-        tap_name_ = "tftp_eo";
-        name_ = "TFTP";
-        tap_packet_ = eo_tftp_packet;
-        break;
     }
 
     save_bt_ = eo_ui_->buttonBox->button(QDialogButtonBox::Save);
     save_all_bt_ = eo_ui_->buttonBox->button(QDialogButtonBox::SaveAll);
     close_bt = eo_ui_->buttonBox->button(QDialogButtonBox::Close);
 
-    setWindowTitle(wsApp->windowTitleString(QStringList() << tr("Export") << tr("%1 object list").arg(name_)));
+    this->setWindowTitle(QString(tr("Wireshark: %1 object list")).arg(name_));
 
     if (save_bt_) save_bt_->setEnabled(false);
     if (save_all_bt_) save_all_bt_->setEnabled(false);
     if (close_bt) close_bt->setDefault(true);
 
-    connect(&cap_file_, SIGNAL(captureFileClosing()), this, SLOT(captureFileClosing()));
+    connect(wsApp, SIGNAL(captureFileClosing(const capture_file*)),
+            this, SLOT(captureFileClosing(const capture_file*)));
 
     show();
     raise();
@@ -174,6 +170,8 @@ void ExportObjectDialog::show()
 {
     GString *error_msg;
 
+    if (!cap_file_) destroy(); // Assert?
+
     /* Data will be gathered via a tap callback */
     error_msg = register_tap_listener(tap_name_, (void *)&export_object_list_, NULL, 0,
                                       eo_reset,
@@ -192,7 +190,7 @@ void ExportObjectDialog::show()
     }
 
     QDialog::show();
-    cap_file_.retapPackets();
+    cf_retap_packets(cap_file_);
     eo_ui_->progressFrame->hide();
     for (int i = 0; i < eo_ui_->objectTree->columnCount(); i++)
         eo_ui_->objectTree->resizeColumnToContents(i);
@@ -204,9 +202,11 @@ void ExportObjectDialog::accept()
     // Don't close the dialog.
 }
 
-void ExportObjectDialog::captureFileClosing()
+void ExportObjectDialog::captureFileClosing(const capture_file *cf)
 {
-    close();
+    if (cap_file_ && cf == cap_file_) {
+        close();
+    }
 }
 
 void ExportObjectDialog::on_buttonBox_helpRequested()
@@ -226,8 +226,8 @@ void ExportObjectDialog::on_objectTree_currentItemChanged(QTreeWidgetItem *item,
     if (save_bt_) save_bt_->setEnabled(true);
 
     export_object_entry_t *entry = item->data(0, Qt::UserRole).value<export_object_entry_t *>();
-    if (entry && !file_closed_) {
-        cf_goto_frame(cap_file_.capFile(), entry->pkt_num);
+    if (entry && cap_file_) {
+        cf_goto_frame(cap_file_, entry->pkt_num);
     }
 }
 
@@ -257,7 +257,7 @@ void ExportObjectDialog::saveCurrentEntry()
     entry = item->data(0, Qt::UserRole).value<export_object_entry_t *>();
     if (!entry) return;
 
-    file_name = QFileDialog::getSaveFileName(this, wsApp->windowTitleString(tr("Save Object As" UTF8_HORIZONTAL_ELLIPSIS)),
+    file_name = QFileDialog::getSaveFileName(this, tr("Wireshark: Save Object As..."),
                                              path.filePath(entry->filename));
 
     if (file_name.length() > 0) {
@@ -274,7 +274,7 @@ void ExportObjectDialog::saveAllEntries()
     QString file_path;
     bool all_saved = true;
 
-    file_path = QFileDialog::getSaveFileName(this, wsApp->windowTitleString(tr("Save All Objects In" UTF8_HORIZONTAL_ELLIPSIS)),
+    file_path = QFileDialog::getSaveFileName(this, tr("Wireshark: Save All Objects In..."),
                                              path.canonicalPath(), QString(), NULL,
                                              QFileDialog::ShowDirsOnly);
 

@@ -22,12 +22,16 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-erf.h"
 
 /*
+#include "wiretap/atm.h"
 */
 #include "wiretap/erf.h"
 
@@ -104,7 +108,6 @@ typedef struct sdh_g707_format_s
 } sdh_g707_format_t;
 
 static dissector_handle_t erf_handle;
-static dissector_table_t erf_dissector_table;
 
 /* Initialize the protocol and registered fields */
 static int proto_erf = -1;
@@ -281,6 +284,13 @@ static expert_field ei_erf_checksum_error = EI_INIT;
 /* Default subdissector, display raw hex data */
 static dissector_handle_t data_handle;
 
+/* IPv4 and IPv6 subdissectors */
+static dissector_handle_t ipv4_handle;
+static dissector_handle_t ipv6_handle;
+
+static dissector_handle_t infiniband_handle;
+static dissector_handle_t infiniband_link_handle;
+
 typedef enum {
   ERF_HDLC_CHDLC  = 0,
   ERF_HDLC_PPP    = 1,
@@ -305,6 +315,7 @@ static gint erf_aal5_type = ERF_AAL5_GUESS;
 static dissector_handle_t atm_untruncated_handle;
 
 static gboolean erf_ethfcs = TRUE;
+static dissector_handle_t ethwithfcs_handle, ethwithoutfcs_handle;
 
 static dissector_handle_t sdh_handle;
 
@@ -1060,13 +1071,12 @@ dissect_erf_pseudo_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   proto_tree_add_uint64(tree, hf_erf_ts, tvb, 0, 0, pinfo->pseudo_header->erf.phdr.ts);
 
   rectype_item = proto_tree_add_uint_format_value(tree, hf_erf_rectype, tvb, 0, 0, pinfo->pseudo_header->erf.phdr.type,
-                                                  "0x%02x (Type %d: %s)",
-                                                  pinfo->pseudo_header->erf.phdr.type,
-                                                  pinfo->pseudo_header->erf.phdr.type & ERF_HDR_TYPE_MASK,
-                                                  val_to_str_const(
-                                                    pinfo->pseudo_header->erf.phdr.type & ERF_HDR_TYPE_MASK,
-                                                    erf_type_vals,
-                                                    "Unknown Type"));
+					    "0x%02x (Type %d: %s)",
+					    pinfo->pseudo_header->erf.phdr.type,
+					    pinfo->pseudo_header->erf.phdr.type & ERF_HDR_TYPE_MASK,
+					    val_to_str_const(pinfo->pseudo_header->erf.phdr.type & ERF_HDR_TYPE_MASK,
+								 erf_type_vals,
+								 "Unknown Type"));
 
   rectype_tree = proto_item_add_subtree(rectype_item, ett_erf_rectype);
   proto_tree_add_uint(rectype_tree, hf_erf_type, tvb, 0, 0, pinfo->pseudo_header->erf.phdr.type);
@@ -1119,10 +1129,10 @@ dissect_erf_pseudo_extension_header(tvbuff_t *tvb, packet_info *pinfo, proto_tre
   int         max      = sizeof(pinfo->pseudo_header->erf.ehdr_list)/sizeof(struct erf_ehdr);
 
   while(has_more && (i < max)) {
-    type = (guint8) (pinfo->pseudo_header->erf.ehdr_list[i].ehdr >> 56);
+	  type = (guint8) (pinfo->pseudo_header->erf.ehdr_list[i].ehdr >> 56);
 
-    pi = proto_tree_add_uint(tree, hf_erf_ehdr_t, tvb, 0, 0, (type & 0x7f));
-    ehdr_tree = proto_item_add_subtree(pi, ett_erf_pseudo_hdr);
+	  pi = proto_tree_add_uint(tree, hf_erf_ehdr_t, tvb, 0, 0, (type & 0x7f));
+	  ehdr_tree = proto_item_add_subtree(pi, ett_erf_pseudo_hdr);
 
     switch (type & 0x7f) {
     case EXT_HDR_TYPE_CLASSIFICATION:
@@ -1191,8 +1201,7 @@ dissect_erf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   guint8              flags;
   guint8              erf_type;
   guint32             atm_hdr  = 0;
-  proto_tree         *erf_tree;
-  proto_item         *erf_item;
+  proto_tree         *erf_tree = NULL;
   guint               atm_pdu_caplen;
   const guint8       *atm_pdu;
   erf_hdlc_type_vals  hdlc_type;
@@ -1207,13 +1216,16 @@ dissect_erf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   col_add_fstr(pinfo->cinfo, COL_INFO, "%s",
        val_to_str(erf_type, erf_type_vals, "Unknown type %u"));
 
-  erf_item = proto_tree_add_item(tree, proto_erf, tvb, 0, -1, ENC_NA);
-  erf_tree = proto_item_add_subtree(erf_item, ett_erf);
+  if (tree) {
+    proto_item *erf_item;
+    erf_item = proto_tree_add_item(tree, proto_erf, tvb, 0, -1, ENC_NA);
+    erf_tree = proto_item_add_subtree(erf_item, ett_erf);
 
-  dissect_erf_pseudo_header(tvb, pinfo, erf_tree);
-  if (pinfo->pseudo_header->erf.phdr.type & 0x80) {
-    dissect_erf_pseudo_extension_header(tvb, pinfo, erf_tree);
+    dissect_erf_pseudo_header(tvb, pinfo, erf_tree);
+    if (pinfo->pseudo_header->erf.phdr.type & 0x80) {
+      dissect_erf_pseudo_extension_header(tvb, pinfo, erf_tree);
     }
+  }
 
   flags = pinfo->pseudo_header->erf.phdr.flags;
   /*
@@ -1231,7 +1243,7 @@ dissect_erf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   switch (erf_type) {
 
   case ERF_TYPE_RAW_LINK:
-    if(sdh_handle) {
+    if(sdh_handle){
       call_dissector(sdh_handle, tvb, pinfo, tree);
     }
     else{
@@ -1239,18 +1251,32 @@ dissect_erf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     }
     break;
 
-  case ERF_TYPE_ETH:
-  case ERF_TYPE_COLOR_ETH:
-  case ERF_TYPE_DSM_COLOR_ETH:
-    dissect_eth_header(tvb, pinfo, erf_tree);
-    /* fall through */
   case ERF_TYPE_IPV4:
-  case ERF_TYPE_IPV6:
-  case ERF_TYPE_INFINIBAND:
-  case ERF_TYPE_INFINIBAND_LINK:
-    if (!dissector_try_uint(erf_dissector_table, erf_type, tvb, pinfo, tree)) {
+    if (ipv4_handle)
+      call_dissector(ipv4_handle, tvb, pinfo, tree);
+    else
       call_dissector(data_handle, tvb, pinfo, tree);
-    }
+    break;
+
+  case ERF_TYPE_IPV6:
+    if (ipv6_handle)
+      call_dissector(ipv6_handle, tvb, pinfo, tree);
+    else
+      call_dissector(data_handle, tvb, pinfo, tree);
+    break;
+
+  case ERF_TYPE_INFINIBAND:
+    if (infiniband_handle)
+      call_dissector(infiniband_handle, tvb, pinfo, tree);
+    else
+      call_dissector(data_handle, tvb, pinfo, tree);
+    break;
+
+  case ERF_TYPE_INFINIBAND_LINK:
+    if (infiniband_link_handle)
+      call_dissector(infiniband_link_handle, tvb, pinfo, tree);
+    else
+      call_dissector(data_handle, tvb, pinfo, tree);
     break;
 
   case ERF_TYPE_LEGACY:
@@ -1419,6 +1445,16 @@ dissect_erf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     /* remove ATM cell header from tvb */
     new_tvb = tvb_new_subset_remaining(tvb, ATM_HDR_LENGTH);
     call_dissector(atm_untruncated_handle, new_tvb, pinfo, tree);
+    break;
+
+  case ERF_TYPE_ETH:
+  case ERF_TYPE_COLOR_ETH:
+  case ERF_TYPE_DSM_COLOR_ETH:
+    dissect_eth_header(tvb, pinfo, erf_tree);
+    if (erf_ethfcs)
+      call_dissector(ethwithfcs_handle, tvb, pinfo, tree);
+    else
+      call_dissector(ethwithoutfcs_handle, tvb, pinfo, tree);
     break;
 
   case ERF_TYPE_MC_HDLC:
@@ -1929,8 +1965,6 @@ proto_register_erf(void)
                                  "Ethernet packets have FCS",
                                  "Whether the FCS is present in Ethernet packets",
                                  &erf_ethfcs);
-
-  erf_dissector_table = register_dissector_table("erf.types.type", "Type",  FT_UINT8, BASE_DEC);
 }
 
 void
@@ -1941,27 +1975,26 @@ proto_reg_handoff_erf(void)
   /* Dissector called to dump raw data, or unknown protocol */
   data_handle = find_dissector("data");
 
+  /* Get handle for IP dissectors) */
+  ipv4_handle   = find_dissector("ip");
+  ipv6_handle   = find_dissector("ipv6");
+
+  /* Get handle for Infiniband dissector */
+  infiniband_handle      = find_dissector("infiniband");
+  infiniband_link_handle = find_dissector("infiniband_link");
+
   /* Get handles for serial line protocols */
   chdlc_handle  = find_dissector("chdlc");
   ppp_handle    = find_dissector("ppp_hdlc");
   frelay_handle = find_dissector("fr");
-  mtp2_handle   = find_dissector("mtp2_with_crc");
+  mtp2_handle   = find_dissector("mtp2");
 
   /* Get handle for ATM dissector */
   atm_untruncated_handle = find_dissector("atm_untruncated");
 
+  /* Get handles for Ethernet dissectors */
+  ethwithfcs_handle    = find_dissector("eth_withfcs");
+  ethwithoutfcs_handle = find_dissector("eth_withoutfcs");
+
   sdh_handle = find_dissector("sdh");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

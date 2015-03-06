@@ -33,10 +33,14 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/conversation.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-sprt.h"
 
 void proto_register_sprt(void);
@@ -58,9 +62,9 @@ typedef enum {
 } i_octet_dlci_status_t;
 
 
-/* Keep conversation info for one side of an SPRT conversation
- * TODO - this needs to be bidirectional
- */
+ /* Keep conversation info for one side of an SPRT conversation
+  * TODO - this needs to be bidirectional
+  */
 struct _sprt_conversation_info
 {
     gchar    method[SPRT_CONV_MAX_SETUP_METHOD_SIZE + 1];
@@ -3429,20 +3433,7 @@ void
 proto_reg_handoff_sprt(void)
 {
     sprt_handle = find_dissector("sprt");
-    dissector_add_for_decode_as("udp.port", sprt_handle);
+    dissector_add_handle("udp.port", sprt_handle);
 
     heur_dissector_add( "udp", dissect_sprt_heur, proto_sprt);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

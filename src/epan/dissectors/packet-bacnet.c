@@ -26,6 +26,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 #include <epan/llcsaps.h>
@@ -158,7 +160,6 @@ static int hf_bacnet_perf = -1;
 static int hf_bacnet_rejectreason = -1;
 static int hf_bacnet_rportnum = -1;
 static int hf_bacnet_portid = -1;
-static int hf_bacnet_pinfo = -1;
 static int hf_bacnet_pinfolen = -1;
 static int hf_bacnet_term_time_value = -1;
 
@@ -169,7 +170,9 @@ static void
 dissect_bacnet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	proto_item *ti;
+	proto_item *ct;
 	proto_tree *bacnet_tree;
+	proto_tree *control_tree;
 
 	gint offset;
 	guint8 bacnet_version;
@@ -183,17 +186,6 @@ dissect_bacnet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	guint8 i;
 	tvbuff_t *next_tvb;
 	guint32 vendor_id;
-	static const int * control_flags[] = {
-		&hf_bacnet_control_net,
-		&hf_bacnet_control_res1,
-		&hf_bacnet_control_dest,
-		&hf_bacnet_control_res2,
-		&hf_bacnet_control_src,
-		&hf_bacnet_control_expect,
-		&hf_bacnet_control_prio_high,
-		&hf_bacnet_control_prio_low,
-		NULL
-	};
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "BACnet-NPDU");
 
@@ -213,8 +205,25 @@ dissect_bacnet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 					 bacnet_version,"0x%02x (%s)",bacnet_version,
 					 (bacnet_version == 0x01)?"ASHRAE 135-1995":"unknown");
 	offset ++;
-	proto_tree_add_bitmask(bacnet_tree, tvb, offset, hf_bacnet_control,
-					ett_bacnet_control, control_flags, ENC_NA);
+	ct = proto_tree_add_uint(bacnet_tree, hf_bacnet_control,
+		tvb, offset, 1, bacnet_control);
+	control_tree = proto_item_add_subtree(ct, ett_bacnet_control);
+	proto_tree_add_boolean(control_tree, hf_bacnet_control_net,
+		tvb, offset, 1, bacnet_control);
+	proto_tree_add_boolean(control_tree, hf_bacnet_control_res1, tvb,
+		offset, 1, bacnet_control);
+	proto_tree_add_boolean(control_tree, hf_bacnet_control_dest, tvb,
+		offset, 1, bacnet_control);
+	proto_tree_add_boolean(control_tree, hf_bacnet_control_res2, tvb,
+		offset, 1, bacnet_control);
+	proto_tree_add_boolean(control_tree, hf_bacnet_control_src, tvb,
+		offset, 1, bacnet_control);
+	proto_tree_add_boolean(control_tree, hf_bacnet_control_expect, tvb,
+		offset, 1, bacnet_control);
+	proto_tree_add_boolean(control_tree, hf_bacnet_control_prio_high,
+		tvb, offset, 1, bacnet_control);
+	proto_tree_add_boolean(control_tree, hf_bacnet_control_prio_low,
+		tvb, offset, 1, bacnet_control);
 	offset ++;
 	if (bacnet_control & BAC_CONTROL_DEST) { /* DNET, DLEN, DADR */
 		proto_tree_add_item(bacnet_tree, hf_bacnet_dnet,
@@ -407,8 +416,9 @@ dissect_bacnet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 					proto_tree_add_uint(bacnet_tree, hf_bacnet_pinfolen,
 					tvb, offset, 1, bacnet_pinfolen);
 					offset ++;
-					proto_tree_add_item(bacnet_tree, hf_bacnet_pinfo, tvb, offset,
-					bacnet_pinfolen, ENC_NA);
+					proto_tree_add_text(bacnet_tree, tvb, offset,
+					bacnet_pinfolen, "Port Info: %s",
+					tvb_bytes_to_ep_str(tvb, offset, bacnet_pinfolen));
 					offset += bacnet_pinfolen;
 			}
 		}
@@ -589,11 +599,6 @@ proto_register_bacnet(void)
 			FT_UINT8, BASE_DEC, NULL, 0,
 			NULL, HFILL }
 		},
-		{ &hf_bacnet_pinfo,
-			{ "Port Inf", "bacnet.pinfo",
-			FT_BYTES, BASE_NONE, NULL, 0,
-			NULL, HFILL }
-		},
 		{ &hf_bacnet_portid,
 			{ "Port ID", "bacnet.portid",
 			FT_UINT8, BASE_HEX, NULL, 0,
@@ -638,16 +643,3 @@ proto_reg_handoff_bacnet(void)
 	bacapp_handle = find_dissector("bacapp");
 	data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -32,9 +32,6 @@
 #include <epan/addr_resolv.h>
 #include <wsutil/nstime.h>
 
-#include "ui/utf8_entities.h"
-
-#include "qt_ui_utils.h"
 #include "wireshark_application.h"
 
 #include <QDir>
@@ -134,8 +131,8 @@ static gboolean lbm_uimflow_add_to_graph(seq_analysis_info_t * seq_info, packet_
     }
     if (epa.type == lbm_uim_instance_stream)
     {
-        ctxinst1 = bytes_to_str(pinfo->pool, epa.stream_info.ctxinst.ctxinst, sizeof(epa.stream_info.ctxinst.ctxinst));
-        ctxinst2 = bytes_to_str(pinfo->pool, epb.stream_info.ctxinst.ctxinst, sizeof(epb.stream_info.ctxinst.ctxinst));
+        ctxinst1 = bytes_to_ep_str(epa.stream_info.ctxinst.ctxinst, sizeof(epa.stream_info.ctxinst.ctxinst));
+        ctxinst2 = bytes_to_ep_str(epb.stream_info.ctxinst.ctxinst, sizeof(epb.stream_info.ctxinst.ctxinst));
         item->comment = g_strdup_printf("%s <-> %s [%" G_GUINT64_FORMAT "]",
             ctxinst1,
             ctxinst2,
@@ -145,17 +142,17 @@ static gboolean lbm_uimflow_add_to_graph(seq_analysis_info_t * seq_info, packet_
     {
         item->comment = g_strdup_printf("%" G_GUINT32_FORMAT ":%s:%" G_GUINT16_FORMAT " <-> %" G_GUINT32_FORMAT ":%s:%" G_GUINT16_FORMAT " [%" G_GUINT64_FORMAT "]",
             epa.stream_info.dest.domain,
-            address_to_str(pinfo->pool, &(epa.stream_info.dest.addr)),
+            address_to_str(wmem_packet_scope(), &(epa.stream_info.dest.addr)),
             epa.stream_info.dest.port,
             epb.stream_info.dest.domain,
-            address_to_str(pinfo->pool, &(epb.stream_info.dest.addr)),
+            address_to_str(wmem_packet_scope(), &(epb.stream_info.dest.addr)),
             epb.stream_info.dest.port,
             stream_info->channel);
     }
     item->conv_num = (guint16)LBM_CHANNEL_ID(stream_info->channel);
     item->display = TRUE;
     item->line_style = 1;
-    g_queue_push_tail(seq_info->items, item);
+    seq_info->list = g_list_prepend(seq_info->list, (gpointer)item);
     return (TRUE);
 }
 
@@ -181,10 +178,11 @@ static void lbm_uimflow_get_analysis(capture_file * cfile, seq_analysis_info_t *
 
     register_tap_listener("lbm_uim", (void *)seq_info, NULL, TL_REQUIRES_COLUMNS, NULL, lbm_uimflow_tap_packet, NULL);
     cf_retap_packets(cfile);
+    seq_info->list = g_list_reverse(seq_info->list);
     remove_tap_listener((void *)seq_info);
 
     /* Fill in the timestamps. */
-    list = g_queue_peek_nth_link(seq_info->items, 0);
+    list = g_list_first(seq_info->list);
     while (list != NULL)
     {
         seq_analysis_item_t * seq_item = (seq_analysis_item_t *)list->data;
@@ -467,7 +465,7 @@ void LBMUIMFlowDialog::on_buttonBox_accepted(void)
         filter.append(QString(";;%5").arg(ascii_filter));
     }
 
-    file_name = QFileDialog::getSaveFileName(this, wsApp->windowTitleString(tr("Save Graph As" UTF8_HORIZONTAL_ELLIPSIS)),
+    file_name = QFileDialog::getSaveFileName(this, tr("Wireshark: Save Graph As..."),
         path.canonicalPath(), filter, &extension);
 
     if (file_name.length() > 0)
@@ -508,7 +506,7 @@ void LBMUIMFlowDialog::fillDiagram(void)
     seq_analysis_info_t new_sa;
 
     new_sa = m_sequence_analysis;
-    new_sa.items = g_queue_new();
+    new_sa.list = NULL;
     new_sa.ht = NULL;
     new_sa.num_nodes = 0;
     lbm_uimflow_get_analysis(m_capture_file, &new_sa);
@@ -521,8 +519,7 @@ void LBMUIMFlowDialog::fillDiagram(void)
     m_node_label_width = 0;
     for (guint i = 0; i < m_sequence_analysis.num_nodes; i++)
     {
-        QString addr_str = address_to_display_qstring(&(m_sequence_analysis.nodes[i]));
-        int label_w = vfm.width(addr_str);
+        int label_w = vfm.width(ep_address_to_display(&(m_sequence_analysis.nodes[i])));
         if (m_node_label_width < label_w)
         {
             m_node_label_width = label_w;

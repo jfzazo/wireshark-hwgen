@@ -25,17 +25,21 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/prefs.h>
 #include <epan/to_str.h>
 #include <wiretap/wtap.h>
 #include <epan/reassemble.h>
-#include <epan/conversation_table.h>
+#include <epan/conversation.h>
 #include <epan/etypes.h>
 #include "packet-fc.h"
 #include "packet-fclctl.h"
 #include "packet-fcbls.h"
+#include <epan/tap.h>
+#include <epan/wmem/wmem.h>
 #include <epan/crc32-tvb.h>
 #include <epan/expert.h>
 
@@ -201,57 +205,6 @@ fc_exchange_init_protocol(void)
     fcseq_req_hash = g_hash_table_new(fcseq_hash, fcseq_equal);
 }
 
-static const char* fc_conv_get_filter_type(conv_item_t* conv, conv_filter_type_e filter)
-{
-    if ((filter == CONV_FT_SRC_ADDRESS) && (conv->src_address.type == AT_FC))
-        return "fc.s_id";
-
-    if ((filter == CONV_FT_DST_ADDRESS) && (conv->dst_address.type == AT_FC))
-        return "fc.d_id";
-
-    if ((filter == CONV_FT_ANY_ADDRESS) && (conv->src_address.type == AT_FC))
-        return "fc.id";
-
-    return CONV_FILTER_INVALID;
-}
-
-static ct_dissector_info_t fc_ct_dissector_info = {&fc_conv_get_filter_type};
-
-static int
-fc_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
-{
-    conv_hash_t *hash = (conv_hash_t*) pct;
-    const fc_hdr *fchdr=(const fc_hdr *)vip;
-
-    add_conversation_table_data(hash, &fchdr->s_id, &fchdr->d_id, 0, 0, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->fd->abs_ts, &fc_ct_dissector_info, PT_NONE);
-
-    return 1;
-}
-
-static const char* fc_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
-{
-    if ((filter == CONV_FT_ANY_ADDRESS) && (host->myaddress.type == AT_FC))
-        return "fc.id";
-
-    return CONV_FILTER_INVALID;
-}
-
-static hostlist_dissector_info_t fc_host_dissector_info = {&fc_host_get_filter_type};
-
-static int
-fc_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
-{
-    conv_hash_t *hash = (conv_hash_t*) pit;
-    const fc_hdr *fchdr=(const fc_hdr *)vip;
-
-    /* Take two "add" passes per packet, adding for each direction, ensures that all
-    packets are counted properly (even if address is sending to itself)
-    XXX - this could probably be done more efficiently inside hostlist_table */
-    add_hostlist_table_data(hash, &fchdr->s_id, 0, TRUE, 1, pinfo->fd->pkt_len, &fc_host_dissector_info, PT_NONE);
-    add_hostlist_table_data(hash, &fchdr->d_id, 0, FALSE, 1, pinfo->fd->pkt_len, &fc_host_dissector_info, PT_NONE);
-
-    return 1;
-}
 
 const value_string fc_fc4_val[] = {
     {FC_TYPE_BLS,        "Basic Link Svc"},
@@ -397,6 +350,7 @@ static void
 dissect_fc_ba_acc (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     /* Set up structures needed to add the protocol subtree and manage it */
+    proto_item *ti;
     proto_tree *acc_tree;
     int offset = 0;
 
@@ -406,7 +360,8 @@ dissect_fc_ba_acc (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     col_set_str(pinfo->cinfo, COL_INFO, "BA_ACC");
 
     if (tree) {
-        acc_tree = proto_tree_add_subtree(tree, tvb, 0, -1, ett_fcbls, NULL, "Basic Link Svc");
+        ti = proto_tree_add_text (tree, tvb, 0, tvb_length (tvb), "Basic Link Svc");
+        acc_tree = proto_item_add_subtree (ti, ett_fcbls);
 
         proto_tree_add_item (acc_tree, hf_fc_bls_seqid_vld, tvb, offset++, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item (acc_tree, hf_fc_bls_lastvld_seqid, tvb, offset++, 1, ENC_BIG_ENDIAN);
@@ -425,6 +380,7 @@ static void
 dissect_fc_ba_rjt (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     /* Set up structures needed to add the protocol subtree and manage it */
+    proto_item *ti;
     proto_tree *rjt_tree;
     int offset = 0;
 
@@ -434,7 +390,8 @@ dissect_fc_ba_rjt (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     col_set_str(pinfo->cinfo, COL_INFO, "BA_RJT");
 
     if (tree) {
-        rjt_tree = proto_tree_add_subtree(tree, tvb, 0, -1, ett_fcbls, NULL, "Basic Link Svc");
+        ti = proto_tree_add_text (tree, tvb, 0, tvb_length (tvb), "Basic Link Svc");
+        rjt_tree = proto_item_add_subtree (ti, ett_fcbls);
 
         proto_tree_add_item (rjt_tree, hf_fc_bls_rjtcode, tvb, offset+1, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item (rjt_tree, hf_fc_bls_rjtdetail, tvb, offset+2, 1, ENC_BIG_ENDIAN);
@@ -608,16 +565,18 @@ dissect_fc_vft(proto_tree *parent_tree,
 static void
 dissect_fc_fctl(packet_info *pinfo _U_, proto_tree *parent_tree, tvbuff_t *tvb, int offset)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item=NULL;
+    proto_tree *tree=NULL;
     guint32 flags;
 
     flags = tvb_get_guint8 (tvb, offset);
     flags = (flags<<8) | tvb_get_guint8 (tvb, offset+1);
     flags = (flags<<8) | tvb_get_guint8 (tvb, offset+2);
 
-    item=proto_tree_add_uint(parent_tree, hf_fc_fctl, tvb, offset, 3, flags);
-    tree=proto_item_add_subtree(item, ett_fctl);
+    if(parent_tree){
+        item=proto_tree_add_uint(parent_tree, hf_fc_fctl, tvb, offset, 3, flags);
+        tree=proto_item_add_subtree(item, ett_fctl);
+    }
 
     proto_tree_add_boolean(tree, hf_fc_fctl_exchange_responder, tvb, offset, 3, flags);
     if (flags&FC_FCTL_EXCHANGE_RESPONDER){
@@ -742,7 +701,6 @@ dissect_fc_helper (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean
     guint32 frag_id, frag_size;
     guint8 df_ctl, seq_id;
     guint32 f_ctl;
-    address addr;
 
     guint32 param, exchange_key;
     guint16 real_seqcnt;
@@ -955,17 +913,19 @@ dissect_fc_helper (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean
     PROTO_ITEM_SET_HIDDEN(hidden_item);
 
     /* XXX - use "fc_wka_vals[]" on this? */
-    SET_ADDRESS(&addr, AT_FC, 3, fchdr.d_id.data);
-    proto_tree_add_item(fc_tree, hf_fc_did, tvb, offset+1, 3, ENC_NA);
-    hidden_item = proto_tree_add_item (fc_tree, hf_fc_id, tvb, offset+1, 3, ENC_NA);
+    proto_tree_add_string (fc_tree, hf_fc_did, tvb, offset+1, 3,
+                           fc_to_str ((const guint8 *)fchdr.d_id.data));
+    hidden_item = proto_tree_add_string (fc_tree, hf_fc_id, tvb, offset+1, 3,
+                                         fc_to_str ((const guint8 *)fchdr.d_id.data));
     PROTO_ITEM_SET_HIDDEN(hidden_item);
 
     proto_tree_add_uint (fc_tree, hf_fc_csctl, tvb, offset+4, 1, fchdr.cs_ctl);
 
     /* XXX - use "fc_wka_vals[]" on this? */
-    SET_ADDRESS(&addr, AT_FC, 3, fchdr.s_id.data);
-    proto_tree_add_item(fc_tree, hf_fc_sid, tvb, offset+5, 3, ENC_NA);
-    hidden_item = proto_tree_add_item (fc_tree, hf_fc_id, tvb, offset+5, 3, ENC_NA);
+    proto_tree_add_string (fc_tree, hf_fc_sid, tvb, offset+5, 3,
+                           fc_to_str ((const guint8 *)fchdr.s_id.data));
+    hidden_item = proto_tree_add_string (fc_tree, hf_fc_id, tvb, offset+5, 3,
+                                         fc_to_str ((const guint8 *)fchdr.s_id.data));
     PROTO_ITEM_SET_HIDDEN(hidden_item);
 
     if (ftype == FC_FTYPE_LINKCTL) {
@@ -1044,8 +1004,10 @@ dissect_fc_helper (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean
     if (df_ctl & FC_DFCTL_NH) {
         /* Yes - dissect it. */
         if (tree) {
-            proto_tree_add_item(fc_tree, hf_fc_nh_da, tvb, next_offset, 8, ENC_NA);
-            proto_tree_add_item(fc_tree, hf_fc_nh_sa, tvb, next_offset+8, 8, ENC_NA);
+            proto_tree_add_string (fc_tree, hf_fc_nh_da, tvb, next_offset, 8,
+                                   fcwwn_to_str (tvb_get_string (wmem_packet_scope(), tvb, offset, 8)));
+            proto_tree_add_string (fc_tree, hf_fc_nh_sa, tvb, offset+8, 8,
+                                   fcwwn_to_str (tvb_get_string (wmem_packet_scope(), tvb, offset+8, 8)));
         }
         next_offset += 16;
     }
@@ -1313,6 +1275,7 @@ dissect_fcsof(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
     proto_item *it = NULL;
     proto_tree *fcsof_tree = NULL;
+    gint bytes_remaining;
     tvbuff_t *next_tvb, *checksum_tvb;
     guint32 sof = 0;
     guint32 crc = 0;
@@ -1340,7 +1303,7 @@ dissect_fcsof(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
     /* GET Computed CRC */
     frame_len_for_checksum = crc_offset - FCSOF_HEADER_LEN;
-    checksum_tvb = tvb_new_subset_length(tvb, 4, frame_len_for_checksum);
+    checksum_tvb = tvb_new_subset(tvb, 4, frame_len_for_checksum, frame_len_for_checksum);
     crc_computed = crc32_802_tvb(checksum_tvb, frame_len_for_checksum);
 
     /* Get EOF */
@@ -1372,7 +1335,8 @@ dissect_fcsof(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
     proto_tree_add_uint(fcsof_tree, hf_fceof, tvb, eof_offset, 4, eof);
 
-    next_tvb = tvb_new_subset_remaining(tvb, 4);
+    bytes_remaining = tvb_length_remaining(tvb, 4);
+    next_tvb = tvb_new_subset(tvb, 4, bytes_remaining, -1);
 
     fc_data.ethertype = 0;
     fc_data.sof_eof = 0;
@@ -1411,16 +1375,16 @@ proto_register_fc(void)
           {"Frame type", "fc.ftype", FT_UINT8, BASE_HEX, VALS(fc_ftype_vals),
            0x0, "Derived Type", HFILL}},
         { &hf_fc_did,
-          { "Dest Addr", "fc.d_id", FT_BYTES, SEP_DOT, NULL, 0x0,
+          { "Dest Addr", "fc.d_id", FT_STRING, BASE_NONE, NULL, 0x0,
             "Destination Address", HFILL}},
         { &hf_fc_csctl,
           {"CS_CTL", "fc.cs_ctl", FT_UINT8, BASE_HEX, NULL, 0x0,
            NULL, HFILL}},
         { &hf_fc_sid,
-          {"Src Addr", "fc.s_id", FT_BYTES, SEP_DOT, NULL, 0x0,
+          {"Src Addr", "fc.s_id", FT_STRING, BASE_NONE, NULL, 0x0,
            "Source Address", HFILL}},
         { &hf_fc_id,
-          {"Addr", "fc.id", FT_BYTES, SEP_DOT, NULL, 0x0,
+          {"Addr", "fc.id", FT_STRING, BASE_NONE, NULL, 0x0,
            "Source or Destination Address", HFILL}},
         { &hf_fc_type,
           {"Type", "fc.type", FT_UINT8, BASE_HEX, VALS (fc_fc4_val), 0x0,
@@ -1449,10 +1413,10 @@ proto_register_fc(void)
           {"Reassembled Frame", "fc.reassembled", FT_BOOLEAN, BASE_NONE, NULL,
            0x0, NULL, HFILL}},
         { &hf_fc_nh_da,
-          {"Network DA", "fc.nethdr.da", FT_FCWWN, BASE_NONE, NULL,
+          {"Network DA", "fc.nethdr.da", FT_STRING, BASE_NONE, NULL,
            0x0, NULL, HFILL}},
         { &hf_fc_nh_sa,
-          {"Network SA", "fc.nethdr.sa", FT_FCWWN, BASE_NONE, NULL,
+          {"Network SA", "fc.nethdr.sa", FT_STRING, BASE_NONE, NULL,
            0x0, NULL, HFILL}},
 
         /* Basic Link Svc field definitions */
@@ -1635,8 +1599,6 @@ proto_register_fc(void)
     proto_register_subtree_array(sof_ett, array_length(sof_ett));
 
     fcsof_handle = register_dissector("fcsof", dissect_fcsof, proto_fcsof);
-
-    register_conversation_table(proto_fc, TRUE, fc_conversation_packet, fc_hostlist_packet);
 }
 
 
@@ -1654,16 +1616,3 @@ proto_reg_handoff_fc (void)
 
     data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

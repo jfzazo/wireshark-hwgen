@@ -30,6 +30,9 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
@@ -288,8 +291,7 @@ static const char* get_message_type(tvbuff_t *tvb) {
   return message_type;
 }
 
-static guint get_slsk_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                              int offset, void *data _U_)
+static guint get_slsk_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   guint32 msg_len;
   msg_len = tvb_get_letohl(tvb, offset);
@@ -968,7 +970,7 @@ static int dissect_slsk_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           offset += 4+len;
           len = tvb_get_letohl(tvb, offset);
           proto_tree_add_uint(slsk_tree, hf_slsk_string_length, tvb, offset, 4, len);
-          str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+4, len, ENC_ASCII);
+          str = tvb_get_string(wmem_packet_scope(), tvb, offset+4, len);
           proto_tree_add_string_format_value(slsk_tree, hf_slsk_connection_type, tvb, offset+4, len, str,
             "%s (Char: %s)", connection_type(str),
             format_text(str, len));
@@ -988,7 +990,7 @@ static int dissect_slsk_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           offset += 4+len;
           len = tvb_get_letohl(tvb, offset);
           proto_tree_add_uint(slsk_tree, hf_slsk_string_length, tvb, offset, 4, len);
-          str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+4, len, ENC_ASCII);
+          str = tvb_get_string(wmem_packet_scope(), tvb, offset+4, len);
           proto_tree_add_string_format_value(slsk_tree, hf_slsk_connection_type, tvb, offset+4, len, str,
             "%s (Char: %s)", connection_type(str),
             format_text(str, len));
@@ -2345,7 +2347,7 @@ static int dissect_slsk_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             offset += 4+len;
             len = tvb_get_letohl(tvb, offset);
             proto_tree_add_uint(slsk_tree, hf_slsk_string_length, tvb, offset, 4, len);
-            str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+4, len, ENC_ASCII);
+            str = tvb_get_string(wmem_packet_scope(), tvb, offset+4, len);
             proto_tree_add_string_format_value(slsk_tree, hf_slsk_connection_type, tvb, offset+4, len, str,
               "%s (Char: %s)", connection_type(str),
               format_text(str, len));
@@ -2635,15 +2637,3 @@ proto_reg_handoff_slsk(void)
   dissector_add_uint("tcp.port", TCP_PORT_SLSK_3, slsk_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

@@ -43,8 +43,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/to_str.h>
+#include <epan/wmem/wmem.h>
 #include <epan/ax25_pids.h>
 
 #include "packet-netrom.h"
@@ -53,6 +56,8 @@ void proto_register_netrom(void);
 void proto_reg_handoff_netrom(void);
 
 #define STRLEN 80
+
+#define AX25_ADDR_LEN		   7	/* length of an AX.25 address */
 
 #define NETROM_MIN_SIZE		   7	/* minumum payload for a routing packet */
 #define NETROM_HEADER_SIZE	  20	/* minumum payload for a normal packet */
@@ -71,9 +76,9 @@ void proto_reg_handoff_netrom(void);
 
 #define NETROM_PROTO_IP		0x0C
 
-/* Dissector handles */
+/* Dissector handles - all the possibles are listed */
 static dissector_handle_t ip_handle;
-static dissector_handle_t data_handle;
+static dissector_handle_t default_handle;
 
 /* Initialize the protocol and registered fields */
 static int proto_netrom			= -1;
@@ -191,6 +196,10 @@ dissect_netrom_proto(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	proto_item   *ti;
 	proto_tree   *netrom_tree;
 	int           offset;
+	const guint8 *src_addr;
+	const guint8 *dst_addr;
+	const guint8 *user_addr;
+	const guint8 *node_addr;
 #if 0
 	guint8        src_ssid;
 	guint8        dst_ssid;
@@ -198,7 +207,7 @@ dissect_netrom_proto(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	guint8        op_code;
 	guint8        cct_index;
 	guint8        cct_id;
-	tvbuff_t     *next_tvb;
+	tvbuff_t     *next_tvb = NULL;
 
 	col_set_str( pinfo->cinfo, COL_PROTOCOL, "NET/ROM" );
 	col_clear( pinfo->cinfo, COL_INFO );
@@ -206,15 +215,17 @@ dissect_netrom_proto(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	offset = 0;
 
 	/* source */
-	TVB_SET_ADDRESS(&pinfo->dl_src,	AT_AX25, tvb, offset, AX25_ADDR_LEN);
-	TVB_SET_ADDRESS(&pinfo->src,	AT_AX25, tvb, offset, AX25_ADDR_LEN);
-	/* src_ssid = tvb_get_guint8(tvb, offset+6); */
+	src_addr = tvb_get_ptr( tvb,  offset, AX25_ADDR_LEN );
+	SET_ADDRESS(&pinfo->dl_src,	AT_AX25, AX25_ADDR_LEN, src_addr);
+	SET_ADDRESS(&pinfo->src,	AT_AX25, AX25_ADDR_LEN, src_addr);
+	/* src_ssid = *(src_addr + 6); */
 	offset += AX25_ADDR_LEN; /* step over src addr */
 
 	/* destination */
-	TVB_SET_ADDRESS(&pinfo->dl_dst,	AT_AX25, tvb, offset, AX25_ADDR_LEN);
-	TVB_SET_ADDRESS(&pinfo->dst,	AT_AX25, tvb, offset, AX25_ADDR_LEN);
-	/* dst_ssid = tvb_get_guint8(tvb, offset+6); */
+	dst_addr = tvb_get_ptr( tvb,  offset, AX25_ADDR_LEN );
+	SET_ADDRESS(&pinfo->dl_dst,	AT_AX25, AX25_ADDR_LEN, dst_addr);
+	SET_ADDRESS(&pinfo->dst,	AT_AX25, AX25_ADDR_LEN, dst_addr);
+	/* dst_ssid = *(dst_addr + 6); */
 	offset += AX25_ADDR_LEN; /* step over dst addr */
 
 	offset += 1; /* step over ttl */
@@ -227,7 +238,7 @@ dissect_netrom_proto(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	/* frame type */
 	op_code =  tvb_get_guint8( tvb, offset ) & 0x0f;
-	/*offset += 1;*/ /* step over op_code */
+	offset += 1; /* step over op_code */
 
 	col_add_fstr( pinfo->cinfo, COL_INFO, "%s", val_to_str_const( op_code, op_code_vals_text, "Unknown" ));
 
@@ -236,20 +247,22 @@ dissect_netrom_proto(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* create display subtree for the protocol */
 
 		ti = proto_tree_add_protocol_format( tree, proto_netrom, tvb, 0, NETROM_HEADER_SIZE,
-			"NET/ROM, Src: %s, Dst: %s",
-			address_to_str(wmem_packet_scope(), &pinfo->src),
-			address_to_str(wmem_packet_scope(), &pinfo->dst));
+			"NET/ROM, Src: %s (%s), Dst: %s (%s)",
+			get_ax25_name( src_addr ),
+			ax25_to_str( src_addr ),
+			get_ax25_name( dst_addr ),
+			ax25_to_str( dst_addr ) );
 
 		netrom_tree = proto_item_add_subtree( ti, ett_netrom );
 
 		offset = 0;
 
 		/* source */
-		proto_tree_add_item( netrom_tree, hf_netrom_src, tvb, offset, AX25_ADDR_LEN, ENC_NA );
+		proto_tree_add_ax25( netrom_tree, hf_netrom_src, tvb, offset, AX25_ADDR_LEN, src_addr );
 		offset += AX25_ADDR_LEN;
 
 		/* destination */
-		proto_tree_add_item( netrom_tree, hf_netrom_dst, tvb, offset, AX25_ADDR_LEN, ENC_NA );
+		proto_tree_add_ax25( netrom_tree, hf_netrom_dst, tvb, offset, AX25_ADDR_LEN, dst_addr );
 		offset += AX25_ADDR_LEN;
 
 		/* ttl */
@@ -403,10 +416,12 @@ dissect_netrom_proto(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 						proto_tree_add_item( netrom_tree, hf_netrom_pwindow, tvb, offset, 1, ENC_BIG_ENDIAN );
 						offset += 1;
 
-						proto_tree_add_item( netrom_tree, hf_netrom_user, tvb, offset, AX25_ADDR_LEN, ENC_NA );
+						user_addr = tvb_get_ptr( tvb,  offset, AX25_ADDR_LEN );
+						proto_tree_add_ax25( netrom_tree, hf_netrom_user, tvb, offset, AX25_ADDR_LEN, user_addr );
 						offset += AX25_ADDR_LEN;
 
-						proto_tree_add_item( netrom_tree, hf_netrom_node, tvb, offset, AX25_ADDR_LEN, ENC_NA );
+						node_addr = tvb_get_ptr( tvb,  offset, AX25_ADDR_LEN );
+						proto_tree_add_ax25( netrom_tree, hf_netrom_node, tvb, offset, AX25_ADDR_LEN, node_addr );
 						offset += AX25_ADDR_LEN;
 
 						break;
@@ -439,12 +454,12 @@ dissect_netrom_proto(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 					if ( cct_index == NETROM_PROTO_IP && cct_id == NETROM_PROTO_IP )
 						call_dissector( ip_handle , next_tvb, pinfo, tree );
 					else
-						call_dissector( data_handle , next_tvb, pinfo, tree );
+						call_dissector( default_handle , next_tvb, pinfo, tree );
 
 					break;
 		case NETROM_INFO	:
 		default			:
-					call_dissector( data_handle , next_tvb, pinfo, tree );
+					call_dissector( default_handle , next_tvb, pinfo, tree );
 					break;
 		}
 }
@@ -473,7 +488,7 @@ dissect_netrom_routing(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	next_tvb = tvb_new_subset_remaining(tvb, 7);
 
-	call_dissector( data_handle , next_tvb, pinfo, tree );
+	call_dissector( default_handle , next_tvb, pinfo, tree );
 }
 
 /* Code to actually dissect the packets */
@@ -626,20 +641,8 @@ proto_reg_handoff_netrom(void)
 {
 	dissector_add_uint( "ax25.pid", AX25_P_NETROM, create_dissector_handle( dissect_netrom, proto_netrom ) );
 
-	ip_handle   = find_dissector( "ip" );
-	data_handle = find_dissector( "data" );
+	ip_handle       = find_dissector( "ip" );
+	default_handle  = find_dissector( "data" );
 
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -79,7 +79,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-
 VPATH = @srcdir@
 am__is_gnu_make = test -n '$(MAKEFILE_LIST)' && test -n '$(MAKELEVEL)'
 am__make_running_with_option = \
@@ -147,7 +146,7 @@ host_triplet = @host@
 target_triplet = @target@
 DIST_COMMON = $(srcdir)/Makefile.common \
 	$(srcdir)/../../Makefile.am.inc $(srcdir)/Makefile.in \
-	$(srcdir)/Makefile.am $(top_srcdir)/depcomp $(noinst_HEADERS)
+	$(srcdir)/Makefile.am $(top_srcdir)/depcomp
 subdir = ui/cli
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/aclocal-fallback/glib-2.0.m4 \
@@ -178,7 +177,6 @@ am__objects_1 = libcliui_a-tap-afpstat.$(OBJEXT) \
 	libcliui_a-tap-comparestat.$(OBJEXT) \
 	libcliui_a-tap-dcerpcstat.$(OBJEXT) \
 	libcliui_a-tap-diameter-avp.$(OBJEXT) \
-	libcliui_a-tap-endpoints.$(OBJEXT) \
 	libcliui_a-tap-expert.$(OBJEXT) \
 	libcliui_a-tap-follow.$(OBJEXT) \
 	libcliui_a-tap-funnel.$(OBJEXT) \
@@ -211,7 +209,7 @@ am__objects_1 = libcliui_a-tap-afpstat.$(OBJEXT) \
 am__objects_2 =
 am__objects_3 = libcliui_a-tshark-tap-register.$(OBJEXT)
 am_libcliui_a_OBJECTS = $(am__objects_1) $(am__objects_2) \
-	$(am__objects_2) $(am__objects_3)
+	$(am__objects_3)
 libcliui_a_OBJECTS = $(am_libcliui_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -258,7 +256,6 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-HEADERS = $(noinst_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 # Read a list of newline-separated strings from the standard input,
 # and print each of them once, without duplicates.  Input order is
@@ -296,8 +293,8 @@ CCDEPMODE = @CCDEPMODE@
 CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
-CFLAGS_SSE42 = @CFLAGS_SSE42@
 CONFIG_ARGS = @CONFIG_ARGS@
+CONFIG_WITH_ARGS = @CONFIG_WITH_ARGS@
 COREFOUNDATION_FRAMEWORKS = @COREFOUNDATION_FRAMEWORKS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -323,7 +320,6 @@ ELINKS = @ELINKS@
 ENABLE_STATIC = @ENABLE_STATIC@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FLOORL_LO = @FLOORL_LO@
 FOP = @FOP@
 GEOIP_LIBS = @GEOIP_LIBS@
 GETOPT_LO = @GETOPT_LO@
@@ -396,7 +392,7 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
-LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDES = @LUA_INCLUDES@
 LUA_LIBS = @LUA_LIBS@
 LYNX = @LYNX@
 MAKEINFO = @MAKEINFO@
@@ -432,14 +428,14 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_LIBS = @PLUGIN_LIBS@
 POD2HTML = @POD2HTML@
 POD2MAN = @POD2MAN@
-POPCOUNT_LO = @POPCOUNT_LO@
 PORTAUDIO_INCLUDES = @PORTAUDIO_INCLUDES@
 PORTAUDIO_LIBS = @PORTAUDIO_LIBS@
 PYTHON = @PYTHON@
+PY_CFLAGS = @PY_CFLAGS@
+PY_LIBS = @PY_LIBS@
 QT_MIN_VERSION = @QT_MIN_VERSION@
 Qt_LIBS = @Qt_LIBS@
 RANLIB = @RANLIB@
-RCC = @RCC@
 RPMBUILD_WITH_ARGS = @RPMBUILD_WITH_ARGS@
 SBC_CFLAGS = @SBC_CFLAGS@
 SBC_LIBS = @SBC_LIBS@
@@ -450,6 +446,8 @@ SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+STRNCASECMP_LO = @STRNCASECMP_LO@
+STRPTIME_C = @STRPTIME_C@
 STRPTIME_LO = @STRPTIME_LO@
 SYSTEMCONFIGURATION_FRAMEWORKS = @SYSTEMCONFIGURATION_FRAMEWORKS@
 UIC = @UIC@
@@ -469,6 +467,7 @@ ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 ac_cv_wireshark_have_rpm = @ac_cv_wireshark_have_rpm@
+ac_ws_python_config = @ac_ws_python_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -498,8 +497,6 @@ echld_test_bin = @echld_test_bin@
 editcap_bin = @editcap_bin@
 editcap_man = @editcap_man@
 exec_prefix = @exec_prefix@
-extcapdir = @extcapdir@
-have_sw_vers = @have_sw_vers@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -520,10 +517,10 @@ mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 plugindir = @plugindir@
-plugins_dir = @plugins_dir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pythondir = @pythondir@
 randpkt_bin = @randpkt_bin@
 randpkt_man = @randpkt_man@
 rawshark_bin = @rawshark_bin@
@@ -582,7 +579,6 @@ TSHARK_TAP_SRC = \
 	tap-comparestat.c	\
 	tap-dcerpcstat.c	\
 	tap-diameter-avp.c	\
-	tap-endpoints.c		\
 	tap-expert.c		\
 	tap-follow.c		\
 	tap-funnel.c		\
@@ -614,9 +610,6 @@ TSHARK_TAP_SRC = \
 	tap-stats_tree.c	\
 	tap-sv.c		\
 	tap-wspstat.c
-
-noinst_HEADERS = \
-	tshark-tap.h
 
 AUTOMAKE_OPTIONS = -Wno-portability
 AM_V_AWK = $(am__v_AWK_@AM_V@)
@@ -722,7 +715,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcliui_a-tap-comparestat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcliui_a-tap-dcerpcstat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcliui_a-tap-diameter-avp.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcliui_a-tap-endpoints.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcliui_a-tap-expert.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcliui_a-tap-follow.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcliui_a-tap-funnel.Po@am__quote@
@@ -757,25 +749,22 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcliui_a-tshark-tap-register.Po@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
-@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
@@ -891,20 +880,6 @@ libcliui_a-tap-diameter-avp.obj: tap-diameter-avp.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tap-diameter-avp.c' object='libcliui_a-tap-diameter-avp.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcliui_a_CFLAGS) $(CFLAGS) -c -o libcliui_a-tap-diameter-avp.obj `if test -f 'tap-diameter-avp.c'; then $(CYGPATH_W) 'tap-diameter-avp.c'; else $(CYGPATH_W) '$(srcdir)/tap-diameter-avp.c'; fi`
-
-libcliui_a-tap-endpoints.o: tap-endpoints.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcliui_a_CFLAGS) $(CFLAGS) -MT libcliui_a-tap-endpoints.o -MD -MP -MF $(DEPDIR)/libcliui_a-tap-endpoints.Tpo -c -o libcliui_a-tap-endpoints.o `test -f 'tap-endpoints.c' || echo '$(srcdir)/'`tap-endpoints.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libcliui_a-tap-endpoints.Tpo $(DEPDIR)/libcliui_a-tap-endpoints.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tap-endpoints.c' object='libcliui_a-tap-endpoints.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcliui_a_CFLAGS) $(CFLAGS) -c -o libcliui_a-tap-endpoints.o `test -f 'tap-endpoints.c' || echo '$(srcdir)/'`tap-endpoints.c
-
-libcliui_a-tap-endpoints.obj: tap-endpoints.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcliui_a_CFLAGS) $(CFLAGS) -MT libcliui_a-tap-endpoints.obj -MD -MP -MF $(DEPDIR)/libcliui_a-tap-endpoints.Tpo -c -o libcliui_a-tap-endpoints.obj `if test -f 'tap-endpoints.c'; then $(CYGPATH_W) 'tap-endpoints.c'; else $(CYGPATH_W) '$(srcdir)/tap-endpoints.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libcliui_a-tap-endpoints.Tpo $(DEPDIR)/libcliui_a-tap-endpoints.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tap-endpoints.c' object='libcliui_a-tap-endpoints.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcliui_a_CFLAGS) $(CFLAGS) -c -o libcliui_a-tap-endpoints.obj `if test -f 'tap-endpoints.c'; then $(CYGPATH_W) 'tap-endpoints.c'; else $(CYGPATH_W) '$(srcdir)/tap-endpoints.c'; fi`
 
 libcliui_a-tap-expert.o: tap-expert.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcliui_a_CFLAGS) $(CFLAGS) -MT libcliui_a-tap-expert.o -MD -MP -MF $(DEPDIR)/libcliui_a-tap-expert.Tpo -c -o libcliui_a-tap-expert.o `test -f 'tap-expert.c' || echo '$(srcdir)/'`tap-expert.c
@@ -1444,7 +1419,7 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LIBRARIES) $(HEADERS)
+all-am: Makefile $(LIBRARIES)
 installdirs:
 install: install-am
 install-exec: install-exec-am
@@ -1588,9 +1563,14 @@ abi-descriptor.xml: ../abi-descriptor.template
 # The first argument is the directory in which the source files live.
 # All subsequent arguments are the files to scan.
 #
-tshark-tap-register.c: $(TSHARK_TAP_SRC) $(top_srcdir)/tools/make-tap-reg.py
-	@echo Making tshark-tap-register.c
-	@$(PYTHON) $(top_srcdir)/tools/make-tap-reg.py $(srcdir) tshark-taps $(TSHARK_TAP_SRC)
+tshark-tap-register.c: $(TSHARK_TAP_SRC) $(top_srcdir)/tools/make-tapreg-dotc $(top_srcdir)/tools/make-tap-reg.py
+	@if test -n "$(PYTHON)"; then \
+		echo Making tshark-tap-register.c with python; \
+		$(PYTHON) $(top_srcdir)/tools/make-tap-reg.py $(srcdir) tshark-taps $(TSHARK_TAP_SRC); \
+	else \
+		echo Making tshark-tap-register.c; \
+		$(top_srcdir)/tools/make-tapreg-dotc tshark-tap-register.c $(srcdir) $(TSHARK_TAP_SRC); \
+	fi
 
 doxygen:
 @HAVE_DOXYGEN_TRUE@	$(DOXYGEN) doxygen.cfg

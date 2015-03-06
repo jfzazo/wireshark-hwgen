@@ -2,7 +2,7 @@
 -b
 #-d satcom
 #-s packet-gsm_map-tmp
-#-k
+-k
 -o gsm_map
 #.END
 
@@ -180,7 +180,7 @@ USSD-Res
 UU-Data
 VelocityEstimate
 #.END
-#.REGISTER_NEW
+#.REGISTER
 MAP-DialoguePDU				B "0.4.0.0.1.1.1.1" "map-DialogueAS"
 
 # This table creates the value_sting to name GSM MAP operation codes and errors
@@ -225,16 +225,17 @@ MAP-DialoguePDU				B "0.4.0.0.1.1.1.1" "map-DialogueAS"
 # End ROS
 #----------------------------------------------------------------------------------------
 
-#.FN_PARS PrivateExtension/extId  FN_VARIANT = _str  VAL_PTR = &obj_id
+#.FN_BODY PrivateExtension/extId  FN_VARIANT = _str  VAL_PTR = &actx->external.direct_reference
+%(DEFAULT_BODY)s
+  actx->external.direct_ref_present = (actx->external.direct_reference != NULL) ? TRUE : FALSE;
 
 #.FN_BODY PrivateExtension/extType
-  proto_tree *ext_tree;
-  ext_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_gsm_map_extention_data, NULL, "Extension Data");
-  if (obj_id){
-	 offset=call_ber_oid_callback(obj_id, tvb, offset, actx->pinfo, ext_tree, NULL);
+  proto_tree_add_text(tree, tvb, offset, -1, "Extension Data");
+  if (actx->external.direct_ref_present){
+	 offset=call_ber_oid_callback(actx->external.direct_reference, tvb, offset, actx->pinfo, tree, NULL);
   }else{
-	 call_dissector(data_handle, tvb, actx->pinfo, ext_tree);
-	 offset = tvb_reported_length_remaining(tvb,offset);
+	 call_dissector(data_handle, tvb, actx->pinfo, tree);
+	 offset = tvb_length_remaining(tvb,offset);
   }
 
 #.FN_PARS  AccessNetworkProtocolId
@@ -254,36 +255,19 @@ MAP-DialoguePDU				B "0.4.0.0.1.1.1.1" "map-DialogueAS"
  subtree = proto_item_add_subtree(actx->created_item, ett_gsm_map_isdn_address_string);
  dissect_gsm_map_msisdn(parameter_tvb, actx->pinfo , subtree);
 
-#.FN_BODY IMSI VAL_PTR = &parameter_tvb
- tvbuff_t	*parameter_tvb;
-
-   offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index, &parameter_tvb);
-
-  if (!parameter_tvb)
-	return offset;
- if(tvb_reported_length(parameter_tvb)==0)
-     return offset;
-
- /* Hide the octet string default printout */
- PROTO_ITEM_SET_HIDDEN(actx->created_item);
- dissect_e212_imsi(parameter_tvb, actx->pinfo, tree,  0, tvb_reported_length(parameter_tvb), FALSE);
-
-
 #.FN_BODY TBCD-STRING VAL_PTR = &parameter_tvb
  tvbuff_t	*parameter_tvb;
  const char	*digit_str;
- proto_tree *subtree;
 
  %(DEFAULT_BODY)s
 
  if (!parameter_tvb)
 	return offset;
- if(tvb_reported_length(parameter_tvb)==0)
+ if(tvb_length(parameter_tvb)==0)
      return offset;
 
- subtree = proto_item_add_subtree(actx->created_item, ett_gsm_map_tbcd_digits);
- digit_str = tvb_bcd_dig_to_wmem_packet_str(parameter_tvb, 0, -1, NULL, FALSE);
- proto_tree_add_string(subtree, hf_gsm_map_TBCD_digits, parameter_tvb, 0, -1, digit_str);
+ digit_str = unpack_digits(parameter_tvb, 0);
+ proto_tree_add_string(tree, hf_gsm_map_TBCD_digits, parameter_tvb, 0, -1, digit_str);
 
 #----------------------------------------------------------------------------------------
 #.FN_BODY LongSignalInfo VAL_PTR = &parameter_tvb
@@ -317,8 +301,7 @@ MAP-DialoguePDU				B "0.4.0.0.1.1.1.1" "map-DialogueAS"
 			/* Strip off discrimination and length */
 			proto_tree_add_item(subtree, hf_gsm_map_len, parameter_tvb, 1,1,ENC_BIG_ENDIAN);
 			next_tvb = tvb_new_subset_remaining(parameter_tvb, 2);
-			call_dissector_with_data(bssap_handle, next_tvb, actx->pinfo, subtree,
-					p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_gsm_map, actx->pinfo->curr_layer_num));
+			dissect_bssmap(next_tvb, actx->pinfo, subtree);
 		}else if(octet==1){
 			proto_tree_add_item(subtree, hf_gsm_map_dlci, parameter_tvb, 1,1,ENC_BIG_ENDIAN);
 			proto_tree_add_item(subtree, hf_gsm_map_len, parameter_tvb, 2,1,ENC_BIG_ENDIAN);
@@ -543,31 +526,29 @@ actx->pinfo->p2p_dir = P2P_DIR_RECV;
 
 #.FN_BODY USSD-String VAL_PTR = &parameter_tvb
 
-  tvbuff_t   *parameter_tvb;
-  guint       length;
-  proto_tree *subtree;
+  tvbuff_t	*parameter_tvb;
+  guint		length;
 
 %(DEFAULT_BODY)s
   if (!parameter_tvb)
      return offset;
 
-  length = tvb_ensure_captured_length_remaining(parameter_tvb,0);
-  subtree = proto_item_add_subtree(actx->created_item, ett_gsm_map_ussd_string);
+  length = tvb_ensure_length_remaining(parameter_tvb,0);
   switch(sms_encoding){
     case SMS_ENCODING_7BIT:
     case SMS_ENCODING_7BIT_LANG:
-      proto_tree_add_string(subtree, hf_gsm_map_ussd_string, parameter_tvb, 0, length, tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, 0, length, ENC_3GPP_TS_23_038_7BITS|ENC_NA));
-      break;
+	proto_tree_add_text(tree, parameter_tvb , 0, length, "USSD String: %%s", tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, 0, length, ENC_3GPP_TS_23_038_7BITS|ENC_NA));
+	break;
     case SMS_ENCODING_8BIT:
-      /* XXX - ASCII, or some extended ASCII? */
-      proto_tree_add_string(subtree, hf_gsm_map_ussd_string, parameter_tvb, 0, length, tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, 0, length, ENC_ASCII|ENC_NA));
-      break;
+        /* XXX - ASCII, or some extended ASCII? */
+	proto_tree_add_text(tree, parameter_tvb , 0, length, "USSD String: %%s", tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, 0, length, ENC_ASCII|ENC_NA));
+	break;
     case SMS_ENCODING_UCS2:
     case SMS_ENCODING_UCS2_LANG:
-      proto_tree_add_string(subtree, hf_gsm_map_ussd_string, parameter_tvb, 0, length, tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, 0, length, ENC_UCS_2|ENC_BIG_ENDIAN));
-      break;
+	proto_tree_add_text(tree, parameter_tvb , 0, length, "USSD String: %%s", tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, 0, length, ENC_UCS_2|ENC_BIG_ENDIAN));
+	break;
     default:
-      break;
+	break;
   }
 
 #.FN_FTR ForwardingOptions
@@ -642,10 +623,10 @@ actx->pinfo->p2p_dir = P2P_DIR_RECV;
 	octet = tvb_get_guint8(parameter_tvb,0);
 	switch(octet){
 	case 0x04: /* IPv4 */
-		proto_tree_add_item(subtree, hf_gsm_map_GSNAddress_IPv4, parameter_tvb, 1, tvb_reported_length_remaining(parameter_tvb, 1), ENC_BIG_ENDIAN);
+		proto_tree_add_item(subtree, hf_gsm_map_GSNAddress_IPv4, parameter_tvb, 1, tvb_length_remaining(parameter_tvb, 1), ENC_BIG_ENDIAN);
 		break;
 	case 0x50: /* IPv4 */
-		proto_tree_add_item(subtree, hf_gsm_map_GSNAddress_IPv4, parameter_tvb, 1, tvb_reported_length_remaining(parameter_tvb, 1), ENC_BIG_ENDIAN);
+		proto_tree_add_item(subtree, hf_gsm_map_GSNAddress_IPv4, parameter_tvb, 1, tvb_length_remaining(parameter_tvb, 1), ENC_BIG_ENDIAN);
 		break;
 	default:
 		break;
@@ -673,7 +654,7 @@ actx->pinfo->p2p_dir = P2P_DIR_RECV;
          if (!parameter_tvb)
                 return offset;
         subtree = proto_item_add_subtree(actx->created_item, ett_gsm_map_LAIFixedLength);
-        dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, E212_LAI, TRUE);
+        dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, TRUE);
 
 #.FN_BODY RadioResourceInformation VAL_PTR = &parameter_tvb
     tvbuff_t        *parameter_tvb;
@@ -685,7 +666,7 @@ actx->pinfo->p2p_dir = P2P_DIR_RECV;
                 return offset;
 
     subtree = proto_item_add_subtree(actx->created_item, ett_gsm_map_RadioResourceInformation);
-	be_chan_type(parameter_tvb, subtree, actx->pinfo, 0, tvb_reported_length_remaining(tvb,0), NULL, 0);
+	be_chan_type(parameter_tvb, subtree, actx->pinfo, 0, tvb_length_remaining(tvb,0), NULL, 0);
 
 #.FN_BODY RANAP-ServiceHandover VAL_PTR = &parameter_tvb
     tvbuff_t        *parameter_tvb;
@@ -762,7 +743,7 @@ if (!actx->value_ptr)
 			/* TODO: There may be more than one IE */
 			break;
 		 default:
-			proto_tree_add_expert(subtree, actx->pinfo, &ei_gsm_map_undecoded, (tvbuff_t*)actx->value_ptr, 0, length);
+			proto_tree_add_text(subtree, (tvbuff_t*)actx->value_ptr, 0, length, "If you want this decoded send the packet to Wireshark-dev");
 			break;
 		}/* switch(octet) */
 		break;
@@ -775,8 +756,7 @@ if (!actx->value_ptr)
 			/* Strip off discrimination and length */
 			proto_tree_add_item(subtree, hf_gsm_map_len, (tvbuff_t*)actx->value_ptr, 1,1,ENC_BIG_ENDIAN);
 			next_tvb = tvb_new_subset_remaining((tvbuff_t*)actx->value_ptr, 2);
-			call_dissector_with_data(bssap_handle, next_tvb, actx->pinfo, subtree,
-					p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_gsm_map, actx->pinfo->curr_layer_num));
+			dissect_bssmap(next_tvb, actx->pinfo, subtree);
 		}else if(octet==1){
 			proto_tree_add_item(subtree, hf_gsm_map_dlci, (tvbuff_t*)actx->value_ptr, 1,1,ENC_BIG_ENDIAN);
 			proto_tree_add_item(subtree, hf_gsm_map_len, (tvbuff_t*)actx->value_ptr, 2,1,ENC_BIG_ENDIAN);
@@ -789,8 +769,7 @@ if (!actx->value_ptr)
 		octet = tvb_get_guint8((tvbuff_t*)actx->value_ptr,0);
 		if ( octet == 0) {/* DISCRIMINATION TS 48 006 */
 			next_tvb = tvb_new_subset_remaining((tvbuff_t*)actx->value_ptr, 2);
-			call_dissector_with_data(bssap_handle, next_tvb, actx->pinfo, subtree,
-					p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_gsm_map, actx->pinfo->curr_layer_num));
+			dissect_bssmap(next_tvb, actx->pinfo, subtree);
 		}
 		break;
 	/* ets-300102-1 (~Q.931 ) */
@@ -844,7 +823,7 @@ if (!actx->value_ptr)
 			/* TODO: There may be more than one IE */
 			break;
 		 default:
-			proto_tree_add_expert(subtree, actx->pinfo, &ei_gsm_map_undecoded, (tvbuff_t*)actx->value_ptr, 0, length);
+			proto_tree_add_text(subtree, (tvbuff_t*)actx->value_ptr, 0, length, "If you want this decoded send the packet to Wireshark-dev");
 			break;
 		}/* switch(octet) */
 		break;
@@ -857,8 +836,7 @@ if (!actx->value_ptr)
 			/* Strip off discrimination and length */
 			proto_tree_add_item(subtree, hf_gsm_map_len, (tvbuff_t*)actx->value_ptr, 1,1,ENC_BIG_ENDIAN);
 			next_tvb = tvb_new_subset_remaining((tvbuff_t*)actx->value_ptr, 2);
-			call_dissector_with_data(bssap_handle, next_tvb, actx->pinfo, subtree,
-					p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_gsm_map, actx->pinfo->curr_layer_num));
+			dissect_bssmap(next_tvb, actx->pinfo, subtree);
 		}else if(octet==1){
 			proto_tree_add_item(subtree, hf_gsm_map_dlci, (tvbuff_t*)actx->value_ptr, 1,1,ENC_BIG_ENDIAN);
 			proto_tree_add_item(subtree, hf_gsm_map_len, (tvbuff_t*)actx->value_ptr, 2,1,ENC_BIG_ENDIAN);
@@ -871,8 +849,7 @@ if (!actx->value_ptr)
 		octet = tvb_get_guint8((tvbuff_t*)actx->value_ptr,0);
 		if ( octet == 0) {/* DISCRIMINATION TS 48 006 */
 			next_tvb = tvb_new_subset_remaining((tvbuff_t*)actx->value_ptr, 2);
-			call_dissector_with_data(bssap_handle, next_tvb, actx->pinfo, subtree,
-					p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_gsm_map, actx->pinfo->curr_layer_num));
+			dissect_bssmap(next_tvb, actx->pinfo, subtree);
 		}
 		break;
 	/* ets-300102-1 (~Q.931 ) */
@@ -896,7 +873,7 @@ if (!actx->value_ptr)
                 return offset;
 
     subtree = proto_item_add_subtree(actx->created_item, ett_gsm_map_GlobalCellId);
-	be_cell_id_aux(parameter_tvb, subtree, actx->pinfo, 0, tvb_reported_length_remaining(tvb,0), NULL, 0, 0);
+	be_cell_id_aux(parameter_tvb, subtree, actx->pinfo, 0, tvb_length_remaining(tvb,0), NULL, 0, 0);
 
 #.FN_BODY Ext-GeographicalInformation VAL_PTR = &parameter_tvb
     tvbuff_t	*parameter_tvb;
@@ -930,7 +907,7 @@ if (!actx->value_ptr)
 	if (!parameter_tvb)
                 return offset;
 
-    length = tvb_reported_length(parameter_tvb);
+    length = tvb_length(parameter_tvb);
     name_len = tvb_get_guint8(parameter_tvb, 0);
     apn_str = tvb_get_string_enc(wmem_packet_scope(), parameter_tvb, 1, length - 1, ENC_ASCII|ENC_NA);
     if (name_len < length-1) {
@@ -969,12 +946,12 @@ if (!actx->value_ptr)
   proto_tree_add_item(subtree, hf_gsm_map_locationnumber_apri, tvb, 1, 1, ENC_BIG_ENDIAN);
   proto_tree_add_item(subtree, hf_gsm_map_locationnumber_screening_ind, tvb, 1, 1, ENC_BIG_ENDIAN);
 
- digit_str = tvb_bcd_dig_to_wmem_packet_str(tvb, 2, -1, NULL, FALSE);
+ digit_str = unpack_digits(tvb, 1);
 
- proto_tree_add_string(subtree, hf_gsm_map_locationnumber_digits, tvb, 2, -1, digit_str);
+ proto_tree_add_string(tree, hf_gsm_map_locationnumber_digits, tvb, 1, -1, digit_str);
 
  if ((na == 3) && (np==1))/*International Number & E164*/
-	dissect_e164_cc(tvb, subtree, 2, E164_ENC_BCD);
+	dissect_e164_cc(tvb, tree, 1, TRUE);
 
 #.FN_BODY EnhancedCheckIMEI-Arg/locationInformation VAL_PTR = &parameter_tvb
   tvbuff_t *parameter_tvb;

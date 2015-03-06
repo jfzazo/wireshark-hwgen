@@ -33,11 +33,17 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/in_cksum.h>
+#include <epan/addr_resolv.h>
 #include <epan/ipproto.h>
+#include <epan/asn1.h>
+#include <epan/strutil.h>
 #include <epan/expert.h>
 #include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
 #include <epan/tap.h>
 
 #include "packet-ber.h"
@@ -1372,7 +1378,7 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
                     /* Padding: 6 bytes */
                     proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_padding, tvb, opt_offset + 8, 6, ENC_NA);
 
-                    link_str = tvb_eui64_to_str(tvb, opt_offset);
+                    link_str = tvb_eui64_to_str(tvb, opt_offset, ENC_BIG_ENDIAN);
                     col_append_fstr(pinfo->cinfo, COL_INFO, " from %s", link_str);
                     proto_item_append_text(ti, " : %s", link_str);
                 }else{
@@ -1406,7 +1412,7 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
                     /* Padding: 6 bytes */
                     proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_padding, tvb, opt_offset + 8, 6, ENC_NA);
 
-                    link_str = tvb_eui64_to_str(tvb, opt_offset);
+                    link_str = tvb_eui64_to_str(tvb, opt_offset, ENC_BIG_ENDIAN);
                     col_append_fstr(pinfo->cinfo, COL_INFO, " from %s", link_str);
                     proto_item_append_text(ti, " : %s", link_str);
                 }else{
@@ -1832,7 +1838,6 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
                 guint8 prefix_len;
                 guint8 route_preference;
                 struct e_in6_addr prefix;
-                address prefix_addr;
 
                 /* Prefix Len */
                 proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_prefix_len, tvb, opt_offset, 1, ENC_BIG_ENDIAN);
@@ -1872,8 +1877,7 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
                         memset(&prefix, 0, sizeof(prefix));
                         tvb_memcpy(tvb, (guint8 *)&prefix.bytes, opt_offset, 8);
                         proto_tree_add_ipv6(icmp6opt_tree, hf_icmpv6_opt_prefix, tvb, opt_offset, 8, prefix.bytes);
-                        SET_ADDRESS(&prefix_addr, AT_IPv6, 16, prefix.bytes);
-                        proto_item_append_text(ti, " %s/%d", address_to_str(wmem_packet_scope(), &prefix_addr), prefix_len);
+                        proto_item_append_text(ti, " %s/%d", ip6_to_str(&prefix), prefix_len);
                         opt_offset += 8;
                         break;
                     case 24:
@@ -2126,7 +2130,7 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
 
                 /* EUI-64 */
                 proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_aro_eui64, tvb, opt_offset, 8, ENC_BIG_ENDIAN);
-                proto_item_append_text(ti, " : Register %s %s", tvb_eui64_to_str(tvb, opt_offset), val_to_str(status, nd_opt_6lowpannd_status_val, "Unknown %d"));
+                proto_item_append_text(ti, " : Register %s %s", tvb_eui64_to_str(tvb, opt_offset, FALSE), val_to_str(status, nd_opt_6lowpannd_status_val, "Unknown %d"));
                 opt_offset += 8;
 
             }
@@ -2138,7 +2142,6 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
                 guint8 context_id;
                 guint8 context_len;
                 struct e_in6_addr context_prefix;
-                address context_prefix_addr;
 
                 /* Context Length */
                 proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_6co_context_length, tvb, opt_offset, 1, ENC_BIG_ENDIAN);
@@ -2171,8 +2174,7 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
                     case 16:
                         tvb_memcpy(tvb, (guint8 *)&context_prefix.bytes, opt_offset, 8);
                         proto_tree_add_ipv6(icmp6opt_tree, hf_icmpv6_opt_6co_context_prefix, tvb, opt_offset, 8, context_prefix.bytes);
-                        SET_ADDRESS(&context_prefix_addr, AT_IPv6, 16, context_prefix.bytes);
-                        proto_item_append_text(ti, " %s/%d", address_to_str(wmem_packet_scope(), &context_prefix_addr), context_len);
+                        proto_item_append_text(ti, " %s/%d", ip6_to_str(&context_prefix), context_len);
                         opt_offset += 8;
                         break;
                     case 24:
@@ -2214,7 +2216,7 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
 
                 /* 6LBR Address */
                 proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_abro_6lbr_address, tvb, opt_offset, 16, ENC_NA);
-                proto_item_append_text(ti, " : Version %d.%d, Valid Lifetime : %d, 6LBR : %s", version_high, version_low, valid_lifetime, tvb_ip6_to_str(tvb, opt_offset));
+                proto_item_append_text(ti, " : Version %d.%d, Valid Lifetime : %d,6LBR : %s", version_high, version_low, valid_lifetime, tvb_ip6_to_str(tvb, opt_offset));
                 opt_offset += 16;
 
             }
@@ -2299,7 +2301,6 @@ dissect_icmpv6_rpl_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
             case RPL_OPT_ROUTING: {
                 guint8 prefix_len;
                 struct e_in6_addr prefix;
-                address prefix_addr;
 
                 /* Prefix length */
                 prefix_len = tvb_get_guint8(tvb, opt_offset);
@@ -2334,8 +2335,7 @@ dissect_icmpv6_rpl_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
                         memset(&prefix, 0, sizeof(prefix));
                         tvb_memcpy(tvb, (guint8 *)&prefix.bytes, opt_offset, 8);
                         proto_tree_add_ipv6(icmp6opt_tree, hf_icmpv6_rpl_opt_route_prefix, tvb, opt_offset, 8, prefix.bytes);
-                        SET_ADDRESS(&prefix_addr, AT_IPv6, 16, prefix.bytes);
-                        proto_item_append_text(ti, " %s/%d", address_to_str(wmem_packet_scope(), &prefix_addr), prefix_len);
+                        proto_item_append_text(ti, " %s/%d", ip6_to_str(&prefix), prefix_len);
                         opt_offset += 8;
                         break;
                     case 22:
@@ -2400,7 +2400,6 @@ dissect_icmpv6_rpl_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
             case RPL_OPT_TARGET: {
                 guint8              prefix_len;
                 struct e_in6_addr   target_prefix;
-                address target_prefix_addr;
 
                 /* Flag */
                 proto_tree_add_item(icmp6opt_tree, hf_icmpv6_rpl_opt_target_flag, tvb, opt_offset, 1, ENC_NA);
@@ -2421,8 +2420,7 @@ dissect_icmpv6_rpl_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
                         memset(&target_prefix, 0, sizeof(target_prefix));
                         tvb_memcpy(tvb, (guint8 *)&target_prefix.bytes, opt_offset, 8);
                         proto_tree_add_ipv6(icmp6opt_tree, hf_icmpv6_rpl_opt_target_prefix, tvb, opt_offset, 8, target_prefix.bytes);
-                        SET_ADDRESS(&target_prefix_addr, AT_IPv6, 16, target_prefix.bytes);
-                        proto_item_append_text(ti, " %s/%d", address_to_str(wmem_packet_scope(), &target_prefix_addr), prefix_len);
+                        proto_item_append_text(ti, " %s/%d", ip6_to_str(&target_prefix), prefix_len);
                         opt_offset += 8;
                         break;
                     case 18:
@@ -3153,6 +3151,7 @@ dissect_mldrv2( tvbuff_t *tvb, guint32 offset, packet_info *pinfo _U_, proto_tre
     while(mldr_offset < (int)tvb_reported_length(tvb) ) {
         guint8 aux_data_len, record_type;
         guint16 i, nb_sources;
+        struct e_in6_addr multicast_address;
 
         ti_mar = proto_tree_add_item(tree, hf_icmpv6_mldr_mar, tvb, mldr_offset, -1, ENC_NA);
         mar_tree = proto_item_add_subtree(ti_mar, ett_icmpv6_mar);
@@ -3174,7 +3173,7 @@ dissect_mldrv2( tvbuff_t *tvb, guint32 offset, packet_info *pinfo _U_, proto_tre
 
         /* Multicast Address */
         proto_tree_add_item(mar_tree, hf_icmpv6_mldr_mar_multicast_address, tvb, mldr_offset, 16, ENC_NA);
-        proto_item_append_text(ti_mar, " %s: %s", val_to_str(record_type, mldr_record_type_val,"Unknown Record Type (%d)"), tvb_ip6_to_str(tvb, mldr_offset));
+        tvb_get_ipv6(tvb, mldr_offset, &multicast_address);
         mldr_offset += 16;
 
         /* Source Address */
@@ -3192,6 +3191,7 @@ dissect_mldrv2( tvbuff_t *tvb, guint32 offset, packet_info *pinfo _U_, proto_tre
 
         /* Multicast Address Record Length */
         proto_item_set_len(ti_mar, 4 + 16 + (16 * nb_sources) + (aux_data_len * 4));
+        proto_item_append_text(ti_mar, " %s: %s", val_to_str(record_type, mldr_record_type_val,"Unknown Record Type (%d)"), ip6_to_str(&multicast_address));
 
     }
     return mldr_offset;
@@ -3281,20 +3281,23 @@ dissect_icmpv6(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     cksum = tvb_get_ntohs(tvb, offset);
 
     if (1) { /* There's an expert info in here so always execute */
-        length = tvb_captured_length(tvb);
+        length = tvb_length(tvb);
         reported_length = tvb_reported_length(tvb);
-        if (!pinfo->fragmented && length >= reported_length && !pinfo->flags.in_error_pkt) {
-            /* The packet isn't part of a fragmented datagram, isn't truncated,
-             * and we aren't in an ICMP error packet, so we can checksum it.
-             */
+        if (!pinfo->fragmented && length >= reported_length) {
+            /* The packet isn't part of a fragmented datagram and isn't
+               truncated, so we can checksum it. */
 
             /* Set up the fields of the pseudo-header. */
-            SET_CKSUM_VEC_PTR(cksum_vec[0], (const guint8 *)pinfo->src.data, pinfo->src.len);
-            SET_CKSUM_VEC_PTR(cksum_vec[1], (const guint8 *)pinfo->dst.data, pinfo->dst.len);
+            cksum_vec[0].ptr = (const guint8 *)pinfo->src.data;
+            cksum_vec[0].len = pinfo->src.len;
+            cksum_vec[1].ptr = (const guint8 *)pinfo->dst.data;
+            cksum_vec[1].len = pinfo->dst.len;
+            cksum_vec[2].ptr = (const guint8 *)&phdr;
             phdr[0] = g_htonl(reported_length);
             phdr[1] = g_htonl(IP_PROTO_ICMPV6);
-            SET_CKSUM_VEC_PTR(cksum_vec[2], (const guint8 *)&phdr, 8);
-            SET_CKSUM_VEC_TVB(cksum_vec[3], tvb, 0, reported_length);
+            cksum_vec[2].len = 8;
+            cksum_vec[3].len = reported_length;
+            cksum_vec[3].ptr = tvb_get_ptr(tvb, 0, cksum_vec[3].len);
             computed_cksum = in_cksum(cksum_vec, 4);
 
             if (computed_cksum == 0) {
@@ -3308,9 +3311,6 @@ dissect_icmpv6(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
                 expert_add_info_format(pinfo, checksum_item, &ei_icmpv6_checksum,
                                        "ICMPv6 Checksum Incorrect, should be 0x%04x", in_cksum_shouldbe(cksum, computed_cksum));
             }
-        } else {
-                proto_item_append_text(checksum_item, " [%s]",
-                    pinfo->flags.in_error_pkt ? "in ICMP error packet" : "fragmented datagram");
         }
     }
     offset += 2;
@@ -3363,7 +3363,8 @@ dissect_icmpv6(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 
                     tmp[0] = ~cksum;
                     tmp[1] = ~0x0100; /* The difference between echo request & reply */
-                    SET_CKSUM_VEC_PTR(cksum_vec[0], (guint8 *)tmp, sizeof(tmp));
+                    cksum_vec[0].len = sizeof(tmp);
+                    cksum_vec[0].ptr = (guint8 *)tmp;
                     conv_key[0] = in_cksum(cksum_vec, 1);
                     if (conv_key[0] == 0)
                         conv_key[0] = 0xffff;

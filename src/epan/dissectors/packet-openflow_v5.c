@@ -1,4 +1,4 @@
-/* packet-openflow_v5.c
+/* packet-openflow.c
  * Routines for OpenFlow dissection
  * Copyright 2013, Anders Broman <anders.broman@ericsson.com>
  * Copyright 2013, Zoltan Lajos Kis <zoltan.lajos.kis@ericsson.com>
@@ -26,12 +26,14 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
 #include <epan/etypes.h>
 #include <epan/expert.h>
 #include <epan/ipproto.h>
+#include <epan/packet.h>
 
 void proto_register_openflow_v5(void);
+void proto_reg_handoff_openflow_v5(void);
 
 static dissector_handle_t eth_withoutfcs_handle;
 
@@ -945,7 +947,6 @@ static const value_string openflow_v5_type_values[] = {
     { OFPT_BUNDLE_ADD_MESSAGE,       "OFPT_BUNDLE_ADD_MESSAGE" },
     { 0,                             NULL }
 };
-static value_string_ext openflow_v5_type_values_ext = VALUE_STRING_EXT_INIT(openflow_v5_type_values);
 
 static int
 dissect_openflow_header_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
@@ -1099,7 +1100,6 @@ static const value_string openflow_v5_oxm_basic_field_values[] = {
     { 41, "OFPXMT_OFB_PBB_UCA" },
     {  0, NULL }
 };
-static value_string_ext openflow_v5_oxm_basic_field_values_ext = VALUE_STRING_EXT_INIT(openflow_v5_oxm_basic_field_values);
 
 #define OXM_FIELD_MASK   0xfe
 #define OXM_FIELD_OFFSET 1
@@ -1143,6 +1143,7 @@ dissect_openflow_oxm_header_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
 static int
 dissect_openflow_oxm_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *oxm_tree;
     guint16 oxm_class;
     guint8  oxm_field_hm;
@@ -1159,7 +1160,8 @@ dissect_openflow_oxm_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
     oxm_hm = oxm_field_hm & OXM_HM_MASK;
     field_length = (oxm_hm == 0) ? oxm_length : (oxm_length / 2);
 
-    oxm_tree = proto_tree_add_subtree(tree, tvb, offset, oxm_length + 4, ett_openflow_v5_oxm, NULL, "OXM field");
+    ti = proto_tree_add_text(tree, tvb, offset, oxm_length + 4, "OXM field");
+    oxm_tree = proto_item_add_subtree(ti, ett_openflow_v5_oxm);
 
     offset = dissect_openflow_oxm_header_v5(tvb, pinfo, oxm_tree, offset, length);
 
@@ -1283,10 +1285,11 @@ dissect_openflow_match_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tre
     proto_tree *match_tree;
     guint16 match_type;
     guint16 match_length;
-    gint32 fields_end;
+    guint16 fields_end;
     guint16 pad_length;
 
-    match_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_match, &ti, "Match");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Match");
+    match_tree = proto_item_add_subtree(ti, ett_openflow_v5_match);
 
     /* uint16_t type; */
     match_type = tvb_get_ntohs(tvb, offset);
@@ -1362,7 +1365,8 @@ dissect_openflow_meter_band_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
     guint16 band_type;
     guint16 band_len;
 
-    band_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_meter_band, &ti, "Meter band");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Meter band");
+    band_tree = proto_item_add_subtree(ti, ett_openflow_v5_meter_band);
 
     /* uint16_t type; */
     band_type = tvb_get_ntohs(tvb, offset);
@@ -1431,12 +1435,14 @@ static const value_string openflow_v5_hello_element_type_values[] = {
 static int
 dissect_openflow_hello_element_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length)
 {
+    proto_item *ti;
     proto_tree *elem_tree;
     guint16 elem_type;
     guint16 elem_length;
     guint16 pad_length;
 
-    elem_tree = proto_tree_add_subtree(tree, tvb, offset, length - offset, ett_openflow_v5_hello_element, NULL, "Element");
+    ti = proto_tree_add_text(tree, tvb, offset, length - offset, "Element");
+    elem_tree = proto_item_add_subtree(ti, ett_openflow_v5_hello_element);
 
     /* uint16_t type; */
     elem_type = tvb_get_ntohs(tvb, offset);
@@ -1752,6 +1758,7 @@ static const value_string openflow_v5_error_bundle_failed_code_values[] = {
 static void
 dissect_openflow_error_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length)
 {
+    proto_item *ti;
     proto_tree *data_tree;
     guint16 error_type;
 
@@ -1844,7 +1851,8 @@ dissect_openflow_error_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tre
     case OFPET_METER_MOD_FAILED:
     case OFPET_TABLE_FEATURES_FAILED:
         /* uint8_t data[0]; contains at least the first 64 bytes of the failed request. */
-        data_tree = proto_tree_add_subtree(tree, tvb, offset, length - offset, ett_openflow_v5_error_data, NULL, "Data");
+        ti = proto_tree_add_text(tree, tvb, offset, length - offset, "Data");
+        data_tree = proto_item_add_subtree(ti, ett_openflow_v5_error_data);
 
         offset = dissect_openflow_header_v5(tvb, pinfo, data_tree, offset, length);
 
@@ -1914,7 +1922,7 @@ dissect_openflow_switch_features_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto
     proto_tree *cap_tree;
 
     /* uint64_t datapath_id; */
-    proto_tree_add_item(tree, hf_openflow_v5_switch_features_datapath_id, tvb, offset, 8, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_openflow_v5_switch_features_datapath_id, tvb, offset, 8, ENC_NA);
     offset+=8;
 
     /* uint32_t n_buffers; */
@@ -1930,7 +1938,7 @@ dissect_openflow_switch_features_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto
     offset++;
 
     /* uint8_t pad[2]; */
-    proto_tree_add_item(tree, hf_openflow_v5_switch_features_pad, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_openflow_v5_switch_features_pad, tvb, offset, 2, ENC_NA);
     offset+=2;
 
     /* uint32_t capabilities; */
@@ -1947,7 +1955,7 @@ dissect_openflow_switch_features_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto
     offset+=4;
 
     /* uint32_t reserved; */
-    proto_tree_add_item(tree, hf_openflow_v5_switch_features_reserved, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_openflow_v5_switch_features_reserved, tvb, offset, 4, ENC_NA);
     /*offset+=4;*/
 }
 
@@ -2006,6 +2014,7 @@ static const value_string openflow_v5_packet_in_reason_values[] = {
 static void
 dissect_openflow_packet_in_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *data_tree;
     tvbuff_t *next_tvb;
     gboolean save_writable;
@@ -2045,7 +2054,8 @@ dissect_openflow_packet_in_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree 
 
     /* uint8_t data[0]; */
     if (offset < length) {
-        data_tree = proto_tree_add_subtree(tree, tvb, offset, length - offset, ett_openflow_v5_packet_in_data, NULL, "Data");
+        ti = proto_tree_add_text(tree, tvb, offset, length - offset, "Data");
+        data_tree = proto_item_add_subtree(ti, ett_openflow_v5_packet_in_data);
 
         /* save some state */
         save_writable = col_get_writable(pinfo->cinfo);
@@ -2059,7 +2069,7 @@ dissect_openflow_packet_in_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree 
 
         /* dissect data */
         col_set_writable(pinfo->cinfo, FALSE);
-        next_tvb = tvb_new_subset_length(tvb, offset, length - offset);
+        next_tvb = tvb_new_subset(tvb, offset, length - offset, length - offset);
         call_dissector(eth_withoutfcs_handle, next_tvb, pinfo, data_tree);
 
         /* restore saved state */
@@ -2206,16 +2216,18 @@ dissect_openflow_action_header_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_t
 static int
 dissect_openflow_action_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *act_tree;
     guint16 act_type;
     guint16 act_length;
-    gint32 act_end;
+    guint16 act_end;
 
     act_type = tvb_get_ntohs(tvb, offset);
     act_length = tvb_get_ntohs(tvb, offset + 2);
     act_end = offset + act_length;
 
-    act_tree = proto_tree_add_subtree(tree, tvb, offset, act_length, ett_openflow_v5_action, NULL, "Action");
+    ti = proto_tree_add_text(tree, tvb, offset, act_length, "Action");
+    act_tree = proto_item_add_subtree(ti, ett_openflow_v5_action);
 
     offset = dissect_openflow_action_header_v5(tvb, pinfo, act_tree, offset, length);
 
@@ -2413,21 +2425,21 @@ dissect_openflow_port_desc_prop_ethernet_v5(tvbuff_t *tvb, packet_info *pinfo _U
     ti = proto_tree_add_item(tree, hf_openflow_v5_port_desc_prop_ethernet_current, tvb, offset, 4, ENC_BIG_ENDIAN);
     curr_tree = proto_item_add_subtree(ti, ett_openflow_v5_port_desc_prop_ethernet_current);
 
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_10mb_hd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_10mb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_100mb_hd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_100mb_fd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_1gb_hd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_1gb_fd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_10gb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_40gb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_100gb_fd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_1tb_fd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_other,      tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_copper,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_fiber,      tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_autoneg,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_pause,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_10mb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_10mb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_100mb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_100mb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_1gb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_1gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_10gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_40gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_100gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_1tb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_other, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_copper, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_fiber, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_autoneg, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_pause, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(curr_tree, hf_openflow_v5_port_desc_prop_ethernet_current_pause_asym, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
@@ -2435,21 +2447,21 @@ dissect_openflow_port_desc_prop_ethernet_v5(tvbuff_t *tvb, packet_info *pinfo _U
     ti = proto_tree_add_item(tree, hf_openflow_v5_port_desc_prop_ethernet_advertised, tvb, offset, 4, ENC_BIG_ENDIAN);
     adv_tree = proto_item_add_subtree(ti, ett_openflow_v5_port_desc_prop_ethernet_advertised);
 
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_10mb_hd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_10mb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_100mb_hd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_100mb_fd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_1gb_hd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_1gb_fd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_10gb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_40gb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_100gb_fd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_1tb_fd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_other,      tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_copper,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_fiber,      tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_autoneg,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_pause,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_10mb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_10mb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_100mb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_100mb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_1gb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_1gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_10gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_40gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_100gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_1tb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_other, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_copper, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_fiber, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_autoneg, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_pause, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(adv_tree, hf_openflow_v5_port_desc_prop_ethernet_advertised_pause_asym, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
@@ -2457,21 +2469,21 @@ dissect_openflow_port_desc_prop_ethernet_v5(tvbuff_t *tvb, packet_info *pinfo _U
     ti = proto_tree_add_item(tree, hf_openflow_v5_port_desc_prop_ethernet_supported, tvb, offset, 4, ENC_BIG_ENDIAN);
     supp_tree = proto_item_add_subtree(ti, ett_openflow_v5_port_desc_prop_ethernet_supported);
 
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_10mb_hd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_10mb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_100mb_hd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_100mb_fd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_1gb_hd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_1gb_fd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_10gb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_40gb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_100gb_fd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_1tb_fd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_other,      tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_copper,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_fiber,      tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_autoneg,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_pause,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_10mb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_10mb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_100mb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_100mb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_1gb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_1gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_10gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_40gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_100gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_1tb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_other, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_copper, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_fiber, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_autoneg, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_pause, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(supp_tree, hf_openflow_v5_port_desc_prop_ethernet_supported_pause_asym, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
@@ -2479,21 +2491,21 @@ dissect_openflow_port_desc_prop_ethernet_v5(tvbuff_t *tvb, packet_info *pinfo _U
     ti = proto_tree_add_item(tree, hf_openflow_v5_port_desc_prop_ethernet_peer, tvb, offset, 4, ENC_BIG_ENDIAN);
     peer_tree = proto_item_add_subtree(ti, ett_openflow_v5_port_desc_prop_ethernet_peer);
 
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_10mb_hd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_10mb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_100mb_hd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_100mb_fd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_1gb_hd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_1gb_fd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_10gb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_40gb_fd,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_100gb_fd,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_1tb_fd,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_other,      tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_copper,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_fiber,      tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_autoneg,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_pause,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_10mb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_10mb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_100mb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_100mb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_1gb_hd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_1gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_10gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_40gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_100gb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_1tb_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_other, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_copper, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_fiber, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_autoneg, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_pause, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(peer_tree, hf_openflow_v5_port_desc_prop_ethernet_peer_pause_asym, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
@@ -2583,6 +2595,7 @@ static const value_string openflow_v5_port_desc_prop_type_values[] = {
 static int
 dissect_openflow_port_desc_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *prop_tree;
     guint16 prop_type;
     guint16 prop_length;
@@ -2590,7 +2603,8 @@ dissect_openflow_port_desc_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
     prop_type = tvb_get_ntohs(tvb, offset);
     prop_length = tvb_get_ntohs(tvb, offset);
 
-    prop_tree = proto_tree_add_subtree(tree, tvb, offset, prop_length, ett_openflow_v5_port_desc_prop, NULL, "Port desc. property");
+    ti = proto_tree_add_text(tree, tvb, offset, prop_length, "Port desc. property");
+    prop_tree = proto_item_add_subtree(ti, ett_openflow_v5_port_desc_prop);
 
     /* uint16_t type; */
     proto_tree_add_item(prop_tree, hf_openflow_v5_port_desc_prop_type, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -2653,7 +2667,8 @@ dissect_openflow_port_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
     proto_tree *port_tree, *conf_tree, *state_tree;
     guint16 port_end;
 
-    port_tree = proto_tree_add_subtree(tree, tvb, offset, 64, ett_openflow_v5_port, NULL, "Port");
+    ti = proto_tree_add_text(tree, tvb, offset, 64, "Port");
+    port_tree = proto_item_add_subtree(ti, ett_openflow_v5_port);
 
     /* uint32_t port_no; */
     if (tvb_get_ntohl(tvb, offset) <= OFPP_MAX) {
@@ -2742,9 +2757,9 @@ dissect_openflow_port_status_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
 static void
 dissect_openflow_packet_out_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *data_tree;
-    guint16 acts_len;
-    gint32 acts_end;
+    guint16 acts_len, acts_end;
     tvbuff_t *next_tvb;
     gboolean save_writable;
     gboolean save_in_error_pkt;
@@ -2784,7 +2799,8 @@ dissect_openflow_packet_out_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
 
     /* uint8_t data[0]; */
     if (offset < length) {
-        data_tree = proto_tree_add_subtree(tree, tvb, offset, length - offset, ett_openflow_v5_packet_out_data, NULL, "Data");
+        ti = proto_tree_add_text(tree, tvb, offset, length - offset, "Data");
+        data_tree = proto_item_add_subtree(ti, ett_openflow_v5_packet_out_data);
 
         /* save some state */
         save_writable = col_get_writable(pinfo->cinfo);
@@ -2798,7 +2814,7 @@ dissect_openflow_packet_out_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
 
         /* dissect data */
         col_set_writable(pinfo->cinfo, FALSE);
-        next_tvb = tvb_new_subset_length(tvb, offset, length - offset);
+        next_tvb = tvb_new_subset(tvb, offset, length - offset, length - offset);
         call_dissector(eth_withoutfcs_handle, next_tvb, pinfo, data_tree);
 
         /* restore saved state */
@@ -2861,21 +2877,19 @@ dissect_openflow_instruction_header_v5(tvbuff_t *tvb, packet_info *pinfo _U_, pr
 static int
 dissect_openflow_instruction_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *inst_tree;
     guint16 inst_type;
     guint16 inst_length;
-    gint32 acts_end;
+    guint16 acts_end;
 
     inst_type = tvb_get_ntohs(tvb, offset);
     inst_length = tvb_get_ntohs(tvb, offset + 2);
 
-    inst_tree = proto_tree_add_subtree(tree, tvb, offset, inst_length, ett_openflow_v5_instruction, NULL, "Instruction");
+    ti = proto_tree_add_text(tree, tvb, offset, inst_length, "Instruction");
+    inst_tree = proto_item_add_subtree(ti, ett_openflow_v5_instruction);
 
     offset = dissect_openflow_instruction_header_v5(tvb, pinfo, inst_tree, offset, length);
-
-    if (inst_length < 8) {
-        inst_length = 8;
-    }
 
     switch (inst_type) {
     case OFPIT_GOTO_TABLE:
@@ -3030,7 +3044,7 @@ dissect_openflow_flowmod_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
     offset+=2;
 
     /* uint16_t importance; */
-    proto_tree_add_item(tree, hf_openflow_v5_flowmod_importance, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_openflow_v5_flowmod_importance, tvb, offset, 2, ENC_NA);
     offset+=2;
 
     /* struct ofp_match match; */
@@ -3048,19 +3062,16 @@ dissect_openflow_bucket_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
     proto_item *ti;
     proto_tree *bucket_tree;
     guint16 bucket_length;
-    gint32 acts_end;
+    guint16 acts_end;
 
-    bucket_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_bucket, &ti, "Bucket");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Bucket");
+    bucket_tree = proto_item_add_subtree(ti, ett_openflow_v5_bucket);
 
     /* uint16_t len; */
     bucket_length = tvb_get_ntohs(tvb, offset);
     proto_item_set_len(ti, bucket_length);
     proto_tree_add_item(bucket_tree, hf_openflow_v5_bucket_length, tvb, offset, 2, ENC_BIG_ENDIAN);
     offset+=2;
-
-    if (bucket_length < 16) {
-        bucket_length = 16;
-    }
 
     /* uint16_t weight; */
     proto_tree_add_item(bucket_tree, hf_openflow_v5_bucket_weight, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -3227,6 +3238,7 @@ static const value_string openflow_v5_portmod_prop_type_values[] = {
 static int
 dissect_openflow_portmod_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *prop_tree;
     guint16 prop_type;
     guint16 prop_length;
@@ -3234,7 +3246,8 @@ dissect_openflow_portmod_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tr
     prop_type = tvb_get_ntohs(tvb, offset);
     prop_length = tvb_get_ntohs(tvb, offset + 2);
 
-    prop_tree = proto_tree_add_subtree(tree, tvb, offset, prop_length, ett_openflow_v5_portmod_prop, NULL, "Portmod property");
+    ti = proto_tree_add_text(tree, tvb, offset, prop_length, "Portmod property");
+    prop_tree = proto_item_add_subtree(ti, ett_openflow_v5_portmod_prop);
 
     /* uint16_t type; */
     proto_tree_add_item(prop_tree, hf_openflow_v5_portmod_prop_type, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -3357,7 +3370,8 @@ dissect_openflow_tablemod_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_t
     prop_type = tvb_get_ntohs(tvb, offset);
     prop_length = tvb_get_ntohs(tvb, offset + 2);
 
-    prop_tree = proto_tree_add_subtree(tree, tvb, offset, prop_length, ett_openflow_v5_tablemod_prop, NULL, "Tablemod property");
+    ti = proto_tree_add_text(tree, tvb, offset, prop_length, "Tablemod property");
+    prop_tree = proto_item_add_subtree(ti, ett_openflow_v5_tablemod_prop);
 
     /* uint16_t type; */
     proto_tree_add_item(prop_tree, hf_openflow_v5_tablemod_prop_type, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -3599,10 +3613,11 @@ dissect_openflow_table_feature_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, pr
     guint16 prop_type;
     guint16 prop_length;
     guint16 elem_begin;
-    gint32 body_end;
+    guint16 body_end;
     guint16 pad_length;
 
-    prop_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_table_feature_prop, &ti, "Table feature property");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Table feature property");
+    prop_tree = proto_item_add_subtree(ti, ett_openflow_v5_table_feature_prop);
 
     /* uint16_t type; */
     prop_type = tvb_get_ntohs(tvb, offset);
@@ -3615,10 +3630,6 @@ dissect_openflow_table_feature_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, pr
     proto_tree_add_item(prop_tree, hf_openflow_v5_table_feature_prop_length, tvb, offset, 2, ENC_BIG_ENDIAN);
     offset+=2;
 
-    if (prop_length < 4) {
-        prop_length = 4;
-    }
-
     body_end = offset + prop_length - 4;
 
     /* body */
@@ -3627,7 +3638,8 @@ dissect_openflow_table_feature_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, pr
     case OFPTFPT_INSTRUCTIONS_MISS:
         while (offset < body_end) {
             elem_begin = offset;
-            elem_tree = proto_tree_add_subtree(prop_tree, tvb, offset, -1, ett_openflow_v5_table_feature_prop_instruction_id, &ti, "Instruction ID");
+            ti = proto_tree_add_text(prop_tree, tvb, offset, -1, "Instruction ID");
+            elem_tree = proto_item_add_subtree(ti, ett_openflow_v5_table_feature_prop_instruction_id);
 
             offset = dissect_openflow_instruction_header_v5(tvb, pinfo, elem_tree, offset, length);
             proto_item_set_len(ti, offset - elem_begin);
@@ -3648,7 +3660,8 @@ dissect_openflow_table_feature_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, pr
     case OFPTFPT_APPLY_ACTIONS_MISS:
         while (offset < body_end) {
             elem_begin = offset;
-            elem_tree = proto_tree_add_subtree(prop_tree, tvb, offset, -1, ett_openflow_v5_table_feature_prop_action_id, &ti, "Action ID");
+            ti = proto_tree_add_text(prop_tree, tvb, offset, -1, "Action ID");
+            elem_tree = proto_item_add_subtree(ti, ett_openflow_v5_table_feature_prop_action_id);
 
             offset = dissect_openflow_action_header_v5(tvb, pinfo, elem_tree, offset, length);
             proto_item_set_len(ti, offset - elem_begin);
@@ -3663,7 +3676,8 @@ dissect_openflow_table_feature_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, pr
     case OFPTFPT_APPLY_SETFIELD_MISS:
         while (offset < body_end) {
             elem_begin = offset;
-            elem_tree = proto_tree_add_subtree(prop_tree, tvb, offset, -1, ett_openflow_v5_table_feature_prop_oxm_id, &ti, "OXM ID");
+            ti = proto_tree_add_text(prop_tree, tvb, offset, -1, "OXM ID");
+            elem_tree = proto_item_add_subtree(ti, ett_openflow_v5_table_feature_prop_oxm_id);
 
             offset = dissect_openflow_oxm_header_v5(tvb, pinfo, elem_tree, offset, length);
             proto_item_set_len(ti, offset - elem_begin);
@@ -3717,9 +3731,10 @@ dissect_openflow_table_features_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
     proto_item *ti;
     proto_tree *feat_tree, *caps_tree;
     guint16 feat_length;
-    gint32 feat_end;
+    guint16 feat_end;
 
-    feat_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_table_features, &ti, "Table features");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Table features");
+    feat_tree = proto_item_add_subtree(ti, ett_openflow_v5_table_features);
 
     /* uint16_t length; */
     feat_length = tvb_get_ntohs(tvb, offset);
@@ -3749,7 +3764,7 @@ dissect_openflow_table_features_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
     offset+=8;
 
     /* uint32_t capabilities; */
-    ti = proto_tree_add_item(feat_tree, hf_openflow_v5_table_features_capabilities, tvb, offset, 4, ENC_BIG_ENDIAN);
+    ti = proto_tree_add_item(feat_tree, hf_openflow_v5_table_features_capabilities, tvb, offset, 4, ENC_NA);
     caps_tree = proto_item_add_subtree(ti, ett_openflow_v5_table_features_capabilities);
 
     proto_tree_add_item(caps_tree, hf_openflow_v5_table_features_capabilities_eviction, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -3929,7 +3944,7 @@ dissect_openflow_flow_monitor_request_v5(tvbuff_t *tvb, packet_info *pinfo _U_, 
     offset+=4;
 
     /* uint16_t flags; */
-    ti = proto_tree_add_item(tree, hf_openflow_v5_flow_monitor_request_flags, tvb, offset, 2, ENC_BIG_ENDIAN);
+    ti = proto_tree_add_item(tree, hf_openflow_v5_flow_monitor_request_flags, tvb, offset, 2, ENC_NA);
     flags_tree = proto_item_add_subtree(ti, ett_openflow_v5_flow_monitor_request_flags);
 
     proto_tree_add_item(flags_tree, hf_openflow_v5_flow_monitor_request_flags_initial, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -4131,9 +4146,10 @@ dissect_openflow_flow_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
     proto_item *ti;
     proto_tree *stats_tree, *flags_tree;
     guint16 stats_len;
-    gint32 stats_end;
+    guint16 stats_end;
 
-    stats_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_flow_stats, &ti, "Flow stats");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Flow stats");
+    stats_tree = proto_item_add_subtree(ti, ett_openflow_v5_flow_stats);
 
     /* uint16_t length; */
     stats_len = tvb_get_ntohs(tvb, offset);
@@ -4182,7 +4198,7 @@ dissect_openflow_flow_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
     offset+=2;
 
     /* uint16_t importance; */
-    proto_tree_add_item(stats_tree, hf_openflow_v5_flow_stats_importance, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(stats_tree, hf_openflow_v5_flow_stats_importance, tvb, offset, 4, ENC_NA);
     offset+=2;
 
     /* uint8_t pad2[2]; */
@@ -4237,9 +4253,11 @@ dissect_openflow_aggregate_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto
 static int
 dissect_openflow_table_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *stats_tree;
 
-    stats_tree = proto_tree_add_subtree(tree, tvb, offset, 24, ett_openflow_v5_table_stats, NULL, "Table stats");
+    ti = proto_tree_add_text(tree, tvb, offset, 24, "Table stats");
+    stats_tree = proto_item_add_subtree(ti, ett_openflow_v5_table_stats);
 
     /* uint8_t table_id; */
     if (tvb_get_guint8(tvb, offset) <= OFPTT_MAX) {
@@ -4272,9 +4290,11 @@ dissect_openflow_table_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
 static int
 dissect_openflow_port_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *stats_tree;
 
-    stats_tree = proto_tree_add_subtree(tree, tvb, offset, 112, ett_openflow_v5_port_stats, NULL, "Port stats");
+    ti = proto_tree_add_text(tree, tvb, offset, 112, "Port stats");
+    stats_tree = proto_item_add_subtree(ti, ett_openflow_v5_port_stats);
 
     /* uint8_t port_no; */
     if (tvb_get_ntohl(tvb, offset) <= OFPP_MAX) {
@@ -4355,12 +4375,13 @@ dissect_openflow_table_desc_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
     proto_item *ti;
     proto_tree *desc_tree, *conf_tree;
     guint16 desc_length;
-    gint32 desc_end;
+    guint16 desc_end;
 
     desc_length = tvb_get_ntohs(tvb, offset);
     desc_end = offset + desc_length;
 
-    desc_tree = proto_tree_add_subtree(tree, tvb, offset, desc_length, ett_openflow_v5_table_desc, NULL, "Table desc");
+    ti = proto_tree_add_text(tree, tvb, offset, desc_length, "Table desc");
+    desc_tree = proto_item_add_subtree(ti, ett_openflow_v5_table_desc);
 
     /* uint16_t length; */
     proto_tree_add_item(desc_tree, hf_openflow_v5_table_desc_length, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -4405,6 +4426,7 @@ static const value_string openflow_v5_queue_stats_prop_type_values[] = {
 static int
 dissect_openflow_queue_stats_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *prop_tree;
     guint16 prop_type;
     guint16 prop_length;
@@ -4412,7 +4434,8 @@ dissect_openflow_queue_stats_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, prot
     prop_type = tvb_get_ntohs(tvb, offset);
     prop_length = tvb_get_ntohs(tvb, offset + 2);
 
-    prop_tree = proto_tree_add_subtree(tree, tvb, offset, prop_length, ett_openflow_v5_queue_stats_prop, NULL, "Queue stats property");
+    ti = proto_tree_add_text(tree, tvb, offset, prop_length, "Queue stats property");
+    prop_tree = proto_item_add_subtree(ti, ett_openflow_v5_queue_stats_prop);
 
     /* uint16_t type; */
     proto_tree_add_item(prop_tree, hf_openflow_v5_queue_stats_prop_type, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -4453,14 +4476,16 @@ dissect_openflow_queue_stats_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, prot
 static int
 dissect_openflow_queue_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *stats_tree;
     guint16 stats_len;
-    gint32 stats_end;
+    guint16 stats_end;
 
     stats_len = tvb_get_ntohs(tvb, offset);
     stats_end = offset + stats_len;
 
-    stats_tree = proto_tree_add_subtree(tree, tvb, offset, stats_len, ett_openflow_v5_queue_stats, NULL, "Queue stats");
+    ti = proto_tree_add_text(tree, tvb, offset, stats_len, "Queue stats");
+    stats_tree = proto_item_add_subtree(ti, ett_openflow_v5_queue_stats);
 
     /* uint16_t length; */
     proto_tree_add_item(stats_tree, hf_openflow_v5_queue_stats_length, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -4519,9 +4544,11 @@ dissect_openflow_queue_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
 static int
 dissect_openflow_bucket_counter_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *counter_tree;
 
-    counter_tree = proto_tree_add_subtree(tree, tvb, offset, 16, ett_openflow_v5_bucket_counter, NULL, "Bucket counter");
+    ti = proto_tree_add_text(tree, tvb, offset, 16, "Bucket counter");
+    counter_tree = proto_item_add_subtree(ti, ett_openflow_v5_bucket_counter);
 
     /* uint64_t packet_count; */
     proto_tree_add_item(counter_tree, hf_openflow_v5_bucket_counter_packet_count, tvb, offset, 8, ENC_BIG_ENDIAN);
@@ -4541,9 +4568,10 @@ dissect_openflow_group_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
     proto_item *ti;
     proto_tree *stats_tree;
     guint16 stats_len;
-    gint32 stats_end;
+    guint16 stats_end;
 
-    stats_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_group_stats, &ti, "Group stats");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Group stats");
+    stats_tree = proto_item_add_subtree(ti, ett_openflow_v5_group_stats);
 
     /* uint16_t length; */
     stats_len = tvb_get_ntohs(tvb, offset);
@@ -4603,9 +4631,10 @@ dissect_openflow_group_desc_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
     proto_tree *desc_tree;
 
     guint16 desc_len;
-    gint32 desc_end;
+    guint16 desc_end;
 
-    desc_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_group_desc, &ti, "Group description");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Group description");
+    desc_tree = proto_item_add_subtree(ti, ett_openflow_v5_group_desc);
 
     /* uint16_t length; */
     desc_len = tvb_get_ntohs(tvb, offset);
@@ -4653,115 +4682,115 @@ dissect_openflow_group_features_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
     ti = proto_tree_add_item(tree, hf_openflow_v5_group_features_types, tvb, offset, 4, ENC_BIG_ENDIAN);
     types_tree = proto_item_add_subtree(ti, ett_openflow_v5_group_features_types);
 
-    proto_tree_add_item(types_tree, hf_openflow_v5_group_features_types_all,      tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(types_tree, hf_openflow_v5_group_features_types_select,   tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(types_tree, hf_openflow_v5_group_features_types_all, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(types_tree, hf_openflow_v5_group_features_types_select, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(types_tree, hf_openflow_v5_group_features_types_indirect, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(types_tree, hf_openflow_v5_group_features_types_ff,       tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(types_tree, hf_openflow_v5_group_features_types_ff, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
     /* uint32_t capabilities; */
     ti = proto_tree_add_item(tree, hf_openflow_v5_group_features_capabilities, tvb, offset, 4, ENC_BIG_ENDIAN);
     caps_tree = proto_item_add_subtree(ti, ett_openflow_v5_group_features_capabilities);
 
-    proto_tree_add_item(caps_tree, hf_openflow_v5_group_features_capabilities_select_weight,   tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(caps_tree, hf_openflow_v5_group_features_capabilities_select_weight, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(caps_tree, hf_openflow_v5_group_features_capabilities_select_liveness, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(caps_tree, hf_openflow_v5_group_features_capabilities_chaining,        tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(caps_tree, hf_openflow_v5_group_features_capabilities_chaining, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(caps_tree, hf_openflow_v5_group_features_capabilities_chaining_checks, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
     /* max_groups[4]; */
-    proto_tree_add_item(tree, hf_openflow_v5_group_features_max_groups_all,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_openflow_v5_group_features_max_groups_all, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
-    proto_tree_add_item(tree, hf_openflow_v5_group_features_max_groups_select,   tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_openflow_v5_group_features_max_groups_select, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
     proto_tree_add_item(tree, hf_openflow_v5_group_features_max_groups_indirect, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
-    proto_tree_add_item(tree, hf_openflow_v5_group_features_max_groups_ff,       tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_openflow_v5_group_features_max_groups_ff, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
     /* uint32_t actions[4]; */
     ti = proto_tree_add_item(tree, hf_openflow_v5_group_features_actions_all, tvb, offset, 4, ENC_BIG_ENDIAN);
     acts_tree = proto_item_add_subtree(ti, ett_openflow_v5_group_features_actions_all);
 
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_output,       tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_output, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_copy_ttl_out, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_copy_ttl_in,  tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_copy_ttl_in, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_set_mpls_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_dec_mpls_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_push_vlan,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_pop_vlan,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_push_mpls,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_pop_mpls,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_set_queue,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_group,        tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_set_nw_ttl,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_dec_nw_ttl,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_set_field,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_push_pbb,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_pop_pbb,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_push_vlan, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_pop_vlan, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_push_mpls, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_pop_mpls, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_set_queue, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_group, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_set_nw_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_dec_nw_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_set_field, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_push_pbb, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_all_pop_pbb, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
     ti = proto_tree_add_item(tree, hf_openflow_v5_group_features_actions_select, tvb, offset, 4, ENC_BIG_ENDIAN);
     acts_tree = proto_item_add_subtree(ti, ett_openflow_v5_group_features_actions_select);
 
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_output,       tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_output, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_copy_ttl_out, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_copy_ttl_in,  tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_copy_ttl_in, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_set_mpls_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_dec_mpls_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_push_vlan,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_pop_vlan,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_push_mpls,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_pop_mpls,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_set_queue,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_group,        tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_set_nw_ttl,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_dec_nw_ttl,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_set_field,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_push_pbb,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_pop_pbb,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_push_vlan, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_pop_vlan, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_push_mpls, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_pop_mpls, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_set_queue, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_group, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_set_nw_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_dec_nw_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_set_field, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_push_pbb, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_select_pop_pbb, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
     ti = proto_tree_add_item(tree, hf_openflow_v5_group_features_actions_indirect, tvb, offset, 4, ENC_BIG_ENDIAN);
     acts_tree = proto_item_add_subtree(ti, ett_openflow_v5_group_features_actions_indirect);
 
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_output,       tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_output, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_copy_ttl_out, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_copy_ttl_in,  tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_copy_ttl_in, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_set_mpls_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_dec_mpls_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_push_vlan,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_pop_vlan,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_push_mpls,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_pop_mpls,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_set_queue,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_group,        tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_set_nw_ttl,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_dec_nw_ttl,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_set_field,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_push_pbb,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_pop_pbb,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_push_vlan, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_pop_vlan, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_push_mpls, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_pop_mpls, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_set_queue, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_group, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_set_nw_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_dec_nw_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_set_field, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_push_pbb, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_indirect_pop_pbb, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;
 
     ti = proto_tree_add_item(tree, hf_openflow_v5_group_features_actions_ff, tvb, offset, 4, ENC_BIG_ENDIAN);
     acts_tree = proto_item_add_subtree(ti, ett_openflow_v5_group_features_actions_ff);
 
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_output,       tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_output, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_copy_ttl_out, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_copy_ttl_in,  tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_copy_ttl_in, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_set_mpls_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_dec_mpls_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_push_vlan,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_pop_vlan,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_push_mpls,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_pop_mpls,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_set_queue,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_group,        tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_set_nw_ttl,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_dec_nw_ttl,   tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_set_field,    tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_push_pbb,     tvb, offset, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_pop_pbb,      tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_push_vlan, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_pop_vlan, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_push_mpls, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_pop_mpls, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_set_queue, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_group, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_set_nw_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_dec_nw_ttl, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_set_field, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_push_pbb, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(acts_tree, hf_openflow_v5_group_features_actions_ff_pop_pbb, tvb, offset, 4, ENC_BIG_ENDIAN);
     /*offset+=4;*/
 }
 
@@ -4769,9 +4798,11 @@ dissect_openflow_group_features_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
 static int
 dissect_openflow_meter_band_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *stats_tree;
 
-    stats_tree = proto_tree_add_subtree(tree, tvb, offset, 16, ett_openflow_v5_meter_band_stats, NULL, "Meter band stats");
+    ti = proto_tree_add_text(tree, tvb, offset, 16, "Meter band stats");
+    stats_tree = proto_item_add_subtree(ti, ett_openflow_v5_meter_band_stats);
 
     /* uint64_t packet_band_count; */
     proto_tree_add_item(stats_tree, hf_openflow_v5_meter_band_stats_packet_band_count, tvb, offset, 8, ENC_BIG_ENDIAN);
@@ -4793,7 +4824,8 @@ dissect_openflow_meter_stats_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
     guint16 stats_len;
     guint16 stats_end;
 
-    stats_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_meter_stats, &ti, "Meter stats");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Meter stats");
+    stats_tree = proto_item_add_subtree(ti, ett_openflow_v5_meter_stats);
 
     /* uint32_t meter_id; */
     if (tvb_get_ntohl(tvb, offset) <= OFPM_MAX) {
@@ -4849,9 +4881,10 @@ dissect_openflow_meter_config_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tr
     proto_item *ti;
     proto_tree *conf_tree, *flags_tree;
     guint16 config_len;
-    gint32 config_end;
+    guint16 config_end;
 
-    conf_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_meter_config, &ti, "Meter config");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Meter config");
+    conf_tree = proto_item_add_subtree(ti, ett_openflow_v5_meter_config);
 
     /* uint16_t len; */
     config_len = tvb_get_ntohs(tvb, offset);
@@ -4864,7 +4897,7 @@ dissect_openflow_meter_config_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tr
     ti = proto_tree_add_item(conf_tree, hf_openflow_v5_meter_config_flags, tvb, offset, 2, ENC_BIG_ENDIAN);
     flags_tree = proto_item_add_subtree(ti, ett_openflow_v5_meter_config_flags);
 
-    proto_tree_add_item(flags_tree, hf_openflow_v5_meter_config_flags_kbps,  tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(flags_tree, hf_openflow_v5_meter_config_flags_kbps, tvb, offset, 2, ENC_BIG_ENDIAN);
     proto_tree_add_item(flags_tree, hf_openflow_v5_meter_config_flags_pktps, tvb, offset, 2, ENC_BIG_ENDIAN);
     proto_tree_add_item(flags_tree, hf_openflow_v5_meter_config_flags_burst, tvb, offset, 2, ENC_BIG_ENDIAN);
     proto_tree_add_item(flags_tree, hf_openflow_v5_meter_config_flags_stats, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -4913,7 +4946,7 @@ dissect_openflow_meter_features_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
     ti = proto_tree_add_item(tree, hf_openflow_v5_meter_features_capabilities, tvb, offset, 4, ENC_BIG_ENDIAN);
     caps_tree = proto_item_add_subtree(ti, ett_openflow_v5_meter_features_capabilities);
 
-    proto_tree_add_item(caps_tree, hf_openflow_v5_meter_features_capabilities_kbps,  tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(caps_tree, hf_openflow_v5_meter_features_capabilities_kbps, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(caps_tree, hf_openflow_v5_meter_features_capabilities_pktps, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(caps_tree, hf_openflow_v5_meter_features_capabilities_burst, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(caps_tree, hf_openflow_v5_meter_features_capabilities_stats, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -4964,7 +4997,8 @@ dissect_openflow_queue_desc_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto
     guint16 prop_type;
     guint16 prop_len;
 
-    prop_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_queue_desc_prop, &ti, "Queue property");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Queue property");
+    prop_tree = proto_item_add_subtree(ti, ett_openflow_v5_queue_desc_prop);
 
     /* uint16_t property; */
     prop_type = tvb_get_ntohs(tvb, offset);
@@ -5048,14 +5082,16 @@ static const value_string openflow_v5_queue_id_reserved_values[] = {
 static int
 dissect_openflow_queue_desc_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *desc_tree;
     guint16 desc_len;
-    gint32 desc_end;
+    guint16 desc_end;
 
     desc_len = tvb_get_ntohs(tvb, offset + 8);
     desc_end = offset + desc_len;
 
-    desc_tree = proto_tree_add_subtree(tree, tvb, offset, desc_len, ett_openflow_v5_queue_desc, NULL, "Queue desc");
+    ti = proto_tree_add_text(tree, tvb, offset, desc_len, "Queue desc");
+    desc_tree = proto_item_add_subtree(ti, ett_openflow_v5_queue_desc);
 
     /* uint32_t port_no; */
     if (tvb_get_ntohl(tvb, offset) <= OFPP_MAX) {
@@ -5110,16 +5146,18 @@ static const value_string openflow_v5_flow_monitor_events[] = {
 static int
 dissect_openflow_flow_update_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *update_tree;
     guint16 update_len;
     guint16 update_event;
-    gint32 update_end;
+    guint16 update_end;
 
     update_len = tvb_get_ntohs(tvb, offset);
     update_end = offset + update_len;
     update_event = tvb_get_ntohs(tvb, offset + 2);
 
-    update_tree = proto_tree_add_subtree(tree, tvb, offset, update_len, ett_openflow_v5_flow_update, NULL, "Flow update");
+    ti = proto_tree_add_text(tree, tvb, offset, update_len, "Flow update");
+    update_tree = proto_item_add_subtree(ti, ett_openflow_v5_flow_update);
 
     /* uint16_t length; */
     proto_tree_add_item(update_tree, hf_openflow_v5_flow_update_length, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -5435,7 +5473,8 @@ dissect_openflow_async_config_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, pro
     prop_type = tvb_get_ntohs(tvb, offset);
     prop_len = tvb_get_ntohs(tvb, offset + 2);
 
-    prop_tree = proto_tree_add_subtree(tree, tvb, offset, prop_len, ett_openflow_v5_async_config_prop, NULL, "Async config prop");
+    ti = proto_tree_add_text(tree, tvb, offset, prop_len, "Async config prop");
+    prop_tree = proto_item_add_subtree(ti, ett_openflow_v5_async_config_prop);
 
     /* uint16_t type; */
     proto_tree_add_item(prop_tree, hf_openflow_v5_async_config_prop_type, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -5669,7 +5708,8 @@ dissect_openflow_requestforward_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
     guint16 req_begin;
 
     /* struct ofp_header request; */
-    req_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_requestforward_request, &ti, "Request");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Request");
+    req_tree = proto_item_add_subtree(ti, ett_openflow_v5_requestforward_request);
 
     req_begin = offset;
     offset = dissect_openflow_message_v5(tvb, pinfo, req_tree, offset);
@@ -5687,6 +5727,7 @@ static const value_string openflow_v5_bundle_prop_type_values[] = {
 static int
 dissect_openflow_bundle_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     proto_tree *prop_tree;
     guint16 prop_type;
     guint16 prop_len;
@@ -5694,7 +5735,8 @@ dissect_openflow_bundle_prop_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
     prop_type = tvb_get_ntohs(tvb, offset);
     prop_len = tvb_get_ntohs(tvb, offset + 2);
 
-    prop_tree = proto_tree_add_subtree(tree, tvb, offset, prop_len, ett_openflow_v5_bundle_prop, NULL, "Bundle prop");
+    ti = proto_tree_add_text(tree, tvb, offset, prop_len, "Bundle prop");
+    prop_tree = proto_item_add_subtree(ti, ett_openflow_v5_bundle_prop);
 
     /* uint16_t type; */
     proto_tree_add_item(prop_tree, hf_openflow_v5_bundle_prop_type, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -5807,7 +5849,8 @@ dissect_openflow_bundle_add_v5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
     offset+=2;
 
     /* struct ofp_header message; */
-    msg_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_openflow_v5_bundle_add_message, &ti, "Message");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "Message");
+    msg_tree = proto_item_add_subtree(ti, ett_openflow_v5_bundle_add_message);
 
     msg_begin = offset;
     offset = dissect_openflow_message_v5(tvb, pinfo, msg_tree, offset);
@@ -5826,7 +5869,7 @@ dissect_openflow_message_v5(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 {
     guint8 type;
     guint16 length;
-    gint32 msg_end;
+    guint16 msg_end;
 
     type = tvb_get_guint8(tvb, offset + 1);
     length = tvb_get_ntohs(tvb, offset + 2);
@@ -5950,7 +5993,7 @@ dissect_openflow_v5(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *d
     type = tvb_get_guint8(tvb, 1);
 
     col_append_fstr(pinfo->cinfo, COL_INFO, "Type: %s",
-                  val_to_str_ext_const(type, &openflow_v5_type_values_ext, "Unknown message type"));
+                  val_to_str_const(type, openflow_v5_type_values, "Unknown message type"));
 
     ti = proto_tree_add_item(tree, proto_openflow_v5, tvb, 0, -1, ENC_NA);
     openflow_tree = proto_item_add_subtree(ti, ett_openflow_v5);
@@ -5976,7 +6019,7 @@ proto_register_openflow_v5(void)
         },
         { &hf_openflow_v5_type,
             { "Type", "openflow_v5.type",
-               FT_UINT8, BASE_DEC | BASE_EXT_STRING, &openflow_v5_type_values_ext, 0x0,
+               FT_UINT8, BASE_DEC, VALS(openflow_v5_type_values), 0x0,
                NULL, HFILL }
         },
         { &hf_openflow_v5_xid,
@@ -6001,7 +6044,7 @@ proto_register_openflow_v5(void)
         },
         { &hf_openflow_v5_oxm_field_basic,
             { "Field", "openflow_v5.oxm.field",
-               FT_UINT8, BASE_DEC | BASE_EXT_STRING, &openflow_v5_oxm_basic_field_values_ext, 0x0,
+               FT_UINT8, BASE_DEC, VALS(openflow_v5_oxm_basic_field_values), 0x0,
                NULL, HFILL }
         },
         { &hf_openflow_v5_oxm_hm,
@@ -6056,7 +6099,7 @@ proto_register_openflow_v5(void)
         },
         { &hf_openflow_v5_oxm_value_ipproto,
             { "Value", "openflow_v5.oxm.value",
-               FT_UINT8, BASE_DEC|BASE_EXT_STRING, &ipproto_val_ext, 0x0,
+               FT_UINT8, BASE_DEC|BASE_EXT_STRING, (&ipproto_val_ext), 0x0,
                NULL, HFILL }
         },
         { &hf_openflow_v5_oxm_value_uint16,
@@ -9819,16 +9862,3 @@ proto_register_openflow_v5(void)
     expert_openflow_v5 = expert_register_protocol(proto_openflow_v5);
     expert_register_field_array(expert_openflow_v5, ei, array_length(ei));
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

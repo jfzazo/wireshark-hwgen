@@ -27,10 +27,14 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
 #include <epan/conversation.h>
 #include <epan/asn1.h>
+#include "packet-tpkt.h"
 #include "packet-ssl.h"
 #include "packet-t124.h"
 
@@ -56,17 +60,11 @@ static int ett_rdp_clientCoreData = -1;
 static int ett_rdp_clientSecurityData = -1;
 static int ett_rdp_clientNetworkData = -1;
 static int ett_rdp_clientClusterData = -1;
-static int ett_rdp_clientMonitorData = -1;
-static int ett_rdp_clientMsgChannelData = -1;
-static int ett_rdp_clientMonitorExData = -1;
-static int ett_rdp_clientMultiTransportData = -1;
 static int ett_rdp_clientUnknownData = -1;
 static int ett_rdp_ServerData = -1;
 static int ett_rdp_serverCoreData = -1;
 static int ett_rdp_serverSecurityData = -1;
 static int ett_rdp_serverNetworkData = -1;
-static int ett_rdp_serverMsgChannelData = -1;
-static int ett_rdp_serverMultiTransportData = -1;
 static int ett_rdp_serverUnknownData = -1;
 static int ett_rdp_channelIdArray = -1;
 static int ett_rdp_securityExchangePDU = -1;
@@ -94,17 +92,11 @@ static int hf_rdp_clientCoreData = -1;
 static int hf_rdp_clientSecurityData = -1;
 static int hf_rdp_clientNetworkData = -1;
 static int hf_rdp_clientClusterData = -1;
-static int hf_rdp_clientMonitorData = -1;
-static int hf_rdp_clientMsgChannelData = -1;
-static int hf_rdp_clientMonitorExData = -1;
-static int hf_rdp_clientMultiTransportData = -1;
 static int hf_rdp_clientUnknownData = -1;
 static int hf_rdp_ServerData = -1;
 static int hf_rdp_serverCoreData = -1;
 static int hf_rdp_serverSecurityData = -1;
 static int hf_rdp_serverNetworkData = -1;
-static int hf_rdp_serverMsgChannelData = -1;
-static int hf_rdp_serverMultiTransportData = -1;
 static int hf_rdp_serverUnknownData = -1;
 
 static int hf_rdp_securityExchangePDU = -1;
@@ -141,12 +133,6 @@ static int hf_rdp_encryptionMethods = -1;
 static int hf_rdp_extEncryptionMethods = -1;
 static int hf_rdp_cluster_flags = -1;
 static int hf_rdp_redirectedSessionId = -1;
-static int hf_rdp_msgChannelFlags = -1;
-static int hf_rdp_msgChannelId = -1;
-static int hf_rdp_monitorExFlags = -1;
-static int hf_rdp_monitorAttributeSize = -1;
-static int hf_rdp_monitorCount = -1;
-static int hf_rdp_multiTransportFlags = -1;
 
 
 static int hf_rdp_encryptionMethod = -1;
@@ -334,20 +320,14 @@ static int hf_rdp_DaylightBias = -1;
 
 static int hf_rdp_unused = -1;
 
-#define CS_CORE                0xC001
-#define CS_SECURITY            0xC002
-#define CS_NET                 0xC003
-#define CS_CLUSTER             0xC004
-#define CS_MONITOR             0xC005
-#define CS_MCS_MSGCHANNEL      0xC006
-#define CS_MONITOR_EX          0xC008
-#define CS_MULTITRANSPORT      0xC00A
+#define CS_CORE     0xC001
+#define CS_SECURITY 0xC002
+#define CS_NET      0xC003
+#define CS_CLUSTER  0xC004
 
-#define SC_CORE                0x0C01
-#define SC_SECURITY            0x0C02
-#define SC_NET                 0x0C03
-#define SC_MCS_MSGCHANNEL      0x0C04
-#define SC_MULTITRANSPORT      0x0C08
+#define SC_CORE     0x0C01
+#define SC_SECURITY 0x0C02
+#define SC_NET      0x0C03
 
 #define SEC_EXCHANGE_PKT       0x0001
 #define SEC_ENCRYPT            0x0008
@@ -563,19 +543,13 @@ typedef struct rdp_field_info_t {
 #define FI_TERMINATOR {NULL, 0, NULL, 0, 0, NULL}
 
 static const value_string rdp_headerType_vals[] = {
-  { CS_CORE,           "clientCoreData" },
-  { CS_SECURITY,       "clientSecurityData" },
-  { CS_NET,            "clientNetworkData" },
-  { CS_CLUSTER,        "clientClusterData" },
-  { CS_MONITOR,        "clientMonitorData" },
-  { CS_MCS_MSGCHANNEL, "clientMsgChannelData" },
-  { CS_MONITOR_EX,     "clientMonitorExData" },
-  { CS_MULTITRANSPORT, "clientMultiTransportData" },
-  { SC_CORE,           "serverCoreData" },
-  { SC_SECURITY,       "serverSecurityData" },
-  { SC_NET,            "serverNetworkData" },
-  { SC_MCS_MSGCHANNEL, "serverMsgChannelData" },
-  { SC_MULTITRANSPORT, "serverMultiTransportData" },
+  { CS_CORE,     "clientCoreData" },
+  { CS_SECURITY, "clientSecurityData" },
+  { CS_NET,      "clientNetworkData" },
+  { CS_CLUSTER,  "clientClusterData" },
+  { SC_CORE,     "serverCoreData" },
+  { SC_SECURITY, "serverSecurityData" },
+  { SC_NET,      "serverNetworkData" },
   { 0, NULL }
 };
 
@@ -606,7 +580,7 @@ static const value_string rdp_keyboardType_vals[] = {
   {   5, "Noki 1050 and similar keyboards" },
   {   6, "Nokia 9140 and similar keyboards" },
   {   7, "Japanese keyboard" },
-  {   0, NULL }
+  { 0, NULL }
 };
 
 static const value_string rdp_connectionType_vals[] = {
@@ -615,8 +589,7 @@ static const value_string rdp_connectionType_vals[] = {
   {   3, "Satellite (2 Mbps - 16Mbps with high latency)" },
   {   4, "High-speed broadband (2 Mbps - 10Mbps)" },
   {   5, "WAN (10 Mbps or higher with high latency)" },
-  {   6, "LAN (10 Mbps or higher)" },
-  {   7, "Auto Detect" },
+  {   6, "LAN (10 Mbps or higher" },
   {   0, NULL},
 };
 
@@ -1029,7 +1002,7 @@ dissect_rdp_clientNetworkData(tvbuff_t *tvb, int offset, packet_info *pinfo, pro
     for (i = 0; i < MIN(channelCount, MAX_CHANNELS); i++) {
       if (rdp_info) {
         rdp_info->channels[i].value = -1; /* unset */
-        rdp_info->channels[i].strptr = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 8, ENC_ASCII);
+        rdp_info->channels[i].strptr = tvb_get_string(wmem_packet_scope(), tvb, offset, 8);
       }
       offset = dissect_rdp_fields(tvb, offset, pinfo, next_tree, def_fields, 0);
     }
@@ -1694,32 +1667,6 @@ dissect_rdp_ClientData(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     {&hf_rdp_redirectedSessionId,    4, NULL, 0, 0, NULL },
     FI_TERMINATOR
   };
-  rdp_field_info_t msgchannel_fields[] = {
-    {&hf_rdp_headerType,             2, NULL, 0, 0, NULL },
-    {&hf_rdp_headerLength,           2, NULL, 0, 0, NULL },
-    {&hf_rdp_msgChannelFlags,        4, NULL, 0, 0, NULL },
-    FI_TERMINATOR
-  };
-  rdp_field_info_t monitor_fields[] = {
-    {&hf_rdp_headerType,             2, NULL, 0, 0, NULL },
-    {&hf_rdp_headerLength,           2, NULL, 0, 0, NULL },
-    {&hf_rdp_monitorCount,           4, NULL, 0, 0, NULL },
-    FI_TERMINATOR
-  };
-  rdp_field_info_t monitorex_fields[] = {
-    {&hf_rdp_headerType,             2, NULL, 0, 0, NULL },
-    {&hf_rdp_headerLength,           2, NULL, 0, 0, NULL },
-    {&hf_rdp_monitorExFlags,         4, NULL, 0, 0, NULL },
-    {&hf_rdp_monitorAttributeSize,   4, NULL, 0, 0, NULL },
-    {&hf_rdp_monitorCount,           4, NULL, 0, 0, NULL },
-    FI_TERMINATOR
-  };
-  rdp_field_info_t multitransport_fields[] = {
-    {&hf_rdp_headerType,             2, NULL, 0, 0, NULL },
-    {&hf_rdp_headerLength,           2, NULL, 0, 0, NULL },
-    {&hf_rdp_multiTransportFlags,    4, NULL, 0, 0, NULL },
-    FI_TERMINATOR
-  };
 
   tree = dissect_rdp(tvb, pinfo, tree);
 
@@ -1768,30 +1715,6 @@ dissect_rdp_ClientData(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
       next_tree = proto_item_add_subtree(pi, ett_rdp_clientClusterData);
       /*offset    =*/ dissect_rdp_fields(tvb, offset, pinfo, next_tree, cluster_fields, 0);
 
-      break;
-
-    case CS_MONITOR:
-      pi        = proto_tree_add_item(tree, hf_rdp_clientMonitorData, tvb, offset, length, ENC_NA);
-      next_tree = proto_item_add_subtree(pi, ett_rdp_clientMonitorData);
-      /*offset    =*/ dissect_rdp_fields(tvb, offset, pinfo, next_tree, monitor_fields, 0);
-      break;
-
-    case CS_MONITOR_EX:
-      pi        = proto_tree_add_item(tree, hf_rdp_clientMonitorExData, tvb, offset, length, ENC_NA);
-      next_tree = proto_item_add_subtree(pi, ett_rdp_clientMonitorExData);
-      /*offset    =*/ dissect_rdp_fields(tvb, offset, pinfo, next_tree, monitorex_fields, 0);
-      break;
-
-    case CS_MCS_MSGCHANNEL:
-      pi        = proto_tree_add_item(tree, hf_rdp_clientMsgChannelData, tvb, offset, length, ENC_NA);
-      next_tree = proto_item_add_subtree(pi, ett_rdp_clientMsgChannelData);
-      /*offset    =*/ dissect_rdp_fields(tvb, offset, pinfo, next_tree, msgchannel_fields, 0);
-      break;
-
-    case CS_MULTITRANSPORT:
-      pi        = proto_tree_add_item(tree, hf_rdp_clientMultiTransportData, tvb, offset, length, ENC_NA);
-      next_tree = proto_item_add_subtree(pi, ett_rdp_clientMultiTransportData);
-      /*offset    =*/ dissect_rdp_fields(tvb, offset, pinfo, next_tree, multitransport_fields, 0);
       break;
 
     default: /* unknown */
@@ -1846,6 +1769,10 @@ dissect_rdp_ServerData(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     {&hf_rdp_encryptionLevel,          4, &encryptionLevel,  0, 0, NULL },
     FI_TERMINATOR
   };
+  rdp_field_info_t ss_encryption_len_unused_fields[] = {
+    {&hf_rdp_unused,                   4, NULL,  0, 0, NULL },
+    {&hf_rdp_unused,                   4, NULL,  0, 0, NULL },
+  };
   rdp_field_info_t encryption_fields[] = {
     {&hf_rdp_serverRandomLen,          4, &serverRandomLen,  0, 0, NULL },
     {&hf_rdp_serverCertLen,            4, &serverCertLen,    0, 0, NULL },
@@ -1870,18 +1797,6 @@ dissect_rdp_ServerData(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
   };
   rdp_field_info_t pad_fields[] = {
     {&hf_rdp_Pad, 2, NULL, 0, 0, NULL },
-    FI_TERMINATOR
-  };
-  rdp_field_info_t msgchannel_fields[] = {
-    {&hf_rdp_headerType,               2, NULL, 0, 0, NULL },
-    {&hf_rdp_headerLength,             2, NULL, 0, 0, NULL },
-    {&hf_rdp_msgChannelId,             2, NULL, 0, 0, NULL },
-    FI_TERMINATOR
-  };
-  rdp_field_info_t multitransport_fields[] = {
-    {&hf_rdp_headerType,               2, NULL, 0, 0, NULL },
-    {&hf_rdp_headerLength,             2, NULL, 0, 0, NULL },
-    {&hf_rdp_multiTransportFlags,      4, NULL, 0, 0, NULL },
     FI_TERMINATOR
   };
 
@@ -1927,6 +1842,8 @@ dissect_rdp_ServerData(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
       if ((encryptionLevel != 0) || (encryptionMethod != 0)) {
         /*lcl_offset =*/ dissect_rdp_fields(tvb, lcl_offset, pinfo, next_tree, encryption_fields, 0);
+      } else {
+        /*lcl_offset =*/ dissect_rdp_fields(tvb, lcl_offset, pinfo, next_tree, ss_encryption_len_unused_fields, 0);
       }
 
       rdp_info->encryptionMethod = encryptionMethod;
@@ -1963,18 +1880,6 @@ dissect_rdp_ServerData(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
       }
       break;
     }
-
-    case SC_MCS_MSGCHANNEL:
-      pi        = proto_tree_add_item(tree, hf_rdp_serverMsgChannelData, tvb, offset, length, ENC_NA);
-      next_tree = proto_item_add_subtree(pi, ett_rdp_serverMsgChannelData);
-      /*offset    =*/ dissect_rdp_fields(tvb, offset, pinfo, next_tree, msgchannel_fields, length);
-      break;
-
-    case SC_MULTITRANSPORT:
-      pi        = proto_tree_add_item(tree, hf_rdp_serverMultiTransportData, tvb, offset, length, ENC_NA);
-      next_tree = proto_item_add_subtree(pi, ett_rdp_serverMultiTransportData);
-      /*offset    =*/ dissect_rdp_fields(tvb, offset, pinfo, next_tree, multitransport_fields, length);
-      break;
 
     default:  /* unknown */
       pi        = proto_tree_add_item(tree, hf_rdp_serverUnknownData, tvb, offset, length, ENC_NA);
@@ -2017,22 +1922,6 @@ proto_register_rdp(void) {
       { "clientClusterData", "rdp.client.clusterData",
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
-    { &hf_rdp_clientMonitorData,
-      { "clientMonitorData", "rdp.client.monitorData",
-        FT_NONE, BASE_NONE, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_clientMsgChannelData,
-      { "clientMsgChannelData", "rdp.client.msgChannelData",
-        FT_NONE, BASE_NONE, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_clientMonitorExData,
-      { "clientMonitorExData", "rdp.client.monitorExData",
-        FT_NONE, BASE_NONE, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_clientMultiTransportData,
-      { "clientMultiTransportData", "rdp.client.multiTransportData",
-        FT_NONE, BASE_NONE, NULL, 0,
-        NULL, HFILL }},
     { &hf_rdp_clientUnknownData,
       { "clientUnknownData", "rdp.unknownData.client",
         FT_NONE, BASE_NONE, NULL, 0,
@@ -2051,14 +1940,6 @@ proto_register_rdp(void) {
         NULL, HFILL }},
     { &hf_rdp_serverNetworkData,
       { "serverNetworkData", "rdp.server.networkData",
-        FT_NONE, BASE_NONE, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_serverMsgChannelData,
-      { "serverMsgChannelData", "rdp.server.msgChannelData",
-        FT_NONE, BASE_NONE, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_serverMultiTransportData,
-      { "serverMultiTransportData", "rdp.server.multiTransportData",
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
     { &hf_rdp_serverUnknownData,
@@ -2191,30 +2072,6 @@ proto_register_rdp(void) {
         NULL, HFILL }},
     { &hf_rdp_redirectedSessionId,
       { "redirectedSessionId", "rdp.redirectedSessionId",
-        FT_UINT32, BASE_HEX, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_msgChannelFlags,
-      { "msgChannelFlags", "rdp.msgChannelFlags",
-        FT_UINT32, BASE_HEX, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_msgChannelId,
-      { "msgChannelId", "rdp.msgChannelId",
-        FT_UINT16, BASE_DEC, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_monitorExFlags,
-      { "monitorExFlags", "rdp.monitorExFlags",
-        FT_UINT32, BASE_HEX, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_monitorAttributeSize,
-      { "monitorAttributeSize", "rdp.monitorAttributeSize",
-        FT_UINT32, BASE_DEC, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_monitorCount,
-      { "monitorCount", "rdp.monitorCount",
-        FT_UINT32, BASE_DEC, NULL, 0,
-        NULL, HFILL }},
-    { &hf_rdp_multiTransportFlags,
-      { "multiTransportFlags", "rdp.multiTransportFlags",
         FT_UINT32, BASE_HEX, NULL, 0,
         NULL, HFILL }},
     { &hf_rdp_encryptionMethod,
@@ -2884,10 +2741,6 @@ proto_register_rdp(void) {
     &ett_rdp_clientClusterData,
     &ett_rdp_clientCoreData,
     &ett_rdp_clientInfoPDU,
-    &ett_rdp_clientMonitorData,
-    &ett_rdp_clientMonitorExData,
-    &ett_rdp_clientMsgChannelData,
-    &ett_rdp_clientMultiTransportData,
     &ett_rdp_clientNetworkData,
     &ett_rdp_clientSecurityData,
     &ett_rdp_clientUnknownData,
@@ -2898,8 +2751,6 @@ proto_register_rdp(void) {
     &ett_rdp_pduType,
     &ett_rdp_securityExchangePDU,
     &ett_rdp_serverCoreData,
-    &ett_rdp_serverMsgChannelData,
-    &ett_rdp_serverMultiTransportData,
     &ett_rdp_serverNetworkData,
     &ett_rdp_serverSecurityData,
     &ett_rdp_serverUnknownData,
@@ -2959,16 +2810,3 @@ prefs_register_rdp(void) {
   if ((tcp_port > 0) && (tcp_port != 102) && tpkt_handle)
     dissector_add_uint("tcp.port", tcp_port, tpkt_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

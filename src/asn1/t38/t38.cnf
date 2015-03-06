@@ -129,8 +129,10 @@ VAL_PTR=&Data_Field_field_type_value
                     if (new_tvb) call_dissector_with_data((t30_hdlc_handle) ? t30_hdlc_handle : data_handle, new_tvb, actx->pinfo, tree, t38_info);
                 }
             } else {
-                proto_tree_add_expert_format(tree, actx->pinfo, &ei_t38_malformed, tvb, offset, tvb_reported_length_remaining(tvb, offset),
+                if(tree){
+                    proto_tree_add_text(tree, tvb, offset, tvb_reported_length_remaining(tvb, offset),
                         "[RECEIVED END OF FRAGMENT W/OUT ANY FRAGMENT DATA]");
+                }
                 col_append_str(actx->pinfo->cinfo, COL_INFO, " [Malformed?]");
                 actx->pinfo->fragmented = save_fragmented;
             }
@@ -158,11 +160,11 @@ VAL_PTR=&Data_Field_field_type_value
     if (primary_part){
         if(value_len < 8){
             col_append_fstr(actx->pinfo->cinfo, COL_INFO, "[%s]",
-               tvb_bytes_to_str(wmem_packet_scope(), value_tvb,0,value_len));
+               tvb_bytes_to_ep_str(value_tvb,0,value_len));
         }
         else {
             col_append_fstr(actx->pinfo->cinfo, COL_INFO, "[%s...]",
-               tvb_bytes_to_str(wmem_packet_scope(), value_tvb,0,7));
+               tvb_bytes_to_ep_str(value_tvb,0,7));
         }
     }
 

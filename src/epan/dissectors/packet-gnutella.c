@@ -23,6 +23,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include "packet-gnutella.h"
 #include "packet-tcp.h"
@@ -129,10 +131,11 @@ static void dissect_gnutella_query(tvbuff_t *tvb, guint offset, proto_tree *tree
 			ENC_ASCII|ENC_NA);
 	}
 	else {
-		proto_tree_add_string_format(tree,
-			hf_gnutella_query_search, tvb,
+		proto_tree_add_text(tree,
+			tvb,
 			offset + GNUTELLA_QUERY_SEARCH_OFFSET,
-			0, "", "Missing data for Query Search.");
+			0,
+			"Missing data for Query Search.");
 	}
 }
 
@@ -315,9 +318,7 @@ static void dissect_gnutella_push(tvbuff_t *tvb, guint offset, proto_tree *tree)
 }
 
 static guint
-get_gnutella_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                     int offset, void *data _U_)
-{
+get_gnutella_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset) {
 	guint32 size;
 
 	size = tvb_get_letohl(
@@ -748,16 +749,3 @@ void proto_reg_handoff_gnutella(void) {
 			proto_gnutella);
 	dissector_add_uint("tcp.port", GNUTELLA_TCP_PORT, gnutella_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

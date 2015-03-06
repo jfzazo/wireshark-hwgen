@@ -24,9 +24,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
-#include "packet-mpeg-sect.h"
+#include <epan/dissectors/packet-mpeg-sect.h>
 
 void proto_register_etv(void);
 void proto_reg_handoff_etv(void);
@@ -128,7 +130,7 @@ dissect_etv_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int prot
 	}
 	offset += 1;
 
-	sub_tvb = tvb_new_subset_length(tvb, offset, sect_len-7);
+	sub_tvb = tvb_new_subset(tvb, offset, sect_len-7, sect_len-7);
 	call_dissector(dsmcc_handle, sub_tvb, pinfo, tree);
 
 	sect_len += 3 - 4; /* add header, remove crc */
@@ -237,15 +239,3 @@ proto_reg_handoff_etv(void)
 	dsmcc_handle = find_dissector("mp2t-dsmcc");
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

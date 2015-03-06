@@ -23,6 +23,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 #include "packet-arcnet.h"
@@ -41,7 +43,6 @@ static int hf_arcnet_protID = -1;
 static int hf_arcnet_exception_flag = -1;
 static int hf_arcnet_split_flag = -1;
 static int hf_arcnet_sequence = -1;
-static int hf_arcnet_padding = -1;
 
 /* Initialize the subtree pointers */
 static gint ett_arcnet = -1;
@@ -134,8 +135,8 @@ dissect_arcnet_common (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree,
   int offset = 0;
   guint8 dst, src, protID, split_flag;
   tvbuff_t *next_tvb;
-  proto_item *ti;
-  proto_tree *arcnet_tree;
+  proto_item *ti = NULL;
+  proto_tree *arcnet_tree = NULL;
 
   col_set_str (pinfo->cinfo, COL_PROTOCOL, "ARCNET");
 
@@ -212,7 +213,7 @@ dissect_arcnet_common (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree,
                            split_flag);
       offset++;
 
-      proto_tree_add_item(arcnet_tree, hf_arcnet_padding, tvb, offset, 2, ENC_BIG_ENDIAN);
+      proto_tree_add_text (arcnet_tree, tvb, offset, 2, "Padding");
       offset += 2;
 
       /* Another copy of the packet type appears after the padding. */
@@ -330,11 +331,6 @@ proto_register_arcnet (void)
       FT_UINT16, BASE_DEC, NULL, 0,
       "Sequence number", HFILL}
      },
-    {&hf_arcnet_padding,
-     {"Padding", "arcnet.padding",
-      FT_UINT16, BASE_HEX, NULL, 0,
-      NULL, HFILL}
-     },
   };
 
 /* Setup protocol subtree array */
@@ -368,16 +364,3 @@ proto_reg_handoff_arcnet (void)
   dissector_add_uint ("wtap_encap", WTAP_ENCAP_ARCNET_LINUX, arcnet_linux_handle);
   data_handle = find_dissector ("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

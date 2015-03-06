@@ -22,7 +22,7 @@
 #ifndef PACKET_LIST_MODEL_H
 #define PACKET_LIST_MODEL_H
 
-#include <config.h>
+#include "config.h"
 
 #include <stdio.h>
 
@@ -49,6 +49,7 @@ public:
     QModelIndex parent(const QModelIndex &index) const;
     int packetNumberToRow(int packet_num) const;
     guint recreateVisibleRows();
+    void setColorEnabled(bool enable_color);
     void clear();
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
@@ -61,31 +62,21 @@ public:
     frame_data *getRowFdata(int row);
     int visibleIndexOf(frame_data *fdata) const;
     void resetColumns();
-    void resetColorized();
-    int columnTextSize(const char *str);
 
 signals:
-    void goToPacket(int);
 
 public slots:
-    void setMonospaceFont(const QFont &mono_font);
-    void sort(int column, Qt::SortOrder order = Qt::AscendingOrder);
 
 private:
     capture_file *cap_file_;
-    QFont mono_font_;
     QList<QString> col_names_;
     QVector<PacketListRecord *> visible_rows_;
     QVector<PacketListRecord *> physical_rows_;
     QMap<int, int> number_to_row_;
+    QFont pl_font_;
 
     int header_height_;
-
-    static int sort_column_;
-    static int text_sort_column_;
-    static Qt::SortOrder sort_order_;
-    static capture_file *sort_cap_file_;
-    static bool recordLessThan(PacketListRecord *r1, PacketListRecord *r2);
+    bool enable_color_;
 };
 
 #endif // PACKET_LIST_MODEL_H

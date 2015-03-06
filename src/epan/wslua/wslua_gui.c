@@ -24,7 +24,7 @@
 
 #include "config.h"
 
-#include <epan/wmem/wmem.h>
+#include <epan/emem.h>
 
 #include "wslua.h"
 
@@ -97,6 +97,11 @@ WSLUA_FUNCTION wslua_register_menu(lua_State* L) { /*  Register a menu item in o
 
     if ( group > REGISTER_TOOLS_GROUP_UNSORTED) {
         WSLUA_OPTARG_ERROR(register_menu,GROUP,"Must be a defined MENU_* (see init.lua)");
+        return 0;
+    }
+
+    if(!name) {
+        WSLUA_ARG_ERROR(register_menu,NAME,"Must be a string");
         return 0;
     }
 
@@ -234,7 +239,10 @@ WSLUA_FUNCTION wslua_new_dialog(lua_State* L) { /* Pops up a new dialog */
         return 0;
     }
 
-    title = luaL_checkstring(L,WSLUA_ARG_new_dialog_TITLE);
+    if (! (title  = luaL_checkstring(L,WSLUA_ARG_new_dialog_TITLE)) ) {
+        WSLUA_ARG_ERROR(new_dialog,TITLE,"Must be a string");
+        return 0;
+    }
 
     if (! lua_isfunction(L,WSLUA_ARG_new_dialog_ACTION)) {
         WSLUA_ARG_ERROR(new_dialog,ACTION,"Must be a function");
@@ -261,13 +269,15 @@ WSLUA_FUNCTION wslua_new_dialog(lua_State* L) { /* Pops up a new dialog */
     top -= 2;
 
     for (i = 1; i <= top; i++) {
-        if (! lua_isstring(L,i)) {
+        gchar* label = g_strdup(luaL_checkstring(L,i));
+
+        if (! label) {
             g_ptr_array_free(labels,TRUE);
             WSLUA_ERROR(new_dialog,"All fields must be strings");
             return 0;
         }
 
-        g_ptr_array_add(labels,(gpointer)g_strdup(luaL_checkstring(L,i)));
+        g_ptr_array_add(labels,(gpointer)label);
     }
 
     g_ptr_array_add(labels,NULL);
@@ -362,9 +372,9 @@ WSLUA_METHOD ProgDlg_close(lua_State* L) { /* Closes the progress dialog. */
 static int ProgDlg__tostring(lua_State* L) {
     ProgDlg pd = checkProgDlg(L,1);
 
-    lua_pushfstring(L, "%sstopped",pd->stopped?"":"not ");
+    lua_pushstring(L,ep_strdup_printf("%sstopped",pd->stopped?"":"not "));
 
-    WSLUA_RETURN(1); /* A string specifying whether the Progress Dialog has stopped or not. */
+    return 0;
 }
 
 /* Gets registered as metamethod automatically by WSLUA_REGISTER_CLASS/META */
@@ -486,6 +496,11 @@ WSLUA_METHOD TextWindow_set(lua_State* L) { /* Sets the text. */
         return 0;
     }
 
+    if (!text) {
+        WSLUA_ARG_ERROR(TextWindow_set,TEXT,"Must be a string");
+        return 0;
+    }
+
     ops->set_text(tw->ws_tw,text);
 
     /* XXX: this is a bad way to do this - should copy the object on to the stack first */
@@ -502,6 +517,11 @@ WSLUA_METHOD TextWindow_append(lua_State* L) { /* Appends text */
         return 0;
     }
 
+    if (!text) {
+        WSLUA_ARG_ERROR(TextWindow_append,TEXT,"Must be a string");
+        return 0;
+    }
+
     ops->append_text(tw->ws_tw,text);
 
     /* XXX: this is a bad way to do this - should copy the object on to the stack first */
@@ -515,6 +535,11 @@ WSLUA_METHOD TextWindow_prepend(lua_State* L) { /* Prepends text */
 
     if (!ops->prepend_text) {
         WSLUA_ERROR(TextWindow_prepend,"GUI not available");
+        return 0;
+    }
+
+    if (!text) {
+        WSLUA_ARG_ERROR(TextWindow_prepend,TEXT,"Must be a string");
         return 0;
     }
 
@@ -715,6 +740,11 @@ WSLUA_FUNCTION wslua_copy_to_clipboard(lua_State* L) { /* Copy a string into the
         return 0;
     }
 
+    if (!copied_str) {
+        WSLUA_ARG_ERROR(copy_to_clipboard,TEXT,"Must be a string");
+        return 0;
+    }
+
     gstr = g_string_new(copied_str);
 
     ops->copy_to_clipboard(gstr);
@@ -730,20 +760,24 @@ WSLUA_FUNCTION wslua_open_capture_file(lua_State* L) { /* Open and display a cap
 
     const char* fname = luaL_checkstring(L,WSLUA_ARG_open_capture_file_FILENAME);
     const char* filter = luaL_optstring(L,WSLUA_ARG_open_capture_file_FILTER,NULL);
-    char* error = NULL;
+    const char* error = NULL;
 
     if (!ops->open_file) {
         WSLUA_ERROR(open_capture_file, "GUI not available");
         return 0;
     }
 
+    if (!fname) {
+        WSLUA_ARG_ERROR(open_capture_file,FILENAME,"Must be a string");
+        return 0;
+    }
+
     if (! ops->open_file(fname,filter,&error) ) {
         lua_pushboolean(L,FALSE);
 
-        if (error) {
+        if (error)
             lua_pushstring(L,error);
-            g_free(error);
-        } else
+        else
             lua_pushnil(L);
 
         return 2;
@@ -776,6 +810,11 @@ WSLUA_FUNCTION wslua_set_filter(lua_State* L) { /* Set the main filter text. */
         return 0;
     }
 
+    if (!filter_str) {
+        WSLUA_ARG_ERROR(set_filter,TEXT,"Must be a string");
+        return 0;
+    }
+
     ops->set_filter(filter_str);
 
     return 0;
@@ -784,11 +823,16 @@ WSLUA_FUNCTION wslua_set_filter(lua_State* L) { /* Set the main filter text. */
 WSLUA_FUNCTION wslua_set_color_filter_slot(lua_State* L) { /* Set packet-coloring rule for the current session. */
 #define WSLUA_ARG_set_color_filter_slot_ROW 1 /* The index of the desired color in the temporary coloring rules list. */
 #define WSLUA_ARG_set_color_filter_slot_TEXT  2 /* Display filter for selecting packets to be colorized. */
-    guint8 row = (guint8)luaL_checkinteger(L,WSLUA_ARG_set_color_filter_slot_ROW);
+    guint8 row = luaL_checkint(L,WSLUA_ARG_set_color_filter_slot_ROW);
     const gchar* filter_str = luaL_checkstring(L,WSLUA_ARG_set_color_filter_slot_TEXT);
 
     if (!ops->set_color_filter_slot) {
         WSLUA_ERROR(set_color_filter_slot, "GUI not available");
+        return 0;
+    }
+
+    if (!filter_str) {
+        WSLUA_ARG_ERROR(set_color_filter_slot,TEXT,"Must be a string");
         return 0;
     }
 
@@ -831,6 +875,11 @@ WSLUA_FUNCTION wslua_browser_open_url(lua_State* L) { /* Open an url in a browse
         return 0;
     }
 
+    if (!url) {
+        WSLUA_ARG_ERROR(browser_open_url,URL,"Must be a string");
+        return 0;
+    }
+
     ops->browser_open_url(url);
 
     return 0;
@@ -842,6 +891,11 @@ WSLUA_FUNCTION wslua_browser_open_data_file(lua_State* L) { /* Open a file in a 
 
     if (!ops->browser_open_data_file) {
         WSLUA_ERROR(browser_open_data_file, "GUI not available");
+        return 0;
+    }
+
+    if (!file) {
+        WSLUA_ARG_ERROR(browser_open_data_file,FILENAME,"Must be a string");
         return 0;
     }
 

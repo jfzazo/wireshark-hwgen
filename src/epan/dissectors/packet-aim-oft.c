@@ -23,8 +23,12 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
 
+#include <epan/packet.h>
+#include <epan/strutil.h>
+
+#include "packet-aim.h"
 
 void proto_register_aim_oft(void);
 void proto_reg_handoff_aim_oft(void);
@@ -88,7 +92,7 @@ proto_register_aim_oft(void)
 
 /* Required function calls to register the header fields and subtrees used */
 /*  proto_register_field_array(proto_aim_oft, hf, array_length(hf));*/
-/*  proto_register_subtree_array(ett, array_length(ett));*/
+/*	proto_register_subtree_array(ett, array_length(ett));*/
 }
 
 void
@@ -100,16 +104,3 @@ proto_reg_handoff_aim_oft(void)
   aim_handle = new_create_dissector_handle(dissect_aim, proto_aim);
   dissector_add_uint("tcp.port", TCP_PORT_AIM, aim_handle);*/
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

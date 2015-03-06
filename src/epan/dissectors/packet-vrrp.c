@@ -27,6 +27,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/ipproto.h>
 #include <epan/in_cksum.h>
@@ -180,18 +181,23 @@ dissect_vrrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
             case 3:
                 if((g_vrrp_v3_checksum_as_in_v2 == FALSE)||(pinfo->src.type == AT_IPv6)){
                     /* Set up the fields of the pseudo-header. */
-                    SET_CKSUM_VEC_PTR(cksum_vec[0], (const guint8 *)pinfo->src.data, pinfo->src.len);
-                    SET_CKSUM_VEC_PTR(cksum_vec[1], (const guint8 *)pinfo->dst.data, pinfo->dst.len);
+                    cksum_vec[0].ptr = (const guint8 *)pinfo->src.data;
+                    cksum_vec[0].len = pinfo->src.len;
+                    cksum_vec[1].ptr = (const guint8 *)pinfo->dst.data;
+                    cksum_vec[1].len = pinfo->dst.len;
+                    cksum_vec[2].ptr = (const guint8 *)&phdr;
                     phdr[0] = g_htonl(vrrp_len);
                     phdr[1] = g_htonl(IP_PROTO_VRRP);
-                    SET_CKSUM_VEC_PTR(cksum_vec[2], (const guint8 *)&phdr, 8);
-                    SET_CKSUM_VEC_TVB(cksum_vec[3], tvb, 0, vrrp_len);
+                    cksum_vec[2].len = 8;
+                    cksum_vec[3].ptr = tvb_get_ptr(tvb, 0, vrrp_len);
+                    cksum_vec[3].len = vrrp_len;
                     computed_cksum = in_cksum(cksum_vec, 4);
                     break;
                 }
             case 2:
             default:
-                SET_CKSUM_VEC_TVB(cksum_vec[0], tvb, 0, vrrp_len);
+                cksum_vec[0].ptr = tvb_get_ptr(tvb, 0, vrrp_len);
+                cksum_vec[0].len = vrrp_len;
                 computed_cksum = in_cksum(&cksum_vec[0], 1);
                 break;
         }
@@ -205,9 +211,9 @@ dissect_vrrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
             PROTO_ITEM_SET_HIDDEN(hidden_item);
             if(hi_nibble(ver_type)==3){
                 proto_item_append_text(checksum_item, " [incorrect, should be 0x%04x(check preferences)]", in_cksum_shouldbe(cksum, computed_cksum));
-            } else {
+            }else{
                 proto_item_append_text(checksum_item, " [incorrect, should be 0x%04x]", in_cksum_shouldbe(cksum, computed_cksum));
-            }
+			}
             expert_add_info_format(pinfo, checksum_item, &ei_vrrp_checksum,
                                    "VRRP Checksum Incorrect, should be 0x%04x", in_cksum_shouldbe(cksum, computed_cksum));
         }
@@ -336,7 +342,7 @@ void proto_register_vrrp(void)
 
     vrrp_module = prefs_register_protocol(proto_vrrp, NULL);
 
-    prefs_register_bool_preference(vrrp_module, "v3_checksum_as_in_v2",
+   prefs_register_bool_preference(vrrp_module, "v3_checksum_as_in_v2",
         "Calculate V3 checksum as in V2 for IPv4 packets",
         "There is some ambigiousy on how to calculate V3 checksums"
         "As in V3 will use a pseudo header(which may only be implemented for IPv6 by some manufacturers)",

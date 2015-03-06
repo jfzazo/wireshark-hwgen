@@ -9,7 +9,7 @@ PER
 ALIGNED
 #.END
 
-#.PDU_NEW
+#.PDU
 NBAP-PDU
 
 #.MAKE_DEFINES
@@ -764,7 +764,7 @@ transportFormatSet_type = NBAP_CPCH;
                 umts_fp_conversation_info->channel           = CHANNEL_RACH_FDD;
                 umts_fp_conversation_info->dl_frame_number   = 0;
                 umts_fp_conversation_info->ul_frame_number   = actx->pinfo->fd->num;
-                WMEM_COPY_ADDRESS(wmem_file_scope(), &(umts_fp_conversation_info->crnc_address), &dst_addr);
+                SE_COPY_ADDRESS(&(umts_fp_conversation_info->crnc_address), &dst_addr);
                 umts_fp_conversation_info->crnc_port         = BindingID_port;
                 umts_fp_conversation_info->rlc_mode          = FP_RLC_MODE_UNKNOWN;
 
@@ -857,7 +857,7 @@ num_items = 1;
                 umts_fp_conversation_info->channel            = CHANNEL_PCH;
                 umts_fp_conversation_info->dl_frame_number    = 0;
                 umts_fp_conversation_info->ul_frame_number    = actx->pinfo->fd->num;
-                WMEM_COPY_ADDRESS(wmem_file_scope(), &(umts_fp_conversation_info->crnc_address), &dst_addr);
+                SE_COPY_ADDRESS(&(umts_fp_conversation_info->crnc_address), &dst_addr);
                 umts_fp_conversation_info->crnc_port          = BindingID_port;
                 umts_fp_conversation_info->paging_indications = paging_indications;
                 umts_fp_conversation_info->rlc_mode           = FP_RLC_MODE_UNKNOWN;
@@ -966,7 +966,7 @@ transportFormatSet_type = NBAP_CPCH;
                 umts_fp_conversation_info->channel           = CHANNEL_FACH_FDD;
                 umts_fp_conversation_info->dl_frame_number   = 0;
                 umts_fp_conversation_info->ul_frame_number   = actx->pinfo->fd->num;
-                WMEM_COPY_ADDRESS(wmem_file_scope(), &(umts_fp_conversation_info->crnc_address), &dst_addr);
+                SE_COPY_ADDRESS(&(umts_fp_conversation_info->crnc_address), &dst_addr);
                 umts_fp_conversation_info->crnc_port         = BindingID_port;
                 umts_fp_conversation_info->rlc_mode          = FP_RLC_MODE_UNKNOWN;
                 /*Save unique UE-identifier */
@@ -1173,7 +1173,7 @@ dch_id = 0xFFFFFFFF;
                 umts_fp_conversation_info->channel           = CHANNEL_DCH;
                 umts_fp_conversation_info->dl_frame_number   = 0;
                 umts_fp_conversation_info->ul_frame_number   = actx->pinfo->fd->num;
-                WMEM_COPY_ADDRESS(wmem_file_scope(), &(umts_fp_conversation_info->crnc_address), &dst_addr);
+                SE_COPY_ADDRESS(&(umts_fp_conversation_info->crnc_address), &dst_addr);
                 umts_fp_conversation_info->crnc_port         = BindingID_port;
                 umts_fp_conversation_info->rlc_mode          = FP_RLC_MODE_UNKNOWN;
 
@@ -1264,7 +1264,7 @@ BindingID_port = 0;
             &null_addr, PT_UDP, BindingID_port,
             0, NO_ADDR_B|NO_PORT_B);
 
-        /* We must also check if this port is about to be overriden, if that's the case we
+        /* We must also check if this port is about to be overriden, if thats the case we
          * might already have a DCH entry on this port which should be overwritten
          */
         if (conversation == NULL || ((umts_fp_conversation_info_t*)conversation_get_proto_data(conversation, proto_fp))->channel == CHANNEL_DCH) {
@@ -1286,7 +1286,7 @@ BindingID_port = 0;
                 umts_fp_conversation_info->channel           = CHANNEL_EDCH;
                 umts_fp_conversation_info->dl_frame_number   = 0;
                 umts_fp_conversation_info->ul_frame_number   = actx->pinfo->fd->num;
-                WMEM_COPY_ADDRESS(wmem_file_scope(), &(umts_fp_conversation_info->crnc_address), &dst_addr);
+                SE_COPY_ADDRESS(&(umts_fp_conversation_info->crnc_address), &dst_addr);
                 umts_fp_conversation_info->crnc_port         = BindingID_port;
 
 
@@ -1325,6 +1325,10 @@ BindingID_port = 0;
                         address_to_str(wmem_packet_scope(), &dst_addr),
                         BindingID_port);
 
+                    /* Set address for collection of DDI entries */
+                    COPY_ADDRESS(&(nbap_edch_channel_info[e_dch_macdflow_id].crnc_address),&dst_addr);
+                    nbap_edch_channel_info[e_dch_macdflow_id].crnc_port = BindingID_port;
+
                     g_tree_insert(edch_flow_port_map, GINT_TO_POINTER((gint)umts_fp_conversation_info->com_context_id), nbap_edch_port_info);
                 }else{
 
@@ -1338,9 +1342,6 @@ BindingID_port = 0;
                     old_info->crnc_port[e_dch_macdflow_id] = BindingID_port;
                 }
 
-                /* Set address for collection of DDI entries */
-                COPY_ADDRESS(&(nbap_edch_channel_info[e_dch_macdflow_id].crnc_address),&dst_addr);
-                nbap_edch_channel_info[e_dch_macdflow_id].crnc_port = BindingID_port;
 
                 set_umts_fp_conv_data(conversation, umts_fp_conversation_info);
 
@@ -1459,7 +1460,7 @@ BindingID_port = 0;
                 umts_fp_conversation_info->channel           = CHANNEL_EDCH;
                 umts_fp_conversation_info->dl_frame_number   = 0;
                 umts_fp_conversation_info->ul_frame_number   = actx->pinfo->fd->num;
-                WMEM_COPY_ADDRESS(wmem_file_scope(), &(umts_fp_conversation_info->crnc_address), &dst_addr);
+                SE_COPY_ADDRESS(&(umts_fp_conversation_info->crnc_address), &dst_addr);
                 umts_fp_conversation_info->crnc_port         = BindingID_port;
 
 
@@ -1661,7 +1662,7 @@ nbap_edch_channel_info[e_dch_macdflow_id].no_ddi_entries = num_items;
             /*This flow must also be added*/
             case id_HSDSCH_MACdFlows_to_Add:
                 if (!actx->pinfo->fd->flags.visited){
-                /* Set port to zero use that as an indication of whether we have data or not */
+                /* Set port to zero use that as an indication of wether we have data or not */
                     for (i = 0; i < maxNrOfMACdFlows; i++) {
                         nbap_hsdsch_channel_info[i].crnc_port = 0;
                         nbap_hsdsch_channel_info[i].rlc_mode = FP_RLC_MODE_UNKNOWN;
@@ -1759,7 +1760,7 @@ nbap_edch_channel_info[e_dch_macdflow_id].no_ddi_entries = num_items;
     guint32 i;
 
     if (!actx->pinfo->fd->flags.visited){
-        /* Set port to zero use that as an indication of whether we have data or not */
+        /* Set port to zero use that as an indication of wether we have data or not */
         for (i = 0; i < maxNrOfMACdFlows; i++) {
             nbap_hsdsch_channel_info[i].crnc_port = 0;
             nbap_hsdsch_channel_info[i].rlc_mode = FP_RLC_MODE_UNKNOWN;
@@ -1774,7 +1775,7 @@ nbap_edch_channel_info[e_dch_macdflow_id].no_ddi_entries = num_items;
         return offset;
     }
 
-    /* Set port to zero use that as an indication of whether we have data or not */
+    /* Set port to zero use that as an indication of wether we have data or not */
     SET_ADDRESS(&null_addr, AT_NONE, 0, NULL);
     for (i = 0; i < maxNrOfMACdFlows; i++) {
         if (nbap_hsdsch_channel_info[i].crnc_port != 0){
@@ -1807,7 +1808,7 @@ nbap_edch_channel_info[e_dch_macdflow_id].no_ddi_entries = num_items;
                     umts_fp_conversation_info->channel           = CHANNEL_HSDSCH;
                     umts_fp_conversation_info->dl_frame_number   = 0;
                     umts_fp_conversation_info->ul_frame_number   = actx->pinfo->fd->num;
-                    WMEM_COPY_ADDRESS(wmem_file_scope(), &(umts_fp_conversation_info->crnc_address), &nbap_hsdsch_channel_info[i].crnc_address);
+                    SE_COPY_ADDRESS(&(umts_fp_conversation_info->crnc_address), &nbap_hsdsch_channel_info[i].crnc_address);
                     umts_fp_conversation_info->crnc_port         = nbap_hsdsch_channel_info[i].crnc_port;
 
                     /*Added june 3, normally just the iterator variable*/
@@ -1872,7 +1873,7 @@ nbap_edch_channel_info[e_dch_macdflow_id].no_ddi_entries = num_items;
     guint32 i;
 
     if (!actx->pinfo->fd->flags.visited){
-        /* Set port to zero use that as an indication of whether we have data or not */
+        /* Set port to zero use that as an indication of wether we have data or not */
         for (i = 0; i < maxNrOfMACdFlows; i++) {
             nbap_hsdsch_channel_info[i].crnc_port = 0;
             nbap_hsdsch_channel_info[i].rlc_mode = FP_RLC_MODE_UNKNOWN;
@@ -1887,7 +1888,7 @@ nbap_edch_channel_info[e_dch_macdflow_id].no_ddi_entries = num_items;
         return offset;
     }
 
-    /* Set port to zero use that as an indication of whether we have data or not */
+    /* Set port to zero use that as an indication of wether we have data or not */
     SET_ADDRESS(&null_addr, AT_NONE, 0, NULL);
 
     nbap_debug1("Frame %%u HSDSCH-MACdFlows-Information Start",
@@ -1924,7 +1925,7 @@ nbap_edch_channel_info[e_dch_macdflow_id].no_ddi_entries = num_items;
                     umts_fp_conversation_info->channel           = CHANNEL_HSDSCH;
                     umts_fp_conversation_info->dl_frame_number   = 0;
                     umts_fp_conversation_info->ul_frame_number   = actx->pinfo->fd->num;
-                    WMEM_COPY_ADDRESS(wmem_file_scope(), &(umts_fp_conversation_info->crnc_address), &nbap_hsdsch_channel_info[i].crnc_address);
+                    SE_COPY_ADDRESS(&(umts_fp_conversation_info->crnc_address), &nbap_hsdsch_channel_info[i].crnc_address);
                     umts_fp_conversation_info->crnc_port         = nbap_hsdsch_channel_info[i].crnc_port;
 
                     /*Added june 3, normally just the iterator variable*/
@@ -2008,7 +2009,7 @@ conversation_t   *conversation = NULL;
 int i;
 
     if (!actx->pinfo->fd->flags.visited){
-        /* Set port to zero use that as an indication of whether we have data or not */
+        /* Set port to zero use that as an indication of wether we have data or not */
         for (i = 0; i < maxNrOfCommonMACFlows; i++) {
             nbap_common_channel_info[i].crnc_port = 0;
             nbap_common_channel_info[i].rlc_mode = FP_RLC_MODE_UNKNOWN;
@@ -2021,7 +2022,7 @@ int i;
     if (actx->pinfo->fd->flags.visited){
         return offset;
     }
-    /* Set port to zero use that as an indication of whether we have data or not */
+    /* Set port to zero use that as an indication of wether we have data or not */
     SET_ADDRESS(&null_addr, AT_NONE, 0, NULL);
     for (i = 0; i < maxNrOfCommonMACFlows; i++) {
         if (nbap_common_channel_info[i].crnc_port != 0){
@@ -2047,7 +2048,7 @@ int i;
 
                 umts_fp_conversation_info->dl_frame_number   = 0;
                 umts_fp_conversation_info->ul_frame_number   = actx->pinfo->fd->num;
-                WMEM_COPY_ADDRESS(wmem_file_scope(), &(umts_fp_conversation_info->crnc_address), &nbap_common_channel_info[i].crnc_address);
+                SE_COPY_ADDRESS(&(umts_fp_conversation_info->crnc_address), &nbap_common_channel_info[i].crnc_address);
                 umts_fp_conversation_info->crnc_port         = nbap_common_channel_info[i].crnc_port;
 
                 /*umts_fp_conversation_info->hsdsch_macdflow_id = i ;*/ /*hsdsch_macdflow_ids[i];*/ /* hsdsch_macdflow_id;*/

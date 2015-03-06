@@ -33,6 +33,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 #include "packet-rpc.h"
@@ -119,7 +121,7 @@ gluster_hndsk_2_getspec_call(tvbuff_t *tvb, int offset,
 {
 	if (tree)
 		proto_tree_add_item(tree, hf_gluster_hndsk_flags, tvb, offset,
-								4, ENC_BIG_ENDIAN);
+								4, ENC_NA);
 	offset += 4;
 	offset = dissect_rpc_string(tvb, tree, hf_gluster_hndsk_key, offset,
 								NULL);
@@ -330,15 +332,3 @@ proto_reg_handoff_gluster_cbk(void)
 							hf_gluster_cbk_proc);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

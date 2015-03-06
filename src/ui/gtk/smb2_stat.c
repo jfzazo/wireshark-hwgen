@@ -27,18 +27,24 @@
 #include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
+#include <epan/epan.h>
 #include <epan/value_string.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-smb2.h>
 
 #include "ui/simple_dialog.h"
+#include "../file.h"
+#include "../globals.h"
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/service_response_time_table.h"
 #include "ui/gtk/tap_param_dlg.h"
+#include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtksmb2stat(void);
 
@@ -162,9 +168,7 @@ gtk_smb2stat_init(const char *opt_arg, void *userdata _U_)
 
 	init_srt_table(&ss->smb2_srt_table, 256, vbox, "smb2.cmd");
 	for(i=0;i<256;i++){
-		gchar* tmp_str = val_to_str_ext_wmem(NULL, i, &smb2_cmd_vals_ext, "Unknown(0x%02x)");
-		init_srt_table_row(&ss->smb2_srt_table, i, tmp_str);
-		wmem_free(NULL, tmp_str);
+		init_srt_table_row(&ss->smb2_srt_table, i, val_to_str_ext(i, &smb2_cmd_vals_ext, "Unknown(0x%02x)"));
 	}
 
 
@@ -194,7 +198,7 @@ gtk_smb2stat_init(const char *opt_arg, void *userdata _U_)
 }
 
 static tap_param smb2_stat_params[] = {
-	{ PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+	{ PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg smb2_stat_dlg = {

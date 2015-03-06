@@ -38,9 +38,9 @@ void RelatedPacketDelegate::paint(QPainter *painter, const QStyleOptionViewItem 
     optv4.decorationSize.setWidth(en_w);
     QStyledItemDelegate::paint(painter, optv4, index);
 
-    const frame_data *fd;
+    frame_data *fd;
     PacketListRecord *record = static_cast<PacketListRecord*>(index.internalPointer());
-    if (!record || (fd = record->frameData()) == NULL) {
+    if (!record || (fd = record->getFdata()) == NULL) {
         return;
     }
 

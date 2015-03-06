@@ -10,6 +10,13 @@
 
 
 #include "config.h"
+#ifdef _MSC_VER
+#pragma warning(disable:4005)
+#pragma warning(disable:4013)
+#pragma warning(disable:4018)
+#pragma warning(disable:4101)
+#endif
+
 #include <glib.h>
 #include <string.h>
 #include <epan/packet.h>
@@ -18,8 +25,6 @@
 #include "packet-dcerpc-nt.h"
 #include "packet-windows-common.h"
 #include "packet-dcerpc-efs.h"
-void proto_register_dcerpc_efs(void);
-void proto_reg_handoff_dcerpc_efs(void);
 
 /* Ett declarations */
 static gint ett_dcerpc_efs = -1;
@@ -32,37 +37,37 @@ static gint ett_efs_ENCRYPTION_CERTIFICATE = -1;
 
 /* Header field declarations */
 static gint hf_efs_EFS_CERTIFICATE_BLOB_cbData = -1;
-static gint hf_efs_EFS_CERTIFICATE_BLOB_dwCertEncodingType = -1;
-static gint hf_efs_EFS_CERTIFICATE_BLOB_pbData = -1;
-static gint hf_efs_EFS_HASH_BLOB_cbData = -1;
-static gint hf_efs_EFS_HASH_BLOB_pbData = -1;
-static gint hf_efs_ENCRYPTION_CERTIFICATE_HASH_LIST_nCert_Hash = -1;
-static gint hf_efs_ENCRYPTION_CERTIFICATE_HASH_LIST_pUsers = -1;
-static gint hf_efs_ENCRYPTION_CERTIFICATE_HASH_cbTotalLength = -1;
-static gint hf_efs_ENCRYPTION_CERTIFICATE_HASH_lpDisplayInformation = -1;
+static gint hf_efs_ENCRYPTION_CERTIFICATE_TotalLength = -1;
+static gint hf_efs_EfsRpcSetFileEncryptionKey_pEncryptionCertificate = -1;
+static gint hf_efs_EfsRpcDecryptFileSrv_Reserved = -1;
+static gint hf_efs_EfsRpcOpenFileRaw_FileName = -1;
+static gint hf_efs_EfsRpcQueryRecoveryAgents_FileName = -1;
+static gint hf_efs_werror = -1;
+static gint hf_efs_EfsRpcAddUsersToFile_FileName = -1;
+static gint hf_efs_EfsRpcOpenFileRaw_pvContext = -1;
+static gint hf_efs_EfsRpcEncryptFileSrv_Filename = -1;
+static gint hf_efs_opnum = -1;
 static gint hf_efs_ENCRYPTION_CERTIFICATE_HASH_pHash = -1;
 static gint hf_efs_ENCRYPTION_CERTIFICATE_HASH_pUserSid = -1;
-static gint hf_efs_ENCRYPTION_CERTIFICATE_TotalLength = -1;
-static gint hf_efs_ENCRYPTION_CERTIFICATE_pCertBlob = -1;
-static gint hf_efs_ENCRYPTION_CERTIFICATE_pUserSid = -1;
-static gint hf_efs_EfsRpcAddUsersToFile_FileName = -1;
 static gint hf_efs_EfsRpcCloseRaw_pvContext = -1;
-static gint hf_efs_EfsRpcDecryptFileSrv_FileName = -1;
-static gint hf_efs_EfsRpcDecryptFileSrv_Reserved = -1;
-static gint hf_efs_EfsRpcEncryptFileSrv_Filename = -1;
-static gint hf_efs_EfsRpcOpenFileRaw_FileName = -1;
-static gint hf_efs_EfsRpcOpenFileRaw_Flags = -1;
-static gint hf_efs_EfsRpcOpenFileRaw_pvContext = -1;
-static gint hf_efs_EfsRpcQueryRecoveryAgents_FileName = -1;
-static gint hf_efs_EfsRpcQueryRecoveryAgents_pRecoveryAgents = -1;
-static gint hf_efs_EfsRpcQueryUsersOnFile_FileName = -1;
-static gint hf_efs_EfsRpcQueryUsersOnFile_pUsers = -1;
-static gint hf_efs_EfsRpcReadFileRaw_pvContext = -1;
-static gint hf_efs_EfsRpcRemoveUsersFromFile_FileName = -1;
-static gint hf_efs_EfsRpcSetFileEncryptionKey_pEncryptionCertificate = -1;
+static gint hf_efs_EFS_CERTIFICATE_BLOB_dwCertEncodingType = -1;
+static gint hf_efs_ENCRYPTION_CERTIFICATE_pCertBlob = -1;
 static gint hf_efs_EfsRpcWriteFileRaw_pvContext = -1;
-static gint hf_efs_opnum = -1;
-static gint hf_efs_werror = -1;
+static gint hf_efs_ENCRYPTION_CERTIFICATE_HASH_LIST_nCert_Hash = -1;
+static gint hf_efs_EFS_CERTIFICATE_BLOB_pbData = -1;
+static gint hf_efs_EfsRpcQueryRecoveryAgents_pRecoveryAgents = -1;
+static gint hf_efs_ENCRYPTION_CERTIFICATE_HASH_lpDisplayInformation = -1;
+static gint hf_efs_EfsRpcReadFileRaw_pvContext = -1;
+static gint hf_efs_EfsRpcQueryUsersOnFile_FileName = -1;
+static gint hf_efs_EfsRpcDecryptFileSrv_FileName = -1;
+static gint hf_efs_EfsRpcOpenFileRaw_Flags = -1;
+static gint hf_efs_ENCRYPTION_CERTIFICATE_HASH_LIST_pUsers = -1;
+static gint hf_efs_EFS_HASH_BLOB_pbData = -1;
+static gint hf_efs_ENCRYPTION_CERTIFICATE_HASH_cbTotalLength = -1;
+static gint hf_efs_EfsRpcQueryUsersOnFile_pUsers = -1;
+static gint hf_efs_ENCRYPTION_CERTIFICATE_pUserSid = -1;
+static gint hf_efs_EFS_HASH_BLOB_cbData = -1;
+static gint hf_efs_EfsRpcRemoveUsersFromFile_FileName = -1;
 
 static gint proto_dcerpc_efs = -1;
 /* Version information */
@@ -182,8 +187,6 @@ efs_dissect_struct_EFS_HASH_BLOB(tvbuff_t *tvb _U_, int offset _U_, packet_info 
 
 	ALIGN_TO_5_BYTES;
 
-	ALIGN_TO_5_BYTES;
-
 	old_offset = offset;
 
 	if (parent_tree) {
@@ -211,7 +214,7 @@ efs_dissect_struct_EFS_HASH_BLOB(tvbuff_t *tvb _U_, int offset _U_, packet_info 
 /* IDL: 	uint32 cbTotalLength; */
 /* IDL: 	[unique(1)] dom_sid *pUserSid; */
 /* IDL: 	[unique(1)] EFS_HASH_BLOB *pHash; */
-/* IDL: 	[charset(UTF16)] [unique(1)] uint16 *lpDisplayInformation; */
+/* IDL: 	[unique(1)] [charset(UTF16)] uint16 *lpDisplayInformation; */
 /* IDL: } */
 
 static int
@@ -282,8 +285,6 @@ efs_dissect_struct_ENCRYPTION_CERTIFICATE_HASH(tvbuff_t *tvb _U_, int offset _U_
 
 	ALIGN_TO_5_BYTES;
 
-	ALIGN_TO_5_BYTES;
-
 	old_offset = offset;
 
 	if (parent_tree) {
@@ -313,7 +314,7 @@ efs_dissect_struct_ENCRYPTION_CERTIFICATE_HASH(tvbuff_t *tvb _U_, int offset _U_
 
 /* IDL: struct { */
 /* IDL: 	uint32 nCert_Hash; */
-/* IDL: 	[size_is(nCert_Hash)] [unique(1)] ENCRYPTION_CERTIFICATE_HASH *pUsers[*]; */
+/* IDL: 	[unique(1)] [size_is(nCert_Hash)] ENCRYPTION_CERTIFICATE_HASH *pUsers[*]; */
 /* IDL: } */
 
 static int
@@ -354,8 +355,6 @@ efs_dissect_struct_ENCRYPTION_CERTIFICATE_HASH_LIST(tvbuff_t *tvb _U_, int offse
 	proto_item *item = NULL;
 	proto_tree *tree = NULL;
 	int old_offset;
-
-	ALIGN_TO_5_BYTES;
 
 	ALIGN_TO_5_BYTES;
 
@@ -434,8 +433,6 @@ efs_dissect_struct_EFS_CERTIFICATE_BLOB(tvbuff_t *tvb _U_, int offset _U_, packe
 	proto_item *item = NULL;
 	proto_tree *tree = NULL;
 	int old_offset;
-
-	ALIGN_TO_5_BYTES;
 
 	ALIGN_TO_5_BYTES;
 
@@ -519,8 +516,6 @@ efs_dissect_struct_ENCRYPTION_CERTIFICATE(tvbuff_t *tvb _U_, int offset _U_, pac
 
 	ALIGN_TO_5_BYTES;
 
-	ALIGN_TO_5_BYTES;
-
 	old_offset = offset;
 
 	if (parent_tree) {
@@ -581,7 +576,7 @@ efs_dissect_element_EfsRpcOpenFileRaw_Flags(tvbuff_t *tvb _U_, int offset _U_, p
 }
 
 /* IDL: WERROR EfsRpcOpenFileRaw( */
-/* IDL: [out] [ref] policy_handle *pvContext, */
+/* IDL: [ref] [out] policy_handle *pvContext, */
 /* IDL: [charset(UTF16)] [in] uint16 FileName[*], */
 /* IDL: [in] uint32 Flags */
 /* IDL: ); */
@@ -631,7 +626,7 @@ efs_dissect_element_EfsRpcReadFileRaw_pvContext_(tvbuff_t *tvb _U_, int offset _
 }
 
 /* IDL: WERROR EfsRpcReadFileRaw( */
-/* IDL: [in] [ref] policy_handle *pvContext */
+/* IDL: [ref] [in] policy_handle *pvContext */
 /* IDL: ); */
 
 static int
@@ -717,7 +712,7 @@ efs_dissect_element_EfsRpcCloseRaw_pvContext_(tvbuff_t *tvb _U_, int offset _U_,
 }
 
 /* IDL: void EfsRpcCloseRaw( */
-/* IDL: [in] [out] [ref] policy_handle *pvContext */
+/* IDL: [out] [ref] [in] policy_handle *pvContext */
 /* IDL: ); */
 
 static int
@@ -751,7 +746,7 @@ efs_dissect_element_EfsRpcEncryptFileSrv_Filename(tvbuff_t *tvb _U_, int offset 
 }
 
 /* IDL: WERROR EfsRpcEncryptFileSrv( */
-/* IDL: [charset(UTF16)] [in] uint16 Filename[*] */
+/* IDL: [in] [charset(UTF16)] uint16 Filename[*] */
 /* IDL: ); */
 
 static int
@@ -797,7 +792,7 @@ efs_dissect_element_EfsRpcDecryptFileSrv_Reserved(tvbuff_t *tvb _U_, int offset 
 }
 
 /* IDL: WERROR EfsRpcDecryptFileSrv( */
-/* IDL: [charset(UTF16)] [in] uint16 FileName[*], */
+/* IDL: [in] [charset(UTF16)] uint16 FileName[*], */
 /* IDL: [in] uint32 Reserved */
 /* IDL: ); */
 
@@ -862,8 +857,8 @@ efs_dissect_element_EfsRpcQueryUsersOnFile_pUsers__(tvbuff_t *tvb _U_, int offse
 }
 
 /* IDL: WERROR EfsRpcQueryUsersOnFile( */
-/* IDL: [charset(UTF16)] [in] uint16 FileName[*], */
-/* IDL: [out] [ref] [unique(1)] ENCRYPTION_CERTIFICATE_HASH_LIST **pUsers */
+/* IDL: [in] [charset(UTF16)] uint16 FileName[*], */
+/* IDL: [unique(1)] [ref] [out] ENCRYPTION_CERTIFICATE_HASH_LIST **pUsers */
 /* IDL: ); */
 
 static int
@@ -1051,7 +1046,7 @@ efs_dissect_element_EfsRpcSetFileEncryptionKey_pEncryptionCertificate_(tvbuff_t 
 }
 
 /* IDL: WERROR EfsRpcSetFileEncryptionKey( */
-/* IDL: [in] [unique(1)] ENCRYPTION_CERTIFICATE *pEncryptionCertificate */
+/* IDL: [unique(1)] [in] ENCRYPTION_CERTIFICATE *pEncryptionCertificate */
 /* IDL: ); */
 
 static int
@@ -1189,69 +1184,69 @@ void proto_register_dcerpc_efs(void)
 {
 	static hf_register_info hf[] = {
 	{ &hf_efs_EFS_CERTIFICATE_BLOB_cbData,
-		{ "Cbdata", "efs.EFS_CERTIFICATE_BLOB.cbData", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EFS_CERTIFICATE_BLOB_dwCertEncodingType,
-		{ "Dwcertencodingtype", "efs.EFS_CERTIFICATE_BLOB.dwCertEncodingType", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EFS_CERTIFICATE_BLOB_pbData,
-		{ "Pbdata", "efs.EFS_CERTIFICATE_BLOB.pbData", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EFS_HASH_BLOB_cbData,
-		{ "Cbdata", "efs.EFS_HASH_BLOB.cbData", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EFS_HASH_BLOB_pbData,
-		{ "Pbdata", "efs.EFS_HASH_BLOB.pbData", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_LIST_nCert_Hash,
-		{ "Ncert Hash", "efs.ENCRYPTION_CERTIFICATE_HASH_LIST.nCert_Hash", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_LIST_pUsers,
-		{ "Pusers", "efs.ENCRYPTION_CERTIFICATE_HASH_LIST.pUsers", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_cbTotalLength,
-		{ "Cbtotallength", "efs.ENCRYPTION_CERTIFICATE_HASH.cbTotalLength", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_lpDisplayInformation,
-		{ "Lpdisplayinformation", "efs.ENCRYPTION_CERTIFICATE_HASH.lpDisplayInformation", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_pHash,
-		{ "Phash", "efs.ENCRYPTION_CERTIFICATE_HASH.pHash", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_pUserSid,
-		{ "Pusersid", "efs.ENCRYPTION_CERTIFICATE_HASH.pUserSid", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	  { "Cbdata", "efs.EFS_CERTIFICATE_BLOB.cbData", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
 	{ &hf_efs_ENCRYPTION_CERTIFICATE_TotalLength,
-		{ "Totallength", "efs.ENCRYPTION_CERTIFICATE.TotalLength", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_ENCRYPTION_CERTIFICATE_pCertBlob,
-		{ "Pcertblob", "efs.ENCRYPTION_CERTIFICATE.pCertBlob", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_ENCRYPTION_CERTIFICATE_pUserSid,
-		{ "Pusersid", "efs.ENCRYPTION_CERTIFICATE.pUserSid", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcAddUsersToFile_FileName,
-		{ "Filename", "efs.EfsRpcAddUsersToFile.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcCloseRaw_pvContext,
-		{ "Pvcontext", "efs.EfsRpcCloseRaw.pvContext", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcDecryptFileSrv_FileName,
-		{ "Filename", "efs.EfsRpcDecryptFileSrv.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcDecryptFileSrv_Reserved,
-		{ "Reserved", "efs.EfsRpcDecryptFileSrv.Reserved", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcEncryptFileSrv_Filename,
-		{ "Filename", "efs.EfsRpcEncryptFileSrv.Filename", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcOpenFileRaw_FileName,
-		{ "Filename", "efs.EfsRpcOpenFileRaw.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcOpenFileRaw_Flags,
-		{ "Flags", "efs.EfsRpcOpenFileRaw.Flags", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcOpenFileRaw_pvContext,
-		{ "Pvcontext", "efs.EfsRpcOpenFileRaw.pvContext", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcQueryRecoveryAgents_FileName,
-		{ "Filename", "efs.EfsRpcQueryRecoveryAgents.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcQueryRecoveryAgents_pRecoveryAgents,
-		{ "Precoveryagents", "efs.EfsRpcQueryRecoveryAgents.pRecoveryAgents", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcQueryUsersOnFile_FileName,
-		{ "Filename", "efs.EfsRpcQueryUsersOnFile.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcQueryUsersOnFile_pUsers,
-		{ "Pusers", "efs.EfsRpcQueryUsersOnFile.pUsers", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcReadFileRaw_pvContext,
-		{ "Pvcontext", "efs.EfsRpcReadFileRaw.pvContext", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcRemoveUsersFromFile_FileName,
-		{ "Filename", "efs.EfsRpcRemoveUsersFromFile.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
+	  { "Totallength", "efs.ENCRYPTION_CERTIFICATE.TotalLength", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
 	{ &hf_efs_EfsRpcSetFileEncryptionKey_pEncryptionCertificate,
-		{ "Pencryptioncertificate", "efs.EfsRpcSetFileEncryptionKey.pEncryptionCertificate", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_EfsRpcWriteFileRaw_pvContext,
-		{ "Pvcontext", "efs.EfsRpcWriteFileRaw.pvContext", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_efs_opnum,
-		{ "Operation", "efs.opnum", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
+	  { "Pencryptioncertificate", "efs.EfsRpcSetFileEncryptionKey.pEncryptionCertificate", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcDecryptFileSrv_Reserved,
+	  { "Reserved", "efs.EfsRpcDecryptFileSrv.Reserved", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcOpenFileRaw_FileName,
+	  { "Filename", "efs.EfsRpcOpenFileRaw.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcQueryRecoveryAgents_FileName,
+	  { "Filename", "efs.EfsRpcQueryRecoveryAgents.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
 	{ &hf_efs_werror,
-		{ "Windows Error", "efs.werror", FT_UINT32, BASE_HEX, VALS(WERR_errors), 0, NULL, HFILL }},
+	  { "Windows Error", "efs.werror", FT_UINT32, BASE_HEX, VALS(WERR_errors), 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcAddUsersToFile_FileName,
+	  { "Filename", "efs.EfsRpcAddUsersToFile.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcOpenFileRaw_pvContext,
+	  { "Pvcontext", "efs.EfsRpcOpenFileRaw.pvContext", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcEncryptFileSrv_Filename,
+	  { "Filename", "efs.EfsRpcEncryptFileSrv.Filename", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_opnum,
+	  { "Operation", "efs.opnum", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_pHash,
+	  { "Phash", "efs.ENCRYPTION_CERTIFICATE_HASH.pHash", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_pUserSid,
+	  { "Pusersid", "efs.ENCRYPTION_CERTIFICATE_HASH.pUserSid", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcCloseRaw_pvContext,
+	  { "Pvcontext", "efs.EfsRpcCloseRaw.pvContext", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EFS_CERTIFICATE_BLOB_dwCertEncodingType,
+	  { "Dwcertencodingtype", "efs.EFS_CERTIFICATE_BLOB.dwCertEncodingType", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_ENCRYPTION_CERTIFICATE_pCertBlob,
+	  { "Pcertblob", "efs.ENCRYPTION_CERTIFICATE.pCertBlob", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcWriteFileRaw_pvContext,
+	  { "Pvcontext", "efs.EfsRpcWriteFileRaw.pvContext", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_LIST_nCert_Hash,
+	  { "Ncert Hash", "efs.ENCRYPTION_CERTIFICATE_HASH_LIST.nCert_Hash", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EFS_CERTIFICATE_BLOB_pbData,
+	  { "Pbdata", "efs.EFS_CERTIFICATE_BLOB.pbData", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcQueryRecoveryAgents_pRecoveryAgents,
+	  { "Precoveryagents", "efs.EfsRpcQueryRecoveryAgents.pRecoveryAgents", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_lpDisplayInformation,
+	  { "Lpdisplayinformation", "efs.ENCRYPTION_CERTIFICATE_HASH.lpDisplayInformation", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcReadFileRaw_pvContext,
+	  { "Pvcontext", "efs.EfsRpcReadFileRaw.pvContext", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcQueryUsersOnFile_FileName,
+	  { "Filename", "efs.EfsRpcQueryUsersOnFile.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcDecryptFileSrv_FileName,
+	  { "Filename", "efs.EfsRpcDecryptFileSrv.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcOpenFileRaw_Flags,
+	  { "Flags", "efs.EfsRpcOpenFileRaw.Flags", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_LIST_pUsers,
+	  { "Pusers", "efs.ENCRYPTION_CERTIFICATE_HASH_LIST.pUsers", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EFS_HASH_BLOB_pbData,
+	  { "Pbdata", "efs.EFS_HASH_BLOB.pbData", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_ENCRYPTION_CERTIFICATE_HASH_cbTotalLength,
+	  { "Cbtotallength", "efs.ENCRYPTION_CERTIFICATE_HASH.cbTotalLength", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcQueryUsersOnFile_pUsers,
+	  { "Pusers", "efs.EfsRpcQueryUsersOnFile.pUsers", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_ENCRYPTION_CERTIFICATE_pUserSid,
+	  { "Pusersid", "efs.ENCRYPTION_CERTIFICATE.pUserSid", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EFS_HASH_BLOB_cbData,
+	  { "Cbdata", "efs.EFS_HASH_BLOB.cbData", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_efs_EfsRpcRemoveUsersFromFile_FileName,
+	  { "Filename", "efs.EfsRpcRemoveUsersFromFile.FileName", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
 	};
 
 

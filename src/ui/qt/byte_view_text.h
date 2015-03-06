@@ -29,108 +29,66 @@
 #include <epan/tvbuff.h>
 
 #include "proto_tree.h"
-
-#include <QAbstractScrollArea>
-#include <QMenu>
-
-class QActionGroup;
+#include <QPrinter>
+#include <QTextEdit>
 
 // XXX - Is there any reason we shouldn't add ByteViewImage, etc?
 
 // XXX Copied from gtk/packet_panes.h
 typedef enum {
-    BYTES_HEX,
-    BYTES_BITS
+  BYTES_HEX,
+  BYTES_BITS
 } bytes_view_type;
 
-class ByteViewText : public QAbstractScrollArea
+class ByteViewText : public QTextEdit
 {
     Q_OBJECT
 public:
     explicit ByteViewText(QWidget *parent = 0, tvbuff_t *tvb = NULL, proto_tree *tree = NULL, QTreeWidget *protoTree = NULL, packet_char_enc encoding = PACKET_CHAR_ENC_CHAR_ASCII);
-    bool hasDataSource(const tvbuff_t *ds_tvb = NULL);
+    bool hasDataSource(tvbuff_t *ds_tvb = NULL);
     void setEncoding(packet_char_enc encoding);
     void setFormat(bytes_view_type format);
-    void setHighlightStyle(bool bold) { bold_highlight_ = bold; }
+    void setHighlightStyle(bool bold);
     void setProtocolHighlight(int start, int end);
     void setFieldHighlight(int start, int end, guint32 mask = 0, int mask_le = 0);
     void setFieldAppendixHighlight(int start, int end);
-
-signals:
-    void byteFieldHovered(QString &);
-
-public slots:
-    void setMonospaceFont(const QFont &mono_font);
-
-protected:
-    virtual void paintEvent(QPaintEvent *);
-    virtual void resizeEvent(QResizeEvent *);
-    virtual void mousePressEvent (QMouseEvent * event);
-    virtual void mouseMoveEvent (QMouseEvent * event);
-    virtual void leaveEvent(QEvent *event);
-    virtual void contextMenuEvent(QContextMenuEvent *event);
+    void renderBytes();
 
 private:
     typedef enum {
         StateNormal,
         StateField,
-        StateProtocol,
-        StateOffsetNormal,
-        StateOffsetField
+        StateProtocol
     } highlight_state;
 
-    void drawOffsetLine(QPainter &painter, const guint offset, const int row_y);
-    qreal flushOffsetFragment(QPainter &painter, qreal x, int y, highlight_state state, QString &text);
+    void lineCommon(const int org_off);
+    void setState(highlight_state state);
+    int flushBytes(QString &str);
     void scrollToByte(int byte);
-    int offsetChars();
-    int offsetPixels();
-    int hexPixels();
-    int asciiPixels();
-    int totalPixels();
-    void updateScrollbars();
-    field_info *fieldAtPixel(QPoint &pos);
 
-    static const int separator_interval_;
+    int byteFromRowCol(int row, int col);
+    void mousePressEvent (QMouseEvent * event);
+
     tvbuff_t *tvb_;
     proto_tree *proto_tree_;
     QTreeWidget *tree_widget_;
 
-    // Fonts and colors
-    QFont mono_font_;
-//    QFont mono_bold_font_;
-    QBrush offset_normal_fg_;
-    QBrush offset_field_fg_;
-
     gboolean bold_highlight_;
 
-    // Data
-    packet_char_enc encoding_;  // ASCII or EBCDIC
-    bytes_view_type format_;    // bytes in hex or bytes as bits
-    QActionGroup *format_actions_;
-    QMenu ctx_menu_;
+/* data */
+    packet_char_enc encoding_;	/* ASCII or EBCDIC */
+    bytes_view_type format_;	/* bytes in hex or bytes as bits */
 
-    // Data highlight
-    QPair<guint,guint> p_bound_;
-    QPair<guint,guint> f_bound_;
-    QPair<guint,guint> fa_bound_;
-    QPair<guint,guint> p_bound_save_;
-    QPair<guint,guint> f_bound_save_;
-    QPair<guint,guint> fa_bound_save_;
+/* data-highlight */
+    int p_start_, p_end_;       /* Protocol */
+    int f_start_, f_end_;       /* Field */
+    int fa_start_, fa_end_;     /* Field appendix */
 
-    bool show_offset_;          // Should we show the byte offset?
-    bool show_hex_;             // Should we show the hex display?
-    bool show_ascii_;           // Should we show the ASCII display?
-    guint row_width_;           // Number of bytes per line
-    int one_em_;                // Font character height
-    qreal font_width_;          // Font character width
-    int line_spacing_;          // Font line spacing
-    int margin_;                // Text margin
+    int per_line_;      		/* Number of bytes per line */
+    int offset_width_;			/* Byte offset field width */
 
-    // Data selection
-    QMap<int,int> x_pos_to_column_;
+signals:
 
-private slots:
-    void setHexDisplayFormat(QAction *action);
 };
 
 #endif // BYTE_VIEW_TEXT_H

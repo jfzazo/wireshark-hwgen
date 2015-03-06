@@ -68,7 +68,7 @@
 #define LOG_DOMAIN_LUA "wslua"
 
 /* type conversion macros - lua_Number is a double, so casting isn't kosher; and
-   using Lua's already-available lua_tointeger() and luaL_checkinteger() might be different
+   using Lua's already-available lua_tointeger() and luaL_checkint() might be different
    on different machines; so use these instead please! */
 #define wslua_togint(L,i)       (gint)            ( lua_tointeger(L,i) )
 #define wslua_togint32(L,i)     (gint32)          ( lua_tonumber(L,i) )
@@ -77,17 +77,17 @@
 #define wslua_toguint32(L,i)    (guint32)         ( lua_tonumber(L,i) )
 #define wslua_toguint64(L,i)    (guint64)         ( lua_tonumber(L,i) )
 
-#define wslua_checkgint(L,i)    (gint)            ( luaL_checkinteger(L,i) )
+#define wslua_checkgint(L,i)    (gint)            ( luaL_checkint(L,i) )
 #define wslua_checkgint32(L,i)  (gint32)          ( luaL_checknumber(L,i) )
 #define wslua_checkgint64(L,i)  (gint64)          ( luaL_checknumber(L,i) )
-#define wslua_checkguint(L,i)   (guint)           ( luaL_checkinteger(L,i) )
+#define wslua_checkguint(L,i)   (guint)           ( luaL_checkint(L,i) )
 #define wslua_checkguint32(L,i) (guint32)         ( luaL_checknumber(L,i) )
 #define wslua_checkguint64(L,i) (guint64)         ( luaL_checknumber(L,i) )
 
-#define wslua_optgint(L,i,d)    (gint)            ( luaL_optinteger(L,i,d) )
+#define wslua_optgint(L,i,d)    (gint)            ( luaL_optint(L,i,d) )
 #define wslua_optgint32(L,i,d)  (gint32)          ( luaL_optnumber(L,i,d) )
 #define wslua_optgint64(L,i,d)  (gint64)          ( luaL_optnumber(L,i,d) )
-#define wslua_optguint(L,i,d)   (guint)           ( luaL_optinteger(L,i,d) )
+#define wslua_optguint(L,i,d)   (guint)           ( luaL_optint(L,i,d) )
 #define wslua_optguint32(L,i,d) (guint32)         ( luaL_optnumber(L,i,d) )
 #define wslua_optguint64(L,i,d) (guint64)         ( luaL_optnumber(L,i,d) )
 
@@ -178,7 +178,6 @@ typedef struct _wslua_pref_t {
 
 typedef struct _wslua_proto_t {
     gchar* name;
-    gchar* loname;
     gchar* desc;
     int hfid;
     int ett;
@@ -686,10 +685,6 @@ extern void lua_prime_all_fields(proto_tree* tree);
 
 extern int Proto_commit(lua_State* L);
 
-extern TreeItem create_TreeItem(proto_tree* tree, proto_item* item);
-
-extern void clear_outstanding_FuncSavers(void);
-
 extern void Int64_pack(lua_State* L, luaL_Buffer *b, gint idx, gboolean asLittleEndian);
 extern int Int64_unpack(lua_State* L, const gchar *buff, gboolean asLittleEndian);
 extern void UInt64_pack(lua_State* L, luaL_Buffer *b, gint idx, gboolean asLittleEndian);
@@ -706,7 +701,6 @@ extern void clear_outstanding_Column(void);
 extern void clear_outstanding_Columns(void);
 extern void clear_outstanding_PrivateTable(void);
 
-extern int get_hf_wslua_text(void);
 extern TreeItem* push_TreeItem(lua_State* L, TreeItem ti);
 extern void clear_outstanding_TreeItem(void);
 

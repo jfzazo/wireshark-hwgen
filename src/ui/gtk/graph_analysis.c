@@ -28,6 +28,7 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <math.h>
 
@@ -241,7 +242,7 @@ gtk_save_graph_as_plain_text_file(graph_analysis_data_t *user_data)
 	save_to_file_w = file_selection_new("Wireshark: Save graph to plain text file",
 					    GTK_WINDOW(user_data->dlg.window),
 					    FILE_SELECTION_SAVE);
-	gtk_dialog_set_default_response(GTK_DIALOG(save_to_file_w),
+        gtk_dialog_set_default_response(GTK_DIALOG(save_to_file_w),
        	                                GTK_RESPONSE_ACCEPT);
 
 	pathname = file_selection_run(save_to_file_w);
@@ -364,15 +365,11 @@ static void dialog_graph_draw(graph_analysis_data_t *user_data)
 
 	GtkAllocation draw_area_time_alloc, draw_area_alloc, draw_area_comments_alloc;
 
-	if (!user_data->dlg.needs_redraw) {
+	if(!user_data->dlg.needs_redraw) {
 		return;
 	}
 
 	user_data->dlg.needs_redraw = FALSE;
-
-	if (g_queue_get_length(user_data->graph_info->items) < 1) {
-		return;
-	}
 
 	gtk_widget_get_allocation(user_data->dlg.draw_area_time, &draw_area_time_alloc);
 	gtk_widget_get_allocation(user_data->dlg.draw_area, &draw_area_alloc);
@@ -433,7 +430,7 @@ static void dialog_graph_draw(graph_analysis_data_t *user_data)
 	display_items = draw_height/ITEM_HEIGHT;
 
 	/* get the items to display and fill the matrix array */
-	list = g_queue_peek_nth_link(user_data->graph_info->items, 0);
+	list = g_list_first(user_data->graph_info->list);
 	current_item = 0;
 	i = 0;
 	while (list)
@@ -618,13 +615,9 @@ static void dialog_graph_draw(graph_analysis_data_t *user_data)
 	}
 	/* Draw the node names on top and the division lines */
 	for (i=0; i<user_data->graph_info->num_nodes; i++) {
-		char* addr_str;
-
 		/* print the node identifiers */
 		/* XXX we assign 5 pixels per character in the node identity */
-		addr_str = (char*)address_to_display(NULL, &(user_data->graph_info->nodes[i]));
-		g_strlcpy(label_string, addr_str, NODE_WIDTH/5);
-		wmem_free(NULL, addr_str);
+		g_strlcpy(label_string, ep_address_to_display(&(user_data->graph_info->nodes[i])), NODE_WIDTH/5);
 		pango_layout_set_text(layout, label_string, -1);
 		pango_layout_get_pixel_size(layout, &label_width, &label_height);
 #if GTK_CHECK_VERSION(2,22,0)
@@ -1749,7 +1742,7 @@ graph_analysis_data_t *graph_analysis_init(seq_analysis_info_t *sainfo)
 {
 	graph_analysis_data_t *user_data;
 	/* init */
-	user_data = g_new0(graph_analysis_data_t,1);
+	user_data = g_new(graph_analysis_data_t,1);
 	user_data->graph_info = sainfo;
 
 	/* init user_data */
@@ -1823,17 +1816,3 @@ void graph_analysis_redraw(graph_analysis_data_t *user_data)
 	window_present(user_data->dlg.window);
 	return;
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */
-

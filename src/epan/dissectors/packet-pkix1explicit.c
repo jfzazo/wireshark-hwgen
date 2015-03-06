@@ -32,6 +32,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/asn1.h>
 #include <epan/oids.h>
@@ -106,7 +107,7 @@ static int hf_pkix1explicit_min_01 = -1;          /* ASId */
 static int hf_pkix1explicit_max_01 = -1;          /* ASId */
 
 /*--- End of included file: packet-pkix1explicit-hf.c ---*/
-#line 54 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
+#line 55 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
 
 /* Initialize the subtree pointers */
 
@@ -136,7 +137,7 @@ static gint ett_pkix1explicit_ASIdOrRange = -1;
 static gint ett_pkix1explicit_ASRange = -1;
 
 /*--- End of included file: packet-pkix1explicit-ett.c ---*/
-#line 57 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
+#line 58 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
 
 int
 dissect_pkix1explicit_Certificate(gboolean implicit_tag _U_, tvbuff_t *tvb, int offset, asn1_ctx_t *actx _U_, proto_tree *tree, int hf_index) {
@@ -794,38 +795,30 @@ dissect_pkix1explicit_ASIdentifiers(gboolean implicit_tag _U_, tvbuff_t *tvb _U_
 
 /*--- PDUs ---*/
 
-static int dissect_DomainParameters_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_DomainParameters_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_pkix1explicit_DomainParameters(FALSE, tvb, offset, &asn1_ctx, tree, hf_pkix1explicit_DomainParameters_PDU);
-  return offset;
+  dissect_pkix1explicit_DomainParameters(FALSE, tvb, 0, &asn1_ctx, tree, hf_pkix1explicit_DomainParameters_PDU);
 }
-static int dissect_DirectoryString_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_DirectoryString_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_pkix1explicit_DirectoryString(FALSE, tvb, offset, &asn1_ctx, tree, hf_pkix1explicit_DirectoryString_PDU);
-  return offset;
+  dissect_pkix1explicit_DirectoryString(FALSE, tvb, 0, &asn1_ctx, tree, hf_pkix1explicit_DirectoryString_PDU);
 }
-static int dissect_IPAddrBlocks_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_IPAddrBlocks_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_pkix1explicit_IPAddrBlocks(FALSE, tvb, offset, &asn1_ctx, tree, hf_pkix1explicit_IPAddrBlocks_PDU);
-  return offset;
+  dissect_pkix1explicit_IPAddrBlocks(FALSE, tvb, 0, &asn1_ctx, tree, hf_pkix1explicit_IPAddrBlocks_PDU);
 }
-static int dissect_ASIdentifiers_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ASIdentifiers_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_pkix1explicit_ASIdentifiers(FALSE, tvb, offset, &asn1_ctx, tree, hf_pkix1explicit_ASIdentifiers_PDU);
-  return offset;
+  dissect_pkix1explicit_ASIdentifiers(FALSE, tvb, 0, &asn1_ctx, tree, hf_pkix1explicit_ASIdentifiers_PDU);
 }
 
 
 /*--- End of included file: packet-pkix1explicit-fn.c ---*/
-#line 98 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
+#line 99 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
 
 
 /*--- proto_register_pkix1explicit ----------------------------------------------*/
@@ -1021,7 +1014,7 @@ void proto_register_pkix1explicit(void) {
         "ASId", HFILL }},
 
 /*--- End of included file: packet-pkix1explicit-hfarr.c ---*/
-#line 117 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
+#line 118 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
   };
 
   /* List of subtrees */
@@ -1054,7 +1047,7 @@ void proto_register_pkix1explicit(void) {
     &ett_pkix1explicit_ASRange,
 
 /*--- End of included file: packet-pkix1explicit-ettarr.c ---*/
-#line 123 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
+#line 124 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
   };
 
   /* Register protocol */
@@ -1074,13 +1067,13 @@ void proto_reg_handoff_pkix1explicit(void) {
 
 /*--- Included file: packet-pkix1explicit-dis-tab.c ---*/
 #line 1 "../../asn1/pkix1explicit/packet-pkix1explicit-dis-tab.c"
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.2.1", dissect_DirectoryString_PDU, proto_pkix1explicit, "id-qt-cps");
-  new_register_ber_oid_dissector("1.2.840.10046.2.1", dissect_DomainParameters_PDU, proto_pkix1explicit, "dhpublicnumber");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.1.7", dissect_IPAddrBlocks_PDU, proto_pkix1explicit, "id-pe-ipAddrBlocks");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.1.8", dissect_ASIdentifiers_PDU, proto_pkix1explicit, "id-pe-autonomousSysIds");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.2.1", dissect_DirectoryString_PDU, proto_pkix1explicit, "id-qt-cps");
+  register_ber_oid_dissector("1.2.840.10046.2.1", dissect_DomainParameters_PDU, proto_pkix1explicit, "dhpublicnumber");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.1.7", dissect_IPAddrBlocks_PDU, proto_pkix1explicit, "id-pe-ipAddrBlocks");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.1.8", dissect_ASIdentifiers_PDU, proto_pkix1explicit, "id-pe-autonomousSysIds");
 
 
 /*--- End of included file: packet-pkix1explicit-dis-tab.c ---*/
-#line 140 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
+#line 141 "../../asn1/pkix1explicit/packet-pkix1explicit-template.c"
 }
 

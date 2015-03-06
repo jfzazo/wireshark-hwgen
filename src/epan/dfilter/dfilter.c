@@ -34,6 +34,10 @@
 
 #define DFILTER_TOKEN_ID_OFFSET	1
 
+/* Global error message space for dfilter_compile errors */
+static gchar dfilter_error_msg_buf[1024];
+const gchar *dfilter_error_msg;	/* NULL when no error resulted */
+
 /* From scanner.c */
 void df_scanner_text(const char *text);
 void    df_scanner_cleanup(void);
@@ -42,25 +46,23 @@ int     df_lex(void);
 /* Holds the singular instance of our Lemon parser object */
 static void*	ParserObj = NULL;
 
-/*
- * XXX - if we're using a version of Flex that supports reentrant lexical
- * analyzers, we should put this into the lexical analyzer's state.
- */
-dfwork_t *global_dfw;
-
 void
-dfilter_fail(dfwork_t *dfw, const char *format, ...)
+dfilter_fail(const char *format, ...)
 {
 	va_list	args;
 
 	/* If we've already reported one error, don't overwite it */
-	if (dfw->error_message != NULL)
+	if (dfilter_error_msg != NULL)
 		return;
 
 	va_start(args, format);
-	dfw->error_message = g_strdup_vprintf(format, args);
+
+	g_vsnprintf(dfilter_error_msg_buf, sizeof(dfilter_error_msg_buf),
+			format, args);
+	dfilter_error_msg = dfilter_error_msg_buf;
 	va_end(args);
 }
+
 
 /* Initialize the dfilter module */
 void
@@ -108,7 +110,7 @@ dfilter_new(void)
 
 	df = g_new0(dfilter_t, 1);
 	df->insns = NULL;
-	df->deprecated = NULL;
+    df->deprecated = NULL;
 
 	return df;
 }
@@ -200,15 +202,11 @@ dfwork_free(dfwork_t *dfw)
 		free_insns(dfw->consts);
 	}
 
-	/*
-	 * We don't free the error message string; our caller will return
-	 * it to its caller.
-	 */
 	g_free(dfw);
 }
 
 gboolean
-dfilter_compile(const gchar *text, dfilter_t **dfp, gchar **err_msg)
+dfilter_compile(const gchar *text, dfilter_t **dfp)
 {
 	int		token;
 	dfilter_t	*dfilter;
@@ -223,22 +221,16 @@ dfilter_compile(const gchar *text, dfilter_t **dfp, gchar **err_msg)
 
 	if (!text) {
 		*dfp = NULL;
-		if (err_msg != NULL)
-			*err_msg = g_strdup("BUG: NULL text pointer passed to dfilter_compile()");
 		return FALSE;
 	}
 
-	if ( !( text = dfilter_macro_apply(text, err_msg) ) ) {
+	dfilter_error_msg = NULL;
+
+	if ( !( text = dfilter_macro_apply(text, &dfilter_error_msg) ) ) {
 		return FALSE;
 	}
 
 	dfw = dfwork_new();
-
-	/*
-	 * XXX - if we're using a version of Flex that supports reentrant lexical
-	 * analyzers, we should put this into the lexical analyzer's state.
-	 */
-	global_dfw = dfw;
 
 	df_scanner_text(text);
 
@@ -357,18 +349,11 @@ dfilter_compile(const gchar *text, dfilter_t **dfp, gchar **err_msg)
 		*dfp = dfilter;
 	}
 	/* SUCCESS */
-	global_dfw = NULL;
 	dfwork_free(dfw);
-	wmem_free(NULL, (char*)text);
 	return TRUE;
 
 FAILURE:
 	if (dfw) {
-		if (err_msg != NULL)
-			*err_msg = dfw->error_message;
-		else
-			g_free(dfw->error_message);
-		global_dfw = NULL;
 		dfwork_free(dfw);
 	}
 	for (i = 0; i < deprecated->len; ++i) {
@@ -376,18 +361,10 @@ FAILURE:
 		g_free(depr);
 	}
 	g_ptr_array_free(deprecated, TRUE);
-	if (err_msg != NULL) {
-		/*
-		 * Default error message.
-		 *
-		 * XXX - we should really make sure that this is never the
-		 * case for any error.
-		 */
-		if (*err_msg == NULL)
-			*err_msg = g_strdup_printf("Unable to parse filter string \"%s\".", text);
-	}
+	dfilter_fail("Unable to parse filter string \"%s\".", text);
 	*dfp = NULL;
 	return FALSE;
+
 }
 
 

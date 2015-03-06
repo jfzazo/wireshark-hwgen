@@ -38,7 +38,7 @@
 */
 
 #include <string.h>
-
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/address.h>
@@ -59,6 +59,8 @@ extern gint  scheduling_service_type;           /* declared in packet-wmx.c */
 
 extern address bs_address;			/* declared in packet-wmx.c */
 extern guint max_logical_bands;			/* declared in wimax_compact_dlmap_ie_decoder.c */
+extern gboolean is_down_link(packet_info *pinfo);/* declared in packet-wmx.c */
+extern void init_wimax_globals(void);		/* defined in msg_ulmap.c */
 
 static dissector_handle_t mac_mgmt_msg_decoder_handle = NULL;
 static dissector_handle_t mac_ip_handle = NULL;
@@ -583,7 +585,6 @@ static gint hf_mac_header_generic_arq_fb_ie_seq_ack_map_2 = -1;
 static gint hf_mac_header_generic_arq_fb_ie_seq1_length_6 = -1;
 static gint hf_mac_header_generic_arq_fb_ie_seq2_length_6 = -1;
 static gint hf_mac_header_generic_arq_fb_ie_rsv = -1;
-static gint hf_mac_header_payload_fragment = -1;
 
 static expert_field ei_mac_crc_malformed = EI_INIT;
 static expert_field ei_mac_crc_missing = EI_INIT;
@@ -597,7 +598,7 @@ static const value_string last_ie_msgs[] =
 };
 
 /* Register Wimax defrag table init routine. */
-static void wimax_defragment_init(void)
+void wimax_defragment_init(void)
 {
 	gint i;
 
@@ -1086,7 +1087,7 @@ static void dissect_mac_header_generic_decoder(tvbuff_t *tvb, packet_info *pinfo
 				cid_vernier[cid_index]++;
 			}
 			/* Don't show reassembled packet until last fragment. */
-			proto_tree_add_bytes_format(tree, hf_mac_header_payload_fragment, tvb, offset, frag_len, NULL, "Payload Fragment (%d bytes)", frag_len);
+			proto_tree_add_text(tree, tvb, offset, frag_len, "Payload Fragment (%d bytes)", frag_len);
 
 			if (payload_frag && frag_type == LAST_FRAG)
 			{	/* defragmented completely */
@@ -1988,7 +1989,7 @@ void proto_register_mac_header_generic(void)
 			&hf_mac_header_generic_grant_mgmt_ext_pbr_tree,
 			{
 				"Scheduling Service Type (Default)",
-				"wmx.genericGrantSubhd.Default",
+				"wimax.genericGrantSubhd.Default",
 				FT_UINT16, BASE_DEC, NULL, 0x0,
 				NULL, HFILL
 			}
@@ -2053,7 +2054,7 @@ void proto_register_mac_header_generic(void)
 			&hf_mac_header_generic_grant_mgmt_ext_rtps_tree,
 			{
 				"Scheduling Service Type (Extended rtPS)",
-				"wmx.genericGrantSubhd.ExtendedRTPS",
+				"wimax.genericGrantSubhd.ExtendedRTPS",
 				FT_UINT16, BASE_DEC, NULL, 0x0,
 				NULL, HFILL
 			}
@@ -2212,15 +2213,7 @@ void proto_register_mac_header_generic(void)
 				FT_UINT16, BASE_DEC, NULL, ARQ_FB_IE_RSV_MASK,
 				NULL, HFILL
 			}
-		},
-		{
-			&hf_mac_header_payload_fragment,
-			{
-				"Payload Fragment", "wmx.payload_fragment",
-				FT_BYTES, BASE_NONE, NULL, 0x0,
-				NULL, HFILL
-			}
-		},
+		}
 	};
 
 	/* Setup protocol subtree array */
@@ -2278,18 +2271,5 @@ void
 proto_reg_handoff_mac_header_generic(void)
 {
 	mac_mgmt_msg_decoder_handle = find_dissector("wmx_mac_mgmt_msg_decoder");
-	mac_ip_handle = find_dissector("ip");
+    mac_ip_handle = find_dissector("ip");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

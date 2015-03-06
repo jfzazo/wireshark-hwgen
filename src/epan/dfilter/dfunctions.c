@@ -22,14 +22,32 @@
 
 #include <glib.h>
 
-#include "dfilter-int.h"
 #include "dfunctions.h"
+#include "dfilter-int.h"
 
 #include <string.h>
+#include <ctype.h>
 
 #include <ftypes/ftypes-int.h>
 #include <ftypes/ftypes.h>
 #include <epan/exceptions.h>
+#include <epan/emem.h>
+
+/* lowercase an ASCII character.
+ * (thanks to Guy Harris for the function) */
+static gchar
+string_ascii_to_lower(gchar c)
+{
+    return ((c & 0x80) ? c : tolower(c));
+}
+
+/* uppercase an ASCII character. */
+static gchar
+string_ascii_to_upper(gchar c)
+{
+    return ((c & 0x80) ? c : toupper(c));
+}
+
 
 /* Convert an FT_STRING using a callback function */
 static gboolean
@@ -45,15 +63,14 @@ string_walk(GList* arg1list, GList **retval, gchar(*conv_func)(gchar))
         arg_fvalue = (fvalue_t *)arg1->data;
         /* XXX - it would be nice to handle FT_TVBUFF, too */
         if (IS_FT_STRING(fvalue_type_ftenum(arg_fvalue))) {
-            s = (char *)wmem_strdup(NULL, (gchar *)fvalue_get(arg_fvalue));
+            s = (char *)ep_strdup((gchar *)fvalue_get(arg_fvalue));
             for (c = s; *c; c++) {
-                    /**c = g_ascii_tolower(*c);*/
+                    /**c = string_ascii_to_lower(*c);*/
                     *c = conv_func(*c);
             }
 
             new_ft_string = fvalue_new(FT_STRING);
             fvalue_set_string(new_ft_string, s);
-            wmem_free(NULL, s);
             *retval = g_list_append(*retval, new_ft_string);
 	}
         arg1 = arg1->next;
@@ -66,14 +83,14 @@ string_walk(GList* arg1list, GList **retval, gchar(*conv_func)(gchar))
 static gboolean
 df_func_lower(GList* arg1list, GList *arg2junk _U_, GList **retval)
 {
-    return string_walk(arg1list, retval, g_ascii_tolower);
+    return string_walk(arg1list, retval, string_ascii_to_lower);
 }
 
 /* dfilter function: upper() */
 static gboolean
 df_func_upper(GList* arg1list, GList *arg2junk _U_, GList **retval)
 {
-    return string_walk(arg1list, retval, g_ascii_toupper);
+    return string_walk(arg1list, retval, string_ascii_to_upper);
 }
 
 /* dfilter function: len() */
@@ -141,7 +158,7 @@ df_func_count(GList* arg1list, GList *arg2junk _U_, GList **retval)
 /* For upper(), lower() and len(), checks that the parameter passed to
  * it is an FT_STRING */
 static void
-ul_semcheck_params(dfwork_t *dfw, int param_num, stnode_t *st_node)
+ul_semcheck_params(int param_num, stnode_t *st_node)
 {
     sttype_id_t type;
     ftenum_t    ftype;
@@ -155,12 +172,12 @@ ul_semcheck_params(dfwork_t *dfw, int param_num, stnode_t *st_node)
                 hfinfo = (header_field_info *)stnode_data(st_node);
                 ftype = hfinfo->type;
                 if (!IS_FT_STRING(ftype)) {
-                    dfilter_fail(dfw, "Only strings can be used in upper() or lower() or len()");
+                    dfilter_fail("Only strings can be used in upper() or lower() or len()");
                     THROW(TypeError);
                 }
                 break;
             default:
-                dfilter_fail(dfw, "Only string-type fields can be used in upper() or lower() or len()");
+                dfilter_fail("Only string-type fields can be used in upper() or lower() or len()");
                 THROW(TypeError);
         }
     }
@@ -170,7 +187,7 @@ ul_semcheck_params(dfwork_t *dfw, int param_num, stnode_t *st_node)
 }
 
 static void
-ul_semcheck_field_param(dfwork_t *dfw, int param_num, stnode_t *st_node)
+ul_semcheck_field_param(int param_num, stnode_t *st_node)
 {
     sttype_id_t type;
 
@@ -181,7 +198,7 @@ ul_semcheck_field_param(dfwork_t *dfw, int param_num, stnode_t *st_node)
             case STTYPE_FIELD:
                 break;
             default:
-                dfilter_fail(dfw, "Only type fields can be used as parameter "
+                dfilter_fail("Only type fields can be used as parameter "
                       "for size() or count()");
                 THROW(TypeError);
         }

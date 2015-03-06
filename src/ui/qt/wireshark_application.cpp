@@ -23,35 +23,28 @@
 
 #include "wsutil/filesystem.h"
 
-#include "epan/addr_resolv.h"
 #include "epan/disabled_protos.h"
 #include "epan/tap.h"
 #include "epan/timestamp.h"
 
 #include "ui/decode_as_utils.h"
 #include "ui/preference_utils.h"
-#include "ui/iface_lists.h"
 #include "ui/recent.h"
 #include "ui/simple_dialog.h"
 #include "ui/util.h"
 
 #include "qt_ui_utils.h"
 
+#include "capture.h"
 #include "color_filters.h"
+#include "filters.h"
 #include "log.h"
 #include "recent_file_status.h"
 
-#ifdef HAVE_LIBPCAP
-#include <caputils/iface_monitor.h>
-#endif
-
-#include "ui/capture.h"
-#include "ui/filters.h"
 #include "ui/capture_globals.h"
 #include "ui/software_update.h"
 #include "ui/last_open_dir.h"
 #include "ui/recent_utils.h"
-#include "ui/utf8_entities.h"
 
 #ifdef _WIN32
 #  include "ui/win32/console_win32.h"
@@ -62,9 +55,6 @@
 #include <QEvent>
 #include <QFileOpenEvent>
 #include <QFontMetrics>
-#include <QLibraryInfo>
-#include <QLocale>
-#include <QMutableListIterator>
 #include <QTimer>
 #include <QUrl>
 
@@ -80,9 +70,7 @@ WiresharkApplication *wsApp = NULL;
 // MUST be UTF-8
 static char *last_open_dir = NULL;
 static bool updated_last_open_dir = FALSE;
-static QList<recent_item_status *> recent_items_;
-
-QString WiresharkApplication::window_title_separator_ = QString::fromUtf8(" " UTF8_MIDDLE_DOT " ");
+static QList<recent_item_status *> recent_items;
 
 void
 topic_action(topic_action_e action)
@@ -120,13 +108,13 @@ add_menu_recent_capture_file(const gchar *cf_name) {
     normalized_cf_name = QDir::cleanPath(normalized_cf_name);
     normalized_cf_name = QDir::toNativeSeparators(normalized_cf_name);
 
+    recent_item_status *ri;
+
     /* Iterate through the recent items list, removing duplicate entries and every
      * item above count_max
      */
     unsigned int cnt = 1;
-    QMutableListIterator<recent_item_status *> rii(recent_items_);
-    while (rii.hasNext()) {
-        recent_item_status *ri = rii.next();
+    foreach (ri, wsApp->recentItems()) {
         /* if this element string is one of our special items (separator, ...) or
          * already in the list or
          * this element is above maximum count (too old), remove it
@@ -140,7 +128,7 @@ add_menu_recent_capture_file(const gchar *cf_name) {
             ri->filename.compare(normalized_cf_name) == 0 ||
 #endif
             cnt >= prefs.gui_recent_files_count_max) {
-            rii.remove();
+            wsApp->recentItems().removeOne(ri);
             delete(ri);
             cnt--;
         }
@@ -155,7 +143,7 @@ extern "C" void menu_recent_file_write_all(FILE *rf) {
     /* we have to iterate backwards through the children's list,
      * so we get the latest item last in the file.
      */
-    QListIterator<recent_item_status *> rii(recent_items_);
+    QListIterator<recent_item_status *> rii(recent_items);
     rii.toBack();
     while (rii.hasPrevious()) {
         QString cf_name;
@@ -175,7 +163,7 @@ void WiresharkApplication::refreshRecentFiles(void) {
     RecentFileStatus *rf_status;
     QThread *rf_thread;
 
-    foreach (ri, recent_items_) {
+    foreach (ri, recent_items) {
         if (ri->in_thread) {
             continue;
         }
@@ -187,8 +175,7 @@ void WiresharkApplication::refreshRecentFiles(void) {
 
         connect(rf_thread, SIGNAL(started()), rf_status, SLOT(start()));
 
-        connect(rf_status, SIGNAL(statusFound(QString, qint64, bool)),
-                this, SLOT(itemStatusFinished(QString, qint64, bool)), Qt::QueuedConnection);
+        connect(rf_status, SIGNAL(statusFound(QString, qint64, bool)), this, SLOT(itemStatusFinished(QString, qint64, bool)));
         connect(rf_status, SIGNAL(finished()), rf_thread, SLOT(quit()));
         connect(rf_status, SIGNAL(finished()), rf_status, SLOT(deleteLater()));
 
@@ -196,17 +183,114 @@ void WiresharkApplication::refreshRecentFiles(void) {
     }
 }
 
-void WiresharkApplication::refreshAddressResolution()
-{
-    // Anything new show up?
-    if (host_name_lookup_process()) {
-        emit addressResolutionChanged();
-    }
-}
-
 void WiresharkApplication::updateTaps()
 {
     draw_tap_listeners(FALSE);
+}
+
+void WiresharkApplication::captureCallback(int event _U_, capture_session *cap_session _U_)
+{
+#ifdef HAVE_LIBPCAP
+    switch(event) {
+    case(capture_cb_capture_prepared):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: capture prepared");
+        emit captureCapturePrepared(cap_session);
+        break;
+    case(capture_cb_capture_update_started):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: capture update started");
+        emit captureCaptureUpdateStarted(cap_session);
+        break;
+    case(capture_cb_capture_update_continue):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: capture update continue");
+        emit captureCaptureUpdateContinue(cap_session);
+        break;
+    case(capture_cb_capture_update_finished):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: capture update finished");
+        emit captureCaptureUpdateFinished(cap_session);
+        break;
+    case(capture_cb_capture_fixed_started):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: capture fixed started");
+        emit captureCaptureFixedStarted(cap_session);
+        break;
+    case(capture_cb_capture_fixed_continue):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: capture fixed continue");
+        break;
+    case(capture_cb_capture_fixed_finished):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: capture fixed finished");
+        emit captureCaptureFixedFinished(cap_session);
+        break;
+    case(capture_cb_capture_stopping):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: capture stopping");
+        /* Beware: this state won't be called, if the capture child
+         * closes the capturing on it's own! */
+        emit captureCaptureStopping(cap_session);
+        break;
+    case(capture_cb_capture_failed):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: capture failed");
+        emit captureCaptureFailed(cap_session);
+        break;
+    default:
+        g_warning("main_capture_callback: event %u unknown", event);
+        g_assert_not_reached();
+    }
+#endif // HAVE_LIBPCAP
+}
+
+void WiresharkApplication::captureFileCallback(int event, void * data)
+{
+    capture_file *cf = (capture_file *) data;
+
+    switch(event) {
+
+    case(cf_cb_file_opened):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: Opened");
+        emit captureFileOpened(cf);
+        break;
+    case(cf_cb_file_closing):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: Closing");
+        emit captureFileClosing(cf);
+        break;
+    case(cf_cb_file_closed):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: Closed");
+        emit captureFileClosed(cf);
+        break;
+    case(cf_cb_file_read_started):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: Read started");
+        emit captureFileReadStarted(cf);
+        break;
+    case(cf_cb_file_read_finished):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: Read finished");
+        emit captureFileReadFinished(cf);
+        break;
+    case(cf_cb_file_reload_started):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: Reload started");
+        emit captureFileReadStarted(cf);
+        break;
+    case(cf_cb_file_reload_finished):
+        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: Reload finished");
+        emit captureFileReadFinished(cf);
+        break;
+
+    case(cf_cb_packet_selected):
+    case(cf_cb_packet_unselected):
+    case(cf_cb_field_unselected):
+        // Pure signals and slots
+        break;
+
+//    case(cf_cb_file_save_started): // data = string
+//        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: Save started");
+//        break;
+//    case(cf_cb_file_save_finished):
+//        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: Save finished");
+//        break;
+//    case(cf_cb_file_save_failed):
+//        g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Callback: Save failed");
+//        break;
+    default:
+        g_log(NULL, G_LOG_LEVEL_DEBUG, "FIX: main_cf_callback %d %p", event, data);
+//        g_warning("main_cf_callback: event %u unknown", event);
+//        g_assert_not_reached();
+    }
 }
 
 QDir WiresharkApplication::lastOpenDir() {
@@ -232,9 +316,9 @@ void WiresharkApplication::helpTopicAction(topic_action_e action)
 void WiresharkApplication::setMonospaceFont(const char *font_string) {
 
     if (font_string && strlen(font_string) > 0) {
-        mono_font_.fromString(font_string);
-//        mono_bold_font_ = QFont(mono_regular_font_);
-//        mono_bold_font_.setBold(true);
+        mono_regular_font_.fromString(font_string);
+        mono_bold_font_ = QFont(mono_regular_font_);
+        mono_bold_font_.setBold(true);
         return;
     }
 
@@ -243,8 +327,8 @@ void WiresharkApplication::setMonospaceFont(const char *font_string) {
     const char *win_alt_font = "Lucida Console";
     const char *osx_default_font = "Menlo";
     const char *osx_alt_font = "Monaco";
-    const char *x11_default_font = "Liberation Mono";
-    const QStringList x11_alt_fonts = QStringList() << "DejaVu Sans Mono" << "Bitstream Vera Sans Mono";
+    const char *x11_default_font = "Bitstream Vera Sans Mono";
+    const QStringList x11_alt_fonts = QStringList() << "Liberation Mono" << "DejaVu Sans Mono";
     const QStringList fallback_fonts = QStringList() << "Lucida Sans Typewriter" << "Inconsolata" << "Droid Sans Mono" << "Andale Mono" << "Courier New" << "monospace";
     QStringList substitutes;
     int font_size_adjust = 0;
@@ -262,23 +346,33 @@ void WiresharkApplication::setMonospaceFont(const char *font_string) {
     substitutes << x11_alt_fonts << win_default_font << win_alt_font << osx_default_font << osx_alt_font << fallback_fonts;
 #endif
 
-    mono_font_.setFamily(default_font);
-    mono_font_.insertSubstitutions(default_font, substitutes);
-    mono_font_.setPointSize(wsApp->font().pointSize() + font_size_adjust);
-    mono_font_.setBold(false);
+    mono_regular_font_.setFamily(default_font);
+    mono_regular_font_.insertSubstitutions(default_font, substitutes);
+    mono_regular_font_.setPointSize(wsApp->font().pointSize() + font_size_adjust);
+    mono_regular_font_.setBold(false);
 
-//    mono_bold_font_ = QFont(mono_font_);
-//    mono_bold_font_.setBold(true);
+    mono_bold_font_ = QFont(mono_regular_font_);
+    mono_bold_font_.setBold(true);
 
     g_free(prefs.gui_qt_font_name);
-    prefs.gui_qt_font_name = qstring_strdup(mono_font_.toString());
+    prefs.gui_qt_font_name = g_strdup(mono_regular_font_.toString().toUtf8().constData());
 }
 
-int WiresharkApplication::monospaceTextSize(const char *str)
+int WiresharkApplication::monospaceTextSize(const char *str, bool bold)
 {
-    QFontMetrics fm(mono_font_);
+    QFontMetrics *fm;
 
-    return fm.width(str);
+    if (bold)
+        fm = new QFontMetrics(mono_bold_font_);
+    else
+        fm = new QFontMetrics(mono_regular_font_);
+
+    return fm->width(str);
+}
+
+QFont WiresharkApplication::monospaceFont(bool bold)
+{
+    return bold ? mono_bold_font_ : mono_regular_font_;
 }
 
 void WiresharkApplication::setConfigurationProfile(const gchar *profile_name)
@@ -371,18 +465,7 @@ void WiresharkApplication::setConfigurationProfile(const gchar *profile_name)
 //    user_font_apply();
 
     /* Update menus with new recent values */
-    //    menu_recent_read_finished();
-}
-
-const QString WiresharkApplication::windowTitleString(QStringList title_parts)
-{
-    QMutableStringListIterator tii(title_parts);
-    while (tii.hasNext()) {
-        QString ti = tii.next();
-        if (ti.isEmpty()) tii.remove();
-    }
-    title_parts.prepend(applicationName());
-    return title_parts.join(window_title_separator_);
+//    menu_recent_read_finished();
 }
 
 void WiresharkApplication::setLastOpenDir(const char *dir_name)
@@ -433,36 +516,36 @@ bool WiresharkApplication::event(QEvent *event)
 }
 
 void WiresharkApplication::clearRecentItems() {
-    qDeleteAll(recent_items_.begin(), recent_items_.end());
-    recent_items_.clear();
-    emit updateRecentItemStatus(NULL, 0, false);
-}
+    recent_item_status *ri;
 
-void WiresharkApplication::captureFileReadStarted()
-{
-    // Doesn't appear to do anything. Logic probably needs to be in file.c.
-    QTimer::singleShot(TAP_UPDATE_DEFAULT_INTERVAL / 5, this, SLOT(updateTaps()));
-    QTimer::singleShot(TAP_UPDATE_DEFAULT_INTERVAL / 2, this, SLOT(updateTaps()));
+    foreach (ri, recent_items) {
+        recent_items.removeOne(ri);
+        delete(ri);
+    }
+    emit updateRecentItemStatus(NULL, 0, false);
 }
 
 void WiresharkApplication::cleanup()
 {
     software_update_cleanup();
-    // Write the user's recent file(s) to disk.
+    /* write user's recent file to disk
+     * It is no problem to write this file, even if we do not quit */
     write_profile_recent();
     write_recent();
 }
 
-void WiresharkApplication::itemStatusFinished(const QString filename, qint64 size, bool accessible) {
+void WiresharkApplication::itemStatusFinished(const QString &filename, qint64 size, bool accessible) {
     recent_item_status *ri;
     RecentFileStatus *rf_status = qobject_cast<RecentFileStatus *>(QObject::sender());
 
-    foreach (ri, recent_items_) {
+//    g_log(NULL, G_LOG_LEVEL_DEBUG, "rf isf %d", recent_items.count());
+    foreach (ri, recent_items) {
         if (filename == ri->filename && (size != ri->size || accessible != ri->accessible)) {
             ri->size = size;
             ri->accessible = accessible;
             ri->in_thread = false;
 
+//            g_log(NULL, G_LOG_LEVEL_DEBUG, "rf update %s", filename.toUtf8().constData());
             emit updateRecentItemStatus(filename, size, accessible);
         }
     }
@@ -477,7 +560,6 @@ WiresharkApplication::WiresharkApplication(int &argc,  char **argv) :
     initialized_(false)
 {
     wsApp = this;
-    setApplicationName("Wireshark");
 
     Q_INIT_RESOURCE(about);
     Q_INIT_RESOURCE(display_filter);
@@ -485,8 +567,7 @@ WiresharkApplication::WiresharkApplication(int &argc,  char **argv) :
     Q_INIT_RESOURCE(layout);
     Q_INIT_RESOURCE(status);
     Q_INIT_RESOURCE(toolbar);
-    Q_INIT_RESOURCE(wsicon);
-    Q_INIT_RESOURCE(languages);
+    Q_INIT_RESOURCE(welcome);
 
 #ifdef Q_OS_WIN
     /* RichEd20.DLL is needed for native file dialog filter entries. */
@@ -499,25 +580,11 @@ WiresharkApplication::WiresharkApplication(int &argc,  char **argv) :
     }
 #endif // Q_OS_WIN
 
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 1, 0))
-    setAttribute(Qt::AA_UseHighDpiPixmaps);
-#endif
-
-    QList<int> icon_sizes = QList<int>() << 16 << 24 << 32 << 48 << 64 << 128 << 256 << 512 << 1024;
-    foreach (int icon_size, icon_sizes) {
-        QString icon_path = QString(":/wsicon/wsicon%1.png").arg(icon_size);
-        normal_icon_.addFile(icon_path);
-        icon_path = QString(":/wsicon/wsiconcap%1.png").arg(icon_size);
-        capture_icon_.addFile(icon_path);
-    }
+    setAttribute(Qt::AA_DontShowIconsInMenus, true);
 
     recent_timer_.setParent(this);
     connect(&recent_timer_, SIGNAL(timeout()), this, SLOT(refreshRecentFiles()));
     recent_timer_.start(2000);
-
-    addr_resolv_timer_.setParent(this);
-    connect(&addr_resolv_timer_, SIGNAL(timeout()), this, SLOT(refreshAddressResolution()));
-    recent_timer_.start(1000);
 
     tap_update_timer_.setParent(this);
     tap_update_timer_.setInterval(TAP_UPDATE_DEFAULT_INTERVAL);
@@ -540,7 +607,6 @@ void WiresharkApplication::emitAppSignal(AppSignal signal)
         break;
     case FilterExpressionsChanged:
         emit filterExpressionsChanged();
-        break;
     case PreferencesChanged:
         emit preferencesChanged();
         break;
@@ -550,98 +616,9 @@ void WiresharkApplication::emitAppSignal(AppSignal signal)
     case StaticRecentFilesRead:
         emit recentFilesRead();
         break;
-    case FieldsChanged:
-        emit fieldsChanged();
-        break;
     default:
         break;
     }
-}
-
-void WiresharkApplication::emitStatCommandSignal(const QString &menu_path, const char *arg, void *userdata)
-{
-    emit openStatCommandDialog(menu_path, arg, userdata);
-}
-
-#ifdef HAVE_LIBPCAP
-
-static void
-iface_mon_event_cb(const char *iface, int up)
-{
-    int present = 0;
-    guint ifs, j;
-    interface_t device;
-    interface_options interface_opts;
-
-    for (ifs = 0; ifs < global_capture_opts.all_ifaces->len; ifs++) {
-        device = g_array_index(global_capture_opts.all_ifaces, interface_t, ifs);
-        if (strcmp(device.name, iface) == 0) {
-            present = 1;
-            if (!up) {
-                /*
-                 * Interface went down or disappeared; remove all instances
-                 * of it from the current list of interfaces selected
-                 * for capturing.
-                 */
-                for (j = 0; j < global_capture_opts.ifaces->len; j++) {
-                    interface_opts = g_array_index(global_capture_opts.ifaces, interface_options, j);
-                    if (strcmp(interface_opts.name, device.name) == 0) {
-                        g_array_remove_index(global_capture_opts.ifaces, j);
-                }
-             }
-          }
-        }
-    }
-
-    if (present != up) {
-        /*
-         * We've been told that there's a new interface or that an old
-         * interface is gone; reload the local interface list.
-         */
-        scan_local_interfaces(main_window_update);
-    }
-}
-
-#endif
-
-void WiresharkApplication::ifChangeEventsAvailable()
-{
-#ifdef HAVE_LIBPCAP
-    /*
-     * Something's readable from the descriptor for interface
-     * monitoring.
-     *
-     * Have the interface-monitoring code Read whatever interface-change
-     * events are available, and call the callback for them.
-     */
-    iface_mon_event();
-
-    /*
-     * Now emit a signal to indicate that the list changed, so that all
-     * places displaying the list will get updated.
-     *
-     * XXX - only if it *did* change.
-     */
-    emit localInterfaceListChanged();
-#endif
-}
-
-void WiresharkApplication::refreshLocalInterfaces()
-{
-#ifdef HAVE_LIBPCAP
-    /*
-     * Reload the local interface list.
-     */
-    scan_local_interfaces(main_window_update);
-
-    /*
-     * Now emit a signal to indicate that the list changed, so that all
-     * places displaying the list will get updated.
-     *
-     * XXX - only if it *did* change.
-     */
-    emit localInterfaceListChanged();
-#endif
 }
 
 void WiresharkApplication::allSystemsGo()
@@ -654,16 +631,6 @@ void WiresharkApplication::allSystemsGo()
         pending_open_files_.pop_front();
     }
     software_update_init();
-
-#ifdef HAVE_LIBPCAP
-    int err;
-    err = iface_mon_start(&iface_mon_event_cb);
-    if (err == 0) {
-        if_notifier_ = new QSocketNotifier(iface_mon_get_sock(),
-                                           QSocketNotifier::Read);
-        connect(if_notifier_, SIGNAL(activated(int)), SLOT(ifChangeEventsAvailable()));
-    }
-#endif
 }
 
 e_prefs * WiresharkApplication::readConfigurationFiles(char **gdp_path, char **dp_path)
@@ -772,7 +739,7 @@ e_prefs * WiresharkApplication::readConfigurationFiles(char **gdp_path, char **d
 }
 
 QList<recent_item_status *> WiresharkApplication::recentItems() const {
-    return recent_items_;
+    return recent_items;
 }
 
 void WiresharkApplication::addRecentItem(const QString &filename, qint64 size, bool accessible) {
@@ -782,46 +749,9 @@ void WiresharkApplication::addRecentItem(const QString &filename, qint64 size, b
     ri->size = size;
     ri->accessible = accessible;
     ri->in_thread = false;
-    recent_items_.prepend(ri);
+    recent_items.prepend(ri);
 
     itemStatusFinished(filename, size, accessible);
-}
-
-static void switchTranslator(QTranslator& myTranslator, const QString& filename,
-    const QString& searchPath)
-{
-    wsApp->removeTranslator(&myTranslator);
-
-    if (myTranslator.load(filename, searchPath))
-        wsApp->installTranslator(&myTranslator);
-}
-
-void WiresharkApplication::loadLanguage(const QString& newLanguage)
-{
-    QLocale locale;
-    QString localeLanguage;
-
-    if (newLanguage.isEmpty() || newLanguage == "system") {
-        localeLanguage = QLocale::system().name();
-    } else {
-        localeLanguage = newLanguage;
-    }
-
-    locale = QLocale(localeLanguage);
-    QLocale::setDefault(locale);
-    switchTranslator(wsApp->translator,
-            QString("wireshark_%1.qm").arg(localeLanguage), QString(":/i18n/"));
-    if (QFile::exists(QString("%1/%2/wireshark_%3.qm")
-            .arg(get_datafile_dir()).arg("languages").arg(localeLanguage)))
-        switchTranslator(wsApp->translator,
-                QString("wireshark_%1.qm").arg(localeLanguage), QString(get_datafile_dir()) + QString("/languages"));
-    if (QFile::exists(QString("%1/wireshark_%3.qm")
-            .arg(gchar_free_to_qstring(get_persconffile_path("languages", FALSE))).arg(localeLanguage)))
-        switchTranslator(wsApp->translator,
-                QString("wireshark_%1.qm").arg(localeLanguage), gchar_free_to_qstring(get_persconffile_path("languages", FALSE)));
-    switchTranslator(wsApp->translatorQt,
-            QString("qt_%1.qm").arg(localeLanguage),
-            QLibraryInfo::location(QLibraryInfo::TranslationsPath));
 }
 
 /*

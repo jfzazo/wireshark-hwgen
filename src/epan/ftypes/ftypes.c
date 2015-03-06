@@ -288,48 +288,38 @@ fvalue_init(fvalue_t *fv, ftenum_t ftype)
 }
 
 fvalue_t*
-fvalue_from_unparsed(ftenum_t ftype, const char *s, gboolean allow_partial_value, gchar **err_msg)
+fvalue_from_unparsed(ftenum_t ftype, const char *s, gboolean allow_partial_value, LogFunc logfunc)
 {
 	fvalue_t	*fv;
 
 	fv = fvalue_new(ftype);
 	if (fv->ftype->val_from_unparsed) {
-		if (fv->ftype->val_from_unparsed(fv, s, allow_partial_value, err_msg)) {
-			/* Success */
-			if (err_msg != NULL)
-				*err_msg = NULL;
+		if (fv->ftype->val_from_unparsed(fv, s, allow_partial_value, logfunc)) {
 			return fv;
 		}
 	}
 	else {
-		if (err_msg != NULL) {
-			*err_msg = g_strdup_printf("\"%s\" cannot be converted to %s.",
-					s, ftype_pretty_name(ftype));
-		}
+		logfunc("\"%s\" cannot be converted to %s.",
+				s, ftype_pretty_name(ftype));
 	}
 	FVALUE_FREE(fv);
 	return NULL;
 }
 
 fvalue_t*
-fvalue_from_string(ftenum_t ftype, const char *s, gchar **err_msg)
+fvalue_from_string(ftenum_t ftype, const char *s, LogFunc logfunc)
 {
 	fvalue_t	*fv;
 
 	fv = fvalue_new(ftype);
 	if (fv->ftype->val_from_string) {
-		if (fv->ftype->val_from_string(fv, s, err_msg)) {
-			/* Success */
-			if (err_msg != NULL)
-				*err_msg = NULL;
+		if (fv->ftype->val_from_string(fv, s, logfunc)) {
 			return fv;
 		}
 	}
 	else {
-		if (err_msg != NULL) {
-			*err_msg = g_strdup_printf("\"%s\" cannot be converted to %s.",
-					s, ftype_pretty_name(ftype));
-		}
+		logfunc("\"%s\" cannot be converted to %s.",
+				s, ftype_pretty_name(ftype));
 	}
 	FVALUE_FREE(fv);
 	return NULL;
@@ -358,14 +348,14 @@ fvalue_length(fvalue_t *fv)
 }
 
 int
-fvalue_string_repr_len(fvalue_t *fv, ftrepr_t rtype, int field_display)
+fvalue_string_repr_len(fvalue_t *fv, ftrepr_t rtype)
 {
 	g_assert(fv->ftype->len_string_repr);
-	return fv->ftype->len_string_repr(fv, rtype, field_display);
+	return fv->ftype->len_string_repr(fv, rtype);
 }
 
 char *
-fvalue_to_string_repr(fvalue_t *fv, ftrepr_t rtype, int field_display, char *buf)
+fvalue_to_string_repr(fvalue_t *fv, ftrepr_t rtype, char *buf)
 {
 	if (fv->ftype->val_to_string_repr == NULL) {
 		/* no value-to-string-representation function, so the value cannot be represented */
@@ -373,14 +363,14 @@ fvalue_to_string_repr(fvalue_t *fv, ftrepr_t rtype, int field_display, char *buf
 	}
 	if (!buf) {
 		int len;
-		if ((len = fvalue_string_repr_len(fv, rtype, field_display)) >= 0) {
+		if ((len = fvalue_string_repr_len(fv, rtype)) >= 0) {
 			buf = (char *)g_malloc0(len + 1);
 		} else {
 			/* the value cannot be represented in the given representation type (rtype) */
 			return NULL;
 		}
 	}
-	fv->ftype->val_to_string_repr(fv, rtype, field_display, buf);
+	fv->ftype->val_to_string_repr(fv, rtype, buf);
 	return buf;
 }
 

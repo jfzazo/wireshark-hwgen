@@ -23,105 +23,23 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/ipproto.h>
 #include <epan/afn.h>
 #include <epan/prefs.h>
 #include <epan/in_cksum.h>
+#include <epan/wmem/wmem.h>
 #include <epan/to_str.h>
-#include "packet-igmp.h"
+
+#include "packet-pim.h"
 
 void proto_register_pim(void);
 void proto_reg_handoff_pim(void);
 
 #define PIM_TYPE(x)     ((x) & 0x0f)
 #define PIM_VER(x)      (((x) & 0xf0) >> 4)
-#define PIM_BIDIR_SUBTYPE(x)    ((x) & 0x0f)
-#define PIM_BIDIR_RSVD(x)       (((x) & 0xf0) >> 4)
-
-/* PIM message type */
-
-#define PIM_TYPE_HELLO 0            /* Hello [RFC3973][RFC4601] */
-#define PIM_TYPE_REGISTER 1         /* Register [RFC4601] */
-#define PIM_TYPE_REGISTER_STOP 2    /* Register Stop [RFC4601] */
-#define PIM_TYPE_JOIN_PRUNE 3       /* Join/Prune [RFC3973][RFC4601] */
-#define PIM_TYPE_BOOTSTRAP 4        /* Bootstrap [RFC4601] */
-#define PIM_TYPE_ASSERT 5           /* Assert [RFC3973][RFC4601] */
-#define PIM_TYPE_GRAFT 6            /* Graft [RFC3973] */
-#define PIM_TYPE_GRAFT_ACK 7        /* Graft-Ack [RFC3973] */
-#define PIM_TYPE_CAND_RP_ADV 8      /* Candidate RP Advertisement [RFC4601] */
-#define PIM_TYPE_STATE_REFRESH 9    /* State Refresh [RFC3973] */
-#define PIM_TYPE_DF_ELECT 10        /* DF Election [RFC5015] */
-#define PIM_TYPE_ECMP_REDIR 11      /* ECMP Redirect [RFC6754] */
-
-/* PIM Message hello options */
-
-#define PIM_HELLO_HOLD_T 1          /* Hold Time [RFC4601] */
-#define PIM_HELLO_LAN_PRUNE_DELAY 2 /*LAN Prune Delay [RFC3973] */
-#define PIM_HELLO_LABEL_PARA 17     /* Label Parameters [Dino_Farinacci] */
-#define PIM_HELLO_DR_PRIORITY 19    /* DR Priority */
-#define PIM_HELLO_GEN_ID 20         /* Generation ID [RFC3973] */
-#define PIM_HELLO_STATE_REFRESH 21  /* State-Refresh [RFC3973] */
-#define PIM_HELLO_BIDIR_CAPA 22     /* Bidirectional Capable [RFC5015] */
-#define PIM_HELLO_VCI_CAPA 23       /* VCI Capability */
-#define PIM_HELLO_VAR_ADDR_LST 24   /* variable Address List [RFC4601] */
-#define PIM_HELLO_VAR_NEIG_LST 25   /* variable Neighbor List TLV */
-#define PIM_HELL0_JOIN_ATTR 26      /* Join Attribute [RFC5384] */
-#define PIM_HELLO_O_TCP_CAPA 27     /* variable PIM-over-TCP-Capable */
-#define PIM_HELLO_O_SCTP_CAPA 28    /* variable PIM-over-SCTP-Capable */
-#define PIM_HELLO_VAR_POP_COUNT 29  /* variable Pop-Count [RFC6807] */
-#define PIM_HELLO_MT_ID 30          /* PIM MT-ID [RFC6420] */
-#define PIM_HELLO_INT_ID 31         /* Interface ID [RFC6395] */
-#define PIM_HELLO_ECMP_REDIR  32    /* PIM ECMP Redirect Hello Option [RFC6754] */
-#define PIM_HELLO_VPC_PEER_ID 33    /* 2 vPC Peer ID */
-#define PIM_HELLO_DR_LB_CAPA 34     /* variable DR Load Balancing Capability [draft-ietf-pim-drlb] */
-#define PIM_HELLO_LB_GDR 35         /* variable DR Load Balancing GDR (LBGDR) [draft-ietf-pim-drlb] */
-
-/* PIM BIDIR DF election messages */
-
-#define PIM_BDIR_DF_OFFER 1
-#define PIM_BDIR_DF_WINNER 2
-#define PIM_BDIR_DF_BACKOFF 3
-#define PIM_BDIR_DF_PASS 4
-
-
-static const value_string pimtypevals[] = {
-    { PIM_TYPE_HELLO,       "Hello" },
-    { PIM_TYPE_REGISTER, "Register" },
-    { PIM_TYPE_REGISTER_STOP, "Register-stop" },
-    { PIM_TYPE_JOIN_PRUNE, "Join/Prune" },
-    { PIM_TYPE_BOOTSTRAP, "Bootstrap" },
-    { PIM_TYPE_ASSERT, "Assert" },
-    { PIM_TYPE_GRAFT, "Graft" },
-    { PIM_TYPE_GRAFT_ACK, "Graft-Ack" },
-    { PIM_TYPE_CAND_RP_ADV, "Candidate-RP-Advertisement" },
-    { PIM_TYPE_STATE_REFRESH, "State-Refresh" },
-    { PIM_TYPE_DF_ELECT, "DF election"},
-    { PIM_TYPE_ECMP_REDIR, "ECMP redirect" },
-    { 0, NULL }
-};
-
-static const value_string pimbdirdfvals[] = {
-    { PIM_BDIR_DF_OFFER,    "offer"},
-    { PIM_BDIR_DF_WINNER, "DF Winner"},
-    { PIM_BDIR_DF_BACKOFF, "DF Backoff"},
-    { PIM_BDIR_DF_PASS, "DF Pass"},
-    { 0, NULL }
-};
-
-static const value_string pim_opt_vals[] = {
-    {1, "Hold Time"},
-    {2, "LAN Prune Delay"},
-    {18, "Deprecated and should not be used"},
-    {19, "DR Priority"},
-    {20, "Generation ID"},
-    {21, "State Refresh Capable"},
-    {22, "Bidir Capable"},
-    {24, "Address List"},
-    {65001, "Address List"},    /* old implementation */
-    {0, NULL}
-};
-
 
 enum pimv2_addrtype {
     pimv2_unicast, pimv2_group, pimv2_source
@@ -131,8 +49,6 @@ static int proto_pim = -1;
 static int hf_pim_version = -1;
 static int hf_pim_type = -1;
 static int hf_pim_code = -1;
-static int hf_pim_df_elect_subtype = -1;
-static int hf_pim_df_elect_rsvd = -1;
 static int hf_pim_cksum = -1;
 static int hf_pim_res_bytes = -1;
 /* PIM Hello options (RFC 4601, section 4.9.2 and RFC 3973, section 4.7.5) */
@@ -158,7 +74,6 @@ static int hf_pim_state_refresh_reserved = -1;
 /* Assert fields */
 static int hf_pim_rpt = -1;
 static int hf_pim_metric_pref = -1;
-static int hf_pim_df_metric_pref = -1;
 static int hf_pim_metric = -1;
 static int hf_pim_prune_indicator = -1;
 static int hf_pim_prune_now = -1;
@@ -180,18 +95,10 @@ static int hf_pim_bsr_ip4 = -1;
 static int hf_pim_bsr_ip6 = -1;
 static int hf_pim_rp_ip4 = -1;
 static int hf_pim_rp_ip6 = -1;
-static int hf_pim_bd_bo_offer_ip4 = -1;
-static int hf_pim_bd_bo_offer_ip6 = -1;
-static int hf_pim_bd_offer_metric_pref = -1;
-static int hf_pim_bd_offer_metric = -1;
-static int hf_pim_bd_offer_interval = -1;
-static int hf_pim_bd_pass_ip4 = -1;
-static int hf_pim_bd_pass_ip6 = -1;
-static int hf_pim_bd_pass_metric_pref = -1;
-static int hf_pim_bd_pass_metric = -1;
 static int hf_pim_originator_ip4 = -1;
 static int hf_pim_originator_ip6 = -1;
 static int hf_pim_group_address_ip4 = -1;
+static int hf_pim_rp_address_ip4 = -1;
 static int hf_pim_fragment_tag = -1;
 static int hf_pim_hash_mask_len = -1;
 static int hf_pim_bsr_priority = -1;
@@ -218,7 +125,7 @@ static gboolean use_main_tree  = TRUE;
  *      ftp://ftp.usc.edu/pub/csinfo/tech-reports/papers/95-599.ps.Z
  *
  * NOTE: There is still some doubt that this is THE definitive PIMv1
- *       specification.  Of note, the pim_type1_vals entry, { 8, "Mode" }, does
+ *       specification.  Of note, the type1vals entry, { 8, "Mode" }, does
  *       not appear as a valid code in the referenced document above.
  *
  *       This one is likely closer to the last PIMv1 spec:
@@ -240,7 +147,7 @@ dissect_pimv1_addr(tvbuff_t *tvb, int offset) {
     }
 }
 
-static const value_string pim_type1_vals[] = {
+static const value_string type1vals[] = {
     { 0, "Query" },
     { 1, "Register" },
     { 2, "Register-stop" },
@@ -261,8 +168,9 @@ static const value_string pimv1_modevals[] = {
 };
 
 /* This function is only called from the IGMP dissector */
-static int
-dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_) {
+int
+dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
+              int offset) {
     guint8 pim_type;
     guint8 pim_ver;
     guint length, pim_length;
@@ -271,7 +179,15 @@ dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
     proto_tree *pim_tree = NULL;
     proto_item *ti;
     proto_tree *pimopt_tree = NULL;
-    int offset = 0;
+    proto_item *tiopt;
+
+    if (!proto_is_protocol_enabled(find_protocol_by_id(proto_pim))) {
+        /*
+         * We are not enabled; skip entire packet to be nice to the
+         * IGMP layer (so clicking on IGMP will display the data).
+         */
+        return offset+tvb_length_remaining(tvb, offset);
+    }
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "PIMv1");
     col_clear(pinfo->cinfo, COL_INFO);
@@ -285,7 +201,7 @@ dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
 
     pim_type = tvb_get_guint8(tvb, offset);
     col_add_str(pinfo->cinfo, COL_INFO,
-                    val_to_str(pim_type, pim_type1_vals, "Unknown (%u)"));
+                    val_to_str(pim_type, type1vals, "Unknown (%u)"));
 
     proto_tree_add_uint(pim_tree, hf_pim_code, tvb, offset, 1, pim_type);
     offset += 1;
@@ -301,7 +217,7 @@ dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
 
         offset += 2;
         proto_tree_add_item(pim_tree, hf_pim_version, tvb, offset, 1, ENC_BIG_ENDIAN);
-        return offset+tvb_reported_length_remaining(tvb, offset);
+        return offset+tvb_length_remaining(tvb, offset);
     }
 
     /*
@@ -309,7 +225,7 @@ dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
      * Register message, and thus can figure out how much to
      * checksum and whether to make the columns read-only.
      */
-    length = tvb_reported_length(tvb);
+    length = tvb_length(tvb);
     if (pim_type == 1) {
         /*
          * Register message - the PIM header is 8 bytes long.
@@ -331,7 +247,8 @@ dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
          * The packet isn't part of a fragmented datagram and isn't
          * truncated, so we can checksum it.
          */
-        SET_CKSUM_VEC_TVB(cksum_vec[0], tvb, 0, pim_length);
+        cksum_vec[0].ptr = tvb_get_ptr(tvb, 0, pim_length);
+        cksum_vec[0].len = pim_length;
         computed_cksum = in_cksum(&cksum_vec[0], 1);
         if (computed_cksum == 0) {
             proto_tree_add_uint_format_value(pim_tree, hf_pim_cksum, tvb,
@@ -356,9 +273,10 @@ dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
     offset += 3;        /* skip reserved stuff */
 
     if (tvb_reported_length_remaining(tvb, offset) > 0) {
-        pimopt_tree = proto_tree_add_subtree(pim_tree, tvb, offset, -1, ett_pim_opts, NULL, "PIM options");
+        tiopt = proto_tree_add_text(pim_tree, tvb, offset, -1, "PIM options");
+        pimopt_tree = proto_item_add_subtree(tiopt, ett_pim_opts);
     } else
-        return offset;
+        goto done;
 
     /* version 1 decoder */
     switch (pim_type) {
@@ -534,7 +452,7 @@ dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
         proto_tree_add_item(pimopt_tree, hf_pim_group_mask_ip4, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset += 4;
 
-        proto_tree_add_item(pimopt_tree, hf_pim_rp_ip4, tvb, offset, 4, ENC_BIG_ENDIAN);
+        proto_tree_add_item(pimopt_tree, hf_pim_rp_address_ip4, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset += 4;
 
         offset += 2;    /* skip reserved stuff */
@@ -570,8 +488,9 @@ dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
     default:
         break;
     }
+done:;
 
-    return offset;
+    return offset+tvb_length_remaining(tvb, offset);
 }
 
 static gboolean
@@ -728,6 +647,32 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
     return TRUE;
 }
 
+static const value_string type2vals[] = {
+    { 0, "Hello" },
+    { 1, "Register" },
+    { 2, "Register-stop" },
+    { 3, "Join/Prune" },
+    { 4, "Bootstrap" },
+    { 5, "Assert" },
+    { 6, "Graft" },
+    { 7, "Graft-Ack" },
+    { 8, "Candidate-RP-Advertisement" },
+    { 9, "State-Refresh" },
+    { 0, NULL }
+};
+
+static const value_string pim_opt_vals[] = {
+    {1, "Hold Time"},
+    {2, "LAN Prune Delay"},
+    {18, "Deprecated and should not be used"},
+    {19, "DR Priority"},
+    {20, "Generation ID"},
+    {21, "State Refresh Capable"},
+    {22, "Bidir Capable"},
+    {24, "Address List"},
+    {65001, "Address List"},    /* old implementation */
+    {0, NULL}
+};
 
 /*
  * For PIM v2, see RFC 4601, RFC 3973 and draft-ietf-pim-sm-v2-new-03
@@ -738,7 +683,6 @@ static void
 dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     int offset = 0;
     guint8 pim_typever;
-    guint8 pim_bidir_subtype = 0;
     guint length, pim_length;
     guint16 pim_cksum, computed_cksum;
     vec_t cksum_vec[4];
@@ -756,7 +700,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
     switch (PIM_VER(pim_typever)) {
     case 2:
-        typestr = val_to_str(PIM_TYPE(pim_typever), pimtypevals, "Unknown (%u)");
+        typestr = val_to_str(PIM_TYPE(pim_typever), type2vals, "Unknown (%u)");
         break;
     case 1:     /* PIMv1 - we should never see this */
     default:
@@ -773,16 +717,9 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
     proto_tree_add_item(pim_tree, hf_pim_version, tvb, offset, 1, ENC_BIG_ENDIAN);
     proto_tree_add_item(pim_tree, hf_pim_type, tvb, offset, 1, ENC_BIG_ENDIAN);
-    if (PIM_TYPE(pim_typever) == PIM_TYPE_DF_ELECT) {
-        proto_tree_add_item(pim_tree, hf_pim_df_elect_subtype, tvb, offset + 1, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(pim_tree, hf_pim_df_elect_rsvd, tvb, offset + 1, 1, ENC_BIG_ENDIAN);
-        pim_bidir_subtype = tvb_get_guint8(tvb,offset);
-    }
-    else {
-        proto_tree_add_item(pim_tree, hf_pim_res_bytes, tvb, offset + 1, 1, ENC_NA);
-    }
+    proto_tree_add_item(pim_tree, hf_pim_res_bytes, tvb, offset + 1, 1, ENC_NA);
     pim_cksum = tvb_get_ntohs(tvb, offset + 2);
-    length = tvb_reported_length(tvb);
+    length = tvb_length(tvb);
     if (PIM_VER(pim_typever) == 2) {
         /*
          * Well, it's PIM v2, so we can check whether this is a Register
@@ -819,17 +756,22 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
         switch (pinfo->src.type) {
         case AT_IPv4:
-            SET_CKSUM_VEC_TVB(cksum_vec[0], tvb, 0, pim_length);
+            cksum_vec[0].ptr = tvb_get_ptr(tvb, 0, pim_length);
+            cksum_vec[0].len = pim_length;
             computed_cksum = in_cksum(&cksum_vec[0], 1);
             break;
         case AT_IPv6:
             /* Set up the fields of the pseudo-header. */
-            SET_CKSUM_VEC_PTR(cksum_vec[0], (const guint8 *)pinfo->src.data, pinfo->src.len);
-            SET_CKSUM_VEC_PTR(cksum_vec[1], (const guint8 *)pinfo->dst.data, pinfo->dst.len);
+            cksum_vec[0].ptr = (const guint8 *)pinfo->src.data;
+            cksum_vec[0].len = pinfo->src.len;
+            cksum_vec[1].ptr = (const guint8 *)pinfo->dst.data;
+            cksum_vec[1].len = pinfo->dst.len;
+            cksum_vec[2].ptr = (const guint8 *)&phdr;
             phdr[0] = g_htonl(pim_length);
             phdr[1] = g_htonl(IP_PROTO_PIM);
-            SET_CKSUM_VEC_PTR(cksum_vec[2], (const guint8 *)&phdr, 8);
-            SET_CKSUM_VEC_TVB(cksum_vec[3], tvb, 0, pim_length);
+            cksum_vec[2].len = 8;
+            cksum_vec[3].ptr = tvb_get_ptr(tvb, 0, pim_length);
+            cksum_vec[3].len = pim_length;
             computed_cksum = in_cksum(&cksum_vec[0], 4);
             break;
         default:
@@ -857,7 +799,8 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     offset += 4;
 
     if (tvb_reported_length_remaining(tvb, offset) > 0) {
-        pimopt_tree = proto_tree_add_subtree(pim_tree, tvb, offset, -1, ett_pim_opts, &tiopt, "PIM options");
+        tiopt = proto_tree_add_text(pim_tree, tvb, offset, -1, "PIM options");
+        pimopt_tree = proto_item_add_subtree(tiopt, ett_pim_opts);
     } else
         goto done;
 
@@ -866,7 +809,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
     /* version 2 decoder */
     switch (PIM_TYPE(pim_typever)) {
-    case PIM_TYPE_HELLO:     /*hello*/
+    case 0:     /*hello*/
     {
         int opt_count = 0;
 
@@ -879,14 +822,15 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
             opt_count++;
             hello_opt = tvb_get_ntohs(tvb, offset);
             opt_len = tvb_get_ntohs(tvb, offset + 2);
-            opt_tree = proto_tree_add_subtree_format(pimopt_tree, tvb, offset, 4 + opt_len,
-                                           ett_pim_opt, &opt_item, "Option %u: %s", hello_opt,
+            opt_item = proto_tree_add_text(pimopt_tree, tvb, offset, 4 + opt_len,
+                                           "Option %u: %s", hello_opt,
                                            val_to_str(hello_opt, pim_opt_vals, "Unknown: %u"));
+            opt_tree = proto_item_add_subtree(opt_item, ett_pim_opt);
             proto_tree_add_item(opt_tree, hf_pim_optiontype, tvb, offset, 2, ENC_BIG_ENDIAN);
             proto_tree_add_item(opt_tree, hf_pim_optionlength, tvb, offset + 2, 2, ENC_BIG_ENDIAN);
 
             switch(hello_opt) {
-            case PIM_HELLO_HOLD_T: /* Hello Hold Time Option */
+            case 1: /* Hello Hold Time Option */
                 opt_value = tvb_get_ntohs(tvb, offset + 4);
                 proto_tree_add_uint_format_value(opt_tree, hf_pim_holdtime, tvb,
                                            offset + 4, opt_len, opt_value,
@@ -897,7 +841,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
                                        opt_value == 0xffff ? "(infinity)": "");
                 break;
 
-            case PIM_HELLO_LAN_PRUNE_DELAY: /* LAN Prune Delay Option */
+            case 2: /* LAN Prune Delay Option */
                 proto_tree_add_item(opt_tree, hf_pim_t, tvb, offset + 4, 1, ENC_BIG_ENDIAN);
                 proto_tree_add_item(opt_tree, hf_pim_propagation_delay, tvb, offset + 4, 2, ENC_BIG_ENDIAN);
                 proto_tree_add_item(opt_tree, hf_pim_override_interval, tvb, offset + 6, 2, ENC_BIG_ENDIAN);
@@ -908,17 +852,17 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
                                        tvb_get_ntohs(tvb, offset + 6));
                 break;
 
-            case PIM_HELLO_DR_PRIORITY: /* DR priority */
+            case 19: /* DR priority */
                 proto_tree_add_item(opt_tree, hf_pim_dr_priority, tvb, offset + 4, 4, ENC_BIG_ENDIAN);
                 proto_item_append_text(opt_item, ": %u", tvb_get_ntohl(tvb, offset + 4));
                 break;
 
-            case PIM_HELLO_GEN_ID: /* Generation ID */
+            case 20: /* Generation ID */
                 proto_tree_add_item(opt_tree, hf_pim_generation_id, tvb, offset + 4, 4, ENC_BIG_ENDIAN);
                 proto_item_append_text(opt_item, ": %u", tvb_get_ntohl(tvb, offset + 4));
                 break;
 
-            case PIM_HELLO_STATE_REFRESH: /* State Refresh Capable Option */
+            case 21: /* State Refresh Capable Option */
                 proto_tree_add_item(opt_tree, hf_pim_state_refresh_version, tvb, offset + 4, 1, ENC_BIG_ENDIAN);
                 proto_tree_add_item(opt_tree, hf_pim_state_refresh_interval, tvb, offset + 5, 1, ENC_BIG_ENDIAN);
                 proto_tree_add_item(opt_tree, hf_pim_state_refresh_reserved, tvb, offset + 6, 2, ENC_BIG_ENDIAN);
@@ -927,16 +871,18 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
                                        tvb_get_guint8(tvb, offset + 5));
                 break;
 
-            case PIM_HELLO_VAR_ADDR_LST: /* address list */
+            case 24: /* address list */
             case 65001: /* address list (old implementations) */
             {
                 int i;
                 proto_tree *sub_tree = NULL;
+                proto_item *addrlist_option;
 
-                sub_tree = proto_tree_add_subtree_format(opt_tree, tvb, offset, 4 + opt_len,
-                                                      ett_pim_opt, NULL, "%sAddress List (%u)",
+                addrlist_option = proto_tree_add_text(opt_tree, tvb, offset, 4 + opt_len,
+                                                      "%sAddress List (%u)",
                                                       hello_opt == 65001 ? "old " : "",
                                                       hello_opt);
+                sub_tree = proto_item_add_subtree(addrlist_option, ett_pim_opt);
                 for (i = offset + 4; i < offset + 4 + opt_len; ) {
                     int advance;
                     if (!dissect_pim_addr(sub_tree, tvb, i, pimv2_unicast, NULL, NULL,
@@ -946,20 +892,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
                 }
                 break;
             }
-            case PIM_HELLO_LABEL_PARA:
-            case PIM_HELLO_BIDIR_CAPA:
-            case PIM_HELLO_VCI_CAPA:
-            case PIM_HELLO_VAR_NEIG_LST:
-            case PIM_HELL0_JOIN_ATTR:
-            case PIM_HELLO_O_TCP_CAPA:
-            case PIM_HELLO_O_SCTP_CAPA:
-            case PIM_HELLO_VAR_POP_COUNT:
-            case PIM_HELLO_MT_ID:
-            case PIM_HELLO_INT_ID:
-            case PIM_HELLO_ECMP_REDIR:
-            case PIM_HELLO_VPC_PEER_ID:
-            case PIM_HELLO_DR_LB_CAPA:
-            case PIM_HELLO_LB_GDR:
+
             default:
                 if (opt_len)
                     proto_tree_add_item(opt_tree, hf_pim_optionvalue, tvb,
@@ -972,7 +905,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         break;
     }
 
-    case PIM_TYPE_REGISTER:     /* register */
+    case 1:     /* register */
     {
         guint8 v_hl;
         tvbuff_t *next_tvb;
@@ -1033,7 +966,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         break;
     }
 
-    case PIM_TYPE_REGISTER_STOP:     /* register-stop */
+    case 2:     /* register-stop */
     {
         int advance;
 
@@ -1047,9 +980,9 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         break;
     }
 
-    case PIM_TYPE_JOIN_PRUNE:     /* join/prune */
-    case PIM_TYPE_GRAFT:     /* graft */
-    case PIM_TYPE_GRAFT_ACK:     /* graft-ack */
+    case 3:     /* join/prune */
+    case 6:     /* graft */
+    case 7:     /* graft-ack */
     {
         int advance;
         int off;
@@ -1119,7 +1052,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         break;
     }
 
-    case PIM_TYPE_BOOTSTRAP:     /* bootstrap */
+    case 4:     /* bootstrap */
     {
         int advance;
         int i, j;
@@ -1180,7 +1113,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         break;
     }
 
-    case PIM_TYPE_ASSERT:     /* assert */
+    case 5:     /* assert */
     {
         int advance;
 
@@ -1206,7 +1139,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         break;
     }
 
-    case PIM_TYPE_CAND_RP_ADV:     /* Candidate-RP-Advertisement */
+    case 8:     /* Candidate-RP-Advertisement */
     {
         int advance;
         int pfxcnt;
@@ -1242,7 +1175,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         break;
     }
 
-    case PIM_TYPE_STATE_REFRESH:     /* State-Refresh */
+    case 9:     /* State-Refresh */
     {
         int advance;
 
@@ -1289,47 +1222,6 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         break;
     }
 
-    case PIM_TYPE_DF_ELECT:
-    {
-        int advance;
-
-        if (!dissect_pim_addr(pimopt_tree, tvb, offset, pimv2_unicast,
-                                NULL, NULL,
-                                hf_pim_rp_ip4, hf_pim_rp_ip6, &advance))
-            break;
-        offset += advance;
-        proto_tree_add_item(pimopt_tree, hf_pim_df_metric_pref, tvb,
-                            offset, 4, ENC_BIG_ENDIAN);
-        offset += 4;
-        proto_tree_add_item(pimopt_tree, hf_pim_metric, tvb, offset, 4, ENC_BIG_ENDIAN);
-        offset += 4;
-
-        switch(PIM_BIDIR_SUBTYPE(pim_bidir_subtype)) {
-            case PIM_BDIR_DF_BACKOFF :
-                if (!dissect_pim_addr(pimopt_tree, tvb, offset, pimv2_unicast,
-                                    NULL, NULL,
-                                    hf_pim_bd_bo_offer_ip4, hf_pim_bd_bo_offer_ip6, &advance))
-                    break;
-                offset += advance;
-                proto_tree_add_item(pimopt_tree, hf_pim_bd_offer_metric_pref, tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                proto_tree_add_item(pimopt_tree, hf_pim_bd_offer_metric, tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                proto_tree_add_item(pimopt_tree, hf_pim_bd_offer_interval, tvb, offset, 2, ENC_BIG_ENDIAN);
-                break;
-            case PIM_BDIR_DF_PASS:
-                if (!dissect_pim_addr(pimopt_tree, tvb, offset, pimv2_unicast,
-                                    NULL, NULL,
-                                    hf_pim_bd_pass_ip4, hf_pim_bd_pass_ip6, &advance))
-                    break;
-                offset += advance;
-                proto_tree_add_item(pimopt_tree, hf_pim_bd_pass_metric_pref, tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                proto_tree_add_item(pimopt_tree, hf_pim_bd_pass_metric, tvb, offset, 4, ENC_BIG_ENDIAN);
-                break;
-        }
-    }
-
     default:
         break;
     }
@@ -1348,22 +1240,12 @@ proto_register_pim(void)
             },
             { &hf_pim_type,
               { "Type", "pim.type",
-                FT_UINT8, BASE_DEC, VALS(pimtypevals), 0x0f,
+                FT_UINT8, BASE_DEC, VALS(type2vals), 0x0f,
                 NULL, HFILL }
-            },
-            { &hf_pim_df_elect_subtype,
-              { "DF Subtype", "pim.df_elect.subtype",
-                FT_UINT8, BASE_DEC, VALS(pimbdirdfvals), 0xf0,
-                NULL, HFILL}
-            },
-            { &hf_pim_df_elect_rsvd,
-              { "DF reserved", "pim.df_elect.rsvd",
-                FT_UINT8, BASE_DEC, NULL, 0x0f,
-                NULL, HFILL}
             },
             { &hf_pim_code,
               { "Code", "pim.code",
-                FT_UINT8, BASE_DEC, VALS(pim_type1_vals), 0x0,
+                FT_UINT8, BASE_DEC, VALS(type1vals), 0x0,
                 NULL, HFILL }
             },
             { &hf_pim_cksum,
@@ -1483,11 +1365,6 @@ proto_register_pim(void)
             { &hf_pim_metric_pref ,
               { "Metric Preference", "pim.metric_pref",
                 FT_UINT32, BASE_DEC, NULL, 0x7fffffff,
-                NULL, HFILL }
-            },
-            { &hf_pim_df_metric_pref ,
-              { "DF Metric Preference", "pim.metric_pref",
-                FT_UINT32, BASE_DEC, NULL, 0,
                 NULL, HFILL }
             },
             { &hf_pim_metric ,
@@ -1610,49 +1487,9 @@ proto_register_pim(void)
                 FT_IPv4, BASE_NONE, NULL, 0,
                 NULL, HFILL }
             },
-            { &hf_pim_bd_pass_ip4 ,
-              { "New Winner IP", "pim.bidir_winner_ip4",
+            { &hf_pim_rp_address_ip4 ,
+              { "RP Address", "pim.rp_address",
                 FT_IPv4, BASE_NONE, NULL, 0,
-                NULL, HFILL }
-            },
-            { &hf_pim_bd_pass_ip6 ,
-              { "New Winner IP", "pim.bidir_winner_ip6",
-                FT_IPv6, BASE_NONE, NULL, 0,
-                NULL, HFILL }
-            },
-            { &hf_pim_bd_pass_metric_pref,
-              { "Winner Metric Preference", "pim.bidir_win_metric_pref",
-                FT_UINT32, BASE_DEC, NULL, 0,
-                NULL, HFILL }
-            },
-            { &hf_pim_bd_pass_metric,
-              { "Winner Metric", "pim.bidir_win_metric",
-                FT_UINT32, BASE_DEC, NULL, 0,
-                NULL, HFILL }
-            },
-            { &hf_pim_bd_bo_offer_ip4 ,
-              { "Offering IP", "pim.bidir_offering_ip4",
-                 FT_IPv4, BASE_NONE, NULL, 0,
-                 NULL, HFILL }
-            },
-            { &hf_pim_bd_bo_offer_ip6 ,
-              { "Offering IP", "pim.bidir_offering_ip6",
-                FT_IPv6, BASE_NONE, NULL, 0,
-                NULL, HFILL }
-            },
-            { &hf_pim_bd_offer_metric_pref,
-              { "Offering Metric Preference", "pim.bidir_off_metric_pref",
-                FT_UINT32, BASE_DEC, NULL, 0,
-                NULL, HFILL }
-            },
-            { &hf_pim_bd_offer_metric,
-              { "Offering Metric", "pim.bidir_off_metric",
-                FT_UINT32, BASE_DEC, NULL, 0,
-                NULL, HFILL }
-            },
-            { &hf_pim_bd_offer_interval,
-              { "Offering interval (ms)", "pim.bidir_offering_interval",
-                FT_UINT16, BASE_DEC, NULL, 0,
                 NULL, HFILL }
             },
             { &hf_pim_fragment_tag,
@@ -1731,13 +1568,10 @@ proto_register_pim(void)
 void
 proto_reg_handoff_pim(void)
 {
-    dissector_handle_t pim_handle, pimv1_handle;
+    dissector_handle_t pim_handle;
 
     pim_handle = create_dissector_handle(dissect_pim, proto_pim);
     dissector_add_uint("ip.proto", IP_PROTO_PIM, pim_handle);
-
-    pimv1_handle = new_create_dissector_handle(dissect_pimv1, proto_pim);
-    dissector_add_uint("igmp.type", IGMP_V1_PIM_ROUTING_MESSAGE, pimv1_handle);
 
     /*
      * Get handles for the IPv4 and IPv6 dissectors.
@@ -1745,16 +1579,3 @@ proto_reg_handoff_pim(void)
     ip_handle = find_dissector("ip");
     ipv6_handle = find_dissector("ipv6");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

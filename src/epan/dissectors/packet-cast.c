@@ -416,6 +416,7 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
   /* Set up structures we will need to add the protocol subtree and manage it */
   proto_item *ti;
   proto_tree *cast_tree = NULL;
+  proto_item *ti_sub;
   proto_tree *cast_sub_tree;
   proto_tree *cast_sub_tree_sav;
   proto_tree *cast_sub_tree_sav_sav;
@@ -466,7 +467,8 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
       count = offset+28;
       /* total of 120 bytes */
       for ( i = 0; i < MAX_CUSTOM_PICTURES; i++ ) {
-        cast_sub_tree = proto_tree_add_subtree_format(cast_tree, tvb, offset, 20, ett_cast_tree, NULL, "customPictureFormat[%d]", i);
+        ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 20, "customPictureFormat[%d]", i);
+        cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
         proto_tree_add_item(cast_sub_tree, hf_cast_pictureWidth, tvb, count, 4, ENC_LITTLE_ENDIAN);
         count+= 4;
         proto_tree_add_item(cast_sub_tree, hf_cast_pictureHeight, tvb, count, 4, ENC_LITTLE_ENDIAN);
@@ -478,7 +480,8 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
         proto_tree_add_item(cast_sub_tree, hf_cast_clockDivisor, tvb, count, 4, ENC_LITTLE_ENDIAN);
         count+= 4;
       }
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 8, ett_cast_tree, NULL, "confResources");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 8, "confResources");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_activeStreamsOnRegistration, tvb, count, 4, ENC_LITTLE_ENDIAN);
       count+= 4;
       proto_tree_add_item(cast_sub_tree, hf_cast_maxBW, tvb, count, 4, ENC_LITTLE_ENDIAN);
@@ -488,12 +491,14 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
       cast_sub_tree_sav = cast_sub_tree;
       /* total of 160 bytes */
       for ( i = 0; i < MAX_SERVICE_TYPE; i++ ) {
-        cast_sub_tree = proto_tree_add_subtree_format(cast_sub_tree_sav, tvb, offset, 20, ett_cast_tree, NULL, "serviceResource[%d]", i);
+        ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 20, "serviceResource[%d]", i);
+        cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
         proto_tree_add_item(cast_sub_tree, hf_cast_layoutCount, tvb, count, 4, ENC_LITTLE_ENDIAN);
         count+= 4;
         cast_sub_tree_sav_sav = cast_sub_tree_sav;
         for ( t = 0; t < MAX_LAYOUT_WITH_SAME_SERVICE; t++ ) {
-          cast_sub_tree = proto_tree_add_subtree_format(cast_sub_tree_sav, tvb, offset, 20, ett_cast_tree, NULL, "layouts[%d]", t);
+          ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 20, "layouts[%d]", t);
+          cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
           proto_tree_add_item(cast_sub_tree, hf_cast_layout, tvb, count, 4, ENC_LITTLE_ENDIAN);
           count+= 4;
         }
@@ -509,7 +514,8 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
       }
       /* total of 176 bytes */
       for ( i = 0; i < StationMaxVideoCapabilities; i++ ) {
-        cast_sub_tree = proto_tree_add_subtree_format(cast_tree, tvb, offset, 20, ett_cast_tree, NULL, "vidCaps[%d]", i);
+        ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 20, "vidCaps[%d]", i);
+        cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
         proto_tree_add_item(cast_sub_tree, hf_cast_payloadCapability, tvb, count, 4, ENC_LITTLE_ENDIAN);
         count+= 4;
         proto_tree_add_item(cast_sub_tree, hf_cast_transmitOrReceive, tvb, count, 4, ENC_LITTLE_ENDIAN);
@@ -518,7 +524,8 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
         count+= 4;
         cast_sub_tree_sav = cast_sub_tree;
         for ( t = 0; t < MAX_LEVEL_PREFERENCE; t++ ) {
-          cast_sub_tree = proto_tree_add_subtree_format(cast_sub_tree_sav, tvb, offset, 20, ett_cast_tree, NULL, "levelPreference[%d]", t);
+          ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 20, "levelPreference[%d]", t);
+          cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
           proto_tree_add_item(cast_sub_tree, hf_cast_transmitPreference, tvb, count, 4, ENC_LITTLE_ENDIAN);
           count+= 4;
           proto_tree_add_item(cast_sub_tree, hf_cast_format, tvb, count, 4, ENC_LITTLE_ENDIAN);
@@ -534,17 +541,20 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
         }
 
         /* H.261 */
-        cast_sub_tree = proto_tree_add_subtree(cast_sub_tree_sav, tvb, offset, 8, ett_cast_tree, NULL, "h261VideoCapability");
+        ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8, "h261VideoCapability");
+        cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
         proto_tree_add_item(cast_sub_tree, hf_cast_temporalSpatialTradeOffCapability, tvb, count, 4, ENC_LITTLE_ENDIAN);
         proto_tree_add_item(cast_sub_tree, hf_cast_stillImageTransmission, tvb, count+4, 4, ENC_LITTLE_ENDIAN);
 
         /* H.263 */
-        cast_sub_tree = proto_tree_add_subtree(cast_sub_tree_sav, tvb, offset, 8, ett_cast_tree, NULL, "h263VideoCapability");
+        ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8, "h263VideoCapability");
+        cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
         proto_tree_add_item(cast_sub_tree, hf_cast_h263_capability_bitfield, tvb, count, 4, ENC_LITTLE_ENDIAN);
         proto_tree_add_item(cast_sub_tree, hf_cast_annexNandWFutureUse, tvb, count+4, 4, ENC_LITTLE_ENDIAN);
 
         /* Vieo */
-        cast_sub_tree = proto_tree_add_subtree(cast_sub_tree_sav, tvb, offset, 8, ett_cast_tree, NULL, "vieoVideoCapability");
+        ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8, "vieoVideoCapability");
+        cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
         proto_tree_add_item(cast_sub_tree, hf_cast_modelNumber, tvb, count, 4, ENC_LITTLE_ENDIAN);
         count+= 4;
         proto_tree_add_item(cast_sub_tree, hf_cast_bandwidth, tvb, count, 4, ENC_LITTLE_ENDIAN);
@@ -552,7 +562,8 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
       }
       /* total 80 bytes */
       for ( i = 0; i < StationMaxDataCapabilities; i++ ) {
-        cast_sub_tree = proto_tree_add_subtree_format(cast_tree, tvb, offset, 20, ett_cast_tree, NULL, "dataCaps[%d]", i);
+        ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 20, "dataCaps[%d]", i);
+        cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
         proto_tree_add_item(cast_sub_tree, hf_cast_payloadCapability, tvb, count, 4, ENC_LITTLE_ENDIAN);
         count+= 4;
         proto_tree_add_item(cast_sub_tree, hf_cast_transmitOrReceive, tvb, count, 4, ENC_LITTLE_ENDIAN);
@@ -578,19 +589,22 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
       proto_tree_add_item(cast_tree, hf_cast_isConferenceCreator, tvb, offset+40, 4, ENC_LITTLE_ENDIAN);
 
       /* add audio part of union */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 12, ett_cast_tree, NULL, "audioParameters");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 12, "audioParameters");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_millisecondPacketSize, tvb, offset+44, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_echoCancelType, tvb, offset+48, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_g723BitRate, tvb, offset+52, 4, ENC_LITTLE_ENDIAN);
 
       /* add video part of union */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 30, ett_cast_tree, NULL, "videoParameters");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 30, "videoParameters");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_bitRate, tvb, offset+44, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_pictureFormatCount, tvb, offset+48, 4, ENC_LITTLE_ENDIAN);
       cast_sub_tree_sav = cast_sub_tree;
       count = offset+52;
       for ( i = 0; i < MAX_PICTURE_FORMAT; i++ ) {
-        cast_sub_tree = proto_tree_add_subtree_format(cast_sub_tree_sav, tvb, offset, 8 * MAX_PICTURE_FORMAT, ett_cast_tree, NULL, "pictureFormat[%d]", i);
+        ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8 * MAX_PICTURE_FORMAT, "pictureFormat[%d]", i);
+        cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
         proto_tree_add_item(cast_sub_tree, hf_cast_format, tvb, count, 4, ENC_LITTLE_ENDIAN);
         count += 4;
         proto_tree_add_item(cast_sub_tree, hf_cast_MPI, tvb, count, 4, ENC_LITTLE_ENDIAN);
@@ -601,23 +615,27 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
       count += 4;
 
       /* add H261 part of union */
-      cast_sub_tree = proto_tree_add_subtree(cast_sub_tree_sav, tvb, offset, 8, ett_cast_tree, NULL, "h261VideoCapability");
+      ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8, "h261VideoCapability");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_temporalSpatialTradeOffCapability, tvb, count, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_stillImageTransmission, tvb, count+4, 4, ENC_LITTLE_ENDIAN);
 
       /* add H263 part of union */
-      cast_sub_tree = proto_tree_add_subtree(cast_sub_tree_sav, tvb, offset, 8, ett_cast_tree, NULL, "h263VideoCapability");
+      ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8, "h263VideoCapability");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_h263_capability_bitfield, tvb, count, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_annexNandWFutureUse, tvb, count+4, 4, ENC_LITTLE_ENDIAN);
 
       /* add Vieo part of union */
-      cast_sub_tree = proto_tree_add_subtree(cast_sub_tree_sav, tvb, offset, 8, ett_cast_tree, NULL, "vieoVideoCapability");
+      ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8, "vieoVideoCapability");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_modelNumber, tvb, count, 4, ENC_LITTLE_ENDIAN);
       count += 4;
       proto_tree_add_item(cast_sub_tree, hf_cast_bandwidth, tvb, count, 4, ENC_LITTLE_ENDIAN);
 
       /* add data part of union */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 8, ett_cast_tree, NULL, "dataParameters");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 8, "dataParameters");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_protocolDependentData, tvb, offset+44, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_maxBitRate, tvb, offset+48, 4, ENC_LITTLE_ENDIAN);
       break;
@@ -648,14 +666,15 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
       proto_tree_add_item(cast_tree, hf_cast_DSCPValue, tvb, offset+44, 4, ENC_LITTLE_ENDIAN);
 
       /* add video part of union */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 30, ett_cast_tree, NULL, "videoParameters");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 30, "videoParameters");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_bitRate, tvb, offset+48, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_pictureFormatCount, tvb, offset+52, 4, ENC_LITTLE_ENDIAN);
       cast_sub_tree_sav = cast_sub_tree;
       count = offset+56;
       for ( i = 0; i < MAX_PICTURE_FORMAT; i++ ) {
-        cast_sub_tree = proto_tree_add_subtree_format(cast_sub_tree_sav, tvb, offset, 8 * MAX_PICTURE_FORMAT,
-                            ett_cast_tree, NULL, "pictureFormat[%d]", i);
+        ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8 * MAX_PICTURE_FORMAT, "pictureFormat[%d]", i);
+        cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
         proto_tree_add_item(cast_sub_tree, hf_cast_format, tvb, count, 4, ENC_LITTLE_ENDIAN);
         count += 4;
         proto_tree_add_item(cast_sub_tree, hf_cast_MPI, tvb, count, 4, ENC_LITTLE_ENDIAN);
@@ -667,27 +686,31 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 
       val = count;
       /* add H261 part of union */
-      cast_sub_tree = proto_tree_add_subtree(cast_sub_tree_sav, tvb, offset, 8, ett_cast_tree, NULL, "h261VideoCapability");
+      ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8, "h261VideoCapability");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_temporalSpatialTradeOffCapability, tvb, count, 4, ENC_LITTLE_ENDIAN);
       count += 4;
       proto_tree_add_item(cast_sub_tree, hf_cast_stillImageTransmission, tvb, count, 4, ENC_LITTLE_ENDIAN);
 
       /* add H263 part of union */
       count = val;
-      cast_sub_tree = proto_tree_add_subtree(cast_sub_tree_sav, tvb, offset, 8, ett_cast_tree, NULL, "h263VideoCapability");
+      ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8, "h263VideoCapability");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_h263_capability_bitfield, tvb, count, 4, ENC_LITTLE_ENDIAN);
       count += 4;
       proto_tree_add_item(cast_sub_tree, hf_cast_annexNandWFutureUse, tvb, count, 4, ENC_LITTLE_ENDIAN);
 
       /* add Vieo part of union */
       count = val;
-      cast_sub_tree = proto_tree_add_subtree(cast_sub_tree_sav, tvb, offset, 8, ett_cast_tree, NULL, "vieoVideoCapability");
+      ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8, "vieoVideoCapability");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_modelNumber, tvb, count, 4, ENC_LITTLE_ENDIAN);
       count += 4;
       proto_tree_add_item(cast_sub_tree, hf_cast_bandwidth, tvb, count, 4, ENC_LITTLE_ENDIAN);
 
       /* add data part of union */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 8, ett_cast_tree, NULL, "dataParameters");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 8, "dataParameters");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_protocolDependentData, tvb, offset+48, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_maxBitRate, tvb, offset+52, 4, ENC_LITTLE_ENDIAN);
       break;
@@ -711,40 +734,47 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
       /* not sure of format */
 
       /* show videoFastUpdateGOB */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 8, ett_cast_tree, NULL, "videoFastUpdateGOB");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 8, "videoFastUpdateGOB");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_firstGOB, tvb, offset+28, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_numberOfGOBs, tvb, offset+32, 4, ENC_LITTLE_ENDIAN);
 
       /* show videoFastUpdateMB */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 8, ett_cast_tree, NULL, "videoFastUpdateGOB");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 8, "videoFastUpdateGOB");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_firstGOB, tvb, offset+28, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_firstMB, tvb, offset+32, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_numberOfMBs, tvb, offset+36, 4, ENC_LITTLE_ENDIAN);
 
       /* show lostPicture */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 8, ett_cast_tree, NULL, "lostPicture");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 8, "lostPicture");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_pictureNumber, tvb, offset+28, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_longTermPictureIndex, tvb, offset+32, 4, ENC_LITTLE_ENDIAN);
 
       /* show lostPartialPicture */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 8, ett_cast_tree, NULL, "lostPartialPicture");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 8, "lostPartialPicture");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_pictureNumber, tvb, offset+28, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_longTermPictureIndex, tvb, offset+32, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_firstMB, tvb, offset+36, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_numberOfMBs, tvb, offset+40, 4, ENC_LITTLE_ENDIAN);
 
       /* show recoveryReferencePicture */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 8, ett_cast_tree, NULL, "recoveryReferencePicture");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 8, "recoveryReferencePicture");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_recoveryReferencePictureCount, tvb, offset+28, 4, ENC_LITTLE_ENDIAN);
       cast_sub_tree_sav = cast_sub_tree;
       for ( i = 0; i < MAX_REFERENCE_PICTURE; i++ ) {
-        cast_sub_tree = proto_tree_add_subtree_format(cast_sub_tree_sav, tvb, offset, 8, ett_cast_tree, NULL, "recoveryReferencePicture[%d]", i);
+        ti_sub = proto_tree_add_text(cast_sub_tree_sav, tvb, offset, 8, "recoveryReferencePicture[%d]", i);
+        cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
         proto_tree_add_item(cast_sub_tree, hf_cast_pictureNumber, tvb, offset+32+(i*8), 4, ENC_LITTLE_ENDIAN);
         proto_tree_add_item(cast_sub_tree, hf_cast_longTermPictureIndex, tvb, offset+36+(i*8), 4, ENC_LITTLE_ENDIAN);
       }
 
       /* show temporalSpatialTradeOff */
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 4, ett_cast_tree, NULL, "temporalSpatialTradeOff");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 4, "temporalSpatialTradeOff");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_temporalSpatialTradeOff, tvb, offset+28, 4, ENC_LITTLE_ENDIAN);
       break;
 
@@ -817,7 +847,8 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
       i += 4;
       proto_tree_add_item(cast_tree, hf_cast_callSecurityStatus, tvb, i, 4, ENC_LITTLE_ENDIAN);
       i += 4;
-      cast_sub_tree = proto_tree_add_subtree(cast_tree, tvb, offset, 8, ett_cast_tree, NULL, "partyPIRestrictionBits");
+      ti_sub = proto_tree_add_text(cast_tree, tvb, offset, 8, "partyPIRestrictionBits");
+      cast_sub_tree = proto_item_add_subtree(ti_sub, ett_cast_tree);
       proto_tree_add_item(cast_sub_tree, hf_cast_partyPIRestrictionBits_CallingPartyName, tvb, i, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_partyPIRestrictionBits_CallingPartyNumber, tvb, i, 4, ENC_LITTLE_ENDIAN);
       proto_tree_add_item(cast_sub_tree, hf_cast_partyPIRestrictionBits_CalledPartyName, tvb, i, 4, ENC_LITTLE_ENDIAN);
@@ -1001,7 +1032,7 @@ dissect_cast_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 
 /* Get the length of a single CAST PDU */
 static guint
-get_cast_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_cast_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   guint32 hdr_data_length;
 
@@ -1715,15 +1746,3 @@ proto_reg_handoff_cast(void)
   dissector_add_uint("tcp.port", TCP_PORT_CAST, cast_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

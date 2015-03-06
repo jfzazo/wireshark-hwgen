@@ -39,7 +39,7 @@ wiretap-$(WTAP_VERSION).dll : $(OBJECTS) ..\image\wiretap.res
 		..\image\wiretap.res \
 		$(OBJECTS) $(wiretap_LIBS)
 
-RUNLEX = ../tools/runlex.sh
+RUNLEX = ..\tools\runlex.sh
 
 k12text_lex.h : k12text.c
 k12text.obj : k12text.c
@@ -60,7 +60,7 @@ clean :
 		wiretap-*.exp \
 		wiretap-*.dll \
 		wiretap-*.dll.manifest \
-		*.nativecodeanalysis.xml *.pdb *.sbr
+		*.pdb *.sbr
 
 #
 # We remove the generated files with "distclean" because one of them,

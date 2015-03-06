@@ -23,6 +23,9 @@
 
 #include "config.h"
 
+#include <glib.h>
+
+#include <epan/to_str.h>
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 #include <wsutil/pint.h>
@@ -33,13 +36,14 @@
 #include <epan/bridged_pids.h>
 #include <epan/ppptypes.h>
 #include <epan/arcnet_pids.h>
+#include <epan/conversation.h>
 #include "packet-fc.h"
 #include "packet-ip.h"
 #include "packet-ipx.h"
 #include "packet-netbios.h"
 #include "packet-vines.h"
 #include "packet-sll.h"
-#include "packet-juniper.h"
+#include <epan/sna-utils.h>
 
 #include "packet-llc.h"
 
@@ -56,9 +60,7 @@ void proto_reg_handoff_llc(void);
 static int proto_llc = -1;
 static int hf_llc_dsap = -1;
 static int hf_llc_ssap = -1;
-static int hf_llc_dsap_sap = -1;
 static int hf_llc_dsap_ig = -1;
-static int hf_llc_ssap_sap = -1;
 static int hf_llc_ssap_cr = -1;
 static int hf_llc_ctrl = -1;
 static int hf_llc_n_r = -1;
@@ -177,6 +179,61 @@ const value_string sap_vals[] = {
 	{ 0x00,               NULL }
 };
 
+/*
+ * See
+ *
+ * http://standards.ieee.org/regauth/oui/oui.txt
+ *
+ * http://www.cisco.com/univercd/cc/td/doc/product/lan/trsrb/vlan.htm
+ *
+ * for the PIDs for VTP and DRiP that go with an OUI of OUI_CISCO.
+ */
+const value_string oui_vals[] = {
+	{ OUI_ENCAP_ETHER,	"Encapsulated Ethernet" },
+	{ OUI_XEROX,		"Xerox" },
+/*
+http://www.cisco.com/univercd/cc/td/doc/product/software/ios113ed/113ed_cr/ibm_r/brprt1/brsrb.htm
+*/
+	{ OUI_CISCO,			"Cisco" },
+	{ OUI_NORTEL,			"Nortel Discovery Protocol" },
+	{ OUI_CISCO_90,			"Cisco IOS 9.0 Compatible" },
+	{ OUI_FORCE10,			"Force10 Networks" },
+	{ OUI_ERICSSON,			"Ericsson Group" },
+	{ OUI_CATENA,			"Catena Networks" },
+	{ OUI_SONY_ERICSSON,	"Sony Ericsson Mobile Communications AB" },
+	{ OUI_SONY_ERICSSON_2,	"Sony Ericsson Mobile Communications AB" },
+	{ OUI_PROFINET,			"PROFIBUS Nutzerorganisation e.V." },
+	{ OUI_SONY_ERICSSON_3,	"Sony Ericsson Mobile Communications AB" },
+	{ OUI_CIMETRICS,		"Cimetrics" },
+	{ OUI_IEEE_802_3,		"IEEE 802.3" },
+	{ OUI_MEDIA_ENDPOINT,	"Media (TIA TR-41 Committee)" },
+	{ OUI_SONY_ERICSSON_4,	"Sony Ericsson Mobile Communications AB" },
+	{ OUI_ERICSSON_MOBILE,	"Ericsson Mobile Platforms" },
+	{ OUI_SONY_ERICSSON_5,	"Sony Ericsson Mobile Communications AB" },
+	{ OUI_SONY_ERICSSON_6,	"Sony Ericsson Mobile Communications AB" },
+	{ OUI_SONY_ERICSSON_7,	"Sony Ericsson Mobile Communications AB" },
+	{ OUI_BLUETOOTH,		"Bluetooth SIG, Inc." },
+	{ OUI_SONY_ERICSSON_8,	"Sony Ericsson Mobile Communications AB" },
+	{ OUI_IEEE_802_1QBG,	"IEEE 802.1Qbg" },
+	{ OUI_TURBOCELL,		"Karlnet (Turbocell)" },
+	{ OUI_CISCOWL,			"Cisco Wireless (Aironet) L2" },
+	{ OUI_MARVELL,			"Marvell Semiconductor" },
+	{ OUI_BRIDGED,			"Frame Relay or ATM bridged frames" },
+	{ OUI_IEEE_802_1,		"IEEE 802.1 Committee" },
+	{ OUI_ATM_FORUM,		"ATM Forum" },
+	{ OUI_EXTREME,			"Extreme Networks" },
+	/* RFC 2427, RFC 2684 */
+	{ OUI_CABLE_BPDU,		"DOCSIS Spanning Tree" }, /* DOCSIS spanning tree BPDU */
+	{ OUI_SIEMENS,			"Siemens AG" },
+	{ OUI_APPLE_ATALK,		"Apple (AppleTalk)" },
+	{ OUI_HP,				"Hewlett-Packard" },
+	{ OUI_HP_2,				"Hewlett-Packard" },
+	/* Registry Name: PPP Vendor Specific OUI Options */
+	{ OUI_3GPP2,			"3GPP2 Vendor specific packet ID" },
+	{ OUI_ERICSSON_2,		"Ericsson Group" },
+	{ 0,	NULL }
+};
+
 static const value_string format_vals[] = {
 	{ 0x81,        "LLC basic format" },
 	{ 0,           NULL }
@@ -214,15 +271,25 @@ static GHashTable *oui_info_table = NULL;
  * proto_tree_add_... function to display the topmost 7 bits of the SAP
  * value as a bitfield produces incorrect results (while the bitfield is
  * displayed correctly, Wireshark uses the bitshifted value to display the
- * associated name and for filtering purposes). This function calls a
- * BASE_CUSTOM routine to decode the SAP value as a bitfield
- * counter-balancing the bitshift of the original value.
+ * associated name and for filtering purposes). This function calls the
+ * Wireshark routine to decode the SAP value as a bitfield into a given
+ * string without performing any bitshift of the original value.
+ *
+ * The string passed to this function must be of ITEM_LABEL_LENGTH size.
+ * The SAP value passed to this function must be complete (not masked).
+ *
  */
-
-static void
-llc_sap_value( gchar *result, guint32 sap )
+static gchar *
+decode_sap_value_as_bitfield(gchar *buffer, guint32 sap)
 {
-	g_snprintf( result, ITEM_LABEL_LENGTH, "%s", val_to_str_const(sap<<1, sap_vals, "Unknown"));
+	char *p;
+
+	memset (buffer, '\0', ITEM_LABEL_LENGTH);
+	p = decode_bitfield_value (buffer, sap, SAP_MASK, 8);
+	g_snprintf(p, (gulong)(ITEM_LABEL_LENGTH-strlen(buffer)-1), "SAP: %s",
+		val_to_str_const(sap, sap_vals, "Unknown"));
+
+	return buffer;
 }
 
 /*
@@ -230,7 +297,7 @@ llc_sap_value( gchar *result, guint32 sap )
  */
 void
 llc_add_oui(guint32 oui, const char *table_name, const char *table_ui_name,
-	    hf_register_info *hf_item)
+    hf_register_info *hf_item)
 {
 	oui_info_t *new_info;
 
@@ -428,9 +495,9 @@ dissect_basicxid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 static void
 dissect_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	proto_tree	*llc_tree;
-	proto_tree	*field_tree;
-	proto_item	*ti, *sap_item;
+	proto_tree	*llc_tree = NULL;
+	proto_tree	*field_tree = NULL;
+	proto_item	*ti = NULL;
 	int		is_snap;
 	guint16		control;
 	int		llc_header_len;
@@ -441,19 +508,32 @@ dissect_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	col_clear(pinfo->cinfo, COL_INFO);
 
 	dsap = tvb_get_guint8(tvb, 0);
+	if (tree) {
+		proto_item *dsap_item;
+		gchar label[ITEM_LABEL_LENGTH];
 
-	ti = proto_tree_add_item(tree, proto_llc, tvb, 0, -1, ENC_NA);
-	llc_tree = proto_item_add_subtree(ti, ett_llc);
-	sap_item = proto_tree_add_item(llc_tree, hf_llc_dsap, tvb, 0, 1, ENC_BIG_ENDIAN);
-	field_tree = proto_item_add_subtree(sap_item, ett_llc_dsap);
-	proto_tree_add_item(field_tree, hf_llc_dsap_sap, tvb, 0, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(field_tree, hf_llc_dsap_ig, tvb, 0, 1, ENC_NA);
+		ti = proto_tree_add_item(tree, proto_llc, tvb, 0, -1, ENC_NA);
+		llc_tree = proto_item_add_subtree(ti, ett_llc);
+		dsap_item = proto_tree_add_item(llc_tree, hf_llc_dsap, tvb, 0, 1, ENC_NA);
+		field_tree = proto_item_add_subtree(dsap_item, ett_llc_dsap);
+		proto_tree_add_text(field_tree, tvb, 0, 1, "%s",
+			decode_sap_value_as_bitfield(label, dsap));
+		proto_tree_add_item(field_tree, hf_llc_dsap_ig, tvb, 0, 1, ENC_NA);
+	} else
+		llc_tree = NULL;
 
 	ssap = tvb_get_guint8(tvb, 1);
-	sap_item = proto_tree_add_item(llc_tree, hf_llc_ssap, tvb, 1, 1, ENC_BIG_ENDIAN);
-	field_tree = proto_item_add_subtree(sap_item, ett_llc_ssap);
-	proto_tree_add_item(field_tree, hf_llc_ssap_sap, tvb, 1, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(field_tree, hf_llc_ssap_cr, tvb, 1, 1, ENC_NA);
+	if (tree) {
+		proto_item *ssap_item;
+		gchar label[ITEM_LABEL_LENGTH];
+
+		ssap_item = proto_tree_add_item(llc_tree, hf_llc_ssap, tvb, 1, 1, ENC_NA);
+		field_tree = proto_item_add_subtree(ssap_item, ett_llc_ssap);
+		proto_tree_add_text(field_tree, tvb, 1, 1, "%s",
+			decode_sap_value_as_bitfield(label, ssap));
+		proto_tree_add_item(field_tree, hf_llc_ssap_cr, tvb, 1, 1, ENC_NA);
+	} else
+		llc_tree = NULL;
 
 	is_snap = (dsap == SAP_SNAP) && (ssap == SAP_SNAP);
 	llc_header_len = 2;	/* DSAP + SSAP */
@@ -490,7 +570,7 @@ dissect_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			      "Response" : "Command"
 			);
 
-		if (tvb_reported_length_remaining(tvb, llc_header_len) > 0) {
+		if (tvb_length_remaining(tvb, llc_header_len) > 0) {
 			next_tvb = tvb_new_subset_remaining(tvb, llc_header_len);
 			if (XDLC_IS_INFORMATION(control)) {
 				/*
@@ -537,8 +617,8 @@ dissect_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
  */
 void
 dissect_snap(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree,
-	     proto_tree *snap_tree, int control, int hf_oui, int hf_type, int hf_pid,
-	     int bridge_pad)
+    proto_tree *snap_tree, int control, int hf_oui, int hf_type, int hf_pid,
+    int bridge_pad)
 {
 	guint32		oui;
 	guint16		etype;
@@ -598,7 +678,7 @@ dissect_snap(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree,
 		}
 		break;
 
-	case OUI_IEEE_802_1:
+	case OUI_BRIDGED:
 		/*
 		 * MAC frames bridged over ATM (RFC 2684) or Frame Relay
 		 * (RFC 2427).
@@ -758,10 +838,6 @@ proto_register_llc(void)
 		{ "DSAP",	"llc.dsap", FT_UINT8, BASE_HEX,
 			VALS(sap_vals), 0x0, "Destination Service Access Point", HFILL }},
 
-		{ &hf_llc_dsap_sap,
-		{ "SAP",	"llc.dsap.sap", FT_UINT8, BASE_CUSTOM,
-			llc_sap_value, 0xFE, "Service Access Point", HFILL }},
-
 		{ &hf_llc_dsap_ig,
 		{ "IG Bit",	"llc.dsap.ig", FT_BOOLEAN, 8,
 			TFS(&ig_bit), DSAP_GI_BIT, "Individual/Group", HFILL }},
@@ -769,10 +845,6 @@ proto_register_llc(void)
 		{ &hf_llc_ssap,
 		{ "SSAP", "llc.ssap", FT_UINT8, BASE_HEX,
 			VALS(sap_vals), 0x0, "Source Service Access Point", HFILL }},
-
-		{ &hf_llc_ssap_sap,
-		{ "SAP",	"llc.ssap.sap", FT_UINT8, BASE_CUSTOM,
-			llc_sap_value, 0xFE, "Service Access Point", HFILL }},
 
 		{ &hf_llc_ssap_cr,
 		{ "CR Bit", "llc.ssap.cr", FT_BOOLEAN, 8,
@@ -943,25 +1015,9 @@ proto_reg_handoff_llc(void)
 	dissector_add_uint("arcnet.protocol_id", ARCNET_PROTO_BACNET, llc_handle);
 	dissector_add_uint("ethertype", ETHERTYPE_JUMBO_LLC, llc_handle);
 
-	dissector_add_uint("juniper.proto", JUNIPER_PROTO_LLC, llc_handle);
-	dissector_add_uint("juniper.proto", JUNIPER_PROTO_LLC_SNAP, llc_handle);
-
 	/*
 	 * Register all the fields for PIDs for various OUIs.
 	 */
 	if (oui_info_table != NULL)
 		g_hash_table_foreach(oui_info_table, register_hf, NULL);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

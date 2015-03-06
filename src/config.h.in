@@ -12,9 +12,6 @@
 /* Link plugins statically into Wireshark */
 #undef ENABLE_STATIC
 
-/* Directory for extcap plugins */
-#undef EXTCAP_DIR
-
 /* Enable AirPcap */
 #undef HAVE_AIRPCAP
 
@@ -45,17 +42,8 @@
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
-/* Define if echld is enabled */
-#undef HAVE_ECHLD
-
-/* Define if external capture sources should be enabled */
-#undef HAVE_EXTCAP
-
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
-
-/* Define if you have the floorl function. */
-#undef HAVE_FLOORL
 
 /* Define to use GeoIP library */
 #undef HAVE_GEOIP
@@ -75,7 +63,7 @@
 /* Define to 1 if you have the `getprotobynumber' function. */
 #undef HAVE_GETPROTOBYNUMBER
 
-/* Define if GLib's printf functions support thousands grouping. */
+/* Define if your printf() function supports thousands grouping. */
 #undef HAVE_GLIB_PRINTF_GROUPING
 
 /* Define to use GNU ADNS library */
@@ -95,8 +83,8 @@
    Imendio IGE Mac OS X Integration functions. */
 #undef HAVE_IGE_MAC_INTEGRATION
 
-/* Define to 1 if you have the inet_aton function. */
-#undef HAVE_INET_ATON
+/* Define unless inet/aton.h needs to be included */
+#undef HAVE_INET_ATON_H
 
 /* Define if inet_ntop() prototype exists */
 #undef HAVE_INET_NTOP_PROTO
@@ -191,9 +179,6 @@
 /* SET_CHANNEL is supported */
 #undef HAVE_NL80211_CMD_SET_CHANNEL
 
-/* SPLIT_WIPHY_DUMP is supported */
-#undef HAVE_NL80211_SPLIT_WIPHY_DUMP
-
 /* Define to 1 if you have the optreset variable */
 #undef HAVE_OPTRESET
 
@@ -205,6 +190,9 @@
 
 /* Define to 1 if you have the `pcap_create' function. */
 #undef HAVE_PCAP_CREATE
+
+/* Define to 1 if you have the `pcap_createsrcstr' function. */
+#undef HAVE_PCAP_CREATESRCSTR
 
 /* Define to 1 if you have the `pcap_datalink_name_to_val' function. */
 #undef HAVE_PCAP_DATALINK_NAME_TO_VAL
@@ -218,6 +206,9 @@
 /* Define to 1 if you have the `pcap_findalldevs' function and a pcap.h that
    declares pcap_if_t. */
 #undef HAVE_PCAP_FINDALLDEVS
+
+/* Define to 1 if you have the `pcap_findalldevs_ex' function. */
+#undef HAVE_PCAP_FINDALLDEVS_EX
 
 /* Define to 1 if you have the `pcap_freecode' function. */
 #undef HAVE_PCAP_FREECODE
@@ -250,20 +241,17 @@
 /* Define to 1 if you have the `pcap_set_datalink' function. */
 #undef HAVE_PCAP_SET_DATALINK
 
-/* Define to 1 if you have the `pcap_set_tstamp_precision' function. */
-#undef HAVE_PCAP_SET_TSTAMP_PRECISION
-
 /* Define if plugins are enabled */
 #undef HAVE_PLUGINS
-
-/* Define if you have the popcount function. */
-#undef HAVE_POPCOUNT
 
 /* Define to 1 if you have the <portaudio.h> header file. */
 #undef HAVE_PORTAUDIO_H
 
 /* Define to 1 if you have the <pwd.h> header file. */
 #undef HAVE_PWD_H
+
+/* Define if python devel package available */
+#undef HAVE_PYTHON
 
 /* Define to 1 to enable remote capturing feature in WinPcap library */
 #undef HAVE_REMOTE
@@ -279,9 +267,6 @@
 
 /* Define to 1 if you have the `setresuid' function. */
 #undef HAVE_SETRESUID
-
-/* Support SSSE4.2 (Streaming SIMD Extensions 4.2) instructions */
-#undef HAVE_SSE4_2
 
 /* Define to 1 if you have the <stdarg.h> header file. */
 #undef HAVE_STDARG_H
@@ -300,9 +285,6 @@
 
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
-
-/* Define if you have the strptime function. */
-#undef HAVE_STRPTIME
 
 /* Define if st_flags field exists in struct stat */
 #undef HAVE_ST_FLAGS
@@ -352,9 +334,6 @@
 /* HTML viewer, e.g. mozilla */
 #undef HTML_VIEWER
 
-/* Define if the platform supports IPv6 */
-#undef INET6
-
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */
 #undef LT_OBJDIR
@@ -364,6 +343,9 @@
 
 /* Define if inet/v6defs.h needs to be included */
 #undef NEED_INET_V6DEFS_H
+
+/* Define if strptime.h needs to be included */
+#undef NEED_STRPTIME_H
 
 /* Name of package */
 #undef PACKAGE
@@ -394,9 +376,6 @@
 
 /* Define if we have QtMacExtras */
 #undef QT_MACEXTRAS_LIB
-
-/* Define if we have QtMultimediaWidgets */
-#undef QT_MULTIMEDIAWIDGETS_LIB
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS

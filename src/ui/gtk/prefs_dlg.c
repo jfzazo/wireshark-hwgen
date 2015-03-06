@@ -29,12 +29,15 @@
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/strutil.h>
 #include <epan/prefs-int.h>
 #include <epan/epan_dissect.h>
+#include <epan/print.h>
 
+#include "../file.h"
 #include "ui/preference_utils.h"
+#include "ui/simple_dialog.h"
 
-#include "ui/gtk/old-gtk-compat.h"
 #include "ui/gtk/main.h"
 #include "ui/gtk/prefs_column.h"
 #include "ui/gtk/prefs_dlg.h"
@@ -49,17 +52,18 @@
 #include "ui/gtk/help_dlg.h"
 #include "ui/gtk/keys.h"
 #include "ui/gtk/uat_gui.h"
+#include "ui/gtk/old-gtk-compat.h"
 #include "ui/gtk/file_dlg.h"
+#include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/packet_win.h"
-#include "simple_dialog.h"
 
 #ifdef HAVE_LIBPCAP
 #ifdef _WIN32
-#include <caputils/capture-wpcap.h>
+#include "capture-wpcap.h"
 #endif /* _WIN32 */
 #ifdef HAVE_AIRPCAP
-#include <caputils/airpcap.h>
-#include <caputils/airpcap_loader.h>
+#include "airpcap.h"
+#include "airpcap_loader.h"
 #include "airpcap_gui_utils.h"
 #endif
 #endif
@@ -227,11 +231,10 @@ pref_show(pref_t *pref, gpointer user_data)
   {
     char *range_str_p;
 
-    range_str_p = range_convert_range(NULL, *pref->varp.range);
+    range_str_p = range_convert_range(*pref->varp.range);
     pref->control = create_preference_entry(main_grid, pref->ordinal,
                                             label_string, tooltip_txt,
                                             range_str_p);
-    wmem_free(NULL, range_str_p);
     break;
   }
 

@@ -33,8 +33,9 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include "packet-mtp3.h"
 
 #define SCCPMG_SSN 1
@@ -56,29 +57,29 @@ void proto_reg_handoff_sccpmg(void);
 
 /* Same as below but with names typed out */
 static const value_string sccpmg_message_type_values[] = {
-	{ SCCPMG_MESSAGE_TYPE_SSA,   "SubSystem Allowed" },
-	{ SCCPMG_MESSAGE_TYPE_SSP,   "SubSystem Prohibited" },
-	{ SCCPMG_MESSAGE_TYPE_SST,   "Subsystem Status Test" },
-	{ SCCPMG_MESSAGE_TYPE_SOR,   "Subsystem Out of service Request" },
-	{ SCCPMG_MESSAGE_TYPE_SOG,   "Subsystem Out of service Grant" },
-	{ SCCPMG_MESSAGE_TYPE_SSC,   "SubSystem Congested (ITU)" },
-	{ SCCPMG_MESSAGE_TYPE_SBR,   "Subsystem Backup Routing (ANSI)" },
-	{ SCCPMG_MESSAGE_TYPE_SNR,   "Subsystem Normal Routing (ANSI)" },
-	{ SCCPMG_MESSAGE_TYPE_SRT,   "Subsystem Routing status Test (ANSI)" },
-	{ 0,                       NULL } };
+  { SCCPMG_MESSAGE_TYPE_SSA,   "SubSystem Allowed" },
+  { SCCPMG_MESSAGE_TYPE_SSP,   "SubSystem Prohibited" },
+  { SCCPMG_MESSAGE_TYPE_SST,   "Subsystem Status Test" },
+  { SCCPMG_MESSAGE_TYPE_SOR,   "Subsystem Out of service Request" },
+  { SCCPMG_MESSAGE_TYPE_SOG,   "Subsystem Out of service Grant" },
+  { SCCPMG_MESSAGE_TYPE_SSC,   "SubSystem Congested (ITU)" },
+  { SCCPMG_MESSAGE_TYPE_SBR,   "Subsystem Backup Routing (ANSI)" },
+  { SCCPMG_MESSAGE_TYPE_SNR,   "Subsystem Normal Routing (ANSI)" },
+  { SCCPMG_MESSAGE_TYPE_SRT,   "Subsystem Routing status Test (ANSI)" },
+  { 0,                       NULL } };
 
 /* Same as above but in acronym for (for the Info column) */
 static const value_string sccpmg_message_type_acro_values[] = {
-	{ SCCPMG_MESSAGE_TYPE_SSA,   "SSA" },
-	{ SCCPMG_MESSAGE_TYPE_SSP,   "SSP" },
-	{ SCCPMG_MESSAGE_TYPE_SST,   "SST" },
-	{ SCCPMG_MESSAGE_TYPE_SOR,   "SOR" },
-	{ SCCPMG_MESSAGE_TYPE_SOG,   "SOG" },
-	{ SCCPMG_MESSAGE_TYPE_SSC,   "SSC" },
-	{ SCCPMG_MESSAGE_TYPE_SBR,   "SBR" },
-	{ SCCPMG_MESSAGE_TYPE_SNR,   "SNR" },
-	{ SCCPMG_MESSAGE_TYPE_SRT,   "SRT" },
-	{ 0,                       NULL } };
+  { SCCPMG_MESSAGE_TYPE_SSA,   "SSA" },
+  { SCCPMG_MESSAGE_TYPE_SSP,   "SSP" },
+  { SCCPMG_MESSAGE_TYPE_SST,   "SST" },
+  { SCCPMG_MESSAGE_TYPE_SOR,   "SOR" },
+  { SCCPMG_MESSAGE_TYPE_SOG,   "SOG" },
+  { SCCPMG_MESSAGE_TYPE_SSC,   "SSC" },
+  { SCCPMG_MESSAGE_TYPE_SBR,   "SBR" },
+  { SCCPMG_MESSAGE_TYPE_SNR,   "SNR" },
+  { SCCPMG_MESSAGE_TYPE_SRT,   "SRT" },
+  { 0,                       NULL } };
 
 
 #define SCCPMG_MESSAGE_TYPE_OFFSET 0
@@ -121,7 +122,17 @@ static int hf_sccpmg_congestion_level = -1;
 static gint ett_sccpmg = -1;
 static gint ett_sccpmg_affected_pc = -1;
 
-static expert_field ei_sccpmg_unknown_msg = EI_INIT;
+static void
+dissect_sccpmg_unknown_message(tvbuff_t *message_tvb, proto_tree *sccpmg_tree)
+{
+	guint32 message_length;
+
+	message_length = tvb_length(message_tvb);
+
+	proto_tree_add_text(sccpmg_tree, message_tvb, 0, message_length,
+			    "Unknown message (%u byte%s)", message_length,
+			    plurality(message_length, "", "s"));
+}
 
 static void
 dissect_sccpmg_affected_ssn(tvbuff_t *tvb, proto_tree *sccpmg_tree)
@@ -213,7 +224,7 @@ dissect_sccpmg_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *sccpmg_tre
 	case SCCPMG_MESSAGE_TYPE_SRT:
 		if (mtp3_standard != ANSI_STANDARD)
 		{
-			proto_tree_add_expert(sccpmg_tree, pinfo, &ei_sccpmg_unknown_msg, tvb, 0, -1);
+			dissect_sccpmg_unknown_message(tvb, sccpmg_tree);
 			break;
 		}
 		/* else fallthrough */
@@ -238,7 +249,7 @@ dissect_sccpmg_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *sccpmg_tre
 		/* else fallthrough */
 
 	default:
-		proto_tree_add_expert(sccpmg_tree, pinfo, &ei_sccpmg_unknown_msg, tvb, 0, -1);
+		dissect_sccpmg_unknown_message(tvb, sccpmg_tree);
 	}
 }
 
@@ -332,12 +343,6 @@ proto_register_sccpmg(void)
 		&ett_sccpmg_affected_pc
 	};
 
-	static ei_register_info ei[] = {
-		{ &ei_sccpmg_unknown_msg, { "sccpmg.unknown_msg", PI_UNDECODED, PI_WARN, "Unknown message", EXPFILL }},
-	};
-
-	expert_module_t* expert_sccpmg;
-
 	/* Register the protocol name and description */
 	proto_sccpmg = proto_register_protocol("Signalling Connection Control Part Management",
 					       "SCCPMG", "sccpmg");
@@ -346,8 +351,6 @@ proto_register_sccpmg(void)
 	   used */
 	proto_register_field_array(proto_sccpmg, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_sccpmg = expert_register_protocol(proto_sccpmg);
-	expert_register_field_array(expert_sccpmg, ei, array_length(ei));
 }
 
 void
@@ -361,15 +364,3 @@ proto_reg_handoff_sccpmg(void)
 	dissector_add_uint("sccp.ssn", SCCPMG_SSN, sccpmg_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

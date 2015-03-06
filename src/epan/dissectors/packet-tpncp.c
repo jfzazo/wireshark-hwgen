@@ -28,15 +28,20 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include <epan/packet.h>
-#include <epan/exceptions.h>
-#include <epan/prefs.h>
-#include <epan/to_str.h>
-#include <wsutil/filesystem.h>
+#include <glib.h>
+
 #include <wsutil/file_util.h>
-#include <wsutil/report_err.h>
-#include "packet-tcp.h"
+
+#include <epan/exceptions.h>
+#include <epan/packet.h>
+#include <epan/prefs.h>
+#include <epan/emem.h>
+#include <wsutil/filesystem.h>
+#include <epan/dissectors/packet-tcp.h>
+#include <epan/strutil.h>
+#include <epan/to_str.h>
 
 /*-------------------------------------------------------------------------------------------------------------------------------------------*/
 
@@ -130,8 +135,9 @@ static hf_register_info *hf = NULL;
 
 /*-------------------------------------------------------------------------------------------------------------------------------------------*/
 
-static void dissect_tpncp_data(gint data_id, tvbuff_t *tvb, proto_tree *ltree,
+static void dissect_tpncp_data(gint data_id, tvbuff_t *tvb, proto_item *item,
                                gint *offset, tpncp_data_field_info *data_fields_info) {
+    proto_tree *ltree = NULL;
     proto_item *pi = NULL;
     gint32 g_int;
     gint16 g_short;
@@ -141,6 +147,7 @@ static void dissect_tpncp_data(gint data_id, tvbuff_t *tvb, proto_tree *ltree,
     gint g_str_len, counter, bitshift, bitmask;
     tpncp_data_field_info *current_tpncp_data_field_info = NULL;
 
+    ltree = proto_item_add_subtree(item, ett_tpncp_body);
     current_tpncp_data_field_info = &data_fields_info[data_id];
 
     while (current_tpncp_data_field_info) {
@@ -222,11 +229,11 @@ static void dissect_tpncp_data(gint data_id, tvbuff_t *tvb, proto_tree *ltree,
 /*-------------------------------------------------------------------------------------------------------------------------------------------*/
 
 static void dissect_tpncp_event(gint event_id, tvbuff_t *tvb,
-                                proto_tree *tree, gint *offset) {
+                                proto_item *item, gint *offset) {
     switch (event_id) {
         /* Place non-standard events here. */
         default:
-            dissect_tpncp_data(event_id, tvb, tree, offset, tpncp_events_info_db);
+            dissect_tpncp_data(event_id, tvb, item, offset, tpncp_events_info_db);
             break;
     }
 }
@@ -234,11 +241,11 @@ static void dissect_tpncp_event(gint event_id, tvbuff_t *tvb,
 /*-------------------------------------------------------------------------------------------------------------------------------------------*/
 
 static void dissect_tpncp_command(gint command_id, tvbuff_t *tvb,
-                                  proto_tree *tree, gint *offset) {
+                                  proto_item *item, gint *offset) {
     switch (command_id) {
         /* Place non-standard commands here. */
         default:
-            dissect_tpncp_data(command_id, tvb, tree, offset, tpncp_commands_info_db);
+            dissect_tpncp_data(command_id, tvb, item, offset, tpncp_commands_info_db);
             break;
     }
 }
@@ -246,11 +253,12 @@ static void dissect_tpncp_command(gint command_id, tvbuff_t *tvb,
 /*-------------------------------------------------------------------------------------------------------------------------------------------*/
 
 static int dissect_tpncp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_) {
-    proto_item *item = NULL;
-    proto_tree *tpncp_tree = NULL, *event_tree, *command_tree;
+    proto_item *item = NULL, *tpncp_item = NULL;
+    proto_tree *tpncp_tree = NULL;
     gint offset = 0;
     guint32 id, cid = 0;
     guint16 seq_number, len, ver, reserved;
+    gchar *tpncp_header;
 
     ver = tvb_get_ntohs(tvb, 0);
     len = tvb_get_ntohs(tvb, 2);
@@ -290,9 +298,10 @@ static int dissect_tpncp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                 proto_tree_add_int(tpncp_tree, hf_tpncp_cid, tvb, 12, 4, cid);
                 offset += 16;
                 if (tpncp_events_info_db[id].tpncp_data_field_size) {
-                    event_tree = proto_tree_add_subtree_format(tree, tvb, offset, -1, ett_tpncp_body, NULL, "TPNCP Event: %s (%d)",
+                    tpncp_header = wmem_strdup_printf(wmem_packet_scope(), "TPNCP Event: %s (%d)",
                                                       val_to_str_const(id, tpncp_events_id_vals, "Unknown"), id);
-                    dissect_tpncp_event(id, tvb, event_tree, &offset);
+                    tpncp_item = proto_tree_add_text(tree, tvb, offset, -1, "%s", tpncp_header);
+                    dissect_tpncp_event(id, tvb, tpncp_item, &offset);
                 }
             }
         }
@@ -301,9 +310,10 @@ static int dissect_tpncp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                 proto_tree_add_uint(tpncp_tree, hf_tpncp_command_id, tvb, 8, 4, id);
                 offset += 12;
                 if (tpncp_commands_info_db[id].tpncp_data_field_size) {
-                    command_tree = proto_tree_add_subtree_format(tree, tvb, offset, -1, ett_tpncp_body, NULL, "TPNCP Command: %s (%d)",
+                    tpncp_header = wmem_strdup_printf(wmem_packet_scope(), "TPNCP Command: %s (%d)",
                                                       val_to_str_const(id, tpncp_commands_id_vals, "Unknown"), id);
-                    dissect_tpncp_command(id, tvb, command_tree, &offset);
+                    tpncp_item = proto_tree_add_text(tree, tvb, offset, -1, "%s", tpncp_header);
+                    dissect_tpncp_command(id, tvb, tpncp_item, &offset);
                 }
             }
         }
@@ -314,9 +324,7 @@ static int dissect_tpncp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 
 /*-------------------------------------------------------------------------------------------------------------------------------------------*/
 
-static guint get_tpncp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                               int offset, void *data _U_)
-{
+static guint get_tpncp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, gint offset) {
   guint16 plen;
 
   /* Get the length of the DNS packet. */
@@ -808,7 +816,7 @@ void proto_register_tpncp(void) {
                                           "TPNCP", "tpncp");
     if(global_tpncp_load_db){
         if (init_tpncp_db() == -1) {
-            report_failure("tpncp: Could not load tpncp.dat file, tpncp dissector will not work");
+            g_warning("Could not load tpncp.dat file, tpncp dissector will not work");
             return;
         }
 
@@ -829,7 +837,7 @@ void proto_register_tpncp(void) {
         }
 
         CATCH_ALL {
-            report_failure("Corrupt tpncp.dat file, tpncp dissector will not work.");
+            g_warning("Corrupt tpncp.dat file, tpncp dissector will not work.");
         }
 
         ENDTRY;
@@ -843,11 +851,11 @@ void proto_register_tpncp(void) {
 
     /* See https://bugs.wireshark.org/bugzilla/show_bug.cgi?id=9569 for some discussion on this as well */
     prefs_register_bool_preference(tpncp_module, "load_db",
-                                   "Whether to load DB or not; if DB not loaded dissector is passive",
-                                   "Whether to load the Database or not; not loading the DB"
-                                   " disables the protocol; Wireshark has to be restarted for the"
-                                   " setting to take effect.",
-                                   &global_tpncp_load_db);
+    "Whether to load DB or not, if DB not loaded dissector is passive",
+    "Whether to load the Data base or not, not loading the DB "
+    "dissaables the protocol, Wireshar has to be restarted for the"
+    "setting to take effect ",
+    &global_tpncp_load_db);
 
     prefs_register_uint_preference(tpncp_module, "tcp.trunkpack_port",
                                    "TPNCP \"well-known\" TrunkPack TCP Port",

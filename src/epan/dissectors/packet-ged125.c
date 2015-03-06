@@ -40,6 +40,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
@@ -631,7 +633,8 @@ floating_fields(tvbuff_t* tvb, packet_info *pinfo, proto_tree* tree, gint offset
 	if (size - offset > 0)
 		length = size - offset;
 
-	ged125_tree = proto_tree_add_subtree(tree, tvb, offset, length, ett_ged125_floating, NULL, "Float Message");
+	ti = proto_tree_add_text(tree, tvb, offset, length, "Float Message");
+	ged125_tree = proto_item_add_subtree(ti, ett_ged125_floating);
 
 	/*The Universal Floating-Fields Loop of Fun*/
 	while (offset < size-2)
@@ -727,8 +730,8 @@ service_control_dissect(tvbuff_t* tvb,proto_tree* msg_tree, proto_tree* ged125_t
 	proto_tree *service_tree, *data_tree;
 	guint32 mess_type, DialogueID, SendSeqNo;
 
-	service_tree = proto_tree_add_subtree(msg_tree, tvb, *offset, 12,
-			ett_ged125_service_control_header, NULL, "Service-Control Header");
+	ti = proto_tree_add_text(msg_tree, tvb, *offset, 12, "Service-Control Header");
+	service_tree = proto_item_add_subtree(ti, ett_ged125_service_control_header);
 
 	/* get message sub type, don't want to output that just yet */
 	mess_type = tvb_get_ntohl(tvb, *offset);
@@ -980,10 +983,8 @@ service_control_dissect(tvbuff_t* tvb,proto_tree* msg_tree, proto_tree* ged125_t
 }
 
 static guint
-get_ged125_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                   int offset _U_, void *data _U_)
+get_ged125_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, gint offset _U_)
 {
-	/* XXX: why does this not use the offset to get the value? */
 	return tvb_get_ntohl(tvb, 0) + 8;
 }
 
@@ -1005,12 +1006,14 @@ dissect_ged125_base_messages(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree
 	ged125_tree = proto_item_add_subtree( ti, ett_ged125);
 
 	/* Message header */
-	ged125_header_tree = proto_tree_add_subtree(ged125_tree, tvb, 0, 8, ett_ged125_header, NULL, "GED125 Header");
+	ti = proto_tree_add_text(ged125_tree, tvb, 0, 8, "GED125 Header");
+	ged125_header_tree = proto_item_add_subtree(ti, ett_ged125_header);
 
 	proto_tree_add_item(ged125_header_tree, hf_ged125_length, tvb, 0, 4, ENC_BIG_ENDIAN);
 	proto_tree_add_item(ged125_header_tree, hf_ged125_value, tvb, 4, 4, ENC_BIG_ENDIAN);
 
-	ged125_message_tree = proto_tree_add_subtree(ged125_tree, tvb, offset, -1, ett_ged125_message, &message_item, "GED125 Message");
+	message_item = proto_tree_add_text(ged125_tree, tvb, offset, -1, "GED125 Message");
+	ged125_message_tree = proto_item_add_subtree(message_item, ett_ged125_message);
 
 	switch (message_type)
 	{
@@ -1757,7 +1760,7 @@ proto_register_ged125 (void)
 	ged125_module = prefs_register_protocol(proto_ged125, NULL);
 
 	prefs_register_uint_preference(ged125_module, "tcp_port","GED125 TCP Port",
-							"Set up the TCP port for GED125",
+							"Set up the TCP port for GED125 (default is 5000)",
 							10, &global_tcp_port_ged125);
 
 	prefs_register_bool_preference(ged125_module, "desegment_body",
@@ -1781,16 +1784,3 @@ proto_reg_handoff_ged125(void)
 
 	old_ged125_tcp_port = global_tcp_port_ged125;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

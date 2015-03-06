@@ -28,6 +28,7 @@
 
 #include "ui/progress_dlg.h"
 
+#include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/gui_utils.h"
 

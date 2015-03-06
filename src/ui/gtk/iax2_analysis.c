@@ -34,6 +34,7 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <math.h>
 #include <string.h>
 #include <locale.h>
@@ -60,10 +61,10 @@
 #include <epan/dissectors/packet-iax2.h>
 #include <epan/iax2_codec_type.h>
 #include <epan/addr_resolv.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/strutil.h>
 
-#include <epan/stat_groups.h>
+#include "../stat_menu.h"
 
 #include "ui/util.h"
 #include "ui/alert_box.h"
@@ -83,6 +84,7 @@
 #include "ui/rtp_stream.h"
 #include "ui/gtk/rtp_stream_dlg.h"
 #include "ui/gtk/old-gtk-compat.h"
+#include "ui/gtk/gui_utils.h"
 #include "ui/gtk/stock_icons.h"
 
 #include "frame_tvbuff.h"
@@ -823,31 +825,21 @@ static void
 dialog_graph_set_title(user_data_t* user_data)
 {
 	char	*title;
-	char *src_fwd_addr, *dst_fwd_addr, *src_rev_addr, *dst_rev_addr;
 
 	if (!user_data->dlg.dialog_graph.window) {
 		return;
 	}
-
-	src_fwd_addr = (char*)address_to_display(NULL, &(user_data->ip_src_fwd));
-	dst_fwd_addr = (char*)address_to_display(NULL, &(user_data->ip_dst_fwd));
-	src_rev_addr = (char*)address_to_display(NULL, &(user_data->ip_src_rev));
-	dst_rev_addr = (char*)address_to_display(NULL, &(user_data->ip_dst_rev));
 	title = g_strdup_printf("IAX2 Graph Analysis Forward: %s:%u to %s:%u   Reverse: %s:%u to %s:%u",
-				src_fwd_addr,
+				ep_address_to_display(&(user_data->ip_src_fwd)),
 				user_data->port_src_fwd,
-				dst_fwd_addr,
+				ep_address_to_display(&(user_data->ip_dst_fwd)),
 				user_data->port_dst_fwd,
-				src_rev_addr,
+				ep_address_to_display(&(user_data->ip_src_rev)),
 				user_data->port_src_rev,
-				dst_rev_addr,
+				ep_address_to_display(&(user_data->ip_dst_rev)),
 				user_data->port_dst_rev);
 
 	gtk_window_set_title(GTK_WINDOW(user_data->dlg.dialog_graph.window), title);
-	wmem_free(NULL, src_fwd_addr);
-	wmem_free(NULL, dst_fwd_addr);
-	wmem_free(NULL, src_rev_addr);
-	wmem_free(NULL, dst_rev_addr);
 	g_free(title);
 
 }
@@ -858,7 +850,6 @@ static void
 dialog_graph_reset(user_data_t* user_data)
 {
 	int i, j;
-	char *src_addr, *dst_addr;
 
 	user_data->dlg.dialog_graph.needs_redraw = TRUE;
 	for (i = 0; i < MAX_GRAPHS; i++) {
@@ -877,31 +868,25 @@ dialog_graph_reset(user_data_t* user_data)
 	for (i = 0; i < MAX_GRAPHS; i++) {
 		/* it is forward */
 		if (i < 2) {
-			src_addr = (char*)address_to_display(NULL, &(user_data->ip_src_fwd));
-			dst_addr = (char*)address_to_display(NULL, &(user_data->ip_dst_fwd));
 			g_snprintf(user_data->dlg.dialog_graph.graph[i].title,
 				   sizeof (user_data->dlg.dialog_graph.graph[0].title),
 				   "%s: %s:%u to %s:%u",
 			graph_descr[i],
-			src_addr,
+			ep_address_to_display(&(user_data->ip_src_fwd)),
 			user_data->port_src_fwd,
-			dst_addr,
+			ep_address_to_display(&(user_data->ip_dst_fwd)),
 			user_data->port_dst_fwd);
 		/* it is reverse */
 		} else {
-			src_addr = (char*)address_to_display(NULL, &(user_data->ip_src_rev));
-			dst_addr = (char*)address_to_display(NULL, &(user_data->ip_dst_rev));
 			g_snprintf(user_data->dlg.dialog_graph.graph[i].title,
 				   sizeof(user_data->dlg.dialog_graph.graph[0].title),
 				   "%s: %s:%u to %s:%u",
 			graph_descr[i],
-			src_addr,
+			ep_address_to_display(&(user_data->ip_src_rev)),
 			user_data->port_src_rev,
-			dst_addr,
+			ep_address_to_display(&(user_data->ip_dst_rev)),
 			user_data->port_dst_rev);
 		}
-		wmem_free(NULL, src_addr);
-		wmem_free(NULL, dst_addr);
 	}
 
 	dialog_graph_set_title(user_data);
@@ -1383,7 +1368,7 @@ dialog_graph_draw(user_data_t* user_data)
 				y_pos = draw_height-1 - (val*draw_height)/max_y + top_y_border;
 			}
 
-			/* don't need to draw anything if the segment
+			/* dont need to draw anything if the segment
 			 * is entirely above the top of the graph
 			 */
 			if ( (prev_y_pos == 0) && (y_pos == 0) ) {
@@ -3336,7 +3321,8 @@ create_iax2_dialog(user_data_t* user_data)
 	gchar label_forward[150];
 	gchar label_reverse[150];
 
-	char *src_addr, *dst_addr;
+	gchar str_ip_src[16];
+	gchar str_ip_dst[16];
 
 	window = dlg_window_new("Wireshark: IAX2 Stream Analysis");  /* transient_for top_level */
 	gtk_window_set_default_size(GTK_WINDOW(window), 700, 400);
@@ -3348,21 +3334,20 @@ create_iax2_dialog(user_data_t* user_data)
 	gtk_widget_show(main_vb);
 
 	/* Notebooks... */
-	src_addr = (char*)address_to_display(NULL, &(user_data->ip_src_fwd));
-	dst_addr = (char*)address_to_display(NULL, &(user_data->ip_dst_fwd));
+	g_strlcpy(str_ip_src, ep_address_to_display(&(user_data->ip_src_fwd)), 16);
+	g_strlcpy(str_ip_dst, ep_address_to_display(&(user_data->ip_dst_fwd)), 16);
+
 	g_snprintf(label_forward, sizeof(label_forward),
 		"Analysing stream from  %s port %u  to  %s port %u  ",
-		src_addr, user_data->port_src_fwd, dst_addr, user_data->port_dst_fwd);
-	wmem_free(NULL, src_addr);
-	wmem_free(NULL, dst_addr);
+		str_ip_src, user_data->port_src_fwd, str_ip_dst, user_data->port_dst_fwd);
 
-	src_addr = (char*)address_to_display(NULL, &(user_data->ip_src_rev));
-	dst_addr = (char*)address_to_display(NULL, &(user_data->ip_dst_rev));
+
+	g_strlcpy(str_ip_src, ep_address_to_display(&(user_data->ip_src_rev)), 16);
+	g_strlcpy(str_ip_dst, ep_address_to_display(&(user_data->ip_dst_rev)), 16);
+
 	g_snprintf(label_reverse, sizeof(label_reverse),
 		"Analysing stream from  %s port %u  to  %s port %u  ",
-		src_addr, user_data->port_src_rev, dst_addr, user_data->port_dst_rev);
-	wmem_free(NULL, src_addr);
-	wmem_free(NULL, dst_addr);
+		str_ip_src, user_data->port_src_rev, str_ip_dst, user_data->port_dst_rev);
 
 	/* Start a notebook for flipping between sets of changes */
 	notebook = gtk_notebook_new();
@@ -3703,7 +3688,6 @@ void iax2_analysis_cb(GtkAction *action _U_, gpointer user_data _U_)
 
 	gchar	      filter_text[256];
 	dfilter_t    *sfcode;
-	gchar        *err_msg;
 	capture_file *cf;
 	frame_data   *fdata;
 	GList	     *strinfo_list;
@@ -3714,9 +3698,8 @@ void iax2_analysis_cb(GtkAction *action _U_, gpointer user_data _U_)
 
 	/* Try to compile the filter. */
 	g_strlcpy(filter_text,"iax2 && (ip || ipv6)",256);
-	if (!dfilter_compile(filter_text, &sfcode, &err_msg)) {
-		simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", err_msg);
-		g_free(err_msg);
+	if (!dfilter_compile(filter_text, &sfcode)) {
+		simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", dfilter_error_msg);
 		return;
 	}
 	/* we load the current file into cf variable */
@@ -3771,10 +3754,10 @@ void iax2_analysis_cb(GtkAction *action _U_, gpointer user_data _U_)
 	port_dst_rev = edt.pi.srcport;
 
 	/* Scan for rtpstream */
-	rtpstream_scan(rtpstream_dlg_get_tapinfo(), &cfile);
+	rtpstream_scan();
 	/* search for reversed direction in the global rtp streams list */
 	nfound = 0;
-	strinfo_list = g_list_first(rtpstream_dlg_get_tapinfo()->strinfo_list);
+	strinfo_list = g_list_first(rtpstream_get_info()->strinfo_list);
 	while (strinfo_list)
 	{
 		strinfo = (rtp_stream_info_t*)(strinfo_list->data);
@@ -3825,20 +3808,10 @@ iax2_analysis_init(const char *dummy _U_,void* userdata _U_)
 }
 
 /****************************************************************************/
-static stat_tap_ui iax2_analysis_ui = {
-	REGISTER_STAT_GROUP_GENERIC,
-	NULL,
-	"IAX2",	/* XXX - should be "iax2" */
-	iax2_analysis_init,
-	-1,
-	0,
-	NULL
-};
-
 void
 register_tap_listener_iax2_analysis(void)
 {
-	register_stat_tap_ui(&iax2_analysis_ui,NULL);
+	register_stat_cmd_arg("IAX2", iax2_analysis_init,NULL);
 }
 
 

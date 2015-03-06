@@ -22,7 +22,6 @@
 #ifndef __PACKET_PPP_H__
 #define __PACKET_PPP_H__
 
-#include <epan/params.h>
 #include "ws_symbol_export.h"
 
 /* PPP options */

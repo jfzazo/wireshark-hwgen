@@ -158,9 +158,9 @@ sub ParseFunction_r_Done($$$$)
 	$self->pidl("");
 
 	$self->pidl("status = dcerpc_binding_handle_call_recv(subreq);");
-	$self->pidl("TALLOC_FREE(subreq);");
-	$self->pidl("if (tevent_req_nterror(req, status)) {");
+	$self->pidl("if (!NT_STATUS_IS_OK(status)) {");
 	$self->indent;
+	$self->pidl("tevent_req_nterror(req, status);");
 	$self->pidl("return;");
 	$self->deindent;
 	$self->pidl("}");
@@ -259,7 +259,7 @@ sub HeaderProperties($$)
 	my($props,$ignores) = @_;
 	my $ret = "";
 
-	foreach my $d (sort(keys %{$props})) {
+	foreach my $d (keys %{$props}) {
 		next if (grep(/^$d$/, @$ignores));
 		if($props->{$d} ne "1") {
 			$ret.= "$d($props->{$d}),";
@@ -400,16 +400,11 @@ sub ParseOutputArgument($$$$$$)
 			$self->pidl("$copy_len_var = $out_length_is;");
 		}
 
-		my $dest_ptr = "$o$e->{NAME}";
-		my $elem_size = "sizeof(*$dest_ptr)";
-		$self->pidl("if ($dest_ptr != $out_var) {");
-		$self->indent;
 		if (has_property($e, "charset")) {
-			$dest_ptr = "discard_const_p(uint8_t *, $dest_ptr)";
+			$self->pidl("memcpy(discard_const_p(uint8_t *, $o$e->{NAME}), $out_var, $copy_len_var * sizeof(*$o$e->{NAME}));");
+		} else {
+			$self->pidl("memcpy($o$e->{NAME}, $out_var, $copy_len_var * sizeof(*$o$e->{NAME}));");
 		}
-		$self->pidl("memcpy($dest_ptr, $out_var, $copy_len_var * $elem_size);");
-		$self->deindent;
-		$self->pidl("}");
 
 		$self->deindent;
 		$self->pidl("}");
@@ -568,8 +563,9 @@ sub ParseFunction_Done($$$$)
 
 	$self->pidl("status = dcerpc_$name\_r_recv(subreq, mem_ctx);");
 	$self->pidl("TALLOC_FREE(subreq);");
-	$self->pidl("if (tevent_req_nterror(req, status)) {");
+	$self->pidl("if (!NT_STATUS_IS_OK(status)) {");
 	$self->indent;
+	$self->pidl("tevent_req_nterror(req, status);");
 	$self->pidl("return;");
 	$self->deindent;
 	$self->pidl("}");
@@ -696,20 +692,6 @@ sub ParseFunction_Sync($$$$)
 		$self->ParseCopyArgument($fn, $e, "r.in.", "_");
 	}
 	$self->pidl("");
-
-	$self->pidl("/* Out parameters */");
-	foreach my $e (@{$fn->{ELEMENTS}}) {
-		next unless grep(/out/, @{$e->{DIRECTION}});
-
-		$self->ParseCopyArgument($fn, $e, "r.out.", "_");
-	}
-	$self->pidl("");
-
-	if (defined($fn->{RETURN_TYPE})) {
-		$self->pidl("/* Result */");
-		$self->pidl("ZERO_STRUCT(r.out.result);");
-		$self->pidl("");
-	}
 
 	$self->pidl("status = dcerpc_$name\_r(h, mem_ctx, &r);");
 	$self->pidl("if (!NT_STATUS_IS_OK(status)) {");

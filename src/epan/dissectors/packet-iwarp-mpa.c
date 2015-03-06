@@ -28,10 +28,11 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
+#include <epan/conversation.h>
+#include <epan/dissectors/packet-tcp.h>
 #include <epan/expert.h>
-#include <epan/crc32-tvb.h>
 #include <wsutil/crc32.h>
-#include "packet-tcp.h"
 
 void proto_register_mpa(void);
 void proto_reg_handoff_mpa(void);
@@ -580,7 +581,8 @@ dissect_fpdu_crc(tvbuff_t *tvb, proto_tree *tree, mpa_state_t *state,
 
 	if (state->crc) {
 
-		crc = ~crc32c_tvb_offset_calculate(tvb, 0, length, CRC32C_PRELOAD);
+		crc = ~crc32c_calculate(tvb_get_ptr(tvb, 0, length), length,
+				CRC32C_PRELOAD);
 
 		sent_crc = tvb_get_ntohl(tvb, offset); /* crc start offset */
 
@@ -829,13 +831,14 @@ dissect_iwarp_mpa(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
 		/* removes Markers if any and prepares new tvbuff for next dissector */
 		if (endpoint <= MPA_RESPONDER && state->minfo[endpoint].valid
 				&& number_of_markers(state, tcpinfo, endpoint) > 0) {
-			next_tvb = tvb_new_subset_length(remove_markers(tvb, pinfo,
+			next_tvb = tvb_new_subset(remove_markers(tvb, pinfo,
 					get_first_marker_offset(state, tcpinfo, endpoint),
 					number_of_markers(state, tcpinfo, endpoint),
 					fpdu_total_length(tcpinfo)), MPA_ULPDU_LENGTH_LEN,
-					ulpdu_length);
+					ulpdu_length, ulpdu_length);
 		} else {
-			next_tvb = tvb_new_subset_length(tvb, MPA_ULPDU_LENGTH_LEN, ulpdu_length);
+			next_tvb = tvb_new_subset(tvb, MPA_ULPDU_LENGTH_LEN, ulpdu_length,
+					ulpdu_length);
 		}
 
 
@@ -982,16 +985,3 @@ proto_reg_handoff_mpa(void)
 	heur_dissector_add("tcp", dissect_iwarp_mpa, proto_iwarp_mpa);
 	ddp_rdmap_handle = find_dissector("iwarp_ddp_rdmap");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

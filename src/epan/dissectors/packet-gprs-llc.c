@@ -23,9 +23,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
-#include <epan/expert.h>
 #include <wiretap/wtap.h>
 
 void proto_register_llcgprs(void);
@@ -50,7 +51,6 @@ void proto_reg_handoff_llcgprs(void);
 /* Initialize the protocol and registered fields */
 static int proto_llcgprs       	  = -1;
 static int hf_llcgprs_pd       	  = -1;
-static int hf_llcgprs_fcs         = -1;
 static int hf_llcgprs_cr       	  = -1;
 static int hf_llcgprs_sapi     	  = -1;
 static int hf_llcgprs_sapib    	  = -1;
@@ -124,8 +124,6 @@ static gint ett_llcgprs_adf = -1;
 static gint ett_llcgprs_ctrlf = -1;
 static gint ett_ui = -1;
 static gint ett_llcgprs_sframe = -1;
-
-static expert_field ei_llcgprs_no_info_field = EI_INIT;
 
 static dissector_handle_t data_handle;
 static dissector_handle_t sndcp_xid_handle;
@@ -328,14 +326,17 @@ static void llc_gprs_dissect_xid(tvbuff_t *tvb,
 	guint8 xid_param_len = 0, byte1 = 0, byte2 = 0, item_len = 0, tmp = 0;
 	guint16 location = 0;
 	guint16 loop_counter = 0;
+	proto_item *u_ti = NULL;
+	proto_item *uinfo_field = NULL;
 	proto_tree *uinfo_tree = NULL;
 	proto_tree *xid_tree = NULL;
 	guint16 info_len;
 
 	info_len = tvb_reported_length(tvb);
 
-	xid_tree = proto_tree_add_subtree_format(llcgprs_tree, tvb, 0, info_len,
-				ett_ui, NULL, "Information Field: Length = %u", info_len);
+	u_ti = proto_tree_add_text(llcgprs_tree, tvb, 0, info_len,
+		"Information Field: Length = %u", info_len);
+	xid_tree = proto_item_add_subtree(u_ti, ett_ui);
 
 	while (location < info_len)
 	{
@@ -378,8 +379,9 @@ static void llc_gprs_dissect_xid(tvbuff_t *tvb,
 			tvbuff_t	*sndcp_xid_tvb;
 			guint8 sndcp_xid_offset;
 
-			uinfo_tree = proto_tree_add_subtree(xid_tree, tvb, location, item_len,
-				ett_ui, NULL, "XID parameter Type: L3 parameters");
+			uinfo_field = proto_tree_add_text(xid_tree, tvb, location, item_len,
+				"XID parameter Type: L3 parameters");
+			uinfo_tree = proto_item_add_subtree(uinfo_field, ett_ui);
 			proto_tree_add_uint(uinfo_tree, hf_llcgprs_xid_xl, tvb, location, 1, byte1);
 			proto_tree_add_uint(uinfo_tree, hf_llcgprs_xid_type, tvb, location, 1, byte1);
 			proto_tree_add_uint(uinfo_tree, hf_llcgprs_xid_len1, tvb, location, 1, byte1);
@@ -395,7 +397,7 @@ static void llc_gprs_dissect_xid(tvbuff_t *tvb,
 
 			if (xid_param_len) {
 
-				sndcp_xid_tvb = tvb_new_subset_length (tvb, location+sndcp_xid_offset, xid_param_len);
+				sndcp_xid_tvb = tvb_new_subset (tvb, location+sndcp_xid_offset, xid_param_len, xid_param_len);
 
 				if(sndcp_xid_handle)
 				{
@@ -416,16 +418,17 @@ static void llc_gprs_dissect_xid(tvbuff_t *tvb,
 					value <<= 8;
 					value |= (guint32)tvb_get_guint8(tvb, location+i );
 				}
-				uinfo_tree = proto_tree_add_subtree_format(xid_tree, tvb, location, item_len,
-					ett_ui, NULL, "XID Parameter Type: %s - Value: %u",
+				uinfo_field = proto_tree_add_text(xid_tree, tvb, location, item_len,
+					"XID Parameter Type: %s - Value: %u",
 					val_to_str_ext_const(tmp, &xid_param_type_str_ext, "Reserved Type:%X"), value);
 			}
 			else
 			{
-				uinfo_tree = proto_tree_add_subtree_format(xid_tree, tvb, location, item_len,
-					ett_ui, NULL, "XID Parameter Type: %s",
+				uinfo_field = proto_tree_add_text(xid_tree, tvb, location, item_len,
+					"XID Parameter Type: %s",
 					val_to_str_ext_const(tmp, &xid_param_type_str_ext, "Reserved Type:%X"));
 			}
+			uinfo_tree = proto_item_add_subtree(uinfo_field, ett_ui);
 			proto_tree_add_uint(uinfo_tree, hf_llcgprs_xid_xl, tvb, location,
 				1, byte1);
 			proto_tree_add_uint(uinfo_tree, hf_llcgprs_xid_type, tvb, location,
@@ -458,16 +461,17 @@ static void llc_gprs_dissect_xid(tvbuff_t *tvb,
 }
 
 
+/* Code to actually dissect the packets */
 static void
 dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	guint8 addr_fld=0, sapi=0, ctrl_fld_fb=0, frame_format, tmp=0;
 	guint16 offset=0 , epm = 0, nu=0, ctrl_fld_ui_s=0;
 	guint16 crc_length=0, llc_data_reported_length=0, llc_data_length = 0;
-	proto_item *ti, *addres_field_item;
+	proto_item *ti, *addres_field_item, *ctrl_field_item, *ui_ti;
 	proto_tree *llcgprs_tree=NULL , *ad_f_tree =NULL, *ctrl_f_tree=NULL, *ui_tree=NULL;
 	tvbuff_t *next_tvb;
-	guint length, captured_length;
+	guint length;
 	guint32 fcs=0;
 	guint32 fcs_calc=0;
 	fcs_status_t fcs_status;
@@ -478,8 +482,10 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	guint8 k = 0;
 	guint8 m_bits = 0;
 	guint8 info_len = 0;
+	proto_item *uinfo_field = NULL;
 	proto_tree *uinfo_tree = NULL;
 	/* END MLT CHANGES */
+	proto_item* fcs_item = NULL;
 	gboolean ciphered_ui_frame = FALSE;
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "GPRS-LLC");
@@ -507,12 +513,12 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		frame_format = (ctrl_fld_fb < 0xe0 )? UI_FORMAT : U_FORMAT;
 	}
 	length = tvb_reported_length(tvb);
-	captured_length = llc_data_length = tvb_captured_length(tvb);
+	llc_data_length = tvb_length(tvb);
 	if(llc_data_length==length){
 		llc_data_length = length - CRC_LENGTH;
 	}
 	llc_data_reported_length = length - CRC_LENGTH; /* llc_data_reported_length includes the header and the payload */
-	if (captured_length >= length && length >= CRC_LENGTH)
+	if (tvb_length(tvb) >= length && length >= CRC_LENGTH)
 	{
 		/*
 		 * We have all the packet data, including the full FCS,
@@ -595,23 +601,24 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		switch (fcs_status) {
 
 		case FCS_VALID:
-			proto_tree_add_uint_format_value(llcgprs_tree, hf_llcgprs_fcs, tvb, llc_data_reported_length, CRC_LENGTH,
-				fcs_calc&0xffffff, "0x%06x (correct)", fcs_calc&0xffffff);
+			proto_tree_add_text (llcgprs_tree, tvb, llc_data_reported_length, CRC_LENGTH,
+				"FCS: 0x%06x (correct)", fcs_calc&0xffffff);
 			break;
 
 		case FCS_NOT_VALID:
-			proto_tree_add_uint_format_value(llcgprs_tree, hf_llcgprs_fcs, tvb, llc_data_reported_length, CRC_LENGTH,
-				fcs, "0x%06x  (incorrect, should be 0x%06x)", fcs, fcs_calc );
+			proto_tree_add_text (llcgprs_tree, tvb, llc_data_reported_length, CRC_LENGTH,
+				"FCS: 0x%06x  (incorrect, should be 0x%06x)", fcs, fcs_calc );
 			break;
 
 		case FCS_NOT_VALID_DUE_TO_CIPHERING:
-			proto_tree_add_uint_format_value(llcgprs_tree, hf_llcgprs_fcs, tvb, llc_data_reported_length, CRC_LENGTH,
-				fcs, "0x%06x  (incorrect, maybe due to ciphering, calculated 0x%06x)", fcs, fcs_calc );
+			proto_tree_add_text (llcgprs_tree, tvb, llc_data_reported_length, CRC_LENGTH,
+				"FCS: 0x%06x  (incorrect, maybe due to ciphering, calculated 0x%06x)", fcs, fcs_calc );
 			break;
 
 		case FCS_NOT_COMPUTED:
-			proto_tree_add_uint_format_value(llcgprs_tree, hf_llcgprs_fcs, tvb, 0, 0, 0,
+			fcs_item = proto_tree_add_text (llcgprs_tree, tvb, 0, 0,
 				"FCS: Not enough data to compute the FCS");
+			PROTO_ITEM_SET_GENERATED(fcs_item);
 			break;	/* FCS not present */
 		}
 
@@ -648,9 +655,10 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		{
 			guint32 tmpx;
 
-			ctrl_f_tree = proto_tree_add_subtree_format(llcgprs_tree, tvb, (offset-3),
-							      3, ett_llcgprs_sframe, NULL, "Information format: %s: N(S) = %u,  N(R) = %u",
+			ctrl_field_item = proto_tree_add_text(llcgprs_tree, tvb, (offset-3),
+							      3, "Information format: %s: N(S) = %u,  N(R) = %u",
 							      val_to_str(epm, cr_formats_ipluss, "Unknown (%d)"), ns, nr);
+			ctrl_f_tree = proto_item_add_subtree(ctrl_field_item, ett_llcgprs_sframe);
 
 			/* retrieve the second octet */
 			tmpx = tvb_get_ntohs(tvb, (offset-3))  << 16;
@@ -689,9 +697,10 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				guint8 r_byte = 0;
 				guint16 location = offset;
 
-				ctrl_f_tree = proto_tree_add_subtree_format(llcgprs_tree, tvb, (offset-1),
-								      (k+1), ett_llcgprs_sframe, NULL, "SACK FRAME: k = %u", k);
+				ctrl_field_item = proto_tree_add_text(llcgprs_tree, tvb, (offset-1),
+								      (k+1), "SACK FRAME: k = %u", k);
 
+				ctrl_f_tree = proto_item_add_subtree(ctrl_field_item, ett_llcgprs_sframe);
 				proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_kmask, tvb, offset-1, 1, kmask);
 				proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_k, tvb, offset-1, 1, k);
 
@@ -722,10 +731,11 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				remaining_length = (tom_byte >> 4) & 0x0F;
 				tom_pd = tom_byte & 0x0F;
 
-				ctrl_f_tree = proto_tree_add_subtree_format(llcgprs_tree, tvb, offset,
-								      (llc_data_reported_length-offset), ett_llcgprs_sframe, NULL,
-								      "TOM Envelope - Protocol: %s",
+				ctrl_field_item = proto_tree_add_text(llcgprs_tree, tvb, offset,
+								      (llc_data_reported_length-offset), "TOM Envelope - Protocol: %s",
 								      val_to_str(tom_pd, tompd_formats, "Unknown (%d)"));
+
+				ctrl_f_tree = proto_item_add_subtree(ctrl_field_item, ett_llcgprs_sframe);
 
 				proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_tom_rl, tvb, offset, 1, tom_byte);
 				proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_tom_pd, tvb, offset, 1, tom_byte);
@@ -779,6 +789,7 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		break;
 	case S_FORMAT:
 		nu = ctrl_fld_ui_s = tvb_get_ntohs(tvb, offset);
+		offset +=2;
 		epm = ctrl_fld_ui_s & 0x3;
 		nu = (nu >>2)&0x01FF;
 
@@ -788,21 +799,25 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 		if (tree)
 		{
-			static const int * s_formats[] = {
-				&hf_llcgprs_S_fmt,
-				&hf_llcgprs_As,
-			/* MLT CHANGES - added spare bits */
-				&hf_llcgprs_sspare,
-			/* END MLT CHANGES */
-				&hf_llcgprs_NR,
-				&hf_llcgprs_sjsd,
-				NULL
-			};
+			ctrl_field_item = proto_tree_add_text(llcgprs_tree, tvb, offset-2, 2,
+							      "Supervisory format: %s: N(R) = %u",
+							      val_to_str(epm, cr_formats_ipluss, "Unknown (%d)"), nu);
 
-			proto_tree_add_bitmask_text(llcgprs_tree, tvb, offset, 2,
-							      "Supervisory format: ", NULL, ett_llcgprs_sframe, s_formats, ENC_BIG_ENDIAN, 0);
+			ctrl_f_tree = proto_item_add_subtree(ctrl_field_item, ett_llcgprs_sframe);
+			proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_S_fmt, tvb, offset-2,
+					    2, ctrl_fld_ui_s);
+			proto_tree_add_boolean(ctrl_f_tree, hf_llcgprs_As, tvb, offset-2,
+					       2, ctrl_fld_ui_s);
+
+			/* MLT CHANGES - added spare bits */
+			proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_sspare, tvb, offset-2,
+					    2, ctrl_fld_ui_s);
+			/* END MLT CHANGES */
+			proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_NR, tvb, offset-2,
+					    2, ctrl_fld_ui_s);
+			proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_sjsd, tvb, offset-2,
+					    2, ctrl_fld_ui_s);
 		}
-		offset +=2;
 		/* MLT CHANGES - additional parsing code to handle SACK */
 		if ((ctrl_fld_ui_s & 0x03) == 0x03)
 			/* It is a SACK frame */
@@ -815,8 +830,9 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				guint loop_count;
 				guint8 r_byte;
 				guint16 location = offset;
-				ctrl_f_tree = proto_tree_add_subtree_format(llcgprs_tree, tvb, offset, sack_length,
-								      ett_llcgprs_sframe, NULL, "SACK FRAME: length = %u", sack_length);
+				ctrl_field_item = proto_tree_add_text(llcgprs_tree, tvb, offset,
+								      sack_length, "SACK FRAME: length = %u", sack_length);
+				ctrl_f_tree = proto_item_add_subtree(ctrl_field_item, ett_llcgprs_sframe);
 				/* display the R Bitmap */
 				for (loop_count = 0; loop_count < sack_length; loop_count++)
 				{
@@ -846,10 +862,11 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				remaining_length = (tom_byte >> 4) & 0x0F;
 				tom_pd = tom_byte & 0x0F;
 
-				ctrl_f_tree = proto_tree_add_subtree_format(llcgprs_tree, tvb, offset,
-								      (llc_data_reported_length-offset), ett_llcgprs_sframe, NULL,
-								      "TOM Envelope - Protocol: %s",
+				ctrl_field_item = proto_tree_add_text(llcgprs_tree, tvb, offset,
+								      (llc_data_reported_length-offset), "TOM Envelope - Protocol: %s",
 								      val_to_str(tom_pd, tompd_formats, "Unknown (%d)"));
+
+				ctrl_f_tree = proto_item_add_subtree(ctrl_field_item, ett_llcgprs_sframe);
 
 				proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_tom_rl, tvb, offset, 1, tom_byte);
 				proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_tom_pd, tvb, offset, 1, tom_byte);
@@ -907,17 +924,20 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 		if (tree)
 		{
-			static const int * i_formats[] = {
-				&hf_llcgprs_U_fmt,
-				&hf_llcgprs_sp_bits,
-				&hf_llcgprs_NU,
-				&hf_llcgprs_E_bit,
-				&hf_llcgprs_PM_bit,
-				NULL
-			};
+			ctrl_field_item = proto_tree_add_text(llcgprs_tree, tvb, offset-2,
+							      2, "Unconfirmed Information format - UI, N(U) = %u", nu);
+			ctrl_f_tree = proto_item_add_subtree(ctrl_field_item, ett_llcgprs_ctrlf);
 
-			proto_tree_add_bitmask_text(llcgprs_tree, tvb, offset-2, 2,
-							      "Unconfirmed Information format - UI: ", NULL, ett_llcgprs_ctrlf, i_formats, ENC_BIG_ENDIAN, 0);
+			proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_U_fmt, tvb, offset-2,
+					    2, ctrl_fld_ui_s);
+			proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_sp_bits, tvb, offset-2,
+					    2, ctrl_fld_ui_s);
+			proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_NU, tvb, offset-2, 2,
+					    ctrl_fld_ui_s);
+			proto_tree_add_boolean(ctrl_f_tree, hf_llcgprs_E_bit, tvb, offset-2,
+					       2, ctrl_fld_ui_s);
+			proto_tree_add_boolean(ctrl_f_tree, hf_llcgprs_PM_bit, tvb, offset-2,
+					       2, ctrl_fld_ui_s);
 		}
 
 		/* MLT CHANGES - TOM parsing added */
@@ -947,10 +967,11 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 					remaining_length = (tom_byte >> 4) & 0x0F;
 					tom_pd = tom_byte & 0x0F;
 
-					ctrl_f_tree = proto_tree_add_subtree_format(llcgprs_tree, tvb, offset,
-									      (llc_data_reported_length-offset), ett_llcgprs_sframe, NULL,
-									      "TOM Envelope - Protocol: %s",
+					ctrl_field_item = proto_tree_add_text(llcgprs_tree, tvb, offset,
+									      (llc_data_reported_length-offset), "TOM Envelope - Protocol: %s",
 									      val_to_str(tom_pd, tompd_formats, "Unknown (%d)"));
+
+					ctrl_f_tree = proto_item_add_subtree(ctrl_field_item, ett_llcgprs_sframe);
 
 					proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_tom_rl, tvb, offset, 1, tom_byte);
 					proto_tree_add_uint(ctrl_f_tree, hf_llcgprs_tom_pd, tvb, offset, 1, tom_byte);
@@ -1015,13 +1036,17 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		col_append_str(pinfo->cinfo, COL_INFO,
 			       val_to_str(tmp, cr_formats_unnumb, "Unknown/invalid code:%X"));
 
-		ui_tree = proto_tree_add_subtree_format(llcgprs_tree, tvb, (offset-1), (llc_data_reported_length-1),
-						    ett_ui, NULL, "Unnumbered frame: %s",
+		if(tree){
+			ui_ti = proto_tree_add_text(llcgprs_tree, tvb, (offset-1), (llc_data_reported_length-1),
+						    "Unnumbered frame: %s",
 						    val_to_str(tmp, cr_formats_unnumb, "Unknown/invalid code:%X"));
 
-		proto_tree_add_uint(ui_tree, hf_llcgprs_Un, tvb, (offset-1), 1, ctrl_fld_fb);
-		proto_tree_add_boolean(ui_tree, hf_llcgprs_PF, tvb, (offset-1), 1, ctrl_fld_fb);
-		proto_tree_add_uint(ui_tree, hf_llcgprs_ucom, tvb, (offset-1), 1, ctrl_fld_fb);
+			ui_tree = proto_item_add_subtree(ui_ti, ett_ui);
+			proto_tree_add_uint(ui_tree, hf_llcgprs_Un, tvb, (offset-1), 1, ctrl_fld_fb);
+			proto_tree_add_boolean(ui_tree, hf_llcgprs_PF, tvb, (offset-1), 1, ctrl_fld_fb);
+			proto_tree_add_uint(ui_tree, hf_llcgprs_ucom, tvb, (offset-1), 1, ctrl_fld_fb);
+
+		}
 
 		/* MLT CHANGES - parse rest of the message based on type (M Bits) */
 		m_bits = ctrl_fld_fb & 0x0F;
@@ -1034,7 +1059,11 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		case U_DISC:
 		case U_NULL:
 			/* These frames SHOULD NOT have an info field */
-			proto_tree_add_expert(llcgprs_tree, pinfo, &ei_llcgprs_no_info_field, tvb, offset, (llc_data_reported_length-2));
+			if (tree)
+			{
+				proto_tree_add_text(llcgprs_tree, tvb, offset, (llc_data_reported_length-2),
+						    "No Information Field");
+			}
 			break;
 		case U_UA:
 			/* This frame MAY or MAY NOT have an info field */
@@ -1042,7 +1071,7 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			if (tree)
 			{
 				tvbuff_t	*xid_tvb;
-				xid_tvb = tvb_new_subset_length (tvb, offset, info_len);
+				xid_tvb = tvb_new_subset (tvb, offset, info_len, info_len);
 
 				llc_gprs_dissect_xid(xid_tvb, pinfo, llcgprs_tree);
 			}
@@ -1054,7 +1083,7 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			if (tree)
 			{
 				tvbuff_t	*xid_tvb;
-				xid_tvb = tvb_new_subset_length (tvb, offset, info_len);
+				xid_tvb = tvb_new_subset (tvb, offset, info_len, info_len);
 
 				llc_gprs_dissect_xid(xid_tvb, pinfo, llcgprs_tree);
 			}
@@ -1068,11 +1097,13 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				int loop_counter = 0;
 				int location = 0;
 
-				ui_tree = proto_tree_add_subtree_format(llcgprs_tree, tvb, offset, (llc_data_reported_length-2),
-							    ett_ui, NULL, "Information Field: Length = %u", info_len);
+				ui_ti = proto_tree_add_text(llcgprs_tree, tvb, offset, (llc_data_reported_length-2),
+							    "Information Field: Length = %u", info_len);
+				ui_tree = proto_item_add_subtree(ui_ti, ett_ui);
 
-				uinfo_tree = proto_tree_add_subtree(ui_tree, tvb, offset, 6,
-								  ett_ui, NULL, "Rejected Frame Control Field");
+				uinfo_field = proto_tree_add_text(ui_tree, tvb, offset, 6,
+								  "Rejected Frame Control Field");
+				uinfo_tree = proto_item_add_subtree(uinfo_field, ett_ui);
 
 				location = offset;
 				for (loop_counter = 0; loop_counter < 3; loop_counter++)
@@ -1085,8 +1116,9 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 					location += 2;
 				}
 
-				uinfo_tree = proto_tree_add_subtree(ui_tree, tvb, location, 4,
-								  ett_ui, NULL, "Information Field Data");
+				uinfo_field = proto_tree_add_text(ui_tree, tvb, location, 4,
+								  "Information Field Data");
+				uinfo_tree = proto_item_add_subtree(uinfo_field, ett_ui);
 
 				fld_vars = tvb_get_ntohl(tvb, location);
 				proto_tree_add_uint(uinfo_tree, hf_llcgprs_frmr_spare, tvb, location,
@@ -1117,6 +1149,8 @@ dissect_llcgprs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 
 /* Register the protocol with Wireshark */
+/* this format is require because a script is used to build the C function */
+/* that calls all the protocol registration. */
 
 void
 proto_register_llcgprs(void)
@@ -1130,10 +1164,6 @@ proto_register_llcgprs(void)
 		{ &hf_llcgprs_pd,
 		  { "Protocol Discriminator_bit", "llcgprs.pd", FT_BOOLEAN, 8,
 		    TFS(&pd_bit), 0x80, "Protocol Discriminator bit (should be 0)", HFILL }},
-
-		{ &hf_llcgprs_fcs,
-		  { "FCS", "llcgprs.fcs", FT_UINT24, BASE_HEX,
-		    NULL, 0, NULL, HFILL }},
 
 		{&hf_llcgprs_sjsd,
 		 { "Supervisory function bits", "llcgprs.s1s2", FT_UINT16, BASE_HEX,
@@ -1321,12 +1351,7 @@ proto_register_llcgprs(void)
 		&ett_llcgprs_sframe,
 	};
 
-	static ei_register_info ei[] = {
-		{ &ei_llcgprs_no_info_field, { "llcgprs.no_info_field", PI_PROTOCOL, PI_WARN, "No Information Field", EXPFILL }},
-	};
-
 	module_t *llcgprs_module;
-	expert_module_t* expert_llcgprs;
 
 /* Register the protocol name and description */
 	proto_llcgprs = proto_register_protocol("Logical Link Control GPRS",
@@ -1336,8 +1361,6 @@ proto_register_llcgprs(void)
 /* Required function calls to register the header fields and subtrees used */
 	proto_register_field_array(proto_llcgprs, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_llcgprs = expert_register_protocol(proto_llcgprs);
-	expert_register_field_array(expert_llcgprs, ei, array_length(ei));
 	register_dissector("llcgprs", dissect_llcgprs, proto_llcgprs);
 
 	llcgprs_module = prefs_register_protocol ( proto_llcgprs, NULL );
@@ -1348,6 +1371,9 @@ proto_register_llcgprs(void)
 }
 
 
+/* If this dissector uses sub-dissector registration add a registration routine. */
+/* This format is required because a script is used to find these routines and */
+/* create the code that calls these routines. */
 void
 proto_reg_handoff_llcgprs(void)
 {
@@ -1361,15 +1387,3 @@ proto_reg_handoff_llcgprs(void)
 	sndcp_xid_handle  = find_dissector("sndcpxid");
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

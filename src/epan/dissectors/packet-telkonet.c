@@ -31,6 +31,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/etypes.h>
 
@@ -106,16 +107,3 @@ proto_reg_handoff_telkonet(void)
 	telkonet_handle = create_dissector_handle(dissect_telkonet, proto_telkonet);
 	dissector_add_uint("ethertype", ETHERTYPE_TELKONET, telkonet_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

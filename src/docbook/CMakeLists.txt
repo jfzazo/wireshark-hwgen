@@ -19,62 +19,32 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+find_package( FOP ) # Call before XSLTPROC
 find_package( LYNX )
 find_package( XSLTPROC )
 find_package( XMLLINT )
-if(ENABLE_CHM_GUIDES)
-	find_package( HTMLHelp )
-endif()
-
 find_package( ASCIIDOC )
 
-if(WIN32)
-	macro( HHP2CHM _hhpsource )
-		get_filename_component( _source_base_name ${_hhpsource} NAME_WE )
-
-		add_custom_command(
-			OUTPUT ${_output_chm}
-			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-			# The number and order of arguments MUST match hhc.cmake.
-			COMMAND ${CMAKE_COMMAND} -P
-				${CMAKE_SOURCE_DIR}/cmake/modules/hhc.cmake
-					"${HTML_HELP_COMPILER}"
-					${_hhpsource}
-			DEPENDS
-				${_hhpsource}
-		)
-	endmacro()
-else()
-	macro( HHP2CHM _hhpsource )
-	# Dummy.
-	endmacro()
-endif()
-
-set(COMMON_GRAPHICS
-	common_graphics/note.svg
-	common_graphics/tip.svg
-	common_graphics/warning.svg
-)
-
 set(WSUG_FILES
-	wsug_src/WSUG_app_files.asciidoc
-	wsug_src/WSUG_app_howitworks.asciidoc
-	wsug_src/WSUG_app_protocols.asciidoc
-	wsug_src/WSUG_app_messages.asciidoc
-	wsug_src/WSUG_app_tools.asciidoc
-	wsug_src/WSUG_chapter_advanced.asciidoc
-	wsug_src/WSUG_chapter_build_install.asciidoc
-	wsug_src/WSUG_chapter_capture.asciidoc
-	wsug_src/WSUG_chapter_customize.asciidoc
-	wsug_src/WSUG_chapter_introduction.asciidoc
-	wsug_src/WSUG_chapter_io.asciidoc
-	wsug_src/WSUG_chapter_statistics.asciidoc
-	wsug_src/WSUG_chapter_telephony.asciidoc
-	wsug_src/WSUG_chapter_troubleshoot.asciidoc
-	wsug_src/WSUG_chapter_use.asciidoc
-	wsug_src/WSUG_chapter_work.asciidoc
-	wsug_src/WSUG_preface.asciidoc
-	wsluarm.asciidoc
+	wsug_src/WSUG_app_files.xml
+	wsug_src/WSUG_app_howitworks.xml
+	wsug_src/WSUG_app_messages.xml
+	wsug_src/WSUG_app_protocols.xml
+	wsug_src/WSUG_app_tools.xml
+	wsug_src/WSUG_chapter_advanced.xml
+	wsug_src/WSUG_chapter_build_install.xml
+	wsug_src/WSUG_chapter_capture.xml
+	wsug_src/WSUG_chapter_customize.xml
+	wsug_src/WSUG_chapter_introduction.xml
+	wsug_src/WSUG_chapter_io.xml
+	wsug_src/WSUG_chapter_statistics.xml
+	wsug_src/WSUG_chapter_telephony.xml
+	wsug_src/WSUG_chapter_troubleshoot.xml
+	wsug_src/WSUG_chapter_use.xml
+	wsug_src/WSUG_chapter_work.xml
+	wsug_src/WSUG_meta_info.xml
+	wsug_src/WSUG_preface.xml
+	wsluarm.xml
 	ws.css
 )
 
@@ -136,9 +106,11 @@ set(WSUG_GRAPHICS
 	wsug_graphics/ws-main-toolbar.png
 	wsug_graphics/ws-main.png
 	wsug_graphics/ws-menu.png
+	wsug_graphics/ws-merge-gtk20.png
 	wsug_graphics/ws-merge-gtk24.png
 	wsug_graphics/ws-merge-win32.png
 	wsug_graphics/ws-nameresolution-preferences.png
+	wsug_graphics/ws-open-gtk20.png
 	wsug_graphics/ws-open-gtk24.png
 	wsug_graphics/ws-open-win32.png
 	wsug_graphics/ws-packet-format.png
@@ -148,6 +120,7 @@ set(WSUG_GRAPHICS
 	wsug_graphics/ws-packet-sep-win.png
 	wsug_graphics/ws-print.png
 	wsug_graphics/ws-printing-preferences.png
+	wsug_graphics/ws-save-as-gtk20.png
 	wsug_graphics/ws-save-as-gtk24.png
 	wsug_graphics/ws-save-as-win32.png
 	wsug_graphics/ws-statistics-menu.png
@@ -168,6 +141,9 @@ set(WSUG_GRAPHICS
 	wsug_graphics/ws-time-reference.png
 	wsug_graphics/ws-tools-menu.png
 	wsug_graphics/ws-view-menu.png
+	wsug_graphics/note.png
+	wsug_graphics/tip.png
+	wsug_graphics/warning.png
 	wsug_graphics/toolbar/autoscroll_24.png
 	wsug_graphics/toolbar/capture_filter_24.png
 	wsug_graphics/toolbar/capture_interfaces_24.png
@@ -201,7 +177,6 @@ set(WSUG_GRAPHICS
 	wsug_graphics/toolbar/stock_zoom_1_24.png
 	wsug_graphics/toolbar/stock_zoom_in_24.png
 	wsug_graphics/toolbar/stock_zoom_out_24.png
-	${COMMON_GRAPHICS}
 )
 
 set(WSDG_FILES
@@ -227,28 +202,92 @@ set(WSDG_GRAPHICS
 	wsdg_graphics/ws-function-blocks.dia
 	wsdg_graphics/ws-function-blocks.png
 	wsdg_graphics/ws-logo.png
-	${COMMON_GRAPHICS}
+	wsdg_graphics/note.png
+	wsdg_graphics/tip.png
+	wsdg_graphics/warning.png
 )
 
 # user-guide.xml must be first in the list
 set(WSUG_SOURCE
 	user-guide.xml
 	git_version.xml
+	wsluarm
 	${WSUG_FILES}
 	${WSUG_GRAPHICS}
 )
 
-set( ASCIIDOC_CONF_FILES asciidoc.conf asciidoctor-asciidoc.conf )
+MACRO( ASCIIDOC2DOCBOOK _asciidocsource _conffile )
+	GET_FILENAME_COMPONENT( _source_base_name ${_asciidocsource} NAME_WE )
+	set( A2X_HTML_OPTS --stylesheet=ws.css )
+	set( _output_xml ${_source_base_name}.xml )
+	set( _output_dbk ${_source_base_name}.dbk )
+	ADD_CUSTOM_TARGET(${_output_xml}
+		# XXX - Output to a specific directory, e.g. wsdg_generated_src
+		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+		COMMAND ${A2X_EXECUTABLE}
+			--verbose
+			--attribute=docinfo
+			--destination-dir=${CMAKE_CURRENT_BINARY_DIR}
+			--asciidoc-opts="--conf-file=${CMAKE_CURRENT_SOURCE_DIR}/${_conffile}"
+			--no-xmllint
+			--format=docbook
+			--fop
+			${A2X_HTML_OPTS}
+			${CMAKE_CURRENT_SOURCE_DIR}/${_asciidocsource}
+		DEPENDS
+			${CMAKE_CURRENT_SOURCE_DIR}/${_asciidocsource}
+			${CMAKE_CURRENT_SOURCE_DIR}/${_conffile}
+			${WSDG_GENERATED_FILES}
+	)
+ENDMACRO()
 
-add_custom_command(
-	OUTPUT ws.css
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		${CMAKE_CURRENT_SOURCE_DIR}/ws.css
-		${CMAKE_CURRENT_BINARY_DIR}/ws.css
-)
+ASCIIDOC2DOCBOOK( developer-guide.asciidoc asciidoc.conf )
 
-ASCIIDOC2DOCBOOK( developer-guide.asciidoc "${ASCIIDOC_CONF_FILES}" )
-ASCIIDOC2DOCBOOK( user-guide.asciidoc "${ASCIIDOC_CONF_FILES}" )
+SET( WSDG_GENERATED_FILES )
+# Convert an AsciiDoc document to a DocBook chapter
+# Used for chapter-by-chapter conversion from DocBook to AsciiDoc.
+# Can be removed after the User's Guide is converted.
+# .asciidoc -> whole book (.dbk) -> chapter (.xml)
+MACRO( ASCIIDOC2CHAPTER _asciidocsource _conffile )
+	GET_FILENAME_COMPONENT( _source_base_name ${_asciidocsource} NAME_WE )
+	set( A2X_HTML_OPTS --stylesheet=ws.css )
+	set( _output_xml ${_source_base_name}.xml )
+	set( _output_dbk ${_source_base_name}.dbk )
+	ADD_CUSTOM_TARGET(${_output_xml}
+		# XXX - Output to a specific directory, e.g. wsdg_generated_src
+		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+		COMMAND ${A2X_EXECUTABLE}
+			--verbose
+			--destination-dir=${CMAKE_CURRENT_BINARY_DIR}
+			--asciidoc-opts="--conf-file=${CMAKE_CURRENT_SOURCE_DIR}/${_conffile}"
+			--no-xmllint
+			--fop
+			--format=docbook --doctype=book
+			${A2X_HTML_OPTS}
+			${CMAKE_CURRENT_SOURCE_DIR}/${_asciidocsource}
+		COMMAND mv
+			${_output_xml}
+			${_output_dbk}
+		COMMAND ${XMLLINT_EXECUTABLE}
+			--xpath '//chapter | //preface'
+			${_output_dbk}
+			> ${_output_xml}
+		DEPENDS
+			${_outptudir}
+	${CMAKE_CURRENT_SOURCE_DIR}/${_asciidocsource}
+	${CMAKE_CURRENT_SOURCE_DIR}/${_conffile}
+	)
+LIST( APPEND WSDG_GENERATED_FILES ${CMAKE_CURRENT_BINARY_DIR}/${_output_xml} )
+ENDMACRO()
+
+#FOREACH(ASCIIDOCFILE ${WSDG_ASCIIDOC_FILES})
+#	ASCIIDOC2CHAPTER(
+#		${ASCIIDOCFILE}
+#		asciidoc.conf
+#	)
+#ENDFOREACH()
+
+#ADD_CUSTOM_TARGET( wsdg_generated_src DEPENDS ${WSDG_GENERATED_FILES} )
 
 # developer-guide.xml must be first in the list
 set(WSDG_SOURCE
@@ -277,25 +316,21 @@ set(WSLUA_MODULES
 ADD_CUSTOM_COMMAND(
 	OUTPUT
 		git_version.xml
-	COMMAND ${SH_EXECUTABLE}
+	COMMAND ${SH}
 		${CMAKE_CURRENT_SOURCE_DIR}/check_git_version.sh
 	DEPENDS
 		${CMAKE_CURRENT_SOURCE_DIR}/check_git_version.sh
 )
 
-if(ENABLE_HTML_GUIDES)
-	set(WSUG_HTML_OUTPUT wsug_html_chunked/index.html wsug_html/index.html)
-endif()
-
-if(ENABLE_PDF_GUIDES)
-	set(WSUG_PDF_OUTPUT user-guide-a4.pdf user-guide-us.pdf)
-endif()
-
-if(ENABLE_CHM_GUIDES)
-	set(WSUG_CHM_OUTPUT user-guide.chm)
-	XML2HHP(wsug user-guide.xml)
-	HHP2CHM(user-guide.hhp)
-endif()
+add_custom_target(
+	user_guides ALL
+	DEPENDS
+		wsluarm
+		wsug_html_chunked/index.html
+		wsug_html/index.html
+		user-guide-a4.pdf
+		user-guide-us.pdf
+)
 
 VALIDATE_XML(
 	wsug.validated
@@ -303,14 +338,16 @@ VALIDATE_XML(
 )
 
 XML2HTML(
-	wsug
+	wsug.validated
+	wsug_html/index.html
 	single-page
 	WSUG_SOURCE
 	WSUG_GRAPHICS
 )
 
 XML2HTML(
-	wsug
+	wsug.validated
+	wsug_html_chunked/index.html
 	chunked
 	WSUG_SOURCE
 	WSUG_GRAPHICS
@@ -334,19 +371,15 @@ XML2PDF(
 	letter
 )
 
-if(ENABLE_HTML_GUIDES)
-	set(WSDG_HTML_OUTPUT wsdg_html_chunked/index.html wsdg_html/index.html)
-endif()
-
-if(ENABLE_PDF_GUIDES)
-	set(WSDG_PDF_OUTPUT developer-guide-a4.pdf developer-guide-us.pdf)
-endif()
-
-if(ENABLE_CHM_GUIDES)
-	set(WSDG_CHM_OUTPUT developer-guide.chm)
-	XML2HHP(wsdg developer-guide.xml)
-	HHP2CHM(developer-guide.hhp)
-endif()
+add_custom_target(
+	developer_guides ALL
+	DEPENDS
+		wsluarm
+		wsdg_html_chunked/index.html
+		wsdg_html/index.html
+		developer-guide-a4.pdf
+		developer-guide-us.pdf
+)
 
 VALIDATE_XML(
 	wsdg.validated
@@ -354,14 +387,16 @@ VALIDATE_XML(
 )
 
 XML2HTML(
-	wsdg
+	wsdg.validated
+	wsdg_html/index.html
 	single-page
 	WSDG_SOURCE
 	WSDG_GRAPHICS
 )
 
 XML2HTML(
-	wsdg
+	wsdg.validated
+	wsdg_html_chunked/index.html
 	chunked
 	WSDG_SOURCE
 	WSDG_GRAPHICS
@@ -381,77 +416,53 @@ XML2PDF(
 	letter
 )
 
-if(ENABLE_HTML_GUIDES OR ENABLE_PDF_GUIDES OR ENABLE_CHM_GUIDES)
-	add_custom_target(
-		user_guides
-		DEPENDS
-			${WSUG_HTML_OUTPUT}
-			${WSUG_PDF_OUTPUT}
-			${WSUG_CHM_OUTPUT}
-	)
-
-	add_custom_target(
-		developer_guides
-		DEPENDS
-			wsluarm
-			${WSDG_HTML_OUTPUT}
-			${WSDG_PDF_OUTPUT}
-			${WSDG_CHM_OUTPUT}
-	)
-
-	add_custom_target( all_guides ALL )
-	add_dependencies ( all_guides user_guides developer_guides )
-endif()
-
 # release_notes: release-notes.html release-notes.txt release-notes-a4.pdf release-notes-us.pdf
 
-add_custom_target( release_notes_html DEPENDS ws.css release-notes.html )
-set_target_properties(release_notes_html PROPERTIES FOLDER "Docbook")
-add_custom_target( release_notes_txt DEPENDS release-notes.txt )
-set_target_properties(release_notes_txt PROPERTIES FOLDER "Docbook")
-
-# Force serial execution so that separate a2x instances don't trip on each other
-add_dependencies ( release_notes_txt release_notes_html )
-
-add_custom_target( release_notes )
-set_target_properties(release_notes PROPERTIES FOLDER "Docbook")
-add_dependencies ( release_notes release_notes_txt release_notes_html )
-
 add_custom_target(
-	news
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+	release_notes ALL
+	DEPENDS
+		release-notes.html
+		release-notes.txt
+		release-notes-a4.pdf
+		release-notes-us.pdf
+		${CMAKE_SOURCE_DIR}/NEWS
+)
+
+ADD_CUSTOM_COMMAND(
+	OUTPUT
+		${CMAKE_SOURCE_DIR}/NEWS
+	COMMAND cp
 		${CMAKE_CURRENT_BINARY_DIR}/release-notes.txt
 		${CMAKE_SOURCE_DIR}/NEWS
 	DEPENDS
                 ${CMAKE_CURRENT_BINARY_DIR}/release-notes.txt
 )
-set_target_properties(news PROPERTIES FOLDER "Docbook")
 
 ASCIIDOC2HTML(
 	release-notes.html
 	release-notes.asciidoc
-	"${ASCIIDOC_CONF_FILES}"
+	asciidoc.conf
 )
 
 ASCIIDOC2TXT(
 	release-notes.txt
 	release-notes.asciidoc
-	"${ASCIIDOC_CONF_FILES}"
+	asciidoc.conf
 )
 
-#ASCIIDOC2PDF(
-#	release-notes-a4.pdf
-#	release-notes.asciidoc
-#	"${ASCIIDOC_CONF_FILES}"
-#	A4
-#)
+ASCIIDOC2PDF(
+	release-notes-a4.pdf
+	release-notes.asciidoc
+	asciidoc.conf
+	A4
+)
 
-#ASCIIDOC2PDF(
-#	release-notes-us.pdf
-#	release-notes.asciidoc
-#	"${ASCIIDOC_CONF_FILES}"
-#	letter
-#)
+ASCIIDOC2PDF(
+	release-notes-us.pdf
+	release-notes.asciidoc
+	asciidoc.conf
+	letter
+)
 
 # wsluarm
 ADD_CUSTOM_COMMAND(
@@ -467,3 +478,4 @@ ADD_CUSTOM_COMMAND(
 		${CMAKE_CURRENT_SOURCE_DIR}/make-wsluarm.pl
 		${WSLUA_MODULES}
 )
+

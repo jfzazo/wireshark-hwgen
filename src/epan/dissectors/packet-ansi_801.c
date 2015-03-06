@@ -33,9 +33,14 @@
 
 #include "config.h"
 
+#include <stdlib.h>
+
+#include <glib.h>
 #include <math.h>
 
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
+#include <epan/to_str.h>
 
 void proto_register_ansi_801(void);
 void proto_reg_handoff_ansi_801(void);
@@ -49,8 +54,6 @@ static const char *ansi_proto_name_short = "IS-801";
 
 /* Initialize the subtree pointers */
 static gint ett_ansi_801 = -1;
-static gint ett_gps = -1;
-static gint ett_loc = -1;
 
 /* Initialize the protocol and registered fields */
 static int proto_ansi_801 = -1;
@@ -94,98 +97,10 @@ static int hf_ansi_801_num_fixes = -1;
 static int hf_ansi_801_t_betw_fixes = -1;
 static int hf_ansi_801_offset_req = -1;
 
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_ansi_801_for_message_number_responsesF0 = -1;
-static int hf_ansi_801_apdc_id = -1;
-static int hf_ansi_801_num_sv_p32 = -1;
-static int hf_ansi_801_regulatory_services_indicator = -1;
-static int hf_ansi_801_session_source = -1;
-static int hf_ansi_801_reserved8_E0 = -1;
-static int hf_ansi_801_action_time = -1;
-static int hf_ansi_801_rev_message_number_responsesF0 = -1;
-static int hf_ansi_801_reserved24_3 = -1;
-static int hf_ansi_801_cancellation_type = -1;
-static int hf_ansi_801_gps_navigation_message_bits = -1;
-static int hf_ansi_801_num_dr_p = -1;
-static int hf_ansi_801_rev_message_number_requests8 = -1;
-static int hf_ansi_801_reserved8_F0 = -1;
-static int hf_ansi_801_for_req_loc_clock_correction_for_gps_time = -1;
-static int hf_ansi_801_for_response_length = -1;
-static int hf_ansi_801_session_end = -1;
-static int hf_ansi_801_reserved8_1F = -1;
-static int hf_ansi_801_part_num = -1;
-static int hf_ansi_801_dr_size = -1;
-static int hf_ansi_801_reserved_24_700 = -1;
-static int hf_ansi_801_for_message_number_responses0F = -1;
-static int hf_ansi_801_rev_message_number_requests16 = -1;
-static int hf_ansi_801_lcc_capable_using_location_assistance_spherical = -1;
-static int hf_ansi_801_part_num32 = -1;
-static int hf_ansi_801_part_num16 = -1;
-static int hf_ansi_801_reserved8_07 = -1;
-static int hf_ansi_801_reserved24_1 = -1;
-static int hf_ansi_801_reserved_24_F80000 = -1;
-static int hf_ansi_801_extended_base_station_almanac = -1;
-static int hf_ansi_801_no_outstanding_request_element = -1;
-static int hf_ansi_801_for_request_length = -1;
-static int hf_ansi_801_week_num = -1;
-static int hf_ansi_801_total_parts16 = -1;
-static int hf_ansi_801_pd_message_type = -1;
-static int hf_ansi_801_total_parts32 = -1;
-static int hf_ansi_801_alpha_and_beta_parameters = -1;
-static int hf_ansi_801_lcc_using_gps_ephemeris_assistance = -1;
-static int hf_ansi_801_rev_request_length = -1;
-static int hf_ansi_801_reserved8_7F = -1;
-static int hf_ansi_801_unsolicited_response_indicator = -1;
-static int hf_ansi_801_autonomous_location_calculation_capable = -1;
-static int hf_ansi_801_gps_almanac_correction = -1;
-static int hf_ansi_801_total_parts = -1;
-static int hf_ansi_801_session_start = -1;
-static int hf_ansi_801_ref_bit_num = -1;
-static int hf_ansi_801_aflt_lcc = -1;
-static int hf_ansi_801_reject_reason = -1;
-static int hf_ansi_801_gps_ephemeris = -1;
-static int hf_ansi_801_pre_programmed_location = -1;
-static int hf_ansi_801_rev_response_length = -1;
-static int hf_ansi_801_afltc_id = -1;
-static int hf_ansi_801_rev_req_loc_height_information = -1;
-static int hf_ansi_801_reserved8_01 = -1;
-static int hf_ansi_801_pilot_ph_cap = -1;
-static int hf_ansi_801_gps_acquisition_assistance = -1;
-static int hf_ansi_801_coordinate_type_requested = -1;
-static int hf_ansi_801_gps_almanac = -1;
-static int hf_ansi_801_rev_req_loc_velocity_information = -1;
-static int hf_ansi_801_gps_autonomous_acquisition_capable = -1;
-static int hf_ansi_801_num_sv_p16 = -1;
-static int hf_ansi_801_mob_sys_t_offset = -1;
-static int hf_ansi_801_desired_pilot_phase_resolution = -1;
-static int hf_ansi_801_for_req_loc_velocity_information = -1;
-static int hf_ansi_801_reserved8_0F = -1;
-static int hf_ansi_801_hybrid_gps_and_aflt_lcc = -1;
-static int hf_ansi_801_gps_acq_cap = -1;
-static int hf_ansi_801_gps_sensitivity_assistance = -1;
-static int hf_ansi_801_ms_ls_rev = -1;
-static int hf_ansi_801_reject_request_type = -1;
-static int hf_ansi_801_ms_mode = -1;
-static int hf_ansi_801_bs_ls_rev = -1;
-static int hf_ansi_801_ref_pn = -1;
-static int hf_ansi_801_rev_message_number_responses0F = -1;
-static int hf_ansi_801_for_req_loc_height_information = -1;
-static int hf_ansi_801_gps_capability_indicator = -1;
-static int hf_ansi_801_rev_req_loc_clock_correction_for_gps_time = -1;
-static int hf_ansi_801_data_records = -1;
-static int hf_ansi_801_for_message_number_requests8 = -1;
-static int hf_ansi_801_subframes_4_and_5 = -1;
-static int hf_ansi_801_use_action_time_indicator = -1;
-static int hf_ansi_801_lcc_using_gps_almanac_assistance = -1;
-static int hf_ansi_801_lcc_using_gps_almanac_correction = -1;
-static int hf_ansi_801_pd_message_len = -1;
-static int hf_ansi_801_lcc_using_location_assistance_cartesian = -1;
-static int hf_ansi_801_for_message_number_requests16 = -1;
-static int hf_ansi_801_reserved_24_7 = -1;
-static int hf_ansi_801_loc_calc_cap = -1;
-static int hf_ansi_801_toa = -1;
-
 static dissector_handle_t ansi_801_handle;
+
+static char bigbuf[1024];
+
 
 /* PARAM FUNCTIONS */
 
@@ -218,11 +133,11 @@ static dissector_handle_t ansi_801_handle;
  */
 static const value_string for_req_type_strings[] = {
 	{ 0,	"Reserved" },
-	{ 1,	"Request Location Response" },
 	{ 2,	"Request MS Information" },
 	{ 3,	"Request Autonomous Measurement Weighting Factors" },
 	{ 4,	"Request Pseudorange Measurement" },
 	{ 5,	"Request Pilot Phase Measurement" },
+	{ 1,	"Request Location Response" },
 	{ 6,	"Request Time Offset Measurement" },
 	{ 7,	"Request Cancellation" },
 	{ 0, NULL },
@@ -286,31 +201,41 @@ static const value_string rev_req_type_strings[] = {
 #define	NUM_REV_REQ_TYPE (sizeof(rev_req_type_strings)/sizeof(value_string))
 static gint ett_rev_req_type[NUM_REV_REQ_TYPE];
 
-static const value_string regulatory_services_indicator_vals[] = {
-	{ 0,	"No Regulatory service" },
-	{ 1,	"Emergency service" },
-	{ 2,	"Reserved" },
-	{ 3,	"Reserved" },
-	{ 0, NULL },
-};
-
-const true_false_string tfs_desired_pilot_phase_resolution = { "at least 1/8th PN chip resolution", "at least 1 PN chip resolution" };
-const true_false_string tfs_spherical_cartesian = { "Spherical", "Cartesian" };
-
 static void
 for_req_pseudo_meas(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
-	guint32	saved_offset = offset;
+	guint32	bit_offset, spare_bits;
+	guint32	saved_offset, value;
 
 	SHORT_DATA_CHECK(len, 3);
+	saved_offset = offset;
+	bit_offset   = offset << 3;
 
 	/* PREF_RESP_QUAL */
-	proto_tree_add_item(tree, hf_ansi_801_pref_resp_qual, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_num_fixes, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_t_betw_fixes, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_offset_req, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_reserved_24_7, tvb, offset, 3, ENC_BIG_ENDIAN);
-	offset += 3;
+	proto_tree_add_bits_item(tree, hf_ansi_801_pref_resp_qual, tvb, bit_offset, 3, ENC_BIG_ENDIAN);
+	bit_offset += 3;
+
+	/* NUM_FIXES */
+	value = tvb_get_bits8(tvb, bit_offset, 8) + 1;
+	proto_tree_add_uint_bits_format_value(tree, hf_ansi_801_num_fixes, tvb, bit_offset, 8, value, "%u", value);
+	bit_offset += 8;
+
+	/* T_BETW_FIXES */
+	value = tvb_get_bits8(tvb, bit_offset, 8);
+	proto_tree_add_uint_bits_format_value(tree, hf_ansi_801_t_betw_fixes, tvb, bit_offset, 8, value, "%u seconds", value);
+	bit_offset += 8;
+
+	/* OFFSET_REQ */
+	proto_tree_add_bits_item(tree, hf_ansi_801_offset_req, tvb, bit_offset++, 1, ENC_BIG_ENDIAN);
+
+	if(bit_offset & 0x07)
+	{
+		spare_bits = 8 - (bit_offset & 0x07);
+		proto_tree_add_bits_item(tree, hf_ansi_801_reserved_bits, tvb, bit_offset, spare_bits, ENC_BIG_ENDIAN);
+		bit_offset += spare_bits;
+	}
+
+	offset = bit_offset >> 3;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
 
@@ -319,18 +244,60 @@ for_req_pseudo_meas(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 static void
 for_req_pilot_ph_meas(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
+	guint32	value;
 	guint32	saved_offset;
 
 	SHORT_DATA_CHECK(len, 3);
 
 	saved_offset = offset;
 
-	proto_tree_add_item(tree, hf_ansi_801_pref_resp_qual, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_num_fixes, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_t_betw_fixes, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_offset_req, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_desired_pilot_phase_resolution, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_reserved_24_7, tvb, offset, 3, ENC_BIG_ENDIAN);
+	value = tvb_get_ntoh24(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, value >> 16, 0xe0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Preferred response quality, %u",
+			    bigbuf,
+			    (value & 0xe00000) >> 21);
+
+	other_decode_bitfield_value(bigbuf, value >> 16, 0x1f, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Number of fixes (MSB), %u",
+			    bigbuf,
+			    (value & 0x1fe000) >> 13);
+
+	other_decode_bitfield_value(bigbuf, value >> 8, 0xe0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Number of fixes (LSB)",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value >> 8, 0x1f, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Time between fixes (MSB), %u",
+			    bigbuf,
+			    (value & 0x001fe0) >> 5);
+
+	other_decode_bitfield_value(bigbuf, value, 0xe0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Time between fixes (LSB)",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x10, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Offset %srequested",
+			    bigbuf,
+			    (value & 0x10) ? "" : "not ");
+
+	other_decode_bitfield_value(bigbuf, value, 0x08, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Desired pilot phase resolution: at least %s PN chip resolution",
+			    bigbuf,
+			    (value & 0x08) ? "1/8th" : "1");
+
+	other_decode_bitfield_value(bigbuf, value, 0x07, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset += 3;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -339,19 +306,66 @@ for_req_pilot_ph_meas(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset
 static void
 for_req_loc_response(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
+	guint32	value;
 	guint32	saved_offset;
 
 	SHORT_DATA_CHECK(len, 3);
 
 	saved_offset = offset;
 
-	proto_tree_add_item(tree, hf_ansi_801_pref_resp_qual, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_num_fixes, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_t_betw_fixes, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_for_req_loc_height_information, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_for_req_loc_clock_correction_for_gps_time, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_for_req_loc_velocity_information, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_reserved24_3, tvb, offset, 3, ENC_BIG_ENDIAN);
+	value = tvb_get_ntoh24(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, value >> 16, 0xe0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Preferred response quality, %u",
+			    bigbuf,
+			    (value & 0xe00000) >> 21);
+
+	other_decode_bitfield_value(bigbuf, value >> 16, 0x1f, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Number of fixes (MSB), %u",
+			    bigbuf,
+			    (value & 0x1fe000) >> 13);
+
+	other_decode_bitfield_value(bigbuf, value >> 8, 0xe0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Number of fixes (LSB)",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value >> 8, 0x1f, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Time between fixes (MSB), %u",
+			    bigbuf,
+			    (value & 0x001fe0) >> 5);
+
+	other_decode_bitfield_value(bigbuf, value, 0xe0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Time between fixes (LSB)",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x10, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Height information %srequested",
+			    bigbuf,
+			    (value & 0x10) ? "" : "not ");
+
+	other_decode_bitfield_value(bigbuf, value, 0x08, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Clock correction for GPS time %srequested",
+			    bigbuf,
+			    (value & 0x08) ? "" : "not ");
+
+	other_decode_bitfield_value(bigbuf, value, 0x04, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Velocity information %srequested",
+			    bigbuf,
+			    (value & 0x04) ? "" : "not ");
+
+	other_decode_bitfield_value(bigbuf, value, 0x03, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset += 3;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -361,6 +375,7 @@ static void
 for_req_time_off_meas(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
 	guint8	oct;
+	guint8	bit_mask;
 	guint32	saved_offset;
 
 	SHORT_DATA_CHECK(len, 1);
@@ -369,17 +384,31 @@ for_req_time_off_meas(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset
 
 	oct = tvb_get_guint8(tvb, offset);
 
-	proto_tree_add_item(tree, hf_ansi_801_use_action_time_indicator, tvb, offset, 1, ENC_NA);
+	other_decode_bitfield_value(bigbuf, oct, 0x80, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Use action time indicator",
+			    bigbuf);
 
 	if (oct & 0x80)
 	{
-		proto_tree_add_item(tree, hf_ansi_801_action_time, tvb, offset, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(tree, hf_ansi_801_reserved8_01, tvb, offset, 1, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, oct, 0x7e, 8);
+		proto_tree_add_text(tree, tvb, offset, 1,
+				    "%s :  Action time, %u",
+				    bigbuf,
+				    (oct & 0x7e) >> 1);
+
+		bit_mask = 0x01;
 	}
 	else
 	{
-		proto_tree_add_item(tree, hf_ansi_801_reserved8_7F, tvb, offset, 1, ENC_BIG_ENDIAN);
+		bit_mask = 0x7f;
 	}
+
+	other_decode_bitfield_value(bigbuf, oct, bit_mask, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset++;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -391,6 +420,7 @@ for_req_cancel(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 	guint8       oct;
 	guint32      saved_offset;
 	const gchar *str = NULL;
+	gint         idx;
 
 	SHORT_DATA_CHECK(len, 1);
 
@@ -398,11 +428,24 @@ for_req_cancel(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 
 	oct = tvb_get_guint8(tvb, offset);
 
-	str = val_to_str_const((oct & 0xf0) >> 4, for_req_type_strings, "Reserved");
-	proto_tree_add_uint_format_value(tree, hf_ansi_801_cancellation_type, tvb, offset, 1,
-			    oct, "(%u) %s", (oct & 0xf0) >> 4, str);
+	str = try_val_to_str_idx((oct & 0xf0) >> 4, for_req_type_strings, &idx);
+	if (str == NULL)
+	{
+		str = "Reserved";
+	}
 
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_0F, tvb, offset, 1, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, oct, 0xf0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Cancellation Type: (%u) %s",
+			    bigbuf,
+			    (oct & 0xf0) >> 4,
+			    str);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x0f, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset++;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -414,16 +457,26 @@ for_reject(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 	guint8       oct;
 	guint32      saved_offset;
 	const gchar *str = NULL;
+	gint         idx;
 
 	saved_offset = offset;
 
 	SHORT_DATA_CHECK(len, 1);
 
 	oct = tvb_get_guint8(tvb, offset);
-	str = val_to_str_const((oct & 0xf0) >> 4, rev_req_type_strings, "Reserved");
 
-	proto_tree_add_uint_format_value(tree, hf_ansi_801_reject_request_type, tvb, offset, 1, oct,
-			    "(%u) %s", (oct & 0xf0) >> 4, str);
+	str = try_val_to_str_idx((oct & 0xf0) >> 4, rev_req_type_strings, &idx);
+	if (str == NULL)
+	{
+		str = "Reserved";
+	}
+
+	other_decode_bitfield_value(bigbuf, oct, 0xf0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reject request type: (%u) %s",
+			    bigbuf,
+			    (oct & 0xf0) >> 4,
+			    str);
 
 	switch ((oct & 0x0e) >> 1)
 	{
@@ -432,8 +485,17 @@ for_reject(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 	default: str = "Reserved"; break;
 	}
 
-	proto_tree_add_uint_format_value(tree, hf_ansi_801_reject_reason, tvb, offset, 1, oct, "%s", str);
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_01, tvb, offset, 1, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, oct, 0x0e, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reject reason: %s",
+			    bigbuf,
+			    str);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x01, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset++;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -449,20 +511,36 @@ for_pr_bs_cap(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 
 	SHORT_DATA_CHECK(len, 2);
 
-	proto_tree_add_item(tree, hf_ansi_801_bs_ls_rev, tvb, offset, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_gps_capability_indicator, tvb, offset, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_afltc_id, tvb, offset, 1, ENC_BIG_ENDIAN);
+	oct = tvb_get_guint8(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, oct, 0xfc, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  BS_LS_REV",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x02, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  GPSC_ID: GPS capability indicator",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x01, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  AFLTC_ID: Advanced forward link trilateration capability indicator",
+			    bigbuf);
+
 	offset++;
 
 	oct = tvb_get_guint8(tvb, offset);
 	if (oct == 0x00)
 	{
-		proto_tree_add_uint_format(tree, hf_ansi_801_apdc_id, tvb, offset, 1, 0,
+		proto_tree_add_text(tree, tvb, offset, 1,
 				    "APDC_ID: Autonomous position determination capability indicator: None");
 	}
 	else
 	{
-		proto_tree_add_item(tree, hf_ansi_801_apdc_id, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_text(tree, tvb, offset, 1,
+				    "APDC_ID: Autonomous position determination capability indicator: Autonomous Location Technology Identifier %u",
+				    oct);
 	}
 
 	offset++;
@@ -473,26 +551,81 @@ for_pr_bs_cap(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 static void
 for_pr_gps_sense_ass(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
+	guint8	oct;
+	guint8	num_dr_p;
+	guint32	value;
 	guint32	saved_offset;
 
 	saved_offset = offset;
 
 	SHORT_DATA_CHECK(len, 4);
 
-	proto_tree_add_item(tree, hf_ansi_801_ref_bit_num, tvb, offset, 2, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_num_dr_p, tvb, offset, 2, ENC_BIG_ENDIAN);
-	offset += 2;
+	value = tvb_get_ntohs(tvb, offset);
 
-	proto_tree_add_item(tree, hf_ansi_801_dr_size, tvb, offset, 3, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, value, 0xffe0, 16);
+	proto_tree_add_text(tree, tvb, offset, 2,
+			    "%s :  REF_BIT_NUM: %u",
+			    bigbuf,
+			    (value & 0xffe0) >> 5);
+
+	num_dr_p = (value & 0x001e) >> 1;
+
+	other_decode_bitfield_value(bigbuf, value, 0x001e, 16);
+	proto_tree_add_text(tree, tvb, offset, 2,
+			    "%s :  NUM_DR_P: Number of data records in this part: %u",
+			    bigbuf,
+			    num_dr_p);
+
+	offset += 2;
+	oct     = tvb_get_guint8(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, value, 0x0001, 16);
+	value = ((value & 0x0001) << 7) | ((oct & 0xfe) >> 1);
+
+	proto_tree_add_text(tree, tvb, offset - 2, 2,
+			    "%s :  DR_SIZE: Data record size in 2-bit units (MSB): %u",
+			    bigbuf,
+			    value);
+
+	other_decode_bitfield_value(bigbuf, oct, 0xfe, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  DR_SIZE: (LSB)",
+			    bigbuf);
+
+	value = oct;
 	offset++;
 
-	proto_tree_add_item(tree, hf_ansi_801_part_num, tvb, offset, 2, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_total_parts, tvb, offset, 2, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_data_records, tvb, offset, 2, ENC_BIG_ENDIAN);
+	oct = tvb_get_guint8(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, value, 0x01, 8);
+	value = ((value & 0x0001) << 2) | ((oct & 0xc0) >> 6);
+
+	proto_tree_add_text(tree, tvb, offset - 1, 1,
+			    "%s :  PART_NUM: The part number (MSB): %u",
+			    bigbuf,
+			    value);
+
+	other_decode_bitfield_value(bigbuf, oct, 0xc0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  PART_NUM: (LSB)",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x38, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  TOTAL_PARTS: Total number of parts: %u",
+			    bigbuf,
+			    (oct & 0x38) >> 3);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x07, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Data records (MSB)",
+			    bigbuf);
+
 	offset++;
 
 	proto_tree_add_text(tree, tvb, offset, (len - (offset - saved_offset)),
-			    "Data records (LSB) + Reserved");
+			    "%s :  Data records (LSB) + Reserved",
+			    bigbuf);
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
 }
@@ -511,11 +644,36 @@ for_pr_gps_almanac(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 	value  = tvb_get_ntohl(tvb, offset);
 	num_sv = (value & 0xfc000000) >> 26;
 
-	proto_tree_add_item(tree, hf_ansi_801_num_sv_p32, tvb, offset, 4, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_week_num, tvb, offset, 4, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_toa, tvb, offset, 4, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_part_num32, tvb, offset, 4, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_total_parts32, tvb, offset, 4, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, value, 0xfc000000, 32);
+	proto_tree_add_text(tree, tvb, offset, 4,
+			    "%s :  NUM_SV_P: Number of satellites in this part: %u",
+			    bigbuf,
+			    num_sv);
+
+	other_decode_bitfield_value(bigbuf, value, 0x03fc0000, 32);
+	proto_tree_add_text(tree, tvb, offset, 4,
+			    "%s :  WEEK_NUM: The GPS week number of the almanac: %u",
+			    bigbuf,
+			    (value & 0x03fc0000) >> 18);
+
+	other_decode_bitfield_value(bigbuf, value, 0x0003fc00, 32);
+	proto_tree_add_text(tree, tvb, offset, 4,
+			    "%s :  TOA: The reference time of the almanac: %u",
+			    bigbuf,
+			    (value & 0x0003fc00) >> 10);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000003e0, 32);
+	proto_tree_add_text(tree, tvb, offset, 4,
+			    "%s :  PART_NUM: The part number: %u",
+			    bigbuf,
+			    (value & 0x000003e0) >> 5);
+
+	other_decode_bitfield_value(bigbuf, value, 0x0000001f, 32);
+	proto_tree_add_text(tree, tvb, offset, 4,
+			    "%s :  TOTAL_PARTS: The total number of parts: %u",
+			    bigbuf,
+			    (value & 0x0000001f));
+
 	offset += 4;
 
 	proto_tree_add_text(tree, tvb, offset, (len - (offset - saved_offset)),
@@ -539,9 +697,24 @@ for_pr_gps_nav_msg_bits(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offs
 	value  = tvb_get_ntohs(tvb, offset);
 	num_sv = (value & 0xfc00) >> 10;
 
-	proto_tree_add_item(tree, hf_ansi_801_num_sv_p16, tvb, offset, 2, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_part_num16, tvb, offset, 2, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_total_parts16, tvb, offset, 2, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, value, 0xfc00, 16);
+	proto_tree_add_text(tree, tvb, offset, 2,
+			    "%s :  NUM_SV_P: Number of satellites in this part: %u",
+			    bigbuf,
+			    num_sv);
+
+	other_decode_bitfield_value(bigbuf, value, 0x03e0, 16);
+	proto_tree_add_text(tree, tvb, offset, 2,
+			    "%s :  PART_NUM: The part number: %u",
+			    bigbuf,
+			    (value & 0x03e0) >> 5);
+
+	other_decode_bitfield_value(bigbuf, value, 0x001f, 16);
+	proto_tree_add_text(tree, tvb, offset, 2,
+			    "%s :  TOTAL_PARTS: The total number of parts: %u",
+			    bigbuf,
+			    (value & 0x001f));
+
 	offset += 2;
 
 	proto_tree_add_text(tree, tvb, offset, (len - (offset - saved_offset)),
@@ -798,14 +971,26 @@ rev_req_gps_acq_ass(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 static void
 rev_req_gps_loc_ass(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
+	guint8  oct;
 	guint32 saved_offset;
 
 	SHORT_DATA_CHECK(len, 1);
 
 	saved_offset = offset;
 
-	proto_tree_add_item(tree, hf_ansi_801_coordinate_type_requested, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_7F, tvb, offset, 1, ENC_BIG_ENDIAN);
+	oct = tvb_get_guint8(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x80, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Coordinate type requested: %s coordinates",
+			    bigbuf,
+			    (oct & 0x80) ? "Spherical" : "Cartesian");
+
+	other_decode_bitfield_value(bigbuf, oct, 0x7f, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset++;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -814,14 +999,26 @@ rev_req_gps_loc_ass(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 static void
 rev_req_bs_alm(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
+	guint8  oct;
 	guint32 saved_offset;
 
 	SHORT_DATA_CHECK(len, 1);
 
 	saved_offset = offset;
 
-	proto_tree_add_item(tree, hf_ansi_801_extended_base_station_almanac, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_7F, tvb, offset, 1, ENC_BIG_ENDIAN);
+	oct = tvb_get_guint8(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x80, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Extended base station almanac %srequested",
+			    bigbuf,
+			    (oct & 0x80) ? "" : "not ");
+
+	other_decode_bitfield_value(bigbuf, oct, 0x7f, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset++;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -830,14 +1027,26 @@ rev_req_bs_alm(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 static void
 rev_req_gps_ephemeris(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
+	guint8  oct;
 	guint32 saved_offset;
 
 	SHORT_DATA_CHECK(len, 1);
 
 	saved_offset = offset;
 
-	proto_tree_add_item(tree, hf_ansi_801_alpha_and_beta_parameters, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_7F, tvb, offset, 1, ENC_BIG_ENDIAN);
+	oct = tvb_get_guint8(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x80, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Alpha and Beta parameters %srequested",
+			    bigbuf,
+			    (oct & 0x80) ? "" : "not ");
+
+	other_decode_bitfield_value(bigbuf, oct, 0x7f, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset++;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -846,14 +1055,25 @@ rev_req_gps_ephemeris(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset
 static void
 rev_req_gps_nav_msg_bits(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
+	guint8  oct;
 	guint32 saved_offset;
 
 	SHORT_DATA_CHECK(len, 1);
 
 	saved_offset = offset;
 
-	proto_tree_add_item(tree, hf_ansi_801_subframes_4_and_5, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_7F, tvb, offset, 1, ENC_BIG_ENDIAN);
+	oct = tvb_get_guint8(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x80, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Subframes 4 and 5 %srequested",
+			    bigbuf,
+			    (oct & 0x80) ? "" : "not ");
+
+	other_decode_bitfield_value(bigbuf, oct, 0x7f, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
 
 	offset++;
 
@@ -863,16 +1083,38 @@ rev_req_gps_nav_msg_bits(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 off
 static void
 rev_req_loc_response(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
+	guint8  oct;
 	guint32 saved_offset;
 
 	SHORT_DATA_CHECK(len, 1);
 
 	saved_offset = offset;
 
-	proto_tree_add_item(tree, hf_ansi_801_rev_req_loc_height_information, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_rev_req_loc_clock_correction_for_gps_time, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_rev_req_loc_velocity_information, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_1F, tvb, offset, 1, ENC_BIG_ENDIAN);
+	oct = tvb_get_guint8(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x80, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Height information %srequested",
+			    bigbuf,
+			    (oct & 0x80) ? "" : "not ");
+
+	other_decode_bitfield_value(bigbuf, oct, 0x40, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Clock correction for GPS time %srequested",
+			    bigbuf,
+			    (oct & 0x40) ? "" : "not ");
+
+	other_decode_bitfield_value(bigbuf, oct, 0x20, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Velocity information %srequested",
+			    bigbuf,
+			    (oct & 0x20) ? "" : "not ");
+
+	other_decode_bitfield_value(bigbuf, oct, 0x1f, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset++;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -905,6 +1147,7 @@ rev_reject(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 	guint8       oct;
 	guint32      saved_offset;
 	const gchar *str = NULL;
+	gint         idx;
 
 	saved_offset = offset;
 
@@ -912,10 +1155,18 @@ rev_reject(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 
 	oct = tvb_get_guint8(tvb, offset);
 
-	str = val_to_str_const((oct & 0xf0) >> 4, for_req_type_strings, "Reserved");
+	str = try_val_to_str_idx((oct & 0xf0) >> 4, for_req_type_strings, &idx);
+	if (str == NULL)
+	{
+		str = "Reserved";
+	}
 
-	proto_tree_add_uint_format_value(tree, hf_ansi_801_reject_request_type, tvb, offset, 1, oct,
-			    "(%u) %s", (oct & 0xf0) >> 4, str);
+	other_decode_bitfield_value(bigbuf, oct, 0xf0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reject request type: (%u) %s",
+			    bigbuf,
+			    (oct & 0xf0) >> 4,
+			    str);
 
 	switch ((oct & 0x0e) >> 1)
 	{
@@ -924,10 +1175,17 @@ rev_reject(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 	default: str = "Reserved"; break;
 	}
 
-	proto_tree_add_uint_format_value(tree, hf_ansi_801_reject_reason, tvb, offset, 1,
-			    oct, "%s", str);
+	other_decode_bitfield_value(bigbuf, oct, 0x0e, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reject reason: %s",
+			    bigbuf,
+			    str);
 
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_01, tvb, offset, 1, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, oct, 0x01, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset++;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -939,8 +1197,6 @@ rev_pr_ms_information(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset
 	guint32      value;
 	guint32      saved_offset;
 	const gchar *str = NULL;
-	proto_item* ti;
-	proto_tree *gps_tree, *loc_tree;
 
 	saved_offset = offset;
 
@@ -948,9 +1204,15 @@ rev_pr_ms_information(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset
 
 	value = tvb_get_ntohs(tvb, offset);
 
-	proto_tree_add_item(tree, hf_ansi_801_ms_ls_rev, tvb, offset, 2, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, value, 0xfc00, 16);
+	proto_tree_add_text(tree, tvb, offset, 2,
+			    "%s :  MS_LS_REV",
+			    bigbuf);
 
-	proto_tree_add_item(tree, hf_ansi_801_ms_mode, tvb, offset, 2, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, value, 0x03c0, 16);
+	proto_tree_add_text(tree, tvb, offset, 2,
+			    "%s :  MS_MODE",
+			    bigbuf);
 
 	switch (value & 0x003f)
 	{
@@ -962,35 +1224,106 @@ rev_pr_ms_information(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset
 	default: str = "Reserved"; break;
 	}
 
-	proto_tree_add_uint_format_value(tree, hf_ansi_801_pilot_ph_cap, tvb, offset, 2,
-			    value, "(%u) %s", value & 0x3f, str);
+	other_decode_bitfield_value(bigbuf, value, 0x003f, 16);
+	proto_tree_add_text(tree, tvb, offset, 2,
+			    "%s :  PILOT_PH_CAP: (%u) %s",
+			    bigbuf,
+			    value & 0x3f,
+			    str);
+
 	offset += 2;
+	value = tvb_get_ntoh24(tvb, offset);
 
-	ti = proto_tree_add_item(tree, hf_ansi_801_gps_acq_cap, tvb, offset, 3, ENC_BIG_ENDIAN);
-	gps_tree = proto_item_add_subtree(ti, ett_gps);
+	other_decode_bitfield_value(bigbuf, value, 0xf80000, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  GPS_ACQ_CAP:  Reserved",
+			    bigbuf);
 
-	proto_tree_add_item(gps_tree, hf_ansi_801_reserved_24_F80000, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(gps_tree, hf_ansi_801_gps_autonomous_acquisition_capable, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(gps_tree, hf_ansi_801_gps_almanac_correction, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(gps_tree, hf_ansi_801_gps_navigation_message_bits, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(gps_tree, hf_ansi_801_gps_ephemeris, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(gps_tree, hf_ansi_801_gps_almanac, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(gps_tree, hf_ansi_801_gps_sensitivity_assistance, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(gps_tree, hf_ansi_801_gps_acquisition_assistance, tvb, offset, 3, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, value, 0x040000, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  GPS_ACQ_CAP:  GPS Autonomous Acquisition Capable",
+			    bigbuf);
 
-	ti = proto_tree_add_item(tree, hf_ansi_801_loc_calc_cap, tvb, offset, 3, ENC_BIG_ENDIAN);
-	loc_tree = proto_item_add_subtree(ti, ett_loc);
+	other_decode_bitfield_value(bigbuf, value, 0x020000, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  GPS_ACQ_CAP:  GPS Almanac Correction",
+			    bigbuf);
 
-	proto_tree_add_item(loc_tree, hf_ansi_801_pre_programmed_location, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(loc_tree, hf_ansi_801_reserved_24_700, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(loc_tree, hf_ansi_801_hybrid_gps_and_aflt_lcc, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(loc_tree, hf_ansi_801_autonomous_location_calculation_capable, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(loc_tree, hf_ansi_801_lcc_using_gps_almanac_correction, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(loc_tree, hf_ansi_801_lcc_using_gps_ephemeris_assistance, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(loc_tree, hf_ansi_801_lcc_using_gps_almanac_assistance, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(loc_tree, hf_ansi_801_aflt_lcc, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(loc_tree, hf_ansi_801_lcc_using_location_assistance_cartesian, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(loc_tree, hf_ansi_801_lcc_capable_using_location_assistance_spherical, tvb, offset, 3, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, value, 0x010000, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  GPS_ACQ_CAP:  GPS Navigation Message Bits",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x008000, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  GPS_ACQ_CAP:  GPS Ephemeris",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x004000, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  GPS_ACQ_CAP:  GPS Almanac",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x002000, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  GPS_ACQ_CAP:  GPS Sensitivity Assistance",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x001000, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  GPS_ACQ_CAP:  GPS Acquisition Assistance",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000800, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  LOC_CALC_CAP:  Pre-programmed Location",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000700, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  LOC_CALC_CAP:  Reserved",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000080, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  LOC_CALC_CAP:  Hybrid GPS and AFLT Location Calculation Capable",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000040, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  LOC_CALC_CAP:  Autonomous Location Calculation Capable",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000020, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  LOC_CALC_CAP:  Location Calculation Capable using GPS Almanac Correction",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000010, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  LOC_CALC_CAP:  Location Calculation Capable using GPS Ephemeris Assistance",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000008, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  LOC_CALC_CAP:  Location Calculation Capable using GPS Almanac Assistance",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000004, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  LOC_CALC_CAP:  Advanced Forward Link Trilateration (AFLT) Location Calculation Capable",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000002, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  LOC_CALC_CAP:  Location Calculation Capable using Location Assistance - Cartesian",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000001, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  LOC_CALC_CAP:  Location Calculation Capable using Location Assistance - Spherical",
+			    bigbuf);
+
 	offset += 3;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -1005,6 +1338,7 @@ rev_pr_loc_response(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 static void
 rev_pr_time_off_meas(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
+	guint32	value;
 	guint32	saved_offset;
 
 	saved_offset = offset;
@@ -1013,11 +1347,27 @@ rev_pr_time_off_meas(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 
 	proto_tree_add_text(tree, tvb, offset, 3,
 			    "TIME_REF_MS:  The time of validity of the parameters reported in this response element.");
-	offset += 3;
 
-	proto_tree_add_item(tree, hf_ansi_801_ref_pn, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_mob_sys_t_offset, tvb, offset, 3, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_reserved24_1, tvb, offset, 3, ENC_BIG_ENDIAN);
+	offset += 3;
+	value = tvb_get_ntoh24(tvb, offset);
+
+	other_decode_bitfield_value(bigbuf, value, 0xff8000, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  REF_PN: (%u)",
+			    bigbuf,
+			    (value & 0xff8000) >> 15);
+
+	other_decode_bitfield_value(bigbuf, value, 0x007ffe, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  MOB_SYS_T_OFFSET: (%u)",
+			    bigbuf,
+			    (value & 0x007ffe) >> 1);
+
+	other_decode_bitfield_value(bigbuf, value, 0x000001, 24);
+	proto_tree_add_text(tree, tvb, offset, 3,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset += 3;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -1028,7 +1378,8 @@ rev_pr_can_ack(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 {
 	guint8       oct;
 	guint32      saved_offset;
-	const gchar *str;
+	const gchar *str = NULL;
+	gint         idx;
 
 	saved_offset = offset;
 
@@ -1036,12 +1387,29 @@ rev_pr_can_ack(tvbuff_t *tvb, proto_tree *tree, guint len, guint32 offset)
 
 	oct = tvb_get_guint8(tvb, offset);
 
-	str = val_to_str_const((oct & 0xf0) >> 4, for_req_type_strings, "Reserved");
-	proto_tree_add_uint_format_value(tree, hf_ansi_801_cancellation_type, tvb, offset, 1, oct,
-			    "(%u) %s", (oct & 0xf0) >> 4, str);
+	str = try_val_to_str_idx((oct & 0xf0) >> 4, for_req_type_strings, &idx);
+	if (str == NULL)
+	{
+		str = "Reserved";
+	}
 
-	proto_tree_add_item(tree, hf_ansi_801_no_outstanding_request_element, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_07, tvb, offset, 1, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, oct, 0xf0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Cancellation Type: (%u) %s",
+			    bigbuf,
+			    (oct & 0xf0) >> 4,
+			    str);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x08, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  No outstanding request element",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x07, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
 	offset++;
 
 	EXTRANEOUS_DATA_CHECK(len, offset - saved_offset);
@@ -1120,7 +1488,10 @@ for_request(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p, guint8 pd_msg_ty
 
 	if (pd_msg_type == 0x00)
 	{
-		proto_tree_add_item(tree, hf_ansi_801_reserved8_F0, tvb, offset, 1, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, oct, 0xf0, 8);
+		proto_tree_add_text(tree, tvb, offset, 1,
+				    "%s :  Reserved",
+				    bigbuf);
 
 		str = try_val_to_str_idx(oct & 0x0f, for_req_type_strings, &idx);
 		if (str == NULL)
@@ -1128,8 +1499,14 @@ for_request(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p, guint8 pd_msg_ty
 			return;
 		}
 
-		item = proto_tree_add_uint_format_value(tree, hf_ansi_801_for_req_type, tvb, offset, 1,
-							oct & 0x0f, "%s (%u)", str, oct & 0x0f);
+		other_decode_bitfield_value(bigbuf, oct, 0x0f, 8);
+		item =
+			proto_tree_add_uint_format(tree, hf_ansi_801_for_req_type, tvb, offset,
+						   1, oct & 0x0f,
+						   "%s :  Request Type, %s (%u)",
+						   bigbuf,
+						   str,
+						   oct & 0x0f);
 	}
 	else
 	{
@@ -1146,7 +1523,10 @@ for_request(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p, guint8 pd_msg_ty
 	offset++;
 	oct = tvb_get_guint8(tvb, offset);
 
-	proto_tree_add_item(subtree, hf_ansi_801_for_request_length, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(subtree, tvb, offset, 1,
+			    "Length: %u",
+			    oct);
+
 	offset++;
 
 	if (oct > 0)
@@ -1157,7 +1537,8 @@ for_request(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p, guint8 pd_msg_ty
 		}
 		else
 		{
-			proto_tree_add_text(subtree, tvb, offset, oct, "Data");
+			proto_tree_add_text(subtree, tvb, offset, oct,
+					    "Data");
 		}
 	}
 
@@ -1177,8 +1558,15 @@ for_response(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p)
 	offset = *offset_p;
 	oct    = tvb_get_guint8(tvb, offset);
 
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_E0, tvb, offset, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_unsolicited_response_indicator, tvb, offset, 1, ENC_NA);
+	other_decode_bitfield_value(bigbuf, oct, 0xe0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x10, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Unsolicited response indicator",
+			    bigbuf);
 
 	str = try_val_to_str_idx(oct & 0x0f, for_rsp_type_strings, &idx);
 
@@ -1187,14 +1575,23 @@ for_response(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p)
 		return;
 	}
 
-	item = proto_tree_add_uint_format_value(tree, hf_ansi_801_for_rsp_type, tvb, offset, 1,
-						oct & 0x0f, "%s (%u)", str, oct & 0x0f);
+	other_decode_bitfield_value(bigbuf, oct, 0x0f, 8);
+	item =
+		proto_tree_add_uint_format(tree, hf_ansi_801_for_rsp_type, tvb, offset,
+					   1, oct & 0x0f,
+					   "%s :  Response Type, %s (%u)",
+					   bigbuf,
+					   str,
+					   oct & 0x0f);
+
 	subtree = proto_item_add_subtree(item, ett_for_rsp_type[idx]);
 
 	offset++;
 	oct = tvb_get_guint8(tvb, offset);
 
-	proto_tree_add_item(subtree, hf_ansi_801_for_response_length, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(subtree, tvb, offset, 1,
+			    "Length: %u",
+			    oct);
 
 	offset++;
 
@@ -1226,7 +1623,10 @@ rev_request(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p, guint8 pd_msg_ty
 
 	if (pd_msg_type == 0x00)
 	{
-		proto_tree_add_item(tree, hf_ansi_801_reserved8_F0, tvb, offset, 1, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, oct, 0xf0, 8);
+		proto_tree_add_text(tree, tvb, offset, 1,
+				    "%s :  Reserved",
+				    bigbuf);
 
 		str = try_val_to_str_idx(oct & 0x0f, rev_req_type_strings, &idx);
 		if (str == NULL)
@@ -1234,8 +1634,14 @@ rev_request(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p, guint8 pd_msg_ty
 			return;
 		}
 
-		item = proto_tree_add_uint_format_value(tree, hf_ansi_801_rev_req_type, tvb, offset, 1,
-							oct & 0x0f, "%s (%u)", str, oct & 0x0f);
+		other_decode_bitfield_value(bigbuf, oct, 0x0f, 8);
+		item =
+			proto_tree_add_uint_format(tree, hf_ansi_801_rev_req_type, tvb, offset,
+						   1, oct & 0x0f,
+						   "%s :  Request Type, %s (%u)",
+						   bigbuf,
+						   str,
+						   oct & 0x0f);
 	}
 	else
 	{
@@ -1252,7 +1658,9 @@ rev_request(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p, guint8 pd_msg_ty
 	offset++;
 	oct = tvb_get_guint8(tvb, offset);
 
-	proto_tree_add_item(subtree, hf_ansi_801_rev_request_length, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(subtree, tvb, offset, 1,
+			    "Length: %u",
+			    oct);
 
 	offset++;
 
@@ -1282,8 +1690,15 @@ rev_response(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p)
 	offset = *offset_p;
 	oct    = tvb_get_guint8(tvb, offset);
 
-	proto_tree_add_item(tree, hf_ansi_801_reserved8_E0, tvb, offset, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_ansi_801_unsolicited_response_indicator, tvb, offset, 1, ENC_NA);
+	other_decode_bitfield_value(bigbuf, oct, 0xe0, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Reserved",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x10, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Unsolicited response indicator",
+			    bigbuf);
 
 	str = try_val_to_str_idx(oct & 0x0f, rev_rsp_type_strings, &idx);
 
@@ -1292,14 +1707,23 @@ rev_response(tvbuff_t *tvb, proto_tree *tree, guint32 *offset_p)
 		return;
 	}
 
-	item = proto_tree_add_uint_format_value(tree, hf_ansi_801_rev_rsp_type, tvb, offset, 1,
-						oct & 0x0f, "%s (%u)", str, oct & 0x0f);
-	subtree = proto_item_add_subtree(item, ett_rev_rsp_type[idx]);
-	offset++;
+	other_decode_bitfield_value(bigbuf, oct, 0x0f, 8);
+	item =
+		proto_tree_add_uint_format(tree, hf_ansi_801_rev_rsp_type, tvb, offset,
+					   1, oct & 0x0f,
+					   "%s :  Response Type, %s (%u)",
+					   bigbuf,
+					   str,
+					   oct & 0x0f);
 
+	subtree = proto_item_add_subtree(item, ett_rev_rsp_type[idx]);
+
+	offset++;
 	oct = tvb_get_guint8(tvb, offset);
 
-	proto_tree_add_item(subtree, hf_ansi_801_rev_response_length, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(subtree, tvb, offset, 1,
+			    "Length: %u",
+			    oct);
 
 	offset++;
 
@@ -1327,13 +1751,32 @@ dissect_ansi_801_for_message(tvbuff_t *tvb, proto_tree *tree)
 	proto_item  *hidden_item;
 
 	offset = 0;
+	oct    = tvb_get_guint8(tvb, offset);
 
-	proto_tree_add_item(tree, hf_ansi_801_session_start, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_session_end, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_session_source, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_for_sess_tag, tvb, offset, 1, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, oct, 0x80, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Session Start",
+			    bigbuf);
 
-	hidden_item = proto_tree_add_item(tree, hf_ansi_801_sess_tag, tvb, offset, 1, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, oct, 0x40, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Session End",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x20, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Session Source",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x1f, 8);
+	proto_tree_add_uint_format(tree, hf_ansi_801_for_sess_tag, tvb, offset,
+				   1, oct & 0x1f,
+				   "%s :  Session Tag (%u)",
+				   bigbuf,
+				   oct & 0x1f);
+
+	hidden_item = proto_tree_add_uint(tree, hf_ansi_801_sess_tag, tvb, offset,
+					  1, oct & 0x1f);
 	PROTO_ITEM_SET_HIDDEN(hidden_item);
 
 	offset++;
@@ -1352,21 +1795,27 @@ dissect_ansi_801_for_message(tvbuff_t *tvb, proto_tree *tree)
 		}
 		else
 		{
-			str = "Available for manufacturer-specific Position Determination "
-				  "Data Message definition as specified in TSB-58";
+			str =
+				"Available for manufacturer-specific Position Determination "
+				"Data Message definition as specified in TSB-58";
 		}
 		break;
 	}
 
-	proto_tree_add_uint_format_value(tree, hf_ansi_801_pd_message_type, tvb, offset, 1, pd_msg_type,
-			    "%s (%u)", str, pd_msg_type);
+	other_decode_bitfield_value(bigbuf, pd_msg_type, 0xff, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  PD Message Type, %s (%u)",
+			    bigbuf,
+			    str,
+			    pd_msg_type);
 
 	offset++;
 
 	if ((pd_msg_type != 0x00) &&
 	    (pd_msg_type != 0x01))
 	{
-		proto_tree_add_text(tree, tvb, offset, -1, "Reserved/Proprietary/Future Data");
+		proto_tree_add_text(tree, tvb, offset, -1,
+				    "Reserved/Proprietary/Future Data");
 		return;
 	}
 
@@ -1374,18 +1823,46 @@ dissect_ansi_801_for_message(tvbuff_t *tvb, proto_tree *tree)
 	{
 		value = tvb_get_ntohs(tvb, offset);
 
-		proto_tree_add_item(tree, hf_ansi_801_pd_message_len, tvb, offset, 2, ENC_BIG_ENDIAN);
-		proto_tree_add_item(tree, hf_ansi_801_regulatory_services_indicator, tvb, offset, 2, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, value, 0xffc0, 16);
+		proto_tree_add_text(tree, tvb, offset, 2,
+				    "%s :  PD Message Length, (%u)",
+				    bigbuf,
+				    (value & 0xffc0) >> 6);
+
+		switch ((value & 0x0030) >> 4)
+		{
+		case 0x00: str = "No Regulatory service"; break;
+		case 0x01: str = "Emergency service"; break;
+		default:   str = "Reserved"; break;
+		}
+
+		other_decode_bitfield_value(bigbuf, value, 0x0030, 16);
+		proto_tree_add_text(tree, tvb, offset, 2,
+				    "%s :  Regulatory Services Indicator - %s (%u)",
+				    bigbuf,
+				    str,
+				    (value & 0x0030) >> 4);
 
 		num_req = value & 0x000f;
 
-		proto_tree_add_item(tree, hf_ansi_801_for_message_number_requests16, tvb, offset, 2, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, value, 0x000f, 16);
+		proto_tree_add_text(tree, tvb, offset, 2,
+				    "%s :  Number Requests (%u)",
+				    bigbuf,
+				    num_req);
+
 		offset += 2;
 
 		oct = tvb_get_guint8(tvb, offset);
+
 		num_rsp = oct & 0xf0;
 
-		proto_tree_add_item(tree, hf_ansi_801_for_message_number_responsesF0, tvb, offset, 1, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, oct, 0xf0, 8);
+		proto_tree_add_text(tree, tvb, offset, 1,
+				    "%s :  Number Responses (%u)",
+				    bigbuf,
+				    num_rsp);
+
 		offset++;
 	}
 	else
@@ -1395,8 +1872,17 @@ dissect_ansi_801_for_message(tvbuff_t *tvb, proto_tree *tree)
 		num_req = (oct & 0xf0) >> 4;
 		num_rsp = oct & 0x0f;
 
-		proto_tree_add_item(tree, hf_ansi_801_for_message_number_requests8, tvb, offset, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(tree, hf_ansi_801_for_message_number_responses0F, tvb, offset, 1, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, oct, 0xf0, 8);
+		proto_tree_add_text(tree, tvb, offset, 1,
+				    "%s :  Number Requests (%u)",
+				    bigbuf,
+				    num_req);
+
+		other_decode_bitfield_value(bigbuf, oct, 0x0f, 8);
+		proto_tree_add_text(tree, tvb, offset, 1,
+				    "%s :  Number Responses (%u)",
+				    bigbuf,
+				    num_rsp);
 	}
 
 	offset++;
@@ -1452,13 +1938,32 @@ dissect_ansi_801_rev_message(tvbuff_t *tvb, proto_tree *tree)
 	proto_item  *hidden_item;
 
 	offset = 0;
+	oct    = tvb_get_guint8(tvb, offset);
 
-	proto_tree_add_item(tree, hf_ansi_801_session_start, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_session_end, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_session_source, tvb, offset, 1, ENC_NA);
-	proto_tree_add_item(tree, hf_ansi_801_rev_sess_tag, tvb, offset, 1, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, oct, 0x80, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Session Start",
+			    bigbuf);
 
-	hidden_item = proto_tree_add_item(tree, hf_ansi_801_sess_tag, tvb, offset, 1, ENC_BIG_ENDIAN);
+	other_decode_bitfield_value(bigbuf, oct, 0x40, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Session End",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x20, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  Session Source",
+			    bigbuf);
+
+	other_decode_bitfield_value(bigbuf, oct, 0x1f, 8);
+	proto_tree_add_uint_format(tree, hf_ansi_801_rev_sess_tag, tvb, offset,
+				   1, oct & 0x1f,
+				   "%s :  Session Tag (%u)",
+				   bigbuf,
+				   oct & 0x1f);
+
+	hidden_item = proto_tree_add_uint(tree, hf_ansi_801_sess_tag, tvb, offset,
+					  1, oct & 0x1f);
 	PROTO_ITEM_SET_HIDDEN(hidden_item);
 
 	offset++;
@@ -1477,20 +1982,27 @@ dissect_ansi_801_rev_message(tvbuff_t *tvb, proto_tree *tree)
 		}
 		else
 		{
-			str = "Available for manufacturer-specific Position Determination "
+			str =
+				"Available for manufacturer-specific Position Determination "
 				"Data Message definition as specified in TSB-58";
 		}
 		break;
 	}
 
-	proto_tree_add_uint_format_value(tree, hf_ansi_801_pd_message_type, tvb, offset, 1, pd_msg_type,
-			    "%s (%u)", str, pd_msg_type);
+	other_decode_bitfield_value(bigbuf, pd_msg_type, 0xff, 8);
+	proto_tree_add_text(tree, tvb, offset, 1,
+			    "%s :  PD Message Type, %s (%u)",
+			    bigbuf,
+			    str,
+			    pd_msg_type);
+
 	offset++;
 
 	if ((pd_msg_type != 0x00) &&
 	    (pd_msg_type != 0x01))
 	{
-		proto_tree_add_text(tree, tvb, offset, -1, "Reserved/Proprietary/Future Data");
+		proto_tree_add_text(tree, tvb, offset, -1,
+				    "Reserved/Proprietary/Future Data");
 		return;
 	}
 
@@ -1498,18 +2010,46 @@ dissect_ansi_801_rev_message(tvbuff_t *tvb, proto_tree *tree)
 	{
 		value = tvb_get_ntohs(tvb, offset);
 
-		proto_tree_add_item(tree, hf_ansi_801_pd_message_len, tvb, offset, 2, ENC_BIG_ENDIAN);
-		proto_tree_add_item(tree, hf_ansi_801_regulatory_services_indicator, tvb, offset, 2, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, value, 0xffc0, 16);
+		proto_tree_add_text(tree, tvb, offset, 2,
+				    "%s :  PD Message Length, (%u)",
+				    bigbuf,
+				    (value & 0xffc0) >> 6);
+
+		switch ((value & 0x0030) >> 4)
+		{
+		case 0x00: str = "No Regulatory service"; break;
+		case 0x01: str = "Emergency service"; break;
+		default:   str = "Reserved"; break;
+		}
+
+		other_decode_bitfield_value(bigbuf, value, 0x0030, 16);
+		proto_tree_add_text(tree, tvb, offset, 2,
+				    "%s :  Regulatory Services Indicator - %s (%u)",
+				    bigbuf,
+				    str,
+				    (value & 0x0030) >> 4);
 
 		num_req = value & 0x000f;
 
-		proto_tree_add_item(tree, hf_ansi_801_rev_message_number_requests16, tvb, offset, 2, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, value, 0x000f, 16);
+		proto_tree_add_text(tree, tvb, offset, 2,
+				    "%s :  Number Requests (%u)",
+				    bigbuf,
+				    num_req);
+
 		offset += 2;
 
 		oct = tvb_get_guint8(tvb, offset);
+
 		num_rsp = oct & 0xf0;
 
-		proto_tree_add_item(tree, hf_ansi_801_rev_message_number_responsesF0, tvb, offset, 1, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, oct, 0xf0, 8);
+		proto_tree_add_text(tree, tvb, offset, 1,
+				    "%s :  Number Responses (%u)",
+				    bigbuf,
+				    num_rsp);
+
 		offset++;
 	}
 	else
@@ -1519,8 +2059,18 @@ dissect_ansi_801_rev_message(tvbuff_t *tvb, proto_tree *tree)
 		num_req = (oct & 0xf0) >> 4;
 		num_rsp = oct & 0x0f;
 
-		proto_tree_add_item(tree, hf_ansi_801_rev_message_number_requests8, tvb, offset, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(tree, hf_ansi_801_rev_message_number_responses0F, tvb, offset, 1, ENC_BIG_ENDIAN);
+		other_decode_bitfield_value(bigbuf, oct, 0xf0, 8);
+		proto_tree_add_text(tree, tvb, offset, 1,
+				    "%s :  Number Requests (%u)",
+				    bigbuf,
+				    num_req);
+
+		other_decode_bitfield_value(bigbuf, oct, 0x0f, 8);
+		proto_tree_add_text(tree, tvb, offset, 1,
+				    "%s :  Number Responses (%u)",
+				    bigbuf,
+				    num_rsp);
+
 		offset++;
 	}
 
@@ -1610,645 +2160,196 @@ proto_register_ansi_801(void)
 	gint  last_offset;
 
 	/* Setup list of header fields */
-	static hf_register_info hf[] = {
-		{ &hf_ansi_801_for_req_type,
-		  { "Forward Request Type", "ansi_801.for_req_type",
-		    FT_UINT8, BASE_DEC, NULL, 0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_rsp_type,
-		  { "Forward Response Type", "ansi_801.for_rsp_type",
-		    FT_UINT8, BASE_DEC, NULL, 0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_req_type,
-		  { "Reverse Request Type", "ansi_801.rev_req_type",
-		    FT_UINT8, BASE_DEC, NULL, 0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_rsp_type,
-		  { "Reverse Response Type", "ansi_801.rev_rsp_type",
-		    FT_UINT8, BASE_DEC, NULL, 0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_sess_tag,
-		  { "Forward Session Tag", "ansi_801.for_sess_tag",
-		    FT_UINT8, BASE_DEC, NULL, 0x1f,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_sess_tag,
-		  { "Reverse Session Tag", "ansi_801.rev_sess_tag",
-		    FT_UINT8, BASE_DEC, NULL, 0x1f,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_sess_tag,
-		  { "Session Tag", "ansi_801.sess_tag",
-		    FT_UINT8, BASE_DEC, NULL, 0x1f,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_time_ref_cdma,
-		  { "CDMA system time at the time the solution is valid (TIME_REF_CDMA)", "ansi_801.time_ref_cdma",
-		    FT_UINT32, BASE_DEC, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_lat,
-		  { "Latitude (LAT)", "ansi_801.lat",
-		    FT_FLOAT, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_long,
-		  { "Longitude (LONG)", "ansi_801.long",
-		    FT_FLOAT, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_loc_uncrtnty_ang,
-		  { "Angle of axis with respect to True North for pos uncertainty (LOC_UNCRTNTY_ANG)", "ansi_801.loc_uncrtnty_ang",
-		    FT_FLOAT, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_loc_uncrtnty_a,
-		  { "Std dev of axis along angle specified for pos uncertainty (LOC_UNCRTNTY_A)", "ansi_801.loc_uncrtnty_a",
-		    FT_UINT8, BASE_DEC, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_loc_uncrtnty_p,
-		  { "Std dev of axis perpendicular to angle specified for pos uncertainty (LOC_UNCRTNTY_P)", "ansi_801.loc_uncrtnty_p",
-		    FT_UINT8, BASE_DEC, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_fix_type,
-		  { "Fix type (FIX_TYPE)", "ansi_801.fix_type",
-		    FT_BOOLEAN, BASE_NONE, TFS(&ansi_801_fix_type_vals), 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_velocity_incl,
-		  { "Velocity information included (VELOCITY_INCL)", "ansi_801.velocity_incl",
-		    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_velocity_hor,
-		  { "Horizontal velocity magnitude (VELOCITY_HOR)", "ansi_801.velocity_hor",
-		    FT_FLOAT, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_heading,
-		  { "Heading (HEADING)", "ansi_801.heading",
-		    FT_FLOAT, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_velocity_ver,
-		  { "Vertical velocity (VELOCITY_VER)", "ansi_801.velocity_ver",
-		    FT_FLOAT, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_clock_incl,
-		  { "Clock information included (CLOCK_INCL)", "ansi_801.clock_incl",
-		    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_clock_bias,
-		  { "Clock bias (CLOCK_BIAS)", "ansi_801.clock_bias",
-		    FT_INT24, BASE_DEC, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_clock_drift,
-		  { "Clock drift (CLOCK_DRIFT)", "ansi_801.clock_drift",
-		    FT_INT16, BASE_DEC, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_height_incl,
-		  { "Height information included (HEIGHT_INCL)", "ansi_801.height_incl",
-		    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_height,
-		  { "Height (HEIGHT)", "ansi_801.height",
-		    FT_INT16, BASE_DEC, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_loc_uncrtnty_v,
-		  { "Std dev of vertical error for pos uncertainty (LOC_UNCRTNTY_V)", "ansi_801.loc_uncrtnty_v",
-		    FT_UINT8, BASE_DEC, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved_bits,
-		  { "Reserved bit(s)","ansi_801.reerved_bits",
-		    FT_UINT8,BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_bad_sv_present,
-		  { "Bad GPS satellites present (BAD_SV_PRESENT)", "ansi_801.bad_sv_present",
-		    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_num_bad_sv,
-		  { "Number of bad GPS satellites (NUM_BAD_SV)", "ansi_801.num_bad_sv",
-		    FT_UINT8, BASE_DEC, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_bad_sv_prn_num,
-		  { "Satellite PRN number (SV_PRN_NUM)", "ansi_801.bad_sv_prn_num",
-		    FT_UINT8, BASE_DEC, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_dopp_req,
-		  { "Doppler (0th order) term requested (DOPP_REQ)", "ansi_801.dopp_req",
-		    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_add_dopp_req,
-		  { "Additional Doppler terms requested (ADD_DOPP_REQ)", "ansi_801.add_dopp_req",
-		    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_code_ph_par_req,
-		  { "Code phase parameters requested (CODE_PH_PAR_REQ)", "ansi_801.code_ph_par_req",
-		    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_az_el_req,
-		  { "Azimuth and elevation angle requested (AZ_EL_REQ)", "ansi_801.az_el_req",
-		    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_pref_resp_qual,
-		  { "Preferred response quality (PREF_RESP_QUAL)", "ansi_801.pref_resp_qual",
-		    FT_UINT24, BASE_DEC, NULL, 0xe00000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_num_fixes,
-		  { "Number of fixes (NUM_FIXES)", "ansi_801.num_fixes",
-		    FT_UINT24, BASE_DEC, NULL, 0x1fe000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_t_betw_fixes,
-		  { "Time between fixes (T_BETW_FIXES) (in seconds)", "ansi_801.t_betw_fixes",
-		    FT_UINT24, BASE_DEC, NULL, 0x001fe0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_offset_req,
-		  { "Offset requested (OFFSET_REQ)", "ansi_801.offset_req",
-		    FT_BOOLEAN, 24, TFS(&tfs_requested_not_requested), 0x000010,
-		    NULL, HFILL }
-		},
-
-		/* Generated from convert_proto_tree_add_text.pl */
-		{ &hf_ansi_801_desired_pilot_phase_resolution,
-		  { "Desired pilot phase resolution", "ansi_801.desired_pilot_phase_resolution",
-		    FT_BOOLEAN, 24, TFS(&tfs_desired_pilot_phase_resolution), 0x08,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved_24_7,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT24, BASE_HEX, NULL, 0x07,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_req_loc_height_information,
-		  { "Height information", "ansi_801.height_incl",
-		    FT_BOOLEAN, 24, TFS(&tfs_requested_not_requested), 0x10,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_req_loc_clock_correction_for_gps_time,
-		  { "Clock correction for GPS time", "ansi_801.clock_correction_for_gps_time",
-		    FT_BOOLEAN, 24, TFS(&tfs_requested_not_requested), 0x08,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_req_loc_velocity_information,
-		  { "Velocity information", "ansi_801.velocity_information",
-		    FT_BOOLEAN, 24, TFS(&tfs_requested_not_requested), 0x04,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved24_3,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT24, BASE_HEX, NULL, 0x03,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_use_action_time_indicator,
-		  { "Use action time indicator", "ansi_801.use_action_time_indicator",
-		    FT_BOOLEAN, 8, NULL, 0x80,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_action_time,
-		  { "Action time", "ansi_801.action_time",
-		    FT_UINT8, BASE_DEC, NULL, 0x7E,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved8_7F,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT8, BASE_HEX, NULL, 0x7F,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_cancellation_type,
-		  { "Cancellation Type", "ansi_801.cancellation_type",
-		    FT_UINT8, BASE_DEC, VALS(for_req_type_strings), 0xF0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved8_0F,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT8, BASE_HEX, NULL, 0x0F,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reject_request_type,
-		  { "Reject request type", "ansi_801.reject_request_type",
-		    FT_UINT8, BASE_DEC, VALS(rev_req_type_strings), 0xF0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reject_reason,
-		  { "Reject reason", "ansi_801.reject_reason",
-		    FT_UINT8, BASE_DEC, NULL, 0x0E,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved8_01,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT8, BASE_HEX, NULL, 0x01,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_bs_ls_rev,
-		  { "BS_LS_REV", "ansi_801.bs_ls_rev",
-		    FT_UINT8, BASE_HEX, NULL, 0xfc,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_gps_capability_indicator,
-		  { "GPSC_ID: GPS capability indicator", "ansi_801.gps_capability_indicator",
-		    FT_UINT8, BASE_DEC, NULL, 0x02,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_afltc_id,
-		  { "AFLTC_ID: Advanced forward link trilateration capability indicator", "ansi_801.afltc_id",
-		    FT_UINT8, BASE_DEC, NULL, 0x01,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_apdc_id,
-		  { "APDC_ID: Autonomous position determination capability indicator: Autonomous Location Technology Identifier", "ansi_801.apdc_id",
-		    FT_UINT8, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_ref_bit_num,
-		  { "REF_BIT_NUM", "ansi_801.ref_bit_num",
-		    FT_UINT16, BASE_DEC, NULL, 0xffe0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_num_dr_p,
-		  { "NUM_DR_P: Number of data records in this part", "ansi_801.num_dr_p",
-		    FT_UINT16, BASE_DEC, NULL, 0x001e,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_dr_size,
-		  { "DR_SIZE: Data record size", "ansi_801.dr_size",
-		    FT_UINT24, BASE_DEC, NULL, 0x0001FE,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_part_num,
-		  { "PART_NUM: The part number", "ansi_801.part_num",
-		    FT_UINT16, BASE_DEC, NULL, 0x01c0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_total_parts,
-		  { "TOTAL_PARTS: Total number of parts", "ansi_801.total_parts",
-		    FT_UINT16, BASE_DEC, NULL, 0x38,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_data_records,
-		  { "Data records", "ansi_801.data_records",
-		    FT_UINT16, BASE_DEC, NULL, 0x07,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_num_sv_p32,
-		  { "NUM_SV_P: Number of satellites in this part", "ansi_801.num_sv_p",
-		    FT_UINT32, BASE_DEC, NULL, 0xfc000000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_week_num,
-		  { "WEEK_NUM: The GPS week number of the almanac", "ansi_801.week_num",
-		    FT_UINT32, BASE_DEC, NULL, 0x03fc0000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_toa,
-		  { "TOA: The reference time of the almanac", "ansi_801.toa",
-		    FT_UINT32, BASE_DEC, NULL, 0x0003fc00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_part_num32,
-		  { "PART_NUM: The part number", "ansi_801.part_num",
-		    FT_UINT32, BASE_DEC, NULL, 0x000003e0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_total_parts32,
-		  { "TOTAL_PARTS: The total number of parts", "ansi_801.total_parts",
-		    FT_UINT32, BASE_DEC, NULL, 0x0000001f,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_num_sv_p16,
-		  { "NUM_SV_P: Number of satellites in this part", "ansi_801.num_sv_p",
-		    FT_UINT16, BASE_DEC, NULL, 0xfc00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_part_num16,
-		  { "PART_NUM: The part number", "ansi_801.part_num",
-		    FT_UINT16, BASE_DEC, NULL, 0x03e0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_total_parts16,
-		  { "TOTAL_PARTS: The total number of parts", "ansi_801.total_parts",
-		    FT_UINT16, BASE_DEC, NULL, 0x001f,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_coordinate_type_requested,
-		  { "Coordinate type requested", "ansi_801.coordinate_type_requested",
-		    FT_BOOLEAN, 8, TFS(&tfs_spherical_cartesian), 0x80,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_extended_base_station_almanac,
-		  { "Extended base station almanac", "ansi_801.extended_base_station_almanac",
-		    FT_BOOLEAN, 8, TFS(&tfs_requested_not_requested), 0x80,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_alpha_and_beta_parameters,
-		  { "Alpha and Beta parameters", "ansi_801.alpha_and_beta_parameters",
-		    FT_BOOLEAN, 8, TFS(&tfs_requested_not_requested), 0x80,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_subframes_4_and_5,
-		  { "Subframes 4 and 5", "ansi_801.subframes_4_and_5",
-		    FT_BOOLEAN, 8, TFS(&tfs_requested_not_requested), 0x80,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_req_loc_height_information,
-		  { "Height information", "ansi_801.height_information",
-		    FT_BOOLEAN, 8, TFS(&tfs_requested_not_requested), 0x80,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_req_loc_clock_correction_for_gps_time,
-		  { "Clock correction for GPS time", "ansi_801.clock_correction_for_gps_time",
-		    FT_BOOLEAN, 8, TFS(&tfs_requested_not_requested), 0x40,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_req_loc_velocity_information,
-		  { "Velocity information", "ansi_801.velocity_information",
-		    FT_BOOLEAN, 8, TFS(&tfs_requested_not_requested), 0x20,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved8_1F,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT8, BASE_HEX, NULL, 0x1F,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_ms_ls_rev,
-		  { "MS_LS_REV", "ansi_801.ms_ls_rev",
-		    FT_UINT16, BASE_DEC, NULL, 0xfc00,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_ms_mode,
-		  { "MS_MODE", "ansi_801.ms_mode",
-		    FT_UINT16, BASE_DEC, NULL, 0x03c0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_pilot_ph_cap,
-		  { "PILOT_PH_CAP", "ansi_801.pilot_ph_cap",
-		    FT_UINT16, BASE_DEC, NULL, 0x003f,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_gps_acq_cap,
-		  { "GPS_ACQ_CAP", "ansi_801.gps_acq_cap",
-		    FT_UINT24, BASE_HEX, NULL, 0x000FFF,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved_24_F80000,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT24, BASE_HEX, NULL, 0xf80000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_gps_autonomous_acquisition_capable,
-		  { "GPS Autonomous Acquisition Capable", "ansi_801.gps_autonomous_acquisition_capable",
-		    FT_BOOLEAN, 24, NULL, 0x040000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_gps_almanac_correction,
-		  { "GPS Almanac Correction", "ansi_801.gps_almanac_correction",
-		    FT_BOOLEAN, 24, NULL, 0x020000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_gps_navigation_message_bits,
-		  { "GPS Navigation Message Bits", "ansi_801.gps_navigation_message_bits",
-		    FT_BOOLEAN, 24, NULL, 0x010000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_gps_ephemeris,
-		  { "GPS Ephemeris", "ansi_801.gps_ephemeris",
-		    FT_BOOLEAN, 24, NULL, 0x008000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_gps_almanac,
-		  { "GPS Almanac", "ansi_801.gps_almanac",
-		    FT_BOOLEAN, 24, NULL, 0x004000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_gps_sensitivity_assistance,
-		  { "GPS Sensitivity Assistance", "ansi_801.gps_sensitivity_assistance",
-		    FT_BOOLEAN, 24, NULL, 0x002000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_gps_acquisition_assistance,
-		  { "GPS Acquisition Assistance", "ansi_801.gps_acquisition_assistance",
-		    FT_BOOLEAN, 24, NULL, 0x001000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_loc_calc_cap,
-		  { "LOC_CALC_CAP", "ansi_801.loc_calc_cap",
-		    FT_UINT24, BASE_HEX, NULL, 0x000FFF,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_pre_programmed_location,
-		  { "Pre-programmed Location", "ansi_801.pre_programmed_location",
-		    FT_BOOLEAN, 24, NULL, 0x000800,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved_24_700,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT24, BASE_HEX, NULL, 0x000700,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_hybrid_gps_and_aflt_lcc,
-		  { "Hybrid GPS and AFLT Location Calculation Capable", "ansi_801.hybrid_gps_and_aflt_lcc",
-		    FT_BOOLEAN, 24, NULL, 0x000080,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_autonomous_location_calculation_capable,
-		  { "Autonomous Location Calculation Capable", "ansi_801.autonomous_lcc",
-		    FT_BOOLEAN, 24, NULL, 0x000040,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_lcc_using_gps_almanac_correction,
-		  { "Location Calculation Capable using GPS Almanac Correction", "ansi_801.lcc_using_gps_almanac_correction",
-		    FT_BOOLEAN, 24, NULL, 0x000020,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_lcc_using_gps_ephemeris_assistance,
-		  { "Location Calculation Capable using GPS Ephemeris Assistance", "ansi_801.lcc_using_gps_ephemeris_assistance",
-		    FT_BOOLEAN, 24, NULL, 0x000010,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_lcc_using_gps_almanac_assistance,
-		  { "Location Calculation Capable using GPS Almanac Assistance", "ansi_801.lcc_using_gps_almanac_assistance",
-		    FT_BOOLEAN, 24, NULL, 0x000008,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_aflt_lcc,
-		  { "Advanced Forward Link Trilateration (AFLT) Location Calculation Capable", "ansi_801.aflt_lcc",
-		    FT_BOOLEAN, 24, NULL, 0x000004,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_lcc_using_location_assistance_cartesian,
-		  { "Location Calculation Capable using Location Assistance - Cartesian", "ansi_801.lcc_using_location_assistance.cartesian",
-		    FT_BOOLEAN, 24, NULL, 0x000002,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_lcc_capable_using_location_assistance_spherical,
-		  { "Location Calculation Capable using Location Assistance - Spherical", "ansi_801.lcc_using_location_assistance.spherical",
-		    FT_BOOLEAN, 24, NULL, 0x000001,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_ref_pn,
-		  { "REF_PN", "ansi_801.ref_pn",
-		    FT_UINT24, BASE_DEC, NULL, 0xff8000,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_mob_sys_t_offset,
-		  { "MOB_SYS_T_OFFSET", "ansi_801.mob_sys_t_offset",
-		    FT_UINT24, BASE_DEC, NULL, 0x007ffe,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved24_1,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT24, BASE_HEX, NULL, 0x000001,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_no_outstanding_request_element,
-		  { "No outstanding request element", "ansi_801.no_outstanding_request_element",
-		    FT_BOOLEAN, 8, NULL, 0x08,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved8_07,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT8, BASE_HEX, NULL, 0x07,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved8_F0,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT8, BASE_HEX, NULL, 0xF0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_request_length,
-		  { "Length", "ansi_801.for_request_length",
-		    FT_UINT8, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_reserved8_E0,
-		  { "Reserved", "ansi_801.reserved",
-		    FT_UINT8, BASE_HEX, NULL, 0xE0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_unsolicited_response_indicator,
-		  { "Unsolicited response indicator", "ansi_801.unsolicited_response_indicator",
-		    FT_BOOLEAN, 8, NULL, 0x10,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_response_length,
-		  { "Length", "ansi_801.for_response_length",
-		    FT_UINT8, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_request_length,
-		  { "Length", "ansi_801.rev_request_length",
-		    FT_UINT8, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_response_length,
-		  { "Length", "ansi_801.rev_response_length",
-		    FT_UINT8, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_session_start,
-		  { "Session Start", "ansi_801.session_start",
-		    FT_BOOLEAN, 8, NULL, 0x80,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_session_end,
-		  { "Session End", "ansi_801.session_end",
-		    FT_BOOLEAN, 8, NULL, 0x40,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_session_source,
-		  { "Session Source", "ansi_801.session_source",
-		    FT_BOOLEAN, 8, NULL, 0x20,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_pd_message_type,
-		  { "PD Message Type", "ansi_801.pd_message_type",
-		    FT_UINT8, BASE_DEC, NULL, 0xFF,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_pd_message_len,
-		  { "PD Message Length", "ansi_801.pd_message_len",
-		    FT_UINT16, BASE_DEC, NULL, 0xffc0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_regulatory_services_indicator,
-		  { "Regulatory Services Indicator", "ansi_801.regulatory_services_indicator",
-		    FT_UINT16, BASE_DEC, VALS(regulatory_services_indicator_vals), 0x0030,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_message_number_requests16,
-		  { "Number Requests", "ansi_801.for_message_number_requests",
-		    FT_UINT16, BASE_DEC, NULL, 0x0F,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_message_number_responsesF0,
-		  { "Number Responses", "ansi_801.for_message_number_responses",
-		    FT_UINT8, BASE_DEC, NULL, 0xF0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_message_number_requests8,
-		  { "Number Requests", "ansi_801.for_message_number_requests",
-		    FT_UINT8, BASE_DEC, NULL, 0xF0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_for_message_number_responses0F,
-		  { "Number Responses", "ansi_801.for_message_number_responses",
-		    FT_UINT8, BASE_DEC, NULL, 0x0F,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_message_number_requests16,
-		  { "Number Requests", "ansi_801.rev_message_number_requests",
-		    FT_UINT16, BASE_DEC, NULL, 0x0F,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_message_number_responsesF0,
-		  { "Number Responses", "ansi_801.rev_message_number_responses",
-		    FT_UINT8, BASE_DEC, NULL, 0xF0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_message_number_requests8,
-		  { "Number Requests", "ansi_801.rev_message_number_requests",
-		    FT_UINT8, BASE_DEC, NULL, 0xF0,
-		    NULL, HFILL }
-		},
-		{ &hf_ansi_801_rev_message_number_responses0F,
-		  { "Number Responses", "ansi_801.rev_message_number_responses",
-		    FT_UINT8, BASE_DEC, NULL, 0x0F,
-		    NULL, HFILL }
-		},
-
-	};
+	static hf_register_info hf[] =
+		{
+			{ &hf_ansi_801_for_req_type,
+			  { "Forward Request Type",		"ansi_801.for_req_type",
+			    FT_UINT8, BASE_DEC, NULL, 0,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_for_rsp_type,
+			  { "Forward Response Type",		"ansi_801.for_rsp_type",
+			    FT_UINT8, BASE_DEC, NULL, 0,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_rev_req_type,
+			  { "Reverse Request Type",		"ansi_801.rev_req_type",
+			    FT_UINT8, BASE_DEC, NULL, 0,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_rev_rsp_type,
+			  { "Reverse Response Type",		"ansi_801.rev_rsp_type",
+			    FT_UINT8, BASE_DEC, NULL, 0,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_for_sess_tag,
+			  { "Forward Session Tag",		"ansi_801.for_sess_tag",
+			    FT_UINT8, BASE_DEC, NULL, 0,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_rev_sess_tag,
+			  { "Reverse Session Tag",		"ansi_801.rev_sess_tag",
+			    FT_UINT8, BASE_DEC, NULL, 0,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_sess_tag,
+			  { "Session Tag",			"ansi_801.sess_tag",
+			    FT_UINT8, BASE_DEC, NULL, 0,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_time_ref_cdma,
+			  { "CDMA system time at the time the solution is valid (TIME_REF_CDMA)", "ansi_801.time_ref_cdma",
+			    FT_UINT32, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_lat,
+			  { "Latitude (LAT)", "ansi_801.lat",
+			    FT_FLOAT, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_long,
+			  { "Longitude (LONG)", "ansi_801.long",
+			    FT_FLOAT, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_loc_uncrtnty_ang,
+			  { "Angle of axis with respect to True North for pos uncertainty (LOC_UNCRTNTY_ANG)", "ansi_801.loc_uncrtnty_ang",
+			    FT_FLOAT, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_loc_uncrtnty_a,
+			  { "Std dev of axis along angle specified for pos uncertainty (LOC_UNCRTNTY_A)", "ansi_801.loc_uncrtnty_a",
+			    FT_UINT8, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_loc_uncrtnty_p,
+			  { "Std dev of axis perpendicular to angle specified for pos uncertainty (LOC_UNCRTNTY_P)", "ansi_801.loc_uncrtnty_p",
+			    FT_UINT8, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_fix_type,
+			  { "Fix type (FIX_TYPE)", "ansi_801.fix_type",
+			    FT_BOOLEAN, BASE_NONE, TFS(&ansi_801_fix_type_vals), 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_velocity_incl,
+			  { "Velocity information included (VELOCITY_INCL)", "ansi_801.velocity_incl",
+			    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_velocity_hor,
+			  { "Horizontal velocity magnitude (VELOCITY_HOR)", "ansi_801.velocity_hor",
+			    FT_FLOAT, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_heading,
+			  { "Heading (HEADING)", "ansi_801.heading",
+			    FT_FLOAT, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_velocity_ver,
+			  { "Vertical velocity (VELOCITY_VER)", "ansi_801.velocity_ver",
+			    FT_FLOAT, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_clock_incl,
+			  { "Clock information included (CLOCK_INCL)", "ansi_801.clock_incl",
+			    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_clock_bias,
+			  { "Clock bias (CLOCK_BIAS)", "ansi_801.clock_bias",
+			    FT_INT24, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_clock_drift,
+			  { "Clock drift (CLOCK_DRIFT)", "ansi_801.clock_drift",
+			    FT_INT16, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_height_incl,
+			  { "Height information included (HEIGHT_INCL)", "ansi_801.height_incl",
+			    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_height,
+			  { "Height (HEIGHT)", "ansi_801.height",
+			    FT_INT16, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_loc_uncrtnty_v,
+			  { "Std dev of vertical error for pos uncertainty (LOC_UNCRTNTY_V)", "ansi_801.loc_uncrtnty_v",
+			    FT_UINT8, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_reserved_bits,
+			  { "Reserved bit(s)","ansi_801.reerved_bits",
+			    FT_UINT8,BASE_DEC, NULL, 0x0,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_bad_sv_present,
+			  { "Bad GPS satellites present (BAD_SV_PRESENT)", "ansi_801.bad_sv_present",
+			    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_num_bad_sv,
+			  { "Number of bad GPS satellites (NUM_BAD_SV)", "ansi_801.num_bad_sv",
+			    FT_UINT8, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_bad_sv_prn_num,
+			  { "Satellite PRN number (SV_PRN_NUM)", "ansi_801.bad_sv_prn_num",
+			    FT_UINT8, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_dopp_req,
+			  { "Doppler (0th order) term requested (DOPP_REQ)", "ansi_801.dopp_req",
+			    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_add_dopp_req,
+			  { "Additional Doppler terms requested (ADD_DOPP_REQ)", "ansi_801.add_dopp_req",
+			    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_code_ph_par_req,
+			  { "Code phase parameters requested (CODE_PH_PAR_REQ)", "ansi_801.code_ph_par_req",
+			    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_az_el_req,
+			  { "Azimuth and elevation angle requested (AZ_EL_REQ)", "ansi_801.az_el_req",
+			    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_pref_resp_qual,
+			  { "Preferred response quality (PREF_RESP_QUAL)", "ansi_801.pref_resp_qual",
+			    FT_UINT8, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_num_fixes,
+			  { "Number of fixes (NUM_FIXES)", "ansi_801.num_fixes",
+			    FT_UINT16, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_t_betw_fixes,
+			  { "Time between fixes (T_BETW_FIXES)", "ansi_801.t_betw_fixes",
+			    FT_UINT8, BASE_DEC, NULL, 0x00,
+			    NULL, HFILL }
+			},
+			{ &hf_ansi_801_offset_req,
+			  { "Offset requested (OFFSET_REQ)", "ansi_801.offset_req",
+			    FT_BOOLEAN, BASE_NONE, NULL, 0x00,
+			    NULL, HFILL }
+			},
+		};
 
 
 	/* Setup protocol subtree array */
-#define	NUM_INDIVIDUAL_PARAMS	3
+#define	NUM_INDIVIDUAL_PARAMS	1
 	gint *ett[NUM_INDIVIDUAL_PARAMS+NUM_FOR_REQ_TYPE+NUM_FOR_RSP_TYPE+NUM_REV_REQ_TYPE+NUM_REV_RSP_TYPE];
 
 	ett[0] = &ett_ansi_801;
-	ett[1] = &ett_gps;
-	ett[2] = &ett_loc;
 
 	last_offset = NUM_INDIVIDUAL_PARAMS;
 
@@ -2297,16 +2398,3 @@ proto_reg_handoff_ansi_801(void)
 	dissector_add_uint("ansi_a.pld",   ANSI_801_FORWARD, ansi_801_handle);
 	dissector_add_uint("ansi_a.pld",   ANSI_801_REVERSE, ansi_801_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

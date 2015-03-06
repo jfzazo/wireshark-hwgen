@@ -164,6 +164,7 @@ static char*
 create_packet_window_title(void)
 {
 	GString *title;
+	char *ret;
 	int i;
 
 	title = g_string_new("");
@@ -177,7 +178,11 @@ create_packet_window_title(void)
 		g_string_append_c(title, ' ');
 	}
 
-	return g_string_free(title, FALSE);
+	ret = title->str;
+
+	g_string_free(title, FALSE);
+
+	return ret;
 }
 
 static void
@@ -297,7 +302,7 @@ finfo_integer_common(struct FieldinfoWinData *DataPtr, guint64 u_val)
 	int finfo_length = finfo->length;
 
 	if (finfo_offset <= DataPtr->frame->cap_len && finfo_offset + finfo_length <= DataPtr->frame->cap_len) {
-		guint64 u_mask = hfinfo->bitmask;
+		guint32 u_mask = hfinfo->bitmask;
 
 		while (finfo_length--) {
 			guint8 *ptr = (FI_GET_FLAG(finfo, FI_LITTLE_ENDIAN)) ?
@@ -504,16 +509,12 @@ finfo_ipv4_output(GtkSpinButton *spinbutton, gpointer user_data _U_)
 {
 	GtkAdjustment *adj;
 	guint32 value;
-	address addr;
-	char* addr_str;
 
 	adj = gtk_spin_button_get_adjustment(spinbutton);
 	value = (guint32) gtk_adjustment_get_value(adj);
 	value = GUINT32_TO_BE(value);
-	SET_ADDRESS(&addr, AT_IPv4, 4, &value);
-	addr_str = (char*)address_to_str(NULL, &addr);
-	gtk_entry_set_text(GTK_ENTRY(spinbutton), addr_str);
-	wmem_free(NULL, addr_str);
+	/* ip_to_str_buf((guint8*)&value, buf, MAX_IP_STR_LEN); */	/* not exported */
+	gtk_entry_set_text(GTK_ENTRY(spinbutton), ip_to_str((guint8*)&value));	/* XXX, can we ep_alloc() inside gui? */
 	return TRUE;
 }
 
@@ -639,10 +640,9 @@ not_supported:
 			FT_INT64, FT_UINT64,			; should work with FT_INT[8,16,24,32] code
 			FT_FLOAT, FT_DOUBLE,
 			FT_IPXNET, FT_IPv6, FT_ETHER,
-			FT_GUID, FT_OID, FT_SYSTEM_ID,
+			FT_GUID, FT_OID, FT_SYSTEM_ID
 			FT_UINT_STRING,
-			FT_ABSOLUTE_TIME, FT_RELATIVE_TIME,
-			FT_VINES, FT_FCWWN,
+			FT_ABSOLUTE_TIME, FT_RELATIVE_TIME
 		*/
 		fvalue_edit = gtk_entry_new();
 		gtk_entry_set_text(GTK_ENTRY(fvalue_edit), "<not supported>");
@@ -900,6 +900,22 @@ edit_pkt_destroy_new_window(GObject *object _U_, gpointer user_data)
 	/* XXX, notify main packet list that packet should be redisplayed */
 }
 
+static gint g_direct_compare_func(gconstpointer a, gconstpointer b, gpointer user_data _U_) {
+	if (a > b)
+		return 1;
+	else if (a < b)
+		return -1;
+	else
+		return 0;
+}
+
+static void modifed_frame_data_free(gpointer data) {
+	modified_frame_data *mfd = (modified_frame_data *) data;
+
+	g_free(mfd->pd);
+	g_free(mfd);
+}
+
 #endif /* WANT_PACKET_EDITOR */
 
 void new_packet_window(GtkWidget *w _U_, gboolean reference, gboolean editable _U_)
@@ -958,7 +974,7 @@ void new_packet_window(GtkWidget *w _U_, gboolean reference, gboolean editable _
 	DataPtr->frame = fd;
 	DataPtr->phdr  = cfile.phdr;
 	DataPtr->pd = (guint8 *)g_malloc(DataPtr->frame->cap_len);
-	memcpy(DataPtr->pd, ws_buffer_start_ptr(&cfile.buf), DataPtr->frame->cap_len);
+	memcpy(DataPtr->pd, buffer_start_ptr(&cfile.buf), DataPtr->frame->cap_len);
 
 	epan_dissect_init(&(DataPtr->edt), DataPtr->epan, TRUE, TRUE);
 	epan_dissect_run(&(DataPtr->edt), cfile.cd_t, &DataPtr->phdr,
@@ -1028,11 +1044,15 @@ void new_packet_window(GtkWidget *w _U_, gboolean reference, gboolean editable _
 #ifdef WANT_PACKET_EDITOR
 	if (editable && DataPtr->frame->cap_len != 0) {
 		/* XXX, there's no Save button here, so lets assume packet is always edited */
-		cf_set_frame_edited(&cfile, DataPtr->frame, &DataPtr->phdr,
-		    DataPtr->pd);
+		modified_frame_data *mfd = (modified_frame_data *)g_malloc(sizeof(modified_frame_data));
 
-		/* Update the main window, as we now have unsaved changes. */
-		main_update_for_unsaved_changes(&cfile);
+		mfd->pd = DataPtr->pd;
+		mfd->phdr = DataPtr->phdr;
+
+		if (cfile.edited_frames == NULL)
+			cfile.edited_frames = g_tree_new_full(g_direct_compare_func, NULL, NULL, modifed_frame_data_free);
+		g_tree_insert(cfile.edited_frames, GINT_TO_POINTER(DataPtr->frame->num), mfd);
+		DataPtr->frame->file_off = -1;
 	}
 #endif
 }

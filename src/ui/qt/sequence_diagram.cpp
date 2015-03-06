@@ -31,6 +31,8 @@
 #include <QPen>
 #include <QPointF>
 
+#include <QDebug>
+
 const int max_comment_em_width_ = 20;
 
 // UML-like network node sequence diagrams.
@@ -96,19 +98,16 @@ SequenceDiagram::SequenceDiagram(QCPAxis *keyAxis, QCPAxis *valueAxis, QCPAxis *
 void SequenceDiagram::setData(seq_analysis_info_t *sainfo)
 {
     data_->clear();
-    sainfo_ = sainfo;
-    if (!sainfo) return;
 
+    WSCPSeqData new_data;
     double cur_key = 0.0;
     QVector<double> key_ticks, val_ticks;
     QVector<QString> key_labels, val_labels, com_labels;
     QFontMetrics com_fm(comment_axis_->tickLabelFont());
     int elide_w = com_fm.height() * max_comment_em_width_;
-    char* addr_str;
 
-    for (GList *cur = g_queue_peek_nth_link(sainfo->items, 0); cur; cur = g_list_next(cur)) {
+    for (GList *cur = g_list_first(sainfo->list); cur; cur = g_list_next(cur)) {
         seq_analysis_item_t *sai = (seq_analysis_item_t *) cur->data;
-        WSCPSeqData new_data;
 
         new_data.key = cur_key;
         new_data.value = sai;
@@ -121,16 +120,14 @@ void SequenceDiagram::setData(seq_analysis_info_t *sainfo)
 
         cur_key++;
     }
+    sainfo_ = sainfo;
 
     for (unsigned int i = 0; i < sainfo_->num_nodes; i++) {
         val_ticks.append(i);
-        addr_str = (char*)address_to_display(NULL, &(sainfo_->nodes[i]));
-        val_labels.append(addr_str);
+        val_labels.append(ep_address_to_display(&(sainfo_->nodes[i])));
         if (i % 2 == 0) {
             val_labels.last().append("\n");
         }
-
-        wmem_free(NULL, addr_str);
     }
     keyAxis()->setTickVector(key_ticks);
     keyAxis()->setTickVectorLabels(key_labels);
@@ -196,7 +193,7 @@ void SequenceDiagram::draw(QCPPainter *painter)
     WSCPSeqDataMap::const_iterator it;
     for (it = data_->constBegin(); it != data_->constEnd(); ++it) {
         double cur_key = it.key();
-        seq_analysis_item_t *sai = it.value().value;
+        seq_analysis_item_t *sai = (seq_analysis_item_t *) it.value().value;
         QPen fg_pen(mainPen());
 
         if (sai->fd->num == selected_packet_) {

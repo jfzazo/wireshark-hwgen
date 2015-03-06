@@ -20,15 +20,15 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <wiretap/pcap-encap.h>
 
 #include <epan/packet.h>
 #include "cfile.h"
 #include "summary.h"
-#if 0
-#include "ui/capture_ui_utils.h"
+#ifdef HAVE_LIBPCAP
+#include "capture_ui_utils.h"
 #endif
 
 
@@ -224,16 +224,3 @@ summary_fill_in_capture(capture_file *cf,capture_options *capture_opts, summary_
   }
 }
 #endif
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

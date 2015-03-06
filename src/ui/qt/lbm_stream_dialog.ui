@@ -118,9 +118,10 @@
   <customwidget>
    <class>DisplayFilterEdit</class>
    <extends>QLineEdit</extends>
-   <header>display_filter_edit.h</header>
+   <header location="global">display_filter_edit.h</header>
   </customwidget>
  </customwidgets>
+ <resources/>
  <connections>
   <connection>
    <sender>buttonBox</sender>

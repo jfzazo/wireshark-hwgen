@@ -29,6 +29,12 @@
 #include <epan/asn1.h>
 #include "ws_symbol_export.h"
 
+#define BER_NOT_DECODED_YET(x) \
+proto_tree_add_text(tree, tvb, offset, 0, "something unknown here [%s]",x); \
+fprintf(stderr,"Not decoded yet in packet : %d  [%s]\n", pinfo->fd->num,x); \
+col_append_fstr(pinfo->cinfo, COL_INFO, "[UNKNOWN BER: %s]", x); \
+tvb_get_guint8(tvb, 9999);
+
 /* value for value and size constraints */
 #ifndef NO_BOUND
 #define NO_BOUND -1
@@ -42,7 +48,7 @@ typedef int (*ber_type_fn)(gboolean, tvbuff_t*, int, asn1_ctx_t *actx, proto_tre
 #define BER_CLASS_APP	1
 #define BER_CLASS_CON	2
 #define BER_CLASS_PRI	3
-#define BER_CLASS_ANY   99			/* don't check class nor tag */
+#define BER_CLASS_ANY   99			/* dont check class nor tag */
 
 #define BER_UNI_TAG_EOC					0	/* 'end-of-content' */
 #define BER_UNI_TAG_BOOLEAN				1
@@ -112,7 +118,7 @@ extern int dissect_ber_constrained_integer(gboolean implicit_tag, asn1_ctx_t *ac
 WS_DLL_PUBLIC int dissect_ber_null(gboolean implicit_tag, asn1_ctx_t *actx, proto_tree *tree, tvbuff_t *tvb, int offset, gint hf_id);
 
 WS_DLL_PUBLIC int dissect_ber_boolean(gboolean implicit_tag, asn1_ctx_t *actx, proto_tree *tree, tvbuff_t *tvb, int offset, gint hf_id, gboolean *value);
-WS_DLL_PUBLIC int dissect_ber_real(gboolean implicit_tag, asn1_ctx_t *actx, proto_tree *tree, tvbuff_t *tvb, int offset, gint hf_id, double *value);
+extern int dissect_ber_real(gboolean implicit_tag, asn1_ctx_t *actx, proto_tree *tree, tvbuff_t *tvb, int offset, gint hf_id, double *value);
 
 extern int dissect_ber_external_type(gboolean implicit_tag, proto_tree *parent_tree, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, gint hf_id, ber_callback func);
 WS_DLL_PUBLIC int dissect_ber_EmbeddedPDV_Type(gboolean implicit_tag, proto_tree *parent_tree, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, gint hf_id, ber_callback func);
@@ -201,11 +207,7 @@ void register_ber_oid_dissector_handle(const char *oid, dissector_handle_t disse
 WS_DLL_PUBLIC
 void register_ber_oid_dissector(const char *oid, dissector_t dissector, int proto, const char *name);
 WS_DLL_PUBLIC
-void new_register_ber_oid_dissector(const char *oid, new_dissector_t dissector, int proto, const char *name);
-WS_DLL_PUBLIC
 void register_ber_syntax_dissector(const char *oid, int proto, dissector_t dissector);
-WS_DLL_PUBLIC
-void new_register_ber_syntax_dissector(const char *syntax, int proto, new_dissector_t dissector);
 void register_ber_oid_name(const char *oid, const char *name);
 WS_DLL_PUBLIC
 void register_ber_oid_syntax(const char *oid, const char *name, const char *syntax);

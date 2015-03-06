@@ -25,33 +25,46 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <gtk/gtk.h>
+#include <glib.h>
 
+#include <epan/column-info.h>
 #include <epan/prefs.h>
 #include <epan/packet.h>
+#include <epan/epan_dissect.h>
 #include <epan/column.h>
 #include <epan/strutil.h>
+#include <epan/emem.h>
 
 #include "ui/main_statusbar.h"
 #include "ui/packet_list_utils.h"
 #include "ui/preference_utils.h"
+#include "ui/progress_dlg.h"
 #include "ui/recent.h"
 #include "ui/recent_utils.h"
+#include "ui/ui_util.h"
 
+#include "gui_utils.h"
 #include "packet_list_store.h"
 #include "ui/gtk/packet_list.h"
+#include "globals.h"
 #include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/font_utils.h"
 #include "ui/gtk/packet_history.h"
 #include "ui/gtk/keys.h"
 #include "ui/gtk/menus.h"
+#include "color.h"
 #include "color_filters.h"
 #include "ui/gtk/color_utils.h"
+#include "ui/gtk/capture_file_dlg.h"
 #include "ui/gtk/packet_win.h"
 #include "ui/gtk/main.h"
+#include "ui/gtk/prefs_column.h"
+#include "ui/gtk/prefs_dlg.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/filter_dlg.h"
 #include "ui/gtk/filter_autocomplete.h"
@@ -297,12 +310,12 @@ col_details_edit_dlg (gint col_id, GtkTreeViewColumn *col)
 			      "This string has the same syntax as a display filter string.");
 	field_te = gtk_entry_new();
 	ws_gtk_grid_attach_defaults(GTK_GRID(main_grid), field_te, 1, 2, 1, 1);
-	g_object_set_data (G_OBJECT(field_te), E_FILT_MULTI_FIELD_NAME_ONLY_KEY, (gpointer)"");
+	g_object_set_data (G_OBJECT(field_te), E_FILT_FIELD_NAME_ONLY_KEY, (gpointer)"");
 	g_signal_connect(field_te, "changed", G_CALLBACK(filter_te_syntax_check_cb), NULL);
 	g_signal_connect(field_te, "key-press-event", G_CALLBACK (filter_string_te_key_pressed_cb), NULL);
 	g_signal_connect(win, "key-press-event", G_CALLBACK (filter_parent_dlg_key_pressed_cb), NULL);
 	gtk_widget_set_tooltip_text(field_te,
-			      "Field names used when field type is \"Custom\". "
+			      "Field name used when field type is \"Custom\". "
 			      "This string has the same syntax as a display filter string.");
 
 	occurrence_lb = gtk_label_new("Occurrence:");
@@ -600,12 +613,6 @@ packet_list_column_button_pressed_cb (GtkWidget *widget, GdkEvent *event, gpoint
 	return popup_menu_handler (widget, event, menu);
 }
 
-static gboolean packet_list_recreate_delayed(gpointer user_data _U_)
-{
-	packet_list_recreate();
-	return FALSE;
-}
-
 static void
 column_dnd_changed_cb(GtkTreeView *tree_view, gpointer data _U_)
 {
@@ -641,9 +648,7 @@ column_dnd_changed_cb(GtkTreeView *tree_view, gpointer data _U_)
 		prefs_main_write();
 	}
 
-	/* The columns widget is part of the packets list, delay destruction to
-	 * avoid triggering a use-after-free (maybe a GTK3 bug?) */
-	g_idle_add(packet_list_recreate_delayed, NULL);
+	packet_list_recreate();
 }
 
 static GtkWidget *

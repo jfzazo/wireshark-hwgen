@@ -22,6 +22,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include "type_util.h"
 
 /*
@@ -63,16 +64,3 @@ type_util_gdouble_to_guint64(gdouble value)
   value -= (gdouble) 18446744073709551616.;
   return ((guint64) ((gint64) value));
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

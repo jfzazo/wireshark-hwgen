@@ -252,8 +252,10 @@ EXTRA_DIST =				\
 	README.epan_child		\
 	README.heuristic		\
 	README.idl2wrs			\
+	README.malloc			\
 	README.packaging		\
 	README.plugins			\
+	README.python 			\
 	README.qt			\
 	README.regression   		\
 	README.request_response_tracking\

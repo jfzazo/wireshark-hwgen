@@ -28,11 +28,15 @@
 
 #include "config.h"
 
-#include <stdio.h>
+#include <glib.h>
 
 #include <epan/packet.h>
+#include <epan/emem.h>
+#include <epan/lapd_sapi.h>
 
+#include "packet-gsm_a_common.h"
 
+#include <stdio.h>
 
 void proto_register_abis_om2000(void);
 
@@ -585,7 +589,7 @@ dissect_om2k_attr_unkn(tvbuff_t *tvb, gint offset, gint len, gint iei, proto_tre
 				    offset, len, NULL,
 				    "%s: %s",
 				    val_to_str_ext(iei, &om2k_attr_vals_ext, "0x%02x"),
-				    tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, len));
+				    tvb_bytes_to_ep_str(tvb, offset, len));
 	return len;
 }
 
@@ -1426,15 +1430,3 @@ proto_register_abis_om2000(void)
 			   proto_abis_om2000);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

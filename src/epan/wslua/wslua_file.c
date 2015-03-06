@@ -98,7 +98,7 @@ WSLUA_CLASS_DEFINE(File,FAIL_ON_NULL_OR_EXPIRED("File"),NOP);
 /* a "File" object can be different things under the hood. It can either
    be a FILE_T from wtap struct, which it is during read operations, or it
    can be a wtap_dumper struct during write operations. A wtap_dumper struct
-   has a WFILE_T member, but we can't only store its pointer here because
+   has a FILE_T member, but we can't only store its pointer here because
    dump operations need the whole thing to write out with. Ugh. */
 static File* push_File(lua_State* L, FILE_T ft) {
     File f = (File) g_malloc(sizeof(struct _wslua_file));
@@ -705,7 +705,7 @@ static CaptureInfo* push_CaptureInfo(lua_State* L, wtap *wth, const gboolean fir
     if (first_time) {
         /* XXX: need to do this? */
         wth->file_encap = WTAP_ENCAP_UNKNOWN;
-        wth->file_tsprec = WTAP_TSPREC_UNKNOWN;
+        wth->tsprecision = WTAP_FILE_TSPREC_SEC;
         wth->snapshot_length = 0;
     }
 
@@ -720,8 +720,8 @@ WSLUA_METAMETHOD CaptureInfo__tostring(lua_State* L) {
         lua_pushstring(L,"CaptureInfo pointer is NULL!");
     } else {
         wtap *wth = fi->wth;
-        lua_pushfstring(L, "CaptureInfo: file_type_subtype=%d, snapshot_length=%d, pkt_encap=%d, file_tsprec='%s'",
-            wth->file_type_subtype, wth->snapshot_length, wth->phdr.pkt_encap, wth->file_tsprec);
+        lua_pushfstring(L, "CaptureInfo: file_type_subtype=%d, snapshot_length=%d, pkt_encap=%d, tsprecision='%s'",
+            wth->file_type_subtype, wth->snapshot_length, wth->phdr.pkt_encap, wth->tsprecision);
     }
 
     WSLUA_RETURN(1); /* String of debug information. */
@@ -747,8 +747,8 @@ WSLUA_ATTRIBUTE_NAMED_NUMBER_SETTER(CaptureInfo,encap,wth->file_encap,int);
 
     See `wtap_file_tsprec` in `init.lua` for available precisions.
  */
-WSLUA_ATTRIBUTE_NAMED_NUMBER_GETTER(CaptureInfo,time_precision,wth->file_tsprec);
-WSLUA_ATTRIBUTE_NAMED_NUMBER_SETTER(CaptureInfo,time_precision,wth->file_tsprec,int);
+WSLUA_ATTRIBUTE_NAMED_NUMBER_GETTER(CaptureInfo,time_precision,wth->tsprecision);
+WSLUA_ATTRIBUTE_NAMED_NUMBER_SETTER(CaptureInfo,time_precision,wth->tsprecision,int);
 
 /* WSLUA_ATTRIBUTE CaptureInfo_snapshot_length RW The maximum packet length that could be recorded.
 
@@ -979,7 +979,7 @@ WSLUA_METAMETHOD CaptureInfoConst__tostring(lua_State* L) {
         lua_pushstring(L,"CaptureInfoConst pointer is NULL!");
     } else {
         wtap_dumper *wdh = fi->wdh;
-        lua_pushfstring(L, "CaptureInfoConst: file_type_subtype=%d, snaplen=%d, encap=%d, compressed=%d, file_tsprec='%s'",
+        lua_pushfstring(L, "CaptureInfoConst: file_type_subtype=%d, snaplen=%d, encap=%d, compressed=%d, tsprecision='%s'",
             wdh->file_type_subtype, wdh->snaplen, wdh->encap, wdh->compressed, wdh->tsprecision);
     }
 
@@ -1282,12 +1282,15 @@ static int FrameInfo_set_data (lua_State* L) {
    if (lua_isstring(L,2)) {
         size_t len = 0;
         const gchar* s = luaL_checklstring(L,2,&len);
-
-        /* Make sure we have enough room for the packet */
-        ws_buffer_assure_space(fi->buf, len);
-        memcpy(ws_buffer_start_ptr(fi->buf), s, len);
-        fi->phdr->caplen = (guint32) len;
-        fi->phdr->len = (guint32) len;
+        if (s) {
+            /* Make sure we have enough room for the packet */
+            buffer_assure_space(fi->buf, len);
+            memcpy(buffer_start_ptr(fi->buf), s, len);
+            fi->phdr->caplen = (guint32) len;
+            fi->phdr->len = (guint32) len;
+        } else {
+            luaL_error(L, "FrameInfo's attribute 'data' did not get a valid Lua string");
+        }
     }
     else
         luaL_error(L, "FrameInfo's attribute 'data' must be a Lua string");
@@ -1300,7 +1303,7 @@ static int FrameInfo_get_data (lua_State* L) {
 
     if (!fi->buf) return 0;
 
-    lua_pushlstring(L, ws_buffer_start_ptr(fi->buf), ws_buffer_length(fi->buf));
+    lua_pushlstring(L, buffer_start_ptr(fi->buf), buffer_length(fi->buf));
 
     WSLUA_RETURN(1); /* A Lua string of the frame buffer's data. */
 }
@@ -1649,26 +1652,26 @@ wslua_filehandler_sequential_close(wtap *wth);
  * If the routine handles this type of file, it should set the "file_type"
  * field in the "struct wtap" to the type of the file.
  */
-static wtap_open_return_val
-wslua_filehandler_open(wtap *wth, int *err, gchar **err_info)
+static int
+wslua_filehandler_open(wtap *wth, int *err _U_, gchar **err_info)
 {
     FileHandler fh = (FileHandler)(wth->wslua_data);
-    wtap_open_return_val retval = WTAP_OPEN_NOT_MINE;
+    int retval = 0;
     lua_State* L = NULL;
     File *fp = NULL;
     CaptureInfo *fc = NULL;
 
-    INIT_FILEHANDLER_ROUTINE(read_open,WTAP_OPEN_NOT_MINE);
+    INIT_FILEHANDLER_ROUTINE(read_open,0);
 
     create_wth_priv(L, wth);
 
     fp = push_File(L, wth->fh);
     fc = push_CaptureInfo(L, wth, TRUE);
 
-    errno = WTAP_ERR_CANT_OPEN;
+    errno = WTAP_ERR_CANT_READ;
     switch ( lua_pcall(L,2,1,1) ) {
         case 0:
-            retval = (wtap_open_return_val)wslua_optboolint(L,-1,0);
+            retval = wslua_optboolint(L,-1,0);
             break;
         CASE_ERROR_ERRINFO("read_open")
     }
@@ -1678,24 +1681,18 @@ wslua_filehandler_open(wtap *wth, int *err, gchar **err_info)
     (*fp)->expired = TRUE;
     (*fc)->expired = TRUE;
 
-    if (retval == WTAP_OPEN_MINE) {
+    if (retval == 1) {
         /* this is our file type - set the routines and settings into wtap */
 
         if (fh->read_ref != LUA_NOREF) {
             wth->subtype_read = wslua_filehandler_read;
         }
-        else {
-            g_warning("Lua file format module lacks a read routine");
-            return WTAP_OPEN_NOT_MINE;
-        }
+        else return 0;
 
         if (fh->seek_read_ref != LUA_NOREF) {
             wth->subtype_seek_read = wslua_filehandler_seek_read;
         }
-        else {
-            g_warning("Lua file format module lacks a seek-read routine");
-            return WTAP_OPEN_NOT_MINE;
-        }
+        else return 0;
 
         /* it's ok to not have a close routine */
         if (fh->read_close_ref != LUA_NOREF)
@@ -1711,23 +1708,9 @@ wslua_filehandler_open(wtap *wth, int *err, gchar **err_info)
 
         wth->file_type_subtype = fh->file_type;
     }
-    else if (retval == WTAP_OPEN_ERROR) {
-        /* open error - we *must* return an error code! */
-        if (err) {
-            *err = WTAP_ERR_CANT_OPEN;
-        }
-    }
-    else if (retval == WTAP_OPEN_NOT_MINE) {
+    else {
         /* not our file type */
         remove_wth_priv(L, wth);
-    }
-    else {
-        /* not a valid return type */
-        g_warning("FileHandler read_open routine returned %d", retval);
-        if (err) {
-            *err = WTAP_ERR_INTERNAL;
-        }
-        retval = WTAP_OPEN_ERROR;
     }
 
     lua_settop(L,0);
@@ -1754,9 +1737,7 @@ wslua_filehandler_read(wtap *wth, int *err, gchar **err_info,
     INIT_FILEHANDLER_ROUTINE(read,FALSE);
 
     /* Reset errno */
-    if (err) {
-        *err = errno = 0;
-    }
+    *err = errno = 0;
 
     wth->phdr.opt_comment = NULL;
 
@@ -1764,6 +1745,7 @@ wslua_filehandler_read(wtap *wth, int *err, gchar **err_info,
     fc = push_CaptureInfo(L, wth, FALSE);
     fi = push_FrameInfo(L, &wth->phdr, wth->frame_buffer);
 
+    errno = WTAP_ERR_CANT_READ;
     switch ( lua_pcall(L,3,1,1) ) {
         case 0:
             if (lua_isnumber(L,-1)) {
@@ -1804,9 +1786,7 @@ wslua_filehandler_seek_read(wtap *wth, gint64 seek_off,
     INIT_FILEHANDLER_ROUTINE(seek_read,FALSE);
 
     /* Reset errno */
-    if (err) {
-        *err = errno = 0;
-    }
+    *err = errno = 0;
     phdr->opt_comment = NULL;
 
     fp = push_File(L, wth->random_fh);
@@ -1814,13 +1794,14 @@ wslua_filehandler_seek_read(wtap *wth, gint64 seek_off,
     fi = push_FrameInfo(L, phdr, buf);
     lua_pushnumber(L, (lua_Number)seek_off);
 
+    *err = WTAP_ERR_CANT_READ;
     switch ( lua_pcall(L,4,1,1) ) {
         case 0:
             if (lua_isstring(L,-1)) {
                 size_t len = 0;
                 const gchar* fd = lua_tolstring(L, -1, &len);
                 if (len < WTAP_MAX_PACKET_SIZE)
-                    memcpy(ws_buffer_start_ptr(buf), fd, len);
+                    memcpy(buffer_start_ptr(buf), fd, len);
                 retval = 1;
                 break;
             }
@@ -1918,28 +1899,29 @@ static int
 wslua_filehandler_can_write_encap(int encap, void* data)
 {
     FileHandler fh = (FileHandler)(data);
-    int retval = WTAP_ERR_UNWRITABLE_ENCAP;
+    int retval = WTAP_ERR_UNSUPPORTED_ENCAP;
     lua_State* L = NULL;
 
     INIT_FILEHANDLER_ROUTINE(can_write_encap,WTAP_ERR_INTERNAL);
 
     lua_pushnumber(L, encap);
 
+    errno = WTAP_ERR_CANT_READ;
     switch ( lua_pcall(L,1,1,1) ) {
         case 0:
-            retval = wslua_optboolint(L,-1,WTAP_ERR_UNWRITABLE_ENCAP);
+            retval = wslua_optboolint(L,-1,WTAP_ERR_UNSUPPORTED_ENCAP);
             break;
         CASE_ERROR("can_write_encap")
     }
 
     END_FILEHANDLER_ROUTINE();
 
-    /* the retval we got was either a 1 for true, 0 for false, or WTAP_ERR_UNWRITABLE_ENCAP;
+    /* the retval we got was either a 1 for true, 0 for false, or WTAP_ERR_UNSUPPORTED_ENCAP;
        but can_write_encap() expects 0 to be true/yes */
     if (retval == 1) {
         retval = 0;
     } else if (retval == 0) {
-        retval = WTAP_ERR_UNWRITABLE_ENCAP;
+        retval = WTAP_ERR_UNSUPPORTED_ENCAP;
     }
 
     return retval;
@@ -1948,7 +1930,7 @@ wslua_filehandler_can_write_encap(int encap, void* data)
 /* some declarations */
 static gboolean
 wslua_filehandler_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
-                      const guint8 *pd, int *err, gchar **err_info);
+                      const guint8 *pd, int *err);
 static gboolean
 wslua_filehandler_dump_close(wtap_dumper *wdh, int *err);
 
@@ -1973,9 +1955,7 @@ wslua_filehandler_dump_open(wtap_dumper *wdh, int *err)
     fc = push_CaptureInfoConst(L,wdh);
 
     /* Reset err */
-    if (err) {
-        *err = 0;
-    }
+    *err = 0;
 
     switch ( lua_pcall(L,2,1,1) ) {
         case 0:
@@ -2019,7 +1999,7 @@ wslua_filehandler_dump_open(wtap_dumper *wdh, int *err)
 */
 static gboolean
 wslua_filehandler_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
-                      const guint8 *pd, int *err, gchar **err_info _U_)
+                      const guint8 *pd, int *err)
 {
     FileHandler fh = (FileHandler)(wdh->wslua_data);
     int retval = -1;
@@ -2031,15 +2011,13 @@ wslua_filehandler_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
     INIT_FILEHANDLER_ROUTINE(write,FALSE);
 
     /* Reset errno */
-    if (err) {
-        *err = errno = 0;
-    }
+    *err = errno = 0;
 
     fp = push_Wdh(L, wdh);
     fc = push_CaptureInfoConst(L,wdh);
     fi = push_FrameInfoConst(L, phdr, pd);
 
-    errno = WTAP_ERR_CANT_WRITE;
+    errno = WTAP_ERR_CANT_READ;
     switch ( lua_pcall(L,3,1,1) ) {
         case 0:
             retval = wslua_optboolint(L,-1,0);
@@ -2071,14 +2049,12 @@ wslua_filehandler_dump_close(wtap_dumper *wdh, int *err)
     INIT_FILEHANDLER_ROUTINE(write_close,FALSE);
 
     /* Reset errno */
-    if (err) {
-        *err = errno = 0;
-    }
+    *err = errno = 0;
 
     fp = push_Wdh(L, wdh);
     fc = push_CaptureInfoConst(L,wdh);
 
-    errno = WTAP_ERR_CANT_CLOSE;
+    errno = WTAP_ERR_CANT_READ;
     switch ( lua_pcall(L,2,1,1) ) {
         case 0:
             retval = wslua_optboolint(L,-1,0);

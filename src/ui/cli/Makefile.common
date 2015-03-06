@@ -49,7 +49,6 @@ TSHARK_TAP_SRC = \
 	tap-comparestat.c	\
 	tap-dcerpcstat.c	\
 	tap-diameter-avp.c	\
-	tap-endpoints.c		\
 	tap-expert.c		\
 	tap-follow.c		\
 	tap-funnel.c		\
@@ -81,6 +80,3 @@ TSHARK_TAP_SRC = \
 	tap-stats_tree.c	\
 	tap-sv.c		\
 	tap-wspstat.c
-
-noinst_HEADERS = \
-	tshark-tap.h

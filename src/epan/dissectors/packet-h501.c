@@ -31,6 +31,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/oids.h>
@@ -304,7 +305,7 @@ static int hf_h501_releaseCompleteReason = -1;    /* ReleaseCompleteReason */
 static int hf_h501_causeIE = -1;                  /* INTEGER_1_65535 */
 
 /*--- End of included file: packet-h501-hf.c ---*/
-#line 45 "../../asn1/h501/packet-h501-template.c"
+#line 46 "../../asn1/h501/packet-h501-template.c"
 
 /* Initialize the subtree pointers */
 static int ett_h501 = -1;
@@ -412,7 +413,7 @@ static gint ett_h501_Role = -1;
 static gint ett_h501_TerminationCause = -1;
 
 /*--- End of included file: packet-h501-ett.c ---*/
-#line 49 "../../asn1/h501/packet-h501-template.c"
+#line 50 "../../asn1/h501/packet-h501-template.c"
 
 /* Dissectors */
 static dissector_handle_t h501_pdu_handle;
@@ -2514,7 +2515,7 @@ static int dissect_Message_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_
 
 
 /*--- End of included file: packet-h501-fn.c ---*/
-#line 61 "../../asn1/h501/packet-h501-template.c"
+#line 62 "../../asn1/h501/packet-h501-template.c"
 
 static int
 dissect_h501_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
@@ -2534,14 +2535,14 @@ static int
 dissect_h501_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
   dissect_tpkt_encap(tvb, pinfo, tree, FALSE, h501_pdu_handle);
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 static int
 dissect_h501_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
   dissect_tpkt_encap(tvb, pinfo, tree, h501_desegment_tcp, h501_pdu_handle);
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 /*--- proto_register_h501 ----------------------------------------------*/
@@ -3555,7 +3556,7 @@ void proto_register_h501(void) {
         "INTEGER_1_65535", HFILL }},
 
 /*--- End of included file: packet-h501-hfarr.c ---*/
-#line 97 "../../asn1/h501/packet-h501-template.c"
+#line 98 "../../asn1/h501/packet-h501-template.c"
   };
 
   /* List of subtrees */
@@ -3665,7 +3666,7 @@ void proto_register_h501(void) {
     &ett_h501_TerminationCause,
 
 /*--- End of included file: packet-h501-ettarr.c ---*/
-#line 103 "../../asn1/h501/packet-h501-template.c"
+#line 104 "../../asn1/h501/packet-h501-template.c"
   };
 
   /* Register protocol */

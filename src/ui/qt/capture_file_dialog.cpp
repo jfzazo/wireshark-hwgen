@@ -556,7 +556,7 @@ QDialogButtonBox *CaptureFileDialog::addHelpButton(topic_action_e help_topic)
 }
 
 int CaptureFileDialog::open(QString &file_name, unsigned int &type) {
-    setWindowTitle(wsApp->windowTitleString(tr("Open Capture File")));
+    setWindowTitle(tr("Wireshark: Open Capture File"));
     setNameFilters(buildFileOpenTypeList());
     setFileMode(QFileDialog::ExistingFile);
 
@@ -592,7 +592,7 @@ int CaptureFileDialog::open(QString &file_name, unsigned int &type) {
 }
 
 check_savability_t CaptureFileDialog::saveAs(QString &file_name, bool must_support_all_comments) {
-    setWindowTitle(wsApp->windowTitleString(tr("Save Capture File As")));
+    setWindowTitle(tr("Wireshark: Save Capture File As"));
     // XXX There doesn't appear to be a way to use setNameFilters without restricting
     // what the user can select. We might want to use our own combobox instead and
     // let the user select anything.
@@ -620,7 +620,7 @@ check_savability_t CaptureFileDialog::saveAs(QString &file_name, bool must_suppo
 check_savability_t CaptureFileDialog::exportSelectedPackets(QString &file_name, packet_range_t *range) {
     QDialogButtonBox *button_box;
 
-    setWindowTitle(wsApp->windowTitleString(tr("Export Specified Packets")));
+    setWindowTitle(tr("Wireshark: Export Specified Packets"));
     // XXX See comment in ::saveAs regarding setNameFilters
     setNameFilters(buildFileSaveAsTypeList(false));
     setAcceptMode(QFileDialog::AcceptSave);
@@ -653,7 +653,7 @@ check_savability_t CaptureFileDialog::exportSelectedPackets(QString &file_name, 
 }
 
 int CaptureFileDialog::merge(QString &file_name) {
-    setWindowTitle(wsApp->windowTitleString(tr("Merge Capture File")));
+    setWindowTitle(tr("Wireshark: Merge Capture File"));
     setNameFilters(buildFileOpenTypeList());
     setFileMode(QFileDialog::ExistingFile);
 

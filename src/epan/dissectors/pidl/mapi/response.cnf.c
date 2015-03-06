@@ -33,16 +33,6 @@ MANUAL mapi_dissect_element_EcDoRpc_MAPI_REPL_UNION_GetProps
 #ETT_FIELD ett_mapi_OpenMsgStore_repl
 #MANUAL mapi_dissect_element_EcDoRpc_MAPI_REPL_UNION_OpenMsgStore
 
-#
-# Misc. filters
-#
-HF_FIELD hf_mapi_MAPI_OPNUM "Opnum" "mapi.EcDoRpc_MAPI_REPL.opnum" FT_UINT8 BASE_HEX VALS(mapi_MAPI_OPNUM_vals) 0 NULL HFILL
-HF_RENAME hf_mapi_EcDoRpc_MAPI_REPL_opnum hf_mapi_MAPI_OPNUM
-HF_FIELD hf_mapi_EcDoRpc_handle_index "Handle index" "mapi.EcDoRpc.handle_index" FT_UINT8 BASE_DEC NULL 0 NULL HFILL
-HF_FIELD hf_mapi_EcDoRpc_subcontext_size "Subcontext size" "mapi.EcDoRpc.subcontext_size" FT_UINT32 BASE_HEX NULL 0 NULL HFILL
-HF_FIELD hf_mapi_EcDoRpc_unknown1 "Unknown1" "mapi.EcDoRpc.unknown1" FT_UINT16 BASE_HEX NULL 0 NULL HFILL
-HF_FIELD hf_mapi_EcDoRpc_layout "Layout" "mapi.EcDoRpc.layout" FT_UINT8 BASE_DEC NULL 0 NULL HFILL
-HF_FIELD hf_mapi_EcDoRpc_prop_count "Prop count" "mapi.EcDoRpc.prop_count" FT_UINT16 BASE_HEX NULL 0 NULL HFILL
 
 
 CODE START
@@ -53,29 +43,35 @@ mapi_dissect_struct_EcDoRpc_MAPI_REPL(tvbuff_t *tvb _U_, int offset _U_, packet_
 	proto_item	*item = NULL;
 	proto_tree	*tree = NULL;
 	int		old_offset;
+	int		cur_offset;
 	guint8		opnum;
+	guint8		handle_idx;
 	guint32		retval;
 
 	old_offset = offset;
 
 	if (parent_tree) {
-		item = proto_tree_add_item(parent_tree, hf_index, tvb, offset, -1, ENC_NA);
+		item = proto_tree_add_item(parent_tree, hf_index, tvb, offset, -1, TRUE);
 		tree = proto_item_add_subtree(item, ett_mapi_EcDoRpc_MAPI_REPL);
 	}
 
+	cur_offset = offset;
 	opnum = tvb_get_guint8(tvb, offset);
-	proto_tree_add_item(tree, hf_mapi_MAPI_OPNUM, tvb, offset, 1, ENC_NA);
 	offset += 1;
+	proto_tree_add_text(tree, tvb, cur_offset, offset - cur_offset, "opnum: %s", val_to_str(opnum, mapi_MAPI_OPNUM_vals, "Unknown MAPI operation: 0x%02x"));
 
 	col_append_fstr(pinfo->cinfo, COL_INFO, " + %s", val_to_str(opnum, mapi_MAPI_OPNUM_vals, "Unknown MAPI operation: 0x%02x"));
 
 	if (opnum != op_MAPI_Notify) {
-		proto_tree_add_item(tree, hf_mapi_EcDoRpc_handle_index, tvb, offset, 1, ENC_NA);
+		cur_offset = offset;
+		handle_idx = tvb_get_guint8(tvb, offset);
 		offset += 1;
+		proto_tree_add_text(tree, tvb, cur_offset, offset - cur_offset, "handle index: %d", handle_idx);
 
+		cur_offset = offset;
 		retval = tvb_get_letohl(tvb, offset);
-		proto_tree_add_item(tree, hf_mapi_MAPISTATUS_status, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 		offset += 4;
+		proto_tree_add_text(tree, tvb, cur_offset, offset - cur_offset, "MAPISTATUS: %s", val_to_str(retval, mapi_MAPISTATUS_vals, "Unknown MAPISTATUS error 0x%08x"));
 
 		if (retval == MAPI_E_SUCCESS) {
 			switch(opnum) {
@@ -96,8 +92,8 @@ mapi_dissect_struct_EcDoRpc_MAPI_REPL(tvbuff_t *tvb _U_, int offset _U_, packet_
 			}
 		}
 	} else {
-		/* we don't decode notifications within the dissector yet */
-		offset += param - 1;
+	       /* we don't decode notifications within the dissector yet */
+	       offset += param - 1;
 	}
 
 	proto_item_set_len(item, offset - old_offset);
@@ -125,10 +121,11 @@ mapi_dissect_element_EcDoRpc_response_(tvbuff_t *tvb _U_, int offset _U_, packet
 	gint		reported_len;
 	guint16		pdu_len;
 	guint32		i;
+	proto_item	*it = NULL;
 	proto_tree	*tr = NULL;
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_mapi_EcDoRpc_mapi_response, &size);
-	proto_tree_add_uint(tree, hf_mapi_EcDoRpc_subcontext_size, tvb, start_offset, offset - start_offset + size, size);
+	proto_tree_add_text(tree, tvb, start_offset, offset - start_offset + size, "Subcontext size: 0x%x", size);
 
 	reported_len = tvb_reported_length_remaining(tvb, offset);
 
@@ -151,7 +148,8 @@ mapi_dissect_element_EcDoRpc_response_(tvbuff_t *tvb _U_, int offset _U_, packet
 	tvb_set_free_cb(decrypted_tvb, g_free);
 	add_new_data_source(pinfo, decrypted_tvb, "Decrypted MAPI");
 
-	tr = proto_tree_add_subtree(tree, decrypted_tvb, 0, size, ett_mapi_mapi_response, NULL, "Decrypted MAPI PDU");
+	it = proto_tree_add_text(tree, decrypted_tvb, 0, size, "Decrypted MAPI PDU");
+	tr = proto_item_add_subtree(it, ett_mapi_mapi_response);
 
 	pdu_len = tvb_get_letohs(decrypted_tvb, 0);
 	proto_tree_add_uint(tr, hf_mapi_pdu_len, decrypted_tvb, 0, 2, pdu_len);
@@ -177,7 +175,7 @@ mapi_dissect_element_EcDoRpc_response__(tvbuff_t *tvb _U_, int offset _U_, packe
 	offset += 2;
 
 	while (offset < length) {
-		offset = mapi_dissect_struct_EcDoRpc_MAPI_REPL(subtvb, offset, pinfo, tree, di, drep, hf_mapi_mapi_response_mapi_repl, length - offset);
+	      	offset = mapi_dissect_struct_EcDoRpc_MAPI_REPL(subtvb, offset, pinfo, tree, di, drep, hf_mapi_mapi_response_mapi_repl, length - offset);
 	}
 
 	return offset;
@@ -192,6 +190,8 @@ mapi_dissect_element_EcDoRpc_MAPI_REPL_UNION_OpenFolder(tvbuff_t *tvb _U_, int o
 	proto_tree	*tree = NULL;
 	int		old_offset;
 	int		origin_offset;
+	/**** Function parameters ****/
+	guint16		unknown;
 
 	origin_offset = offset;
 
@@ -201,8 +201,9 @@ mapi_dissect_element_EcDoRpc_MAPI_REPL_UNION_OpenFolder(tvbuff_t *tvb _U_, int o
 	}
 
 	old_offset = offset;
-	proto_tree_add_item(tree, hf_mapi_EcDoRpc_unknown1, tvb, old_offset, 2, ENC_LITTLE_ENDIAN);
+	unknown = tvb_get_letohs(tvb, offset);
 	offset += 2;
+	proto_tree_add_text(tree, tvb, old_offset, offset - old_offset, "unknown: 0x%04x", unknown);
 
 	proto_item_set_len(item, offset - origin_offset);
 
@@ -216,8 +217,10 @@ mapi_dissect_element_EcDoRpc_MAPI_REPL_UNION_GetProps(tvbuff_t *tvb _U_, int off
 {
 	proto_item	*item = NULL;
 	proto_tree	*tree = NULL;
+	int		old_offset;
 	int		origin_offset;
 	/**** Function parameters ****/
+	guint8		layout;
 	guint16		length;
 
 	origin_offset = offset;
@@ -227,12 +230,15 @@ mapi_dissect_element_EcDoRpc_MAPI_REPL_UNION_GetProps(tvbuff_t *tvb _U_, int off
 		tree = proto_item_add_subtree(item, ett_mapi_GetProps_repl);
 	}
 
-	proto_tree_add_item(tree, hf_mapi_EcDoRpc_layout, tvb, offset, 1, ENC_NA);
+	old_offset = offset;
+	layout = tvb_get_guint8(tvb, offset);
 	offset += 1;
+	proto_tree_add_text(tree, tvb, old_offset, offset - old_offset, "layout: %d", layout);
 
+	old_offset = offset;
 	length = tvb_reported_length_remaining(tvb, offset);
-	proto_tree_add_uint(tree, hf_mapi_EcDoRpc_prop_count, tvb, offset, 0, length);
 	offset += length;
+	proto_tree_add_text(tree, tvb, old_offset, offset - old_offset, "prop_count: 0x%x", length);
 
 	proto_item_set_len(item, offset - origin_offset);
 

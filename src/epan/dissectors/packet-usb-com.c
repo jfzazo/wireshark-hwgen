@@ -296,8 +296,10 @@ dissect_usb_com_descriptor(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
     proto_tree *subtree;
     proto_tree *subtree_capabilities;
     proto_item *subitem_capabilities;
+    proto_item *ti;
 
-    subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_usb_com, NULL, "COMMUNICATIONS DESCRIPTOR");
+    ti = proto_tree_add_text(tree, tvb, offset, -1, "COMMUNICATIONS DESCRIPTOR");
+    subtree = proto_item_add_subtree(ti, ett_usb_com);
 
     dissect_usb_descriptor_header(subtree, tvb, offset, &usb_com_descriptor_type_vals_ext);
     offset += 2;
@@ -463,7 +465,7 @@ dissect_usb_com_control(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
         {
             case SEND_ENCAPSULATED_COMMAND:
                 if ((usb_conv_info->interfaceSubclass == COM_SUBCLASS_MBIM) &&
-                    (USB_HEADER_IS_LINUX(usb_trans_info->header_type))) {
+                    (usb_trans_info->header_info & USB_HEADER_IS_LINUX)) {
                     offset = call_dissector_only(mbim_control_handle, tvb, pinfo, tree, usb_conv_info);
                     break;
                 }
@@ -556,6 +558,7 @@ dissect_usb_com_bulk(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
             case 0x01: /* Network Transfer Block */
             case 0x02: /* Network Transfer Block (IP + DSS) */
                 return call_dissector_only(mbim_bulk_handle, tvb, pinfo, tree, NULL);
+                break;
             default:
                 break;
         }

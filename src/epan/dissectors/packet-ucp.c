@@ -24,8 +24,7 @@
  * Dissector of a UCP (Universal Computer Protocol) PDU, as defined for the
  * ERMES paging system in ETS 300 133-3 (2nd final draft, September 1997,
  * www.etsi.org).
- * Includes the extension of EMI-UCP interface
- * (V4.0, May 2001, www.advox.se/download/protocols/EMI_UCP.pdf)
+ * Includes the extension of EMI-UCP interface (V4.0, May 2001, www.cmgwds.com)
  *
  * Support for statistics using the Stats Tree API added by
  * Abhik Sarkar <sarkar.abhik@gmail.com>
@@ -36,8 +35,12 @@
 
 #include <stdlib.h>
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
+#include <epan/conversation.h>
 #include <epan/stats_tree.h>
 
 #include "packet-tcp.h"
@@ -709,9 +712,9 @@ ucp_stats_tree_per_packet(stats_tree *st, /* st as it was passed to us */
  * \param       endpkt  Returns pointer, indicating the end of the PDU
  *
  * \return              The state of this PDU
- *       0               Definitely UCP
- *       UCP_MALFORMED   ???
- *       UCP_INV_CHK     Nice packet, but checksum doesn't add up...
+ * \retval      0               Definitely UCP
+ * \retval      UCP_MALFORMED   ???
+ * \retval      UCP_INV_CHK     Nice packet, but checksum doesn't add up...
  */
 static int
 check_ucp(tvbuff_t *tvb, int *endpkt)
@@ -894,7 +897,7 @@ ucp_handle_int(proto_tree *tree, tvbuff_t *tvb, int field, int *offset)
         tvb_ensure_bytes_exist(tvb, *offset, len + 1);
     } else
         len = idx - *offset;
-    strval = tvb_get_string_enc(wmem_packet_scope(), tvb, *offset, len, ENC_ASCII);
+    strval = tvb_get_string(wmem_packet_scope(), tvb, *offset, len);
     if (len > 0) {
         intval = atoi(strval);
         proto_tree_add_uint(tree, field, tvb, *offset, len, intval);
@@ -920,7 +923,7 @@ ucp_handle_time(proto_tree *tree, tvbuff_t *tvb, int field, int *offset)
         tvb_ensure_bytes_exist(tvb, *offset, len + 1);
     } else
         len = idx - *offset;
-    strval = tvb_get_string_enc(wmem_packet_scope(), tvb, *offset, len, ENC_ASCII);
+    strval = tvb_get_string(wmem_packet_scope(), tvb, *offset, len);
     if (len > 0) {
         tval = ucp_mktime(len, strval);
         tmptime.secs  = tval;
@@ -1681,7 +1684,7 @@ add_5xO(proto_tree *tree, tvbuff_t *tvb)
         proto_tree *subtree;
 
         ti = proto_tree_add_item(tree, hf_ucp_parm_XSer, tvb, offset, len, ENC_NA);
-        tmptvb = tvb_new_subset_length(tvb, offset, len + 1);
+        tmptvb = tvb_new_subset(tvb, offset, len + 1, len + 1);
         subtree = proto_item_add_subtree(ti, ett_XSer);
         ucp_handle_XSer(subtree, tmptvb);
     }
@@ -1733,7 +1736,7 @@ add_6xO(proto_tree *tree, tvbuff_t *tvb, guint8 OT)
 #undef UcpHandleData
 
 static guint
-get_ucp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_ucp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     guint        intval=0;
     int          i;
@@ -2793,7 +2796,7 @@ proto_reg_handoff_ucp(void)
      * Also register as a dissector that can be selected by a TCP port number via "decode as".
      */
     ucp_handle = new_create_dissector_handle(dissect_ucp_tcp, proto_ucp);
-    dissector_add_for_decode_as("tcp.port", ucp_handle);
+    dissector_add_handle("tcp.port", ucp_handle);
 
     /* Tapping setup */
     stats_tree_register_with_group("ucp", "ucp_messages", "_UCP Messages", 0,

@@ -27,8 +27,12 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include <epan/addr_resolv.h>
 #include <epan/ipproto.h>
 #include <epan/in_cksum.h>
@@ -37,9 +41,9 @@
 
 #include "packet-udp.h"
 
+#include "packet-ip.h"
 #include <epan/conversation.h>
-#include <epan/conversation_table.h>
-#include <epan/color_dissector_filters.h>
+#include <epan/tap.h>
 #include <epan/decode_as.h>
 
 void proto_register_udp(void);
@@ -232,7 +236,7 @@ init_udp_conversation_data(void)
   return udpd;
 }
 
-struct udp_analysis *
+static struct udp_analysis *
 get_udp_conversation_data(conversation_t *conv, packet_info *pinfo)
 {
   int direction;
@@ -275,130 +279,6 @@ get_udp_conversation_data(conversation_t *conv, packet_info *pinfo)
 
   return udpd;
 }
-
-static const char* udp_conv_get_filter_type(conv_item_t* conv, conv_filter_type_e filter)
-{
-    if (filter == CONV_FT_SRC_PORT)
-        return "udp.srcport";
-
-    if (filter == CONV_FT_DST_PORT)
-        return "udp.dstport";
-
-    if (filter == CONV_FT_ANY_PORT)
-        return "udp.port";
-
-    if(!conv) {
-        return CONV_FILTER_INVALID;
-    }
-
-    if (filter == CONV_FT_SRC_ADDRESS) {
-        if (conv->src_address.type == AT_IPv4)
-            return "ip.src";
-        if (conv->src_address.type == AT_IPv6)
-            return "ipv6.src";
-    }
-
-    if (filter == CONV_FT_DST_ADDRESS) {
-        if (conv->dst_address.type == AT_IPv4)
-            return "ip.dst";
-        if (conv->dst_address.type == AT_IPv6)
-            return "ipv6.dst";
-    }
-
-    if (filter == CONV_FT_ANY_ADDRESS) {
-        if (conv->src_address.type == AT_IPv4)
-            return "ip.addr";
-        if (conv->src_address.type == AT_IPv6)
-            return "ipv6.addr";
-    }
-
-    return CONV_FILTER_INVALID;
-}
-
-static ct_dissector_info_t udp_ct_dissector_info = {&udp_conv_get_filter_type};
-
-static int
-udpip_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
-{
-    conv_hash_t *hash = (conv_hash_t*) pct;
-    const e_udphdr *udphdr=(const e_udphdr *)vip;
-
-    add_conversation_table_data_with_conv_id(hash, &udphdr->ip_src, &udphdr->ip_dst, udphdr->uh_sport, udphdr->uh_dport, (conv_id_t) udphdr->uh_stream, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->fd->abs_ts, &udp_ct_dissector_info, PT_UDP);
-
-    return 1;
-}
-
-static const char* udp_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
-{
-
-    if (filter == CONV_FT_SRC_PORT)
-        return "udp.srcport";
-
-    if (filter == CONV_FT_DST_PORT)
-        return "udp.dstport";
-
-    if (filter == CONV_FT_ANY_PORT)
-        return "udp.port";
-
-    if(!host) {
-        return CONV_FILTER_INVALID;
-    }
-
-    if (filter == CONV_FT_SRC_ADDRESS || filter == CONV_FT_DST_ADDRESS || filter == CONV_FT_ANY_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
-            return "ip.src";
-        if (host->myaddress.type == AT_IPv6)
-            return "ipv6.src";
-    }
-
-    return CONV_FILTER_INVALID;
-}
-
-static hostlist_dissector_info_t udp_host_dissector_info = {&udp_host_get_filter_type};
-
-static int
-udpip_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
-{
-    conv_hash_t *hash = (conv_hash_t*) pit;
-    const e_udphdr *udphdr=(const e_udphdr *)vip;
-
-    /* Take two "add" passes per packet, adding for each direction, ensures that all
-    packets are counted properly (even if address is sending to itself)
-    XXX - this could probably be done more efficiently inside hostlist_table */
-    add_hostlist_table_data(hash, &udphdr->ip_src, udphdr->uh_sport, TRUE, 1, pinfo->fd->pkt_len, &udp_host_dissector_info, PT_UDP);
-    add_hostlist_table_data(hash, &udphdr->ip_dst, udphdr->uh_dport, FALSE, 1, pinfo->fd->pkt_len, &udp_host_dissector_info, PT_UDP);
-
-    return 1;
-}
-
-static gboolean
-udp_color_filter_valid(packet_info *pinfo)
-{
-    return proto_is_frame_protocol(pinfo->layers, "udp");
-}
-
-static gchar*
-udp_build_color_filter(packet_info *pinfo)
-{
-    if( pinfo->net_src.type == AT_IPv4 && pinfo->net_dst.type == AT_IPv4 ) {
-        /* UDP over IPv4 */
-        return g_strdup_printf("(ip.addr eq %s and ip.addr eq %s) and (udp.port eq %d and udp.port eq %d)",
-            address_to_str(pinfo->pool, &pinfo->net_src),
-            address_to_str(pinfo->pool, &pinfo->net_dst),
-            pinfo->srcport, pinfo->destport );
-    }
-
-    if( pinfo->net_src.type == AT_IPv6 && pinfo->net_dst.type == AT_IPv6 ) {
-        /* UDP over IPv6 */
-        return g_strdup_printf("(ipv6.addr eq %s and ipv6.addr eq %s) and (udp.port eq %d and udp.port eq %d)",
-            address_to_str(pinfo->pool, &pinfo->net_src),
-            address_to_str(pinfo->pool, &pinfo->net_dst),
-            pinfo->srcport, pinfo->destport );
-    }
-
-    return NULL;
-}
-
 
 /* Attach process info to a flow */
 /* XXX - We depend on the UDP dissector finding the conversation first */
@@ -581,8 +461,8 @@ dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 ip_proto)
   udph->uh_sport=tvb_get_ntohs(tvb, offset);
   udph->uh_dport=tvb_get_ntohs(tvb, offset+2);
 
-  src_port_str = udp_port_to_display(wmem_packet_scope(), udph->uh_sport);
-  dst_port_str = udp_port_to_display(wmem_packet_scope(), udph->uh_dport);
+  src_port_str = ep_udp_port_to_display(udph->uh_sport);
+  dst_port_str = ep_udp_port_to_display(udph->uh_dport);
 
   col_add_lstr(pinfo->cinfo, COL_INFO,
     "Source port: ", src_port_str, "  "
@@ -726,8 +606,11 @@ dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 ip_proto)
     if (((ip_proto == IP_PROTO_UDP) && udp_check_checksum) ||
         ((ip_proto == IP_PROTO_UDPLITE) && udplite_check_checksum)) {
       /* Set up the fields of the pseudo-header. */
-      SET_CKSUM_VEC_PTR(cksum_vec[0], (const guint8 *)pinfo->src.data, pinfo->src.len);
-      SET_CKSUM_VEC_PTR(cksum_vec[1], (const guint8 *)pinfo->dst.data, pinfo->dst.len);
+      cksum_vec[0].ptr = (const guint8 *)pinfo->src.data;
+      cksum_vec[0].len = pinfo->src.len;
+      cksum_vec[1].ptr = (const guint8 *)pinfo->dst.data;
+      cksum_vec[1].len = pinfo->dst.len;
+      cksum_vec[2].ptr = (const guint8 *)&phdr;
       switch (pinfo->src.type) {
 
       case AT_IPv4:
@@ -735,7 +618,7 @@ dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 ip_proto)
           phdr[0] = g_htonl((ip_proto<<16) | udph->uh_ulen);
         else
           phdr[0] = g_htonl((ip_proto<<16) | reported_len);
-        SET_CKSUM_VEC_PTR(cksum_vec[2], (const guint8 *)&phdr, 4);
+        cksum_vec[2].len = 4;
         break;
 
       case AT_IPv6:
@@ -744,7 +627,7 @@ dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 ip_proto)
         else
           phdr[0] = g_htonl(reported_len);
         phdr[1] = g_htonl(ip_proto);
-        SET_CKSUM_VEC_PTR(cksum_vec[2], (const guint8 *)&phdr, 8);
+        cksum_vec[2].len = 8;
         break;
 
       default:
@@ -752,7 +635,8 @@ dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 ip_proto)
         DISSECTOR_ASSERT_NOT_REACHED();
         break;
       }
-      SET_CKSUM_VEC_TVB(cksum_vec[3], tvb, offset, udph->uh_sum_cov);
+      cksum_vec[3].ptr = tvb_get_ptr(tvb, offset, udph->uh_sum_cov);
+      cksum_vec[3].len = udph->uh_sum_cov;
       computed_cksum = in_cksum(&cksum_vec[0], 4);
       if (computed_cksum == 0) {
         item = proto_tree_add_uint_format_value(udp_tree, hfi_udp_checksum.id, tvb,
@@ -838,8 +722,9 @@ dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 ip_proto)
   }
 
   if (udpd && ((udpd->fwd && udpd->fwd->command) || (udpd->rev && udpd->rev->command))) {
-    process_tree = proto_tree_add_subtree(udp_tree, tvb, offset, 0, ett_udp_process_info, &ti, "Process Information");
+    ti = proto_tree_add_text(udp_tree, tvb, offset, 0, "Process Information");
     PROTO_ITEM_SET_GENERATED(ti);
+    process_tree = proto_item_add_subtree(ti, ett_udp_process_info);
     if (udpd->fwd && udpd->fwd->command) {
       proto_tree_add_uint_format_value(process_tree, hfi_udp_proc_dst_uid.id, tvb, 0, 0,
               udpd->fwd->process_uid, "%u", udpd->fwd->process_uid);
@@ -973,7 +858,8 @@ proto_register_udp(void)
 /* subdissector code */
   udp_dissector_table = register_dissector_table("udp.port",
                                                  "UDP port", FT_UINT16, BASE_DEC);
-  heur_subdissector_list = register_heur_dissector_list("udp");
+  register_heur_dissector_list("udp", &heur_subdissector_list);
+  register_heur_dissector_list("udplite", &heur_subdissector_list);
 
   /* Register configuration preferences */
   udp_module = prefs_register_protocol(proto_udp, NULL);
@@ -1006,8 +892,6 @@ proto_register_udp(void)
                                  &udplite_check_checksum);
 
   register_decode_as(&udp_da);
-  register_conversation_table(proto_udp, FALSE, udpip_conversation_packet, udpip_hostlist_packet);
-  register_color_conversation_filter("udp", "UDP", udp_color_filter_valid, udp_build_color_filter);
 
   register_init_routine(udp_init);
 

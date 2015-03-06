@@ -19,12 +19,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-include(WiresharkPlugin)
-
-# This info is from moduleinfo.nmake
-set_module_info(docsis 0 0 5 0)
-
-# The sources for the plugin
 set(DISSECTOR_SRC
 	packet-bintrngreq.c
 	packet-bpkmattr.c
@@ -96,10 +90,18 @@ register_dissector_files(plugin.c
 	${DISSECTOR_SRC}
 )
 
-add_plugin_library(docsis)
+add_library(docsis ${LINK_MODE_MODULE}
+	${PLUGIN_FILES}
+)
+set_target_properties(docsis PROPERTIES PREFIX "")
+set_target_properties(docsis PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+set_target_properties(docsis PROPERTIES FOLDER "Plugins")
+
+target_link_libraries(docsis epan)
 
 install(TARGETS docsis
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION} NAMELINK_SKIP
 	RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}
 )
+

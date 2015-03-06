@@ -30,8 +30,10 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
+#include <epan/dissectors/packet-tcp.h>
+#include <epan/tap.h>
 #include <epan/stats_tree.h>
-#include "packet-tcp.h"
 
 #define ANCP_PORT 6068 /* The ANCP TCP port:draft-ietf-ancp-protocol-09.txt */
 
@@ -586,7 +588,7 @@ dissect_ancp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
     if (mtype != ANCP_MTYPE_ADJ) {
         /* Dissect common header */
         proto_tree_add_item(ancp_tree, hf_ancp_result, tvb, offset, 1,
-                            ENC_BIG_ENDIAN); /* treat as 1B, but don't change offset */
+                            ENC_BIG_ENDIAN); /* treat as 1B, but dont change offset */
 
         proto_tree_add_item(ancp_tree, hf_ancp_code, tvb, offset, 2,
                             ENC_BIG_ENDIAN);
@@ -601,7 +603,7 @@ dissect_ancp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
         offset += 3;
 
         proto_tree_add_item(ancp_tree, hf_ancp_i_flag, tvb, offset, 1,
-                            ENC_BIG_ENDIAN); /* treat as 1B, but don't change offset */
+                            ENC_BIG_ENDIAN); /* treat as 1B, but dont change offset */
 
         sti = proto_tree_add_item(ancp_tree, hf_ancp_submsg_num, tvb,
                                   offset, 2, ENC_BIG_ENDIAN);
@@ -636,7 +638,7 @@ dissect_ancp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 }
 
 static guint
-get_ancp_msg_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_ancp_msg_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     return (guint)tvb_get_ntohs(tvb, offset + 2) + 4; /* 2B len + 4B hdr */
 }
@@ -934,15 +936,3 @@ proto_reg_handoff_ancp(void)
             ancp_stats_tree_packet, ancp_stats_tree_init, NULL);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

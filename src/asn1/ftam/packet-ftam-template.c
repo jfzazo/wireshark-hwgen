@@ -28,8 +28,8 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
 
@@ -47,7 +47,6 @@ void proto_reg_handoff_ftam(void);
 /* Initialize the protocol and registered fields */
 static int proto_ftam = -1;
 
-static const char *object_identifier_id;
 /* Declare the function to avoid a compiler warning */
 static int dissect_ftam_OR_Set(gboolean implicit_tag _U_, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index _U_);
 
@@ -58,8 +57,6 @@ static int hf_ftam_unstructured_binary = -1;            /* ISO FTAM unstructured
 /* Initialize the subtree pointers */
 static gint ett_ftam = -1;
 #include "packet-ftam-ett.c"
-
-static expert_field ei_ftam_zero_pdu = EI_INIT;
 
 #include "packet-ftam-fn.c"
 
@@ -106,7 +103,7 @@ dissect_ftam(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 		old_offset=offset;
 		offset=dissect_ftam_PDU(FALSE, tvb, offset, &asn1_ctx, tree, -1);
 		if(offset == old_offset){
-			proto_tree_add_expert(tree, pinfo, &ei_ftam_zero_pdu, tvb, offset, -1);
+			proto_tree_add_text(tree, tvb, offset, -1,"Internal error, zero-byte FTAM PDU");
 			break;
 		}
 	}
@@ -133,11 +130,6 @@ void proto_register_ftam(void) {
     &ett_ftam,
 #include "packet-ftam-ettarr.c"
   };
-  static ei_register_info ei[] = {
-    { &ei_ftam_zero_pdu, { "ftam.zero_pdu", PI_PROTOCOL, PI_ERROR, "Internal error, zero-byte FTAM PDU", EXPFILL }},
-  };
-
-  expert_module_t* expert_ftam;
 
   /* Register protocol */
   proto_ftam = proto_register_protocol(PNAME, PSNAME, PFNAME);
@@ -145,8 +137,6 @@ void proto_register_ftam(void) {
   /* Register fields and subtrees */
   proto_register_field_array(proto_ftam, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
-  expert_ftam = expert_register_protocol(proto_ftam);
-  expert_register_field_array(expert_ftam, ei, array_length(ei));
 
 }
 

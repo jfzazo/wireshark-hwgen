@@ -26,17 +26,14 @@ OBJECTS = file_util.obj		\
 	inet_ntop.obj		\
 	inet_pton.obj		\
 	$(LIBWSUTIL_SRC:.c=.obj) \
-	popcount.obj		 \
 	strptime.obj		\
-	wsgetopt.obj            \
-	ws_mempbrk_sse42.obj
+	wsgetopt.obj
 
 # For use when making libwsutil.dll
 libwsutil.lib: libwsutil.dll
 libwsutil.exp: libwsutil.dll
 
 libwsutil.dll : $(OBJECTS) ..\image\libwsutil.res
-	@echo Linking libwsutil.dll
 	$(link) $(dlllflags) $(conlibsdll) shell32.lib \
 		$(LOCAL_LDFLAGS) $(DLL_LDFLAGS) \
 		/OUT:libwsutil.dll \
@@ -44,19 +41,13 @@ libwsutil.dll : $(OBJECTS) ..\image\libwsutil.res
 		..\image\libwsutil.res \
 		$(OBJECTS) $(libwsutil_LIBS)
 
-#
-# The following target will rebuild its obj
-# if and when version.h should change.
-#
-ws_version_info.obj: ..\version.h
-
-clean:
+clean :
 	rm -f $(OBJECTS) \
 		libwsutil.lib \
 		libwsutil.exp \
 		libwsutil.dll \
 		libwsutil.dll.manifest \
-		*.nativecodeanalysis.xml *.pdb *.sbr
+		*.pdb *.sbr
 
 distclean: clean
 

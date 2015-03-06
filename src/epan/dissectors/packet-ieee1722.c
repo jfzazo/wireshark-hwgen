@@ -32,7 +32,6 @@
 #include "config.h"
 
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/etypes.h>
 
 void proto_register_1722(void);
@@ -117,8 +116,6 @@ static int hf_1722_sample = -1;
 static int ett_1722 = -1;
 static int ett_1722_audio = -1;
 static int ett_1722_sample = -1;
-
-static expert_field ei_1722_incorrect_dbs = EI_INIT;
 
 static dissector_table_t avb_dissector_table;
 
@@ -239,12 +236,13 @@ dissect_1722(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         /* If the DBS is ever 0 for whatever reason, then just add the rest of packet as unknown */
         if(dbs == 0)
-            expert_add_info(pinfo, ti, &ei_1722_incorrect_dbs);
+            proto_tree_add_text(ieee1722_tree, tvb, IEEE_1722_DATA_OFFSET, datalen, "Incorrect DBS");
 
         else {
             /* Loop through all samples and add them to the audio tree. */
             for (j = 0; j < (datalen / (dbs*4)); j++) {
-                sample_tree = proto_tree_add_subtree_format(audio_tree, tvb, offset, 1, ett_1722_sample, NULL, "Sample %d", j+1);
+                ti = proto_tree_add_text(audio_tree, tvb, offset, 1, "Sample %d", j+1);
+                sample_tree = proto_item_add_subtree(ti, ett_1722_sample);
                 for (i = 0; i < dbs; i++) {
                     proto_tree_add_item(sample_tree, hf_1722_label, tvb, offset, 1, ENC_BIG_ENDIAN);
                     offset += 1;
@@ -385,20 +383,12 @@ void proto_register_1722(void)
         &ett_1722_sample
     };
 
-    static ei_register_info ei[] = {
-        { &ei_1722_incorrect_dbs, { "ieee1722.incorrect_dbs", PI_PROTOCOL, PI_WARN, "Incorrect DBS", EXPFILL }},
-    };
-
-    expert_module_t* expert_1722;
-
     /* Register the protocol name and description */
     proto_1722 = proto_register_protocol("IEEE 1722 Protocol", "IEEE1722", "ieee1722");
 
     /* Required function calls to register the header fields and subtrees used */
     proto_register_field_array(proto_1722, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-    expert_1722 = expert_register_protocol(proto_1722);
-    expert_register_field_array(expert_1722, ei, array_length(ei));
 
     /* Sub-dissector for 1772.1 */
     avb_dissector_table = register_dissector_table("ieee1722.subtype",
@@ -412,16 +402,3 @@ void proto_reg_handoff_1722(void)
     avbtp_handle = create_dissector_handle(dissect_1722, proto_1722);
     dissector_add_uint("ethertype", ETHERTYPE_AVBTP, avbtp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -32,6 +32,8 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-btrfcomm.h"
 #include "packet-btsdp.h"
 
@@ -1175,7 +1177,7 @@ dissect_bthfp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             col_set_str(pinfo->cinfo, COL_INFO, "Rcvd ");
             break;
         default:
-            col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection ");
+            col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction %d ", pinfo->p2p_dir);
             break;
     }
 
@@ -1342,7 +1344,7 @@ dissect_bthfp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 
         /* Detect reassemble end character: \r for HS or \n for AG */
         length = tvb_length(tvb);
-        at_stream = tvb_get_string_enc(wmem_packet_scope(), tvb, 0, length, ENC_ASCII);
+        at_stream = tvb_get_string(wmem_packet_scope(), tvb, 0, length);
 
         reassemble_start_offset = 0;
 
@@ -2029,7 +2031,7 @@ proto_reg_handoff_bthfp(void)
 {
     dissector_add_uint("btrfcomm.service", BTSDP_HFP_SERVICE_UUID, bthfp_handle);
     dissector_add_uint("btrfcomm.service", BTSDP_HFP_GW_SERVICE_UUID, bthfp_handle);
-    dissector_add_for_decode_as("btrfcomm.channel", bthfp_handle);
+    dissector_add_handle("btrfcomm.channel", bthfp_handle);
 }
 
 /*

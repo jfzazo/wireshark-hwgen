@@ -29,7 +29,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include <glib.h>
-#include <stdio.h>
+
 #include "epan/timestamp.h"
 #include "ui/ui_util.h"
 
@@ -51,10 +51,10 @@ extern "C" {
 #define RECENT_KEY_REMOTE_HOST          "recent.remote_host"
 
 typedef struct _col_width_data {
-    gint   cfmt;
-    gchar *cfield;
-    gint   width;
-    gchar  xalign;
+  gint   cfmt;
+  gchar *cfield;
+  gint   width;
+  gchar  xalign;
 } col_width_data;
 
 /** Defines used in col_width_data.xalign */
@@ -67,7 +67,7 @@ typedef struct _col_width_data {
 typedef struct recent_settings_tag {
     gboolean    main_toolbar_show;
     gboolean    filter_toolbar_show;
-    gboolean    wireless_toolbar_show;
+    gboolean	wireless_toolbar_show;
     gboolean    airpcap_driver_check_show;
     gboolean    packet_list_show;
     gboolean    tree_view_show;
@@ -98,8 +98,6 @@ typedef struct recent_settings_tag {
     gboolean    privs_warn_if_elevated;
     gboolean    privs_warn_if_no_npf;
     GList      *col_width_list;                     /* column widths */
-    GList      *conversation_tabs;                  /* enabled conversation dialog tabs */
-    GList      *endpoint_tabs;                      /* enabled endpoint dialog tabs */
     gchar      *gui_fileopen_remembered_dir;        /* folder of last capture loaded in File Open dialog */
 } recent_settings_t;
 
@@ -197,56 +195,6 @@ extern GList *recent_get_cfilter_list(const gchar *ifname);
  * @param s text of capture filter
  */
 extern void recent_add_cfilter(const gchar *ifname, const gchar *s);
-
-/**
- * Get the value of a remote host from the remote_host_list.
- *
- * @param host Host's address
- */
-extern struct remote_host *recent_get_remote_host(const gchar *host);
-
-/**
- * Get the number of entries of the remote_host_list.
- *
- * @return size of the hash table
- */
-extern int recent_get_remote_host_list_size(void);
-
-/**
- * Get the pointer of the remote_host_list.
- *
- * @return Pointer to the hash table
- */
-extern GHashTable *get_remote_host_list(void);
-
-/**
- * Free all entries of the remote_host_list.
- *
- */
-extern void free_remote_host_list(void);
-
-/**
- * Add an entry to the remote_host_list.
- *
- * @param host Key of the entry
- * @param rh Vakue of the entry
- */
-extern void recent_add_remote_host(gchar *host, struct remote_host *rh);
-
-/**
- * Fill the remote_host_list with the entries stored in the 'recent' file.
- *
- * @param s String to be filled from the 'recent' file.
- * @return True, if the list was written successfully, False otherwise.
- */
-extern gboolean capture_remote_combo_add_recent(const gchar *s);
-
-/**
- * Write the contents of the remote_host_list to the 'recent' file.
- *
- * @param rf File to write to.
- */
-extern void capture_remote_combo_recent_write_all(FILE *rf);
 
 #ifdef __cplusplus
 }

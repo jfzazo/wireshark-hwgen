@@ -33,21 +33,33 @@ wslua_dir =
 wslua_dist_dir = wslua
 endif		# HAVE_LIBLUA
 
-SUBDIRS = compress crypt ftypes dfilter dissectors jsmn nghttp2 wmem $(wslua_dir)
+if HAVE_LIBPY
+wspython_lib = wspython/libwspython.la
+wspython_dir = wspython
+wspython_dist_dir =
+py_dissectors_dir = -DPYTHON_DIR=\"@pythondir@\"
+else
+wspython_lib =
+wspython_dir =
+wspython_dist_dir = wspython
+py_dissectors_dir = -DPYTHONDIR=
+endif
 
-DIST_SUBDIRS = $(SUBDIRS) $(wslua_dist_dir)
+SUBDIRS = crypt ftypes dfilter dissectors nghttp2 wmem $(wslua_dir) $(wspython_dir)
+
+DIST_SUBDIRS = $(SUBDIRS) $(wslua_dist_dir) $(wspython_dist_dir)
 
 ACLOCAL_AMFLAGS = `../aclocal-flags`
 
 noinst_LTLIBRARIES = libwireshark_generated.la libwireshark_asmopt.la
 lib_LTLIBRARIES = libwireshark.la
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-libwireshark_la_LDFLAGS = -version-info 0:0:0 @LDFLAGS_SHAREDLIB@
+libwireshark_la_LDFLAGS = -version-info 5:4:0 @LDFLAGS_SHAREDLIB@
 
 include Makefile.common
 
 AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/$(LEMON) -I$(builddir)/wslua \
-	@LUA_CFLAGS@ $(LIBGNUTLS_CFLAGS) $(LIBGCRYPT_CFLAGS) \
+	@LUA_INCLUDES@ $(LIBGNUTLS_CFLAGS) $(LIBGCRYPT_CFLAGS) \
 	$(LIBSMI_CFLAGS) $(LIBGEOIP_CFLAGS) $(PY_CFLAGS)
 
 AM_NON_GENERATED_CFLAGS =-DWS_BUILD_DLL
@@ -96,8 +108,7 @@ EXTRA_DIST = \
 	exntest.c		\
 	oids_test.c		\
 	doxygen.cfg.in		\
-	CMakeLists.txt	\
-	CMakeListsCustom.txt.example
+	CMakeLists.txt
 
 CLEANFILES = \
 	doxygen-epan.tag		\
@@ -127,19 +138,17 @@ libwireshark_la_LIBADD = \
 	libwireshark_asmopt.la crypt/libairpdcap.la \
 	ftypes/libftypes.la dfilter/libdfilter.la dissectors/libdissectors.la \
 	dissectors/libdirtydissectors.la dissectors/libfiledissectors.la \
-	jsmn/libjsmn.la nghttp2/libnghttp2.la wmem/libwmem.la $(wslua_lib) \
-	@SOCKET_LIBS@ @NSL_LIBS@ \
+	nghttp2/libnghttp2.la wmem/libwmem.la $(wslua_lib) $(wspython_lib) @SOCKET_LIBS@ @NSL_LIBS@ \
 	@C_ARES_LIBS@ @ADNS_LIBS@ @LIBGCRYPT_LIBS@ @LIBGNUTLS_LIBS@ \
 	@KRB5_LIBS@ @SSL_LIBS@ @LIBSMI_LDFLAGS@ @GEOIP_LIBS@ \
 	${top_builddir}/wiretap/libwiretap.la @GLIB_LIBS@ \
 	${top_builddir}/wsutil/libwsutil.la -lm
 
 libwireshark_la_DEPENDENCIES = \
-	libwireshark_generated.la compress/liblzxpress.la\
+	libwireshark_generated.la \
 	libwireshark_asmopt.la crypt/libairpdcap.la \
 	ftypes/libftypes.la dfilter/libdfilter.la dissectors/libdissectors.la \
-	dissectors/libdirtydissectors.la jsmn/libjsmn.la nghttp2/libnghttp2.la \
-	wmem/libwmem.la $(wslua_lib) \
+	dissectors/libdirtydissectors.la nghttp2/libnghttp2.la wmem/libwmem.la $(wslua_lib) $(wspython_lib) \
 	${top_builddir}/wsutil/libwsutil.la \
 	${top_builddir}/wiretap/libwiretap.la
 
@@ -302,8 +311,6 @@ dumpabi-libwireshark: all abi-descriptor.xml
 	cp *.h abi-check-headers/epan
 	mkdir abi-check-headers/crypt
 	cp crypt/*.h abi-check-headers/crypt
-	mkdir abi-check-headers/compress
-	cp compress/*.h abi-check-headers/compress
 	mkdir abi-check-headers/dfilter
 	cp dfilter/*.h ../tools/lemon/cppmagic.h abi-check-headers/dfilter
 	mkdir abi-check-headers/dissectors

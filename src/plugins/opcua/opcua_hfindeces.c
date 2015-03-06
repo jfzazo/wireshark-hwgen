@@ -21,6 +21,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include "opcua_hfindeces.h"

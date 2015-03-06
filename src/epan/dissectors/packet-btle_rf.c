@@ -68,23 +68,6 @@ static int hf_btle_rf_mic_checked_flag = -1;
 static int hf_btle_rf_mic_valid_flag = -1;
 static int hf_btle_rf_flags_rfu_2 = -1;
 
-static const int *hfs_btle_rf_flags[] = {
-    &hf_btle_rf_dewhitened_flag,
-    &hf_btle_rf_sigpower_valid_flag,
-    &hf_btle_rf_noisepower_valid_flag,
-    &hf_btle_rf_packet_decrypted_flag,
-    &hf_btle_rf_ref_aa_valid_flag,
-    &hf_btle_rf_aa_offenses_valid_flag,
-    &hf_btle_rf_channel_aliased_flag,
-    &hf_btle_rf_flags_rfu_1,
-    &hf_btle_rf_crc_checked_flag,
-    &hf_btle_rf_crc_valid_flag,
-    &hf_btle_rf_mic_checked_flag,
-    &hf_btle_rf_mic_valid_flag,
-    &hf_btle_rf_flags_rfu_2,
-    NULL
-};
-
 static int ett_btle_rf = -1;
 static int ett_btle_rf_flags = -1;
 
@@ -134,91 +117,92 @@ btle_rf_channel_index(guint8 rf_channel)
 }
 
 static gint
-dissect_btle_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+dissect_btle_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-    proto_item        *ti;
-    proto_tree        *btle_rf_tree;
-    tvbuff_t          *btle_tvb;
-    btle_context_t     context;
-    guint8             rf_channel;
-    guint8             aa_offenses;
-    guint16            flags;
-    bluetooth_data_t  *bluetooth_data = (bluetooth_data_t *) data;
-
-    if (tvb_captured_length(tvb) < BTLE_RF_OCTETS)
-        return 0;
-
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "BTLE RF");
     col_clear(pinfo->cinfo, COL_INFO);
 
-    flags = tvb_get_letohs(tvb, 8);
+    if (tree && (tvb_captured_length(tvb) >= BTLE_RF_OCTETS)) {
+        proto_item *ti = NULL;
+        proto_tree *btle_rf_tree = NULL;
+        proto_tree *btle_rf_flags_tree = NULL;
+        tvbuff_t *btle_tvb;
+        btle_context_t context;
+        guint8 rf_channel  = tvb_get_guint8(tvb, 0);
+        guint8 aa_offenses = tvb_get_guint8(tvb, 3);
+        guint16 flags      = tvb_get_letohs(tvb, 8);
 
-    context.previous_protocol_data.bluetooth_data = bluetooth_data;
-    context.aa_category            = E_AA_NO_COMMENT;
-    context.connection_info_valid  = 0; /* TODO */
-    context.crc_checked_at_capture = !!(flags & LE_CRC_CHECKED);
-    context.crc_valid_at_capture   = !!(flags & LE_CRC_VALID);
-    context.mic_checked_at_capture = !!(flags & LE_MIC_CHECKED);
-    context.mic_valid_at_capture   = !!(flags & LE_MIC_VALID);
+        context.aa_category            = E_AA_NO_COMMENT;
+        context.connection_info_valid  = 0; /* TODO */
+        context.crc_checked_at_capture = !!(flags & LE_CRC_CHECKED);
+        context.crc_valid_at_capture   = !!(flags & LE_CRC_VALID);
+        context.mic_checked_at_capture = !!(flags & LE_MIC_CHECKED);
+        context.mic_valid_at_capture   = !!(flags & LE_MIC_VALID);
 
-    ti = proto_tree_add_item(tree, proto_btle_rf, tvb, 0, tvb_captured_length(tvb), ENC_NA);
-    btle_rf_tree = proto_item_add_subtree(ti, ett_btle_rf);
-
-    ti = proto_tree_add_item(btle_rf_tree, hf_btle_rf_channel, tvb, 0, 1, ENC_LITTLE_ENDIAN);
-    rf_channel  = tvb_get_guint8(tvb, 0);
-    proto_item_append_text(ti, ", %d MHz, %s %d", 2402+2*rf_channel,
-                           btle_rf_channel_type(rf_channel),
-                           btle_rf_channel_index(rf_channel));
-
-    if (flags & LE_CHANNEL_ALIASED) {
-        proto_item_append_text(ti, " [aliased]");
-    }
-
-    if (flags & LE_SIGPOWER_VALID) {
-        proto_tree_add_item(btle_rf_tree, hf_btle_rf_signal_dbm, tvb, 1, 1, ENC_LITTLE_ENDIAN);
-    }
-    else {
-        proto_tree_add_item(btle_rf_tree, hf_btle_rf_signed_byte_unused, tvb, 1, 1, ENC_LITTLE_ENDIAN);
-    }
-
-    if (flags & LE_NOISEPOWER_VALID) {
-        proto_tree_add_item(btle_rf_tree, hf_btle_rf_noise_dbm, tvb, 2, 1, ENC_LITTLE_ENDIAN);
-    }
-    else {
-        proto_tree_add_item(btle_rf_tree, hf_btle_rf_signed_byte_unused, tvb, 2, 1, ENC_LITTLE_ENDIAN);
-    }
-
-    if (flags & LE_AA_OFFENSES_VALID) {
-        proto_tree_add_item(btle_rf_tree, hf_btle_rf_access_address_offenses, tvb, 3, 1, ENC_LITTLE_ENDIAN);
-        aa_offenses = tvb_get_guint8(tvb, 3);
-        if (aa_offenses > 0) {
-            if (flags & LE_REF_AA_VALID) {
-                context.aa_category = E_AA_BIT_ERRORS;
+        ti = proto_tree_add_item(tree, proto_btle_rf, tvb, 0, tvb_captured_length(tvb), ENC_NA);
+        btle_rf_tree = proto_item_add_subtree(ti, ett_btle_rf);
+        ti = proto_tree_add_item(btle_rf_tree, hf_btle_rf_channel, tvb, 0, 1, ENC_LITTLE_ENDIAN);
+        proto_item_append_text(ti, ", %d MHz, %s %d", 2402+2*rf_channel,
+                               btle_rf_channel_type(rf_channel),
+                               btle_rf_channel_index(rf_channel));
+        if (flags & LE_CHANNEL_ALIASED) {
+            proto_item_append_text(ti, " [aliased]");
+        }
+        if (flags & LE_SIGPOWER_VALID) {
+            proto_tree_add_item(btle_rf_tree, hf_btle_rf_signal_dbm, tvb, 1, 1, ENC_LITTLE_ENDIAN);
+        }
+        else {
+            proto_tree_add_item(btle_rf_tree, hf_btle_rf_signed_byte_unused, tvb, 1, 1, ENC_LITTLE_ENDIAN);
+        }
+        if (flags & LE_NOISEPOWER_VALID) {
+            proto_tree_add_item(btle_rf_tree, hf_btle_rf_noise_dbm, tvb, 2, 1, ENC_LITTLE_ENDIAN);
+        }
+        else {
+            proto_tree_add_item(btle_rf_tree, hf_btle_rf_signed_byte_unused, tvb, 2, 1, ENC_LITTLE_ENDIAN);
+        }
+        if (flags & LE_REF_AA_VALID) {
+            proto_tree_add_item(btle_rf_tree, hf_btle_rf_reference_access_address, tvb, 4, 4, ENC_LITTLE_ENDIAN);
+        }
+        else {
+            proto_tree_add_item(btle_rf_tree, hf_btle_rf_word_unused, tvb, 4, 4, ENC_LITTLE_ENDIAN);
+        }
+        if (flags & LE_AA_OFFENSES_VALID) {
+            proto_tree_add_item(btle_rf_tree, hf_btle_rf_access_address_offenses, tvb, 3, 1, ENC_LITTLE_ENDIAN);
+            if (aa_offenses > 0) {
+                if (flags & LE_REF_AA_VALID) {
+                    context.aa_category = E_AA_BIT_ERRORS;
+                }
+                else {
+                    context.aa_category = E_AA_ILLEGAL;
+                }
             }
-            else {
-                context.aa_category = E_AA_ILLEGAL;
+            else if (flags & LE_REF_AA_VALID) {
+                context.aa_category = E_AA_MATCHED;
             }
         }
-        else if (flags & LE_REF_AA_VALID) {
-            context.aa_category = E_AA_MATCHED;
+        else {
+            proto_tree_add_item(btle_rf_tree, hf_btle_rf_unsigned_byte_unused, tvb, 3, 1, ENC_LITTLE_ENDIAN);
         }
-    }
-    else {
-        proto_tree_add_item(btle_rf_tree, hf_btle_rf_unsigned_byte_unused, tvb, 3, 1, ENC_LITTLE_ENDIAN);
-    }
+        ti = proto_tree_add_item(btle_rf_tree, hf_btle_rf_flags, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        btle_rf_flags_tree = proto_item_add_subtree(ti, ett_btle_rf_flags);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_dewhitened_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_sigpower_valid_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_noisepower_valid_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_packet_decrypted_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_ref_aa_valid_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_aa_offenses_valid_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_channel_aliased_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_flags_rfu_1, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_crc_checked_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_crc_valid_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_mic_checked_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_mic_valid_flag, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(btle_rf_flags_tree, hf_btle_rf_flags_rfu_2, tvb, 8, 2, ENC_LITTLE_ENDIAN);
 
-    if (flags & LE_REF_AA_VALID) {
-        proto_tree_add_item(btle_rf_tree, hf_btle_rf_reference_access_address, tvb, 4, 4, ENC_LITTLE_ENDIAN);
+        btle_tvb = tvb_new_subset_remaining(tvb, BTLE_RF_OCTETS);
+        return BTLE_RF_OCTETS+call_dissector_with_data(btle_handle, btle_tvb, pinfo, tree, &context);
     }
-    else {
-        proto_tree_add_item(btle_rf_tree, hf_btle_rf_word_unused, tvb, 4, 4, ENC_LITTLE_ENDIAN);
-    }
-
-
-    proto_tree_add_bitmask_with_flags(btle_rf_tree, tvb, 8, hf_btle_rf_flags, ett_btle_rf_flags,  hfs_btle_rf_flags, ENC_LITTLE_ENDIAN, BMT_NO_APPEND);
-
-    btle_tvb = tvb_new_subset_remaining(tvb, BTLE_RF_OCTETS);
-    return BTLE_RF_OCTETS+call_dissector_with_data(btle_handle, btle_tvb, pinfo, tree, &context);
+    return 0;
 }
 
 void
@@ -374,7 +358,7 @@ proto_register_btle_rf(void)
 void
 proto_reg_handoff_btle_rf(void)
 {
-    dissector_add_uint("bluetooth.encap", WTAP_ENCAP_BLUETOOTH_LE_LL_WITH_PHDR, btle_rf_handle);
+    dissector_add_uint("wtap_encap", WTAP_ENCAP_BLUETOOTH_LE_LL_WITH_PHDR, btle_rf_handle);
     btle_handle = find_dissector("btle");
 }
 

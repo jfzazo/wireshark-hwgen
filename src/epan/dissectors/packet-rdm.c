@@ -42,8 +42,8 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
-#include "packet-rdm.h"
 
 void proto_register_rdm(void);
 
@@ -133,7 +133,7 @@ static const value_string rdm_rt_vals[] = {
 #define RDM_PARAM_ID_CAPTURE_PRESET			0x1030
 #define RDM_PARAM_ID_PRESET_PLAYBACK			0x1031
 
-const value_string rdm_param_id_vals[] = {
+static const value_string rdm_param_id_vals[] = {
 	{ RDM_PARAM_ID_DISC_UNIQUE_BRANCH,		   "DISC_UNIQUE_BRANCH" },
 	{ RDM_PARAM_ID_DISC_MUTE,			   "DISC_MUTE" },
 	{ RDM_PARAM_ID_DISC_UN_MUTE,			   "DISC_UN_MUTE" },
@@ -188,8 +188,7 @@ const value_string rdm_param_id_vals[] = {
 	{ RDM_PARAM_ID_PRESET_PLAYBACK,			   "PRESET_PLAYBACK" },
 	{ 0, NULL },
 };
-
-value_string_ext rdm_param_id_vals_ext = VALUE_STRING_EXT_INIT(rdm_param_id_vals);
+static value_string_ext rdm_param_id_vals_ext = VALUE_STRING_EXT_INIT(rdm_param_id_vals);
 
 #define RDM_STATUS_NONE				0x00
 #define RMD_STATUS_GET_LAST_MESSAGE		0x01
@@ -2123,7 +2122,7 @@ dissect_rdm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 		offset += 2;
 
-		if (offset < tvb_reported_length(tvb))
+		if (offset < tvb_length(tvb))
 			proto_tree_add_item(rdm_tree, hf_rdm_trailer, tvb,
 					offset, -1, ENC_NA);
 	}
@@ -2781,15 +2780,3 @@ proto_register_rdm(void)
 	register_dissector("rdm", dissect_rdm, proto_rdm);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

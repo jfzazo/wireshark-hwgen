@@ -25,8 +25,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 
 void proto_register_manolito(void);
 void proto_reg_handoff_manolito(void);
@@ -39,13 +41,9 @@ static int hf_manolito_src = -1;
 static int hf_manolito_dest = -1;
 static int hf_manolito_options_short = -1;
 static int hf_manolito_options = -1;
-static int hf_manolito_string = -1;
-static int hf_manolito_integer = -1;
 
 /* Initialize the subtree pointers */
 static gint ett_manolito = -1;
-
-static expert_field ei_manolito_type = EI_INIT;
 
 /* Code to actually dissect the packets */
 static void
@@ -97,13 +95,13 @@ dissect_manolito(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* (that many bytes) data follows; else is raw data. */
 		do
 		{
-			guint16     field_name;        /* 16-bit field name */
-			guint8      dtype;             /* data-type */
-			guint8      length;            /* length */
-			guint8     *data;              /* payload */
-			int         start;             /* field starting location */
-			char        field_name_str[3]; /* printable name */
-			const char *longname;          /* human-friendly field name */
+			guint16 field_name;      /* 16-bit field name */
+			guint8 dtype;            /* data-type */
+			guint8 length;           /* length */
+			guint8* data;            /* payload */
+			int start;               /* field starting location */
+			char field_name_str[3];  /* printable name */
+			const char* longname;    /* human-friendly field name */
 
 			start = offset;
 
@@ -132,27 +130,27 @@ dissect_manolito(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			/* Find the long name of the field */
 			switch(field_name)
 			{
-			case 0x5346: longname = "Shared Files";     break; /* SF */
-			case 0x534b: longname = "Shared Kilobytes"; break; /* SK */
-			case 0x4e49: longname = "Network ID";       break; /* NI */
-			case 0x4e43: longname = "Num. Connections"; break; /* NC */
-			case 0x4356: longname = "Client Version";   break; /* CV */
-			case 0x564c: longname = "Velocity";         break; /* VL */
-			case 0x464e: longname = "Filename";         break; /* FN */
-			case 0x464c: longname = "File Length";      break; /* FL */
-			case 0x4252: longname = "Bit Rate";         break; /* BR */
-			case 0x4643: longname = "Frequency";        break; /* FC */
-			case 0x5354: longname = "???";              break; /* ST */
-			case 0x534c: longname = "Song Length (s)";  break; /* SL */
-			case 0x434b: longname = "Checksum";         break; /* CK */
-			case 0x4e4e: longname = "Nickname";         break; /* NN */
-			case 0x434e: longname = "Client Name";      break; /* CN */
-			case 0x5054: longname = "Port";             break; /* PT */
-			case 0x484e: longname = "???";              break; /* HN */
-			case 0x4d45: longname = "Message";          break; /* ME */
-			case 0x4944: longname = "Identification";   break; /* ID */
-			case 0x4144: longname = "???";              break; /* AD */
-			default:     longname = "unknown";          break;
+			case 0x5346: longname = "Shared Files"; break;    /* SF */
+			case 0x534b: longname = "Shared Kilobytes";break; /* SK */
+			case 0x4e49: longname = "Network ID"; break;      /* NI */
+			case 0x4e43: longname = "Num. Connections";break; /* NC */
+			case 0x4356: longname = "Client Version"; break;  /* CV */
+			case 0x564c: longname = "Velocity"; break;        /* VL */
+			case 0x464e: longname = "Filename"; break;        /* FN */
+			case 0x464c: longname = "File Length"; break;     /* FL */
+			case 0x4252: longname = "Bit Rate"; break;        /* BR */
+			case 0x4643: longname = "Frequency"; break;       /* FC */
+			case 0x5354: longname = "???"; break;             /* ST */
+			case 0x534c: longname = "Song Length (s)"; break; /* SL */
+			case 0x434b: longname = "Checksum"; break;    /* CK */
+			case 0x4e4e: longname = "Nickname"; break;        /* NN */
+			case 0x434e: longname = "Client Name"; break;     /* CN */
+			case 0x5054: longname = "Port"; break;            /* PT */
+			case 0x484e: longname = "???"; break;             /* HN */
+			case 0x4d45: longname = "Message"; break;         /* ME */
+			case 0x4944: longname = "Identification"; break;  /* ID */
+			case 0x4144: longname = "???"; break;             /* AD */
+			default: longname = "unknown"; break;
 			}
 
 			/* 1-byte data type */
@@ -174,7 +172,7 @@ dissect_manolito(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			offset += length;
 
 			/* convert the 16-bit integer field name to a string */
-			/* XXX: changed this to use g_htons */
+                        /* XXX: changed this to use g_htons */
 			field_name_str[0] = g_htons(field_name) & 0x00ff;
 			field_name_str[1] = (g_htons(field_name) & 0xff00) >> 8;
 			field_name_str[2] = 0;
@@ -182,8 +180,8 @@ dissect_manolito(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			if (dtype == MANOLITO_STRING)
 			{
 				data[length] = 0;
-				proto_tree_add_string_format(manolito_tree, hf_manolito_string, tvb, start,
-					offset - start, data, "%s (%s): %s",
+				proto_tree_add_text(manolito_tree, tvb, start,
+					offset - start, "%s (%s): %s",
 					(char*)field_name_str, longname, data);
 			} else if (dtype == MANOLITO_INTEGER) {
 			 	int n = 0;
@@ -197,13 +195,12 @@ dissect_manolito(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				case 2: n += data[1] << ((length - 2) * 8);
 				case 1: n += data[0] << ((length - 1) * 8);
 				}
-				ti = proto_tree_add_uint_format(manolito_tree, hf_manolito_integer, tvb, start,
-					1, n, "%s (%s): %d",
+				proto_tree_add_text(manolito_tree, tvb, start,
+					offset - start, "%s (%s): %d",
 					(char*)field_name_str, longname, n);
-				proto_item_set_len(ti, offset - start);
 			} else {
-				proto_tree_add_expert_format(manolito_tree, pinfo, &ei_manolito_type,
-						tvb, start, offset - start, "Unknown type %d", dtype);
+				proto_tree_add_text(manolito_tree, tvb, start,
+					offset - start, "unknown type %d", dtype);
 			}
 
 		} while(offset < tvb_reported_length(tvb));
@@ -226,63 +223,46 @@ proto_register_manolito(void)
 /* Setup list of header fields  See Section 1.6.1 for details*/
 	static hf_register_info hf[] = {
 		{ &hf_manolito_checksum,
-		  { "Checksum",		"manolito.checksum",
-		    FT_UINT32, BASE_HEX, NULL, 0,
-		    "Checksum used for verifying integrity", HFILL }
+			{ "Checksum",           "manolito.checksum",
+			FT_UINT32, BASE_HEX, NULL, 0,
+			"Checksum used for verifying integrity", HFILL }
 		},
-		{ &hf_manolito_seqno,
-		  { "Sequence Number",	  "manolito.seqno",
-		    FT_UINT32, BASE_HEX, NULL, 0,
-		    "Incremental sequence number", HFILL }
-		},
-		{ &hf_manolito_src,
-		  { "Forwarded IP Address",    "manolito.src",
-		    FT_IPv4, BASE_NONE, NULL, 0,
-		    "Host packet was forwarded from (or 0)", HFILL }
-		},
-		{ &hf_manolito_dest,
-		  { "Destination IP Address","manolito.dest",
-		    FT_IPv4, BASE_NONE, NULL, 0,
-		    "Destination IPv4 address", HFILL }
-		},
-		{ &hf_manolito_options_short,
-		  { "Options", "manolito.options",
-		    FT_UINT24, BASE_HEX, NULL, 0,
-		    "Packet-dependent data", HFILL }
-		},
-		{ &hf_manolito_options,
-		  { "Options", "manolito.options",
-		    FT_UINT32, BASE_HEX, NULL, 0,
-		    "Packet-dependent data", HFILL }
-		},
-		{ &hf_manolito_string,
-		  { "String field", "manolito.string",
-		    FT_STRING, BASE_NONE, NULL, 0,
-		    NULL, HFILL }
-		},
-		{ &hf_manolito_integer,
-		  { "Integer field", "manolito.integer",
-		    FT_UINT32, BASE_DEC, NULL, 0,
-		    NULL, HFILL }
-		},
+                { &hf_manolito_seqno,
+                        { "Sequence Number",      "manolito.seqno",
+                        FT_UINT32, BASE_HEX, NULL, 0,
+                        "Incremental sequence number", HFILL }
+                },
+                { &hf_manolito_src,
+                        { "Forwarded IP Address",    "manolito.src",
+                        FT_IPv4, BASE_NONE, NULL, 0,
+                        "Host packet was forwarded from (or 0)", HFILL }
+                },
+                { &hf_manolito_dest,
+                        { "Destination IP Address","manolito.dest",
+                        FT_IPv4, BASE_NONE, NULL, 0,
+                       "Destination IPv4 address", HFILL }
+                },
+                { &hf_manolito_options_short,
+                        { "Options", "manolito.options",
+                        FT_UINT24, BASE_HEX, NULL, 0,
+                       "Packet-dependent data", HFILL }
+                },
+                { &hf_manolito_options,
+                        { "Options", "manolito.options",
+                        FT_UINT32, BASE_HEX, NULL, 0,
+                       "Packet-dependent data", HFILL }
+                },
 	};
 
 	static gint *ett[] = {
 		&ett_manolito,
 	};
 
-	static ei_register_info ei[] = {
-		{ &ei_manolito_type, { "manolito.type.unknown", PI_PROTOCOL, PI_WARN, "Unknown type", EXPFILL }},
-	};
-
-	expert_module_t* expert_manolito;
-
-	proto_manolito = proto_register_protocol("Blubster/Piolet MANOLITO Protocol", "Manolito", "manolito");
+	proto_manolito = proto_register_protocol("Blubster/Piolet MANOLITO Protocol",
+	    "Manolito", "manolito");
 
 	proto_register_field_array(proto_manolito, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_manolito = expert_register_protocol(proto_manolito);
-	expert_register_field_array(expert_manolito, ei, array_length(ei));
 }
 
 
@@ -299,16 +279,3 @@ proto_reg_handoff_manolito(void)
 	    proto_manolito);
 	dissector_add_uint("udp.port", 41170, manolito_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

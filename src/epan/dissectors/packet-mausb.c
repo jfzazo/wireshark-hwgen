@@ -26,17 +26,19 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/dissectors/packet-tcp.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
-#include <epan/oui.h>
-#include "packet-tcp.h"
+
 #include "packet-llc.h"
 #include "packet-usb.h"
 
 void proto_reg_handoff_mausb(void);
 void proto_register_mausb(void);
-void proto_register_wfa_oui(void);
+void proto_register_mausb_oui(void);
 
 /* For SNAP Packets */
 static int hf_llc_mausb_pid = -1;
@@ -72,21 +74,6 @@ static int hf_mausb_mgmt_ep_des_pad = -1;
 static int hf_mausb_mgmt_type_spec = -1;
 static int hf_mausb_mgmt_type_spec_generic = -1;
 
-/* CapResp packet specific */
-static int hf_mausb_cap_resp_num_ep = -1;
-static int hf_mausb_cap_resp_num_dev = -1;
-static int hf_mausb_cap_resp_num_stream = -1;
-static int hf_mausb_cap_resp_dev_type = -1;
-static int hf_mausb_cap_resp_desc_count = -1;
-static int hf_mausb_cap_resp_desc_len = -1;
-static int hf_mausb_cap_resp_transfer_req = -1;
-static int hf_mausb_cap_resp_mgmt_req = -1;
-static int hf_mausb_cap_resp_rsvd = -1;
-
-static int hf_mausb_dev_cap_len = -1;
-static int hf_mausb_dev_cap_type = -1;
-static int hf_mausb_dev_cap_generic = -1;
-
 /* EPHandleReq & Resp packet specific */
 static int hf_mausb_ep_handle_req_pad = -1;
 static int hf_mausb_ep_handle_resp_dir = -1;
@@ -116,12 +103,10 @@ static int hf_mausb_payload = -1;
 /* expert info fields */
 static expert_field ei_ep_handle_len = EI_INIT;
 static expert_field ei_len = EI_INIT;
+static expert_field ei_len_dword = EI_INIT;
 static expert_field ei_mgmt_type_undef = EI_INIT;
 static expert_field ei_mgmt_type_spec_len_long = EI_INIT;
 static expert_field ei_mgmt_type_spec_len_short = EI_INIT;
-static expert_field ei_dev_cap_len = EI_INIT;
-static expert_field ei_dev_cap_resp_desc_len = EI_INIT;
-static expert_field ei_cap_resp_desc_len = EI_INIT;
 
 /* MAUSB Version, per 6.2.1.1 */
 #define MAUSB_VERSION_1_0     0x0
@@ -129,10 +114,11 @@ static expert_field ei_cap_resp_desc_len = EI_INIT;
 
 /* for dissecting snap packets */
 /*
- * TODO: determine assigned PID value
+ * TODO: determine assigned OUI & PID value
  * (yet to be assigned as of Earth Day 2014)
  */
-#define PID_MAUSB 0x1500
+#define OUI_MAUSB 0xdead54
+#define PID_MAUSB 0xf539
 
 static const value_string mausb_pid_string[] = {
     { PID_MAUSB, "MAUSB" },
@@ -340,11 +326,6 @@ static const value_string mausb_type_string[] = {
 #define MAUSB_EP_HANDLE_DEV_ADDR 0x0fe0
 #define MAUSB_EP_HANDLE_BUS_NUM  0xf000
 
-#define MAUSB_EP_HANDLE_D_OFFSET        0
-#define MAUSB_EP_HANDLE_EP_NUM_OFFSET   1
-#define MAUSB_EP_HANDLE_DEV_ADDR_OFFSET 5
-#define MAUSB_EP_HANDLE_BUS_NUM_OFFSET  12
-
 static const value_string mausb_status_string[] = {
     {   0, "SUCCESS (NO_ERROR)" },
     { 128, "UNSUCCESSFUL" },
@@ -383,39 +364,6 @@ static const value_string mausb_status_string[] = {
 #define MAUSB_MGMT_NUM_EP_DES_MASK 0x001f
 #define MAUSB_MGMT_SIZE_EP_DES_OFFSET 5
 #define MAUSB_MGMT_SIZE_EP_DES_MASK (0x003f << MAUSB_MGMT_SIZE_EP_DES_OFFSET)
-
-/* CapResp Bitfield Masks */
-#define MAUSB_CAP_RESP_NUM_STREAM_MASK 0x1f
-#define MAUSB_CAP_RESP_DEV_TYPE_OFFSET 5
-#define MAUSB_CAP_RESP_DEV_TYPE_MASK (0x07 << MAUSB_CAP_RESP_DEV_TYPE_OFFSET)
-#define MAUSB_CAP_RESP_MGMT_REQ_MASK 0x0fff
-#define MAUSB_CAP_RESP_RSVD_MASK 0xf000
-
-static const value_string mausb_cap_resp_dev_type[] = {
-    { 0, "Integrated Device" },
-    { 1, "MAUSB 2.0 hub" },
-    { 2, "MAUSB 3.1 hub" },
-    { 0, NULL}
-};
-
-static const value_string mausb_dev_cap_string[] = {
-    { 0, "Speed Capability" },
-    { 1, "P-managed OUT Capabilities" },
-    { 2, "Isochronous Capabilities" },
-    { 3, "Synchronization Capabilities" },
-    { 4, "Container ID Capability" },
-    { 5, "Link Sleep Capability" },
-    { 0, NULL}
-};
-
-enum mausb_dev_cap_type {
-    SpeedCap = 0,
-    PmanCap,
-    IsoCap,
-    SyncCap,
-    ContainerIDCap,
-    LinkSleepCap
-};
 
 #define DWORD_MASK 0xffffffff
 #define MAUSB_MGMT_NUM_EP_HANDLE_PAD_MASK \
@@ -567,69 +515,14 @@ static gboolean mausb_is_data_pkt(struct mausb_header *header)
     return MAUSB_PKT_TYPE_DATA == (header->type & MAUSB_PKT_TYPE_MASK);
 }
 
-static gboolean mausb_is_transfer_req(struct mausb_header *header)
-{
-    return TransferReq == header->type;
-}
-
-static gboolean mausb_is_transfer_ack(struct mausb_header *header)
-{
-    return TransferAck == header->type;
-}
-
-static gint8 mausb_tx_type(struct mausb_header *header)
-{
-    return (header->u.s.eps_tflags >> MAUSB_TFLAG_OFFSET) & MAUSB_TFLAG_TRANSFER_TYPE;
-}
-
-static gboolean mausb_has_setup_data(struct mausb_header *header)
-{
-    if ((TransferReq == header->type ) &&
-        (mausb_is_from_host(header)) &&
-        (0 == header->u.s.seq_num) &&
-        (MAUSB_TX_TYPE_CTRL == mausb_tx_type(header))) {
-
-        return TRUE;
-    }
-    return FALSE;
-}
-
-static gboolean mausb_is_setup_response(struct mausb_header *header)
-{
-    if ((TransferResp == header->type) &&
-        (!mausb_is_from_host(header)) &&
-        (MAUSB_TX_TYPE_CTRL == mausb_tx_type(header))) {
-
-        return TRUE;
-    }
-    return FALSE;
-}
-
-
-/*** EP Handle parsing helper functions */
-
-static guint8 mausb_ep_handle_ep_num(guint16 handle) {
-    return (handle & MAUSB_EP_HANDLE_EP_NUM) >> MAUSB_EP_HANDLE_EP_NUM_OFFSET;
-}
-
-static guint8 mausb_ep_handle_dev_addr(guint16 handle) {
-    return (handle & MAUSB_EP_HANDLE_DEV_ADDR) >> MAUSB_EP_HANDLE_DEV_ADDR_OFFSET;
-}
-
-static guint8 mausb_ep_handle_bus_num(guint16 handle) {
-    return (handle & MAUSB_EP_HANDLE_BUS_NUM) >> MAUSB_EP_HANDLE_BUS_NUM_OFFSET;
-}
-
 /* returns the length field of the MAUSB packet */
-static guint mausb_get_pkt_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                               int offset, void *data _U_)
+static guint mausb_get_pkt_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     return tvb_get_letohs(tvb, offset + 2);
 }
 
 /* Global Port Preference */
 static unsigned int mausb_tcp_port_pref = 0;
-static unsigned int mausb_udp_port_pref = 0;
 
 /* Initialize the subtree pointers */
 static gint ett_mausb = -1;
@@ -637,7 +530,6 @@ static gint ett_mausb_flags = -1;
 static gint ett_mausb_ep_handle = -1;
 static gint ett_mausb_tflags = -1;
 static gint ett_mgmt = -1;
-static gint ett_dev_cap = -1;
 
 
 #define USB_DT_EP_SIZE              7
@@ -666,130 +558,6 @@ static gint ett_dev_cap = -1;
 /* Size of EPHandleResp Descriptor */
 #define MAUSB_SIZE_EP_HANDLE 2
 
-
-/* Dissects an individual Device Capability Descriptor */
-static guint16 dissect_mausb_dev_cap_desc(proto_tree *tree, tvbuff_t *tvb,
-                                          packet_info *pinfo, gint16 offset)
-{
-    guint8 desc_len;
-    guint8 cap_type;
-    gint16 desc_offset;
-    proto_item *len_field;
-    proto_tree *dev_cap_tree;
-
-    desc_offset = offset;
-    desc_len = tvb_get_guint8(tvb, desc_offset);
-    cap_type = tvb_get_guint8(tvb, desc_offset + 1);
-
-    dev_cap_tree = proto_tree_add_subtree(tree, tvb, desc_offset, desc_len,
-        ett_dev_cap, NULL,
-        val_to_str_const(cap_type, mausb_dev_cap_string, "Unknown Capability"));
-
-    len_field = proto_tree_add_item(dev_cap_tree, hf_mausb_dev_cap_len,
-        tvb, desc_offset, 1, ENC_LITTLE_ENDIAN);
-    desc_offset += 1;
-
-    proto_tree_add_item(dev_cap_tree, hf_mausb_dev_cap_type,
-        tvb, desc_offset, 1, ENC_LITTLE_ENDIAN);
-    desc_offset += 1;
-
-    if (desc_len > 2) {
-
-        /* TODO: dissect individual capabilities */
-        switch (cap_type) {
-        case SpeedCap:
-        case PmanCap:
-        case IsoCap:
-        case SyncCap:
-        case ContainerIDCap:
-        case LinkSleepCap:
-        default:
-            proto_tree_add_item(dev_cap_tree, hf_mausb_dev_cap_generic,
-            tvb, desc_offset, (desc_len - 2), ENC_NA);
-            desc_offset += (desc_len - 2);
-
-            break;
-        }
-    }
-
-    /* Was this descriptor a different length than expected */
-    if (desc_offset != offset + desc_len) {
-        expert_add_info(pinfo, len_field, &ei_dev_cap_len);
-    }
-
-    return offset + desc_len;
-}
-
-
-/* Dissects a MAUSB capability response packet
- * also dissects Capability Descriptors
- */
-static guint16 dissect_mausb_mgmt_pkt_cap_resp(struct mausb_header *header,
-       proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, gint16 offset)
-{
-
-    guint desc_len;
-    guint8 desc_count;
-    proto_item *len_field;
-    guint16 loop_offset;
-    int i;
-
-    /* Fields present in all CapResp packets */
-    proto_tree_add_item(tree, hf_mausb_cap_resp_num_ep,
-        tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    offset += 2;
-
-    proto_tree_add_item(tree, hf_mausb_cap_resp_num_dev,
-        tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-
-    proto_tree_add_item(tree, hf_mausb_cap_resp_num_stream,
-        tvb, offset, 1, ENC_LITTLE_ENDIAN); /* really 5 bits */
-    proto_tree_add_item(tree, hf_mausb_cap_resp_dev_type,
-        tvb, offset, 1, ENC_LITTLE_ENDIAN); /* really 3 bits */
-    offset += 1;
-
-    proto_tree_add_item(tree, hf_mausb_cap_resp_desc_count,
-        tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    desc_count = tvb_get_guint8(tvb, offset);
-    offset += 1;
-
-    len_field = proto_tree_add_item(tree, hf_mausb_cap_resp_desc_len,
-        tvb, offset, 3, ENC_LITTLE_ENDIAN);
-    desc_len = tvb_get_letoh24(tvb, offset);
-    offset += 3;
-
-    proto_tree_add_item(tree, hf_mausb_cap_resp_transfer_req,
-        tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    offset += 2;
-
-    proto_tree_add_item(tree, hf_mausb_cap_resp_mgmt_req,
-        tvb, offset, 2, ENC_LITTLE_ENDIAN); /* really 12 bits */
-    proto_tree_add_item(tree, hf_mausb_cap_resp_rsvd,
-        tvb, offset, 2, ENC_LITTLE_ENDIAN); /* really 4 bits */
-    offset += 2;
-
-    /* Descriptors length longer than remainder of packet */
-    if (offset + desc_len > header->length) {
-        expert_add_info(pinfo, len_field, &ei_cap_resp_desc_len);
-        desc_len = header->length - offset; /* to avoid overflows */
-    }
-
-    loop_offset = offset;
-
-    /* dissect capability descriptors */
-    for (i = 0; i < desc_count; i++) {
-        loop_offset = dissect_mausb_dev_cap_desc(tree, tvb, pinfo, loop_offset);
-    }
-
-    /* were the descriptors a different length than expected */
-    if (loop_offset != offset + desc_len) {
-        expert_add_info(pinfo, len_field, &ei_dev_cap_resp_desc_len);
-        desc_len = header->length - offset; /* to avoid overflows */
-    }
-
-    return offset + desc_len;
-}
 
 /* Dissects a MAUSB endpoint handle */
 static gint dissect_ep_handle(proto_tree *tree, tvbuff_t *tvb, gint offset)
@@ -836,6 +604,7 @@ static guint8 mausb_get_size_ep_des(tvbuff_t *tvb, gint offset)
 static guint16 dissect_mausb_mgmt_pkt_ep_handle( proto_tree *tree, tvbuff_t *tvb,
             packet_info *pinfo, gint16 start, gboolean req, gboolean del)
 {
+    usb_trans_info_t usb_trans_info;
     usb_conv_info_t usb_conv_info;
     proto_item *size_field = NULL;
     guint16 offset = start;
@@ -844,6 +613,7 @@ static guint16 dissect_mausb_mgmt_pkt_ep_handle( proto_tree *tree, tvbuff_t *tvb
     guint8 size_ep_des;
     int i;
 
+    memset(&usb_trans_info, 0, sizeof(usb_trans_info_t));
     memset(&usb_conv_info,  0, sizeof(usb_conv_info_t));
 
     num_ep = tvb_get_guint8(tvb, offset) & MAUSB_MGMT_NUM_EP_DES_MASK;
@@ -896,20 +666,20 @@ static guint16 dissect_mausb_mgmt_pkt_ep_handle( proto_tree *tree, tvbuff_t *tvb
 
             /* Standard USB Endpoint Descriptor */
             dissect_usb_endpoint_descriptor(pinfo, tree, tvb, loop_offset,
-                    &usb_conv_info);
+                    &usb_trans_info, &usb_conv_info);
             loop_offset += USB_DT_EP_SIZE;
 
             /* If there are more descriptors to read */
             if (MAUSB_EP_DES_SIZE < size_ep_des) {
                 /* TODO: Dissector for SS EP Companion Descriptors */
                 dissect_usb_unknown_descriptor(pinfo, tree,
-                        tvb, loop_offset, &usb_conv_info);
+                        tvb, loop_offset, &usb_trans_info, &usb_conv_info);
                 loop_offset += USB_DT_SS_EP_COMP_SIZE;
 
                 if (MAUSB_SS_EP_DES_SIZE < size_ep_des) {
                     /* TODO: Dissector for SSP ISO EP Companion Descriptors */
                     loop_offset += dissect_usb_unknown_descriptor(pinfo, tree,
-                            tvb, loop_offset, &usb_conv_info);
+                            tvb, loop_offset, &usb_trans_info, &usb_conv_info);
 
                     /* Pad to a DWORD */
                     proto_tree_add_item(tree, hf_mausb_ep_handle_req_pad, tvb,
@@ -1012,9 +782,6 @@ static guint16 dissect_mausb_mgmt_pkt_flds(struct mausb_header *header,
     switch (header->type) {
 
     /* subtypes with variable length additional data */
-    case CapResp:
-        offset = dissect_mausb_mgmt_pkt_cap_resp(header, mgmt_tree, tvb, pinfo, offset);
-        break;
     case EPHandleReq:
         offset = dissect_mausb_mgmt_pkt_ep_handle(mgmt_tree, tvb, pinfo,
                                                   offset, TRUE, FALSE);
@@ -1034,11 +801,6 @@ static guint16 dissect_mausb_mgmt_pkt_flds(struct mausb_header *header,
     case EPRestartResp:
     case EPClearTransferReq:
     case EPClearTransferResp:
-        proto_tree_add_item(mgmt_tree, hf_mausb_mgmt_type_spec_generic,
-                            tvb, offset, type_spec_len, ENC_NA);
-        offset += type_spec_len;
-        break;
-
     case EPHandleDeleteReq:
         offset = dissect_mausb_mgmt_pkt_ep_handle(mgmt_tree, tvb, pinfo,
                                                   offset, TRUE, TRUE);
@@ -1058,10 +820,10 @@ static guint16 dissect_mausb_mgmt_pkt_flds(struct mausb_header *header,
 
     /* subtypes with constant length additional data */
     case CapReq:
+    case CapResp:
     case USBDevHandleReq:
     case USBDevHandleResp:
     case ModifyEP0Req:
-    case SetDevAddrReq:
     case SetDevAddrResp:
     case UpdateDevReq:
     case MAUSBSyncReq:
@@ -1079,6 +841,7 @@ static guint16 dissect_mausb_mgmt_pkt_flds(struct mausb_header *header,
     /* Managment packets with no additional data */
     case MAUSBDevResetReq:
     case MAUSBDevResetResp:
+    case SetDevAddrReq:
     case UpdateDevResp:
     case DisconnectDevReq:
     case DisconnectDevResp:
@@ -1113,33 +876,7 @@ static guint16 dissect_mausb_mgmt_pkt_flds(struct mausb_header *header,
     return offset;
 }
 
-static conversation_t
-*get_mausb_conversation(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
-                        guint16 handle, gboolean is_data, gboolean req)
-{
-    conversation_t *conversation = NULL;
-    guint16 device_address;
-    guint16 bus_num;
-    int endpoint;
 
-    /* Treat data packets the same as URBs */
-    if (is_data) {
-        device_address = mausb_ep_handle_dev_addr(handle);
-        endpoint = mausb_ep_handle_ep_num(handle);
-        bus_num = mausb_ep_handle_bus_num(handle);
-
-        usb_set_addr(tree, tvb, pinfo, bus_num, device_address, endpoint, req);
-        conversation = get_usb_conversation(pinfo, &pinfo->src, &pinfo->dst,
-                                            pinfo->srcport, pinfo->destport);
-    }
-    /* TODO: track control & managment packet conversations */
-
-    return conversation;
-}
-
-/* Used to detect multiple MA Packets in a single TCP packet */
-/* Not used for MA Packets in SNAP Packets */
-static gint mausb_num_pdus = 0;
 
 /* Code to actually dissect the packets */
 static int
@@ -1157,27 +894,19 @@ dissect_mausb_pkt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     gint offset = 0;
     gint payload_len;
 
-    /* Variables needed to follow the conversation */
-    usb_conv_info_t      *usb_conv_info = NULL;
-    usb_trans_info_t     *usb_trans_info = NULL;
-    conversation_t       *conversation;
-
-
     memset(&header, 0, sizeof(struct mausb_header));
 
     /* Set the Protocol column to the constant string of mausb */
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "MAUSB");
 
-    mausb_num_pdus++;
 
-    col_add_str(pinfo->cinfo, COL_INFO, "[");
-    col_set_fence(pinfo->cinfo, COL_INFO);
+    col_clear(pinfo->cinfo, COL_INFO);
 
     /*** PROTOCOL TREE ***/
 
     /* create display subtree for the protocol */
     ti = proto_tree_add_item(tree, proto_mausb, tvb, 0,
-                mausb_get_pkt_len(pinfo, tvb, offset, NULL), ENC_NA);
+                mausb_get_pkt_len(pinfo, tvb, offset), ENC_NA);
 
     mausb_tree = proto_item_add_subtree(ti, ett_mausb);
 
@@ -1206,7 +935,7 @@ dissect_mausb_pkt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     /* Packet Type */
     header.type = tvb_get_guint8(tvb, offset);
-    col_append_str(pinfo->cinfo, COL_INFO, val_to_str(header.type, mausb_type_string, "%d"));
+    col_add_str(pinfo->cinfo, COL_INFO, val_to_str(header.type, mausb_type_string, "%d"));
     proto_tree_add_item(mausb_tree, hf_mausb_type, tvb,
             offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
@@ -1222,30 +951,13 @@ dissect_mausb_pkt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if (tvb_reported_length(tvb) != header.length) {
         expert_add_info(pinfo, len_field, &ei_len);
     }
+    if (0 != header.length % 4) {
+        expert_add_info(pinfo, len_field, &ei_len_dword);
+    }
 
 
     /* Is the next field a device handle or an endpoint handle */
     header.handle = tvb_get_letohs(tvb, offset);
-
-    /* Once we have the endpoint/device handle,
-     * we can find the right conversation */
-    conversation = get_mausb_conversation(mausb_tree, tvb, pinfo, header.handle,
-                                          mausb_is_data_pkt(&header),
-                                          mausb_is_from_host(&header));
-
-    /* If there is a usb conversation, find it */
-    if (mausb_is_data_pkt(&header) & !(mausb_is_transfer_ack(&header))) {
-
-        usb_conv_info = get_usb_conv_info(conversation);
-
-        /* TODO: set all the usb_conv_info values */
-        usb_conv_info->is_request = mausb_is_transfer_req(&header);
-
-        usb_trans_info = usb_get_trans_info(tvb, pinfo, tree,
-                                            USB_HEADER_MAUSB, usb_conv_info);
-        usb_conv_info->usb_trans_info = usb_trans_info;
-    }
-
 
     if (mausb_is_mgmt_pkt(&header)) {
 
@@ -1364,17 +1076,6 @@ dissect_mausb_pkt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         /* Presentation Time (iso) */
         /* Number of Segments (iso) */
 
-        /* If this packet contains USB Setup Data */
-        if (mausb_has_setup_data(&header)) {
-            offset = dissect_usb_setup_request(pinfo, mausb_tree, tvb, offset,
-                                               URB_SUBMIT, usb_conv_info,
-                                               USB_HEADER_MAUSB);
-        }
-
-        if (mausb_is_setup_response(&header)) {
-            offset = dissect_usb_setup_response(pinfo, mausb_tree, tvb, offset,
-                                                URB_COMPLETE, usb_conv_info);
-        }
         /*
          * TODO: dissect MA USB Payload with USB class dissectors
          *       (ex: MBIM, USB Audio, etc.)
@@ -1390,9 +1091,6 @@ dissect_mausb_pkt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         }
     }
 
-    col_append_str(pinfo->cinfo, COL_INFO, "]");
-    col_set_fence(pinfo->cinfo, COL_INFO);
-
     return offset;
 
 }
@@ -1402,16 +1100,8 @@ static int
 dissect_mausb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
 
-    mausb_num_pdus = 0;
-
     tcp_dissect_pdus(tvb, pinfo, tree, TRUE, MAUSB_MIN_LENGTH,
             mausb_get_pkt_len, dissect_mausb_pkt, data);
-
-    if (1 < mausb_num_pdus) {
-        col_clear_fence(pinfo->cinfo, COL_INFO);
-        col_prepend_fstr(pinfo->cinfo, COL_INFO, "[%i packets] ", mausb_num_pdus);
-    }
-
     return tvb_reported_length(tvb);
 }
 
@@ -1486,7 +1176,7 @@ proto_register_mausb(void)
         /* EP Handle Subfields */
         { &hf_mausb_ep_handle_d,
             { "Direction", "mausb.ep_handle.d", FT_BOOLEAN, 16,
-              TFS(&tfs_endpoint_direction), MAUSB_EP_HANDLE_D, NULL, HFILL
+              TFS(&tfs_set_notset), MAUSB_EP_HANDLE_D, NULL, HFILL
             }
         },
         { &hf_mausb_ep_handle_ep_num,
@@ -1624,94 +1314,6 @@ proto_register_mausb(void)
     };
 
 
-    /* Register info for CapReq/Resp specific fields */
-    static hf_register_info hf_cap[] = {
-
-        { &hf_mausb_cap_resp_num_ep,
-            { "Number of Endpoints", "mausb.cap_resp.num_ep",
-              FT_UINT8, BASE_DEC, NULL, 0,
-              "the maximum number of endpoints for this device",
-              HFILL
-            }
-        },
-        { &hf_mausb_cap_resp_num_dev,
-            { "Number of Devices", "mausb.cap_resp.num_dev",
-              FT_UINT8, BASE_DEC, NULL, 0,
-              "the maximum number of USB devices the MA USB device can manage",
-              HFILL
-            }
-        },
-        { &hf_mausb_cap_resp_num_stream,
-            { "Number of Streams", "mausb.cap_resp.num_stream",
-              FT_UINT8, BASE_DEC, NULL, MAUSB_CAP_RESP_NUM_STREAM_MASK,
-              "2 to the power of this value is the max number of streams supported",
-              /* TODO: have dissector print the actual number of streams supported */
-              HFILL
-            }
-        },
-        { &hf_mausb_cap_resp_dev_type,
-            { "Device Type", "mausb.cap_resp.dev_type", FT_UINT8, BASE_HEX,
-              VALS(mausb_cap_resp_dev_type), MAUSB_CAP_RESP_DEV_TYPE_MASK,
-              NULL, HFILL
-            }
-        },
-        { &hf_mausb_cap_resp_desc_count,
-            { "Descriptors Count", "mausb.cap_resp.desc_count",
-              FT_UINT8, BASE_DEC,
-              NULL, 0, "The total number of MA Device Capabilities descriptors",
-              HFILL
-            }
-        },
-        { &hf_mausb_cap_resp_desc_len,
-            { "Descriptors Length", "mausb.cap_resp.desc_len",
-              FT_UINT24, BASE_DEC,
-              NULL, 0, "The total size of MA Device Capabilities descriptors",
-              HFILL
-            }
-        },
-        { &hf_mausb_cap_resp_transfer_req,
-            { "Number of Outstanding Transfer Requests",
-              "mausb.cap_resp.transfer_req",
-              FT_UINT16, BASE_DEC, NULL, 0,
-              "The maximum number of total outstanding transfer requests", HFILL
-            }
-        },
-        { &hf_mausb_cap_resp_mgmt_req,
-            { "Number of Outstanding Management Requests", "mausb.cap_resp.mgmt_req",
-              FT_UINT16, BASE_DEC, NULL,
-              MAUSB_CAP_RESP_MGMT_REQ_MASK,
-              "The maximum number of host initiated outstanding management requests",
-              HFILL
-            }
-        },
-        { &hf_mausb_cap_resp_rsvd,
-            { "Reserved", "mausb.cap_resp.rsvd", FT_UINT16, BASE_HEX,
-              NULL, MAUSB_CAP_RESP_RSVD_MASK, NULL, HFILL
-            }
-        },
-
-        /* Device Capability Descriptors */
-        { &hf_mausb_dev_cap_len,
-            { "Length", "mausb.cap_resp.dev_cap.length",
-              FT_UINT8, BASE_DEC, NULL,
-              0, NULL, HFILL
-            }
-        },
-        { &hf_mausb_dev_cap_type,
-            { "Type", "mausb.cap_resp.dev_cap.type",
-              FT_UINT8, BASE_DEC, VALS(mausb_dev_cap_string),
-              0, NULL, HFILL
-            }
-        },
-        { &hf_mausb_dev_cap_generic,
-            { "Type-specific device capability descriptor fields",
-              "mausb.cap_resp.dev_cap.generic",
-              FT_NONE, 0, NULL, 0, NULL, HFILL
-            }
-        }
-    };
-
-
     /* register info for ep_handle_* specific fields */
     static hf_register_info hf_ep_handle[] = {
         { &hf_mausb_mgmt_ep_handle_num,
@@ -1804,8 +1406,7 @@ proto_register_mausb(void)
         &ett_mausb_flags,
         &ett_mausb_ep_handle,
         &ett_mausb_tflags,
-        &ett_mgmt,
-        &ett_dev_cap
+        &ett_mgmt
     };
 
     static ei_register_info ei[] = {
@@ -1816,6 +1417,10 @@ proto_register_mausb(void)
         { &ei_len,
             { "mausb.ei.length", PI_MALFORMED, PI_ERROR,
               "Packet length field does not match size of packet", EXPFILL }
+        },
+        { &ei_len_dword,
+            { "mausb.ei.length.dword", PI_PROTOCOL, PI_WARN,
+              "Packet contains partial DWORD", EXPFILL }
         },
         { &ei_mgmt_type_undef,
             { "mausb.ei.type", PI_PROTOCOL, PI_WARN,
@@ -1829,19 +1434,6 @@ proto_register_mausb(void)
             { "mausb.ei.type_spec.len", PI_PROTOCOL, PI_WARN,
               "Expected type-specific managment packet data", EXPFILL }
         },
-        { &ei_dev_cap_len,
-            { "mausb.ei.cap_resp.dev_cap.length", PI_PROTOCOL, PI_WARN,
-              "Incorrect length value for this device capability descriptor",
-              EXPFILL }
-        },
-        { &ei_dev_cap_resp_desc_len,
-            { "mausb.ei.dev_cap_resp.desc_len", PI_PROTOCOL, PI_WARN,
-              "Incorrect value in Device Descriptors Length field", EXPFILL }
-        },
-        { &ei_cap_resp_desc_len,
-            { "mausb.ei.cap_resp.desc_len", PI_PROTOCOL, PI_WARN,
-              "Value in Descriptors Length field exceeds actual space in packet", EXPFILL }
-        },
     };
 
     module_t *mausb_module;
@@ -1853,7 +1445,6 @@ proto_register_mausb(void)
 
     /* Required function calls to register the header fields and subtrees */
     proto_register_field_array(proto_mausb, hf, array_length(hf));
-    proto_register_field_array(proto_mausb, hf_cap, array_length(hf_cap));
     proto_register_field_array(proto_mausb, hf_ep_handle, array_length(hf_ep_handle));
     proto_register_subtree_array(ett, array_length(ett));
 
@@ -1869,11 +1460,6 @@ proto_register_mausb(void)
                        "Set the port for Media Agnostic Packets",
                        10, &mausb_tcp_port_pref);
 
-    /* Register UDP port preference */
-    prefs_register_uint_preference(mausb_module, "udp.port", "MAUSB UDP Port",
-                       "Set the port for Media Agnostic Packets",
-                       10, &mausb_udp_port_pref);
-
 }
 
 void
@@ -1881,36 +1467,31 @@ proto_reg_handoff_mausb(void)
 {
     static gboolean initialized = FALSE;
     static dissector_handle_t mausb_tcp_handle;
-    static dissector_handle_t mausb_pkt_handle;
     static guint saved_mausb_tcp_port_pref;
-    static guint saved_mausb_udp_port_pref;
 
     if (!initialized) {
+        dissector_handle_t mausb_snap_handle;
         /* only initialize once */
         mausb_tcp_handle = new_create_dissector_handle(dissect_mausb,
                 proto_mausb);
 
-        mausb_pkt_handle = new_create_dissector_handle(dissect_mausb_pkt,
+        mausb_snap_handle = new_create_dissector_handle(dissect_mausb_pkt,
                 proto_mausb);
 
-        dissector_add_uint("llc.wfa_pid", PID_MAUSB, mausb_pkt_handle);
+        dissector_add_uint("llc.mausb_pid", PID_MAUSB, mausb_snap_handle);
         initialized = TRUE;
 
     } else {
         /* if we have already been initialized */
         dissector_delete_uint("tcp.port", saved_mausb_tcp_port_pref, mausb_tcp_handle);
-        dissector_delete_uint("udp.port", saved_mausb_udp_port_pref, mausb_pkt_handle);
     }
 
     saved_mausb_tcp_port_pref = mausb_tcp_port_pref;
-    saved_mausb_udp_port_pref = mausb_udp_port_pref;
-
     dissector_add_uint("tcp.port", mausb_tcp_port_pref, mausb_tcp_handle);
-    dissector_add_uint("udp.port", mausb_udp_port_pref, mausb_pkt_handle);
 }
 
 void
-proto_register_wfa_oui(void)
+proto_register_mausb_oui(void)
 {
     static hf_register_info hf[] = {
       { &hf_llc_mausb_pid,
@@ -1919,7 +1500,7 @@ proto_register_wfa_oui(void)
       }
     };
 
-    llc_add_oui(OUI_WFA, "llc.wfa_pid", "LLC WFA OUI PID", hf);
+    llc_add_oui(OUI_MAUSB, "llc.mausb_pid", "LLC MA USB OUI PID", hf);
 }
 
 /*

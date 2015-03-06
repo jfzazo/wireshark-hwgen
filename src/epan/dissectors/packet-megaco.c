@@ -42,13 +42,24 @@
 
 #include <stdlib.h>
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/wmem/wmem.h>
+#include <epan/addr_resolv.h>
+#include <epan/prefs.h>
+#include <epan/strutil.h>
+#include <epan/sctpppids.h>
+#include <epan/dissectors/packet-tpkt.h>
+#include <epan/asn1.h>
+#include <epan/dissectors/packet-per.h>
+#include <epan/dissectors/packet-h245.h>
+#include <epan/dissectors/packet-ip.h>
+#include <epan/dissectors/packet-ber.h>
+
 #include <epan/gcp.h>
 #include <epan/tap.h>
-#include "packet-tpkt.h"
-#include "packet-h245.h"
-#include "packet-ip.h"
 
 void proto_register_megaco(void);
 void proto_reg_handoff_megaco(void);
@@ -164,8 +175,8 @@ static gboolean global_megaco_raw_text = TRUE;
 static gboolean global_megaco_dissect_tree = TRUE;
 
 /* Some basic utility functions that are specific to this dissector */
-static gint megaco_tvb_skip_wsp(tvbuff_t *tvb, gint offset);
-static gint megaco_tvb_skip_wsp_return(tvbuff_t *tvb, gint offset);
+static gint megaco_tvb_skip_wsp(tvbuff_t* tvb, gint offset);
+static gint megaco_tvb_skip_wsp_return(tvbuff_t* tvb, gint offset);
 /*
 * The various functions that either dissect some
 * subpart of MEGACO.  These aren't really proto dissectors but they
@@ -211,7 +222,7 @@ tvb_raw_text_add(tvbuff_t *tvb, proto_tree *tree);
 static void
 dissect_megaco_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 static gint
-megaco_tvb_find_token(tvbuff_t *tvb, gint offset, gint maxlength);
+megaco_tvb_find_token(tvbuff_t* tvb, gint offset, gint maxlenght);
 static dissector_handle_t data_handle;
 static dissector_handle_t sdp_handle;
 static dissector_handle_t h245_handle;
@@ -323,21 +334,21 @@ dissect_megaco_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     guchar      needle;
     guint8      first;
 
-    gcp_msg_t      *msg       = NULL;
-    gcp_trx_t      *trx       = NULL;
-    gcp_ctx_t      *ctx       = NULL;
-    gcp_cmd_t      *cmd       = NULL;
-    gcp_term_t     *term      = NULL;
-    gcp_trx_type_t  trx_type  = GCP_TRX_NONE;
-    guint32         trx_id    = 0;
-    guint32         ctx_id    = 0;
-    gcp_cmd_type_t  cmd_type  = GCP_CMD_NONE;
-    gcp_wildcard_t  wild_term = GCP_WILDCARD_NONE;
-    proto_item     *hidden_item;
+    gcp_msg_t* msg = NULL;
+    gcp_trx_t* trx = NULL;
+    gcp_ctx_t* ctx = NULL;
+    gcp_cmd_t* cmd = NULL;
+    gcp_term_t* term = NULL;
+    gcp_trx_type_t trx_type = GCP_TRX_NONE;
+    guint32 trx_id = 0;
+    guint32 ctx_id = 0;
+    gcp_cmd_type_t cmd_type = GCP_CMD_NONE;
+    gcp_wildcard_t wild_term = GCP_WILDCARD_NONE;
+    proto_item *hidden_item;
 
     top_tree=tree;
     /* Initialize variables */
-    tvb_len                     = tvb_reported_length(tvb);
+    tvb_len                     = tvb_length(tvb);
     megaco_tree                 = NULL;
     ti                          = NULL;
     tvb_offset                  = 0;
@@ -555,8 +566,9 @@ dissect_megaco_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             tvb_LBRKT  = tvb_find_guint8(tvb, tvb_offset, tvb_transaction_end_offset, '{');
             tvb_offset = tvb_LBRKT;
 
-            message_body_tree = proto_tree_add_subtree(megaco_tree, tvb, tvb_previous_offset, tvb_offset-tvb_previous_offset,
-                ett_megaco_message_body, NULL, tvb_format_text(tvb, tvb_previous_offset, tvb_offset-tvb_previous_offset+1));
+            ti = proto_tree_add_text(megaco_tree, tvb, tvb_previous_offset, tvb_offset-tvb_previous_offset,
+                "%s",tvb_format_text(tvb, tvb_previous_offset, tvb_offset-tvb_previous_offset+1));
+            message_body_tree = proto_item_add_subtree(ti, ett_megaco_message_body);
 
             my_proto_tree_add_string(message_body_tree, hf_megaco_transaction, tvb,
                 tvb_previous_offset, tokenlen,
@@ -590,8 +602,9 @@ dissect_megaco_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             tvb_offset = megaco_tvb_skip_wsp(tvb, tvb_offset);
             tvb_LBRKT  = tvb_find_guint8(tvb, tvb_offset, tvb_transaction_end_offset, '{');
             tvb_current_offset = tvb_LBRKT;
-            message_body_tree = proto_tree_add_subtree(megaco_tree, tvb, tvb_previous_offset, tvb_current_offset-tvb_previous_offset,
-                ett_megaco_message_body, NULL, tvb_format_text(tvb, tvb_previous_offset, tvb_current_offset-tvb_previous_offset+1));
+            ti = proto_tree_add_text(megaco_tree, tvb, tvb_previous_offset, tvb_current_offset-tvb_previous_offset,
+                "%s",tvb_format_text(tvb, tvb_previous_offset, tvb_current_offset-tvb_previous_offset+1));
+            message_body_tree = proto_item_add_subtree(ti, ett_megaco_message_body);
 
             tvb_current_offset  = megaco_tvb_skip_wsp_return(tvb, tvb_current_offset-1);
             len = tvb_current_offset - tvb_offset;
@@ -616,8 +629,9 @@ dissect_megaco_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         case REPLYTOKEN:
             trx_type = GCP_TRX_REPLY;
             tvb_LBRKT  = tvb_find_guint8(tvb, tvb_offset, tvb_transaction_end_offset, '{');
-            message_body_tree = proto_tree_add_subtree(megaco_tree, tvb, tvb_previous_offset, tvb_LBRKT-tvb_previous_offset,
-                    ett_megaco_message_body, NULL, tvb_format_text(tvb, tvb_previous_offset, tvb_LBRKT-tvb_previous_offset+1));
+            ti = proto_tree_add_text(megaco_tree, tvb, tvb_previous_offset, tvb_LBRKT-tvb_previous_offset,
+                    "%s",tvb_format_text(tvb, tvb_previous_offset, tvb_LBRKT-tvb_previous_offset+1));
+            message_body_tree = proto_item_add_subtree(ti, ett_megaco_message_body);
 
             if (tree)
                 my_proto_tree_add_string(message_body_tree, hf_megaco_transaction, tvb,
@@ -650,8 +664,9 @@ dissect_megaco_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         case TRANSTOKEN:
             /* TransactionRequest   */
             trx_type = GCP_TRX_REQUEST;
-            message_body_tree = proto_tree_add_subtree(megaco_tree, tvb, tvb_previous_offset, tvb_current_offset-tvb_previous_offset,
-                    ett_megaco_message_body, NULL, tvb_format_text(tvb, tvb_previous_offset, tvb_current_offset-tvb_previous_offset+1));
+            ti = proto_tree_add_text(megaco_tree, tvb, tvb_previous_offset, tvb_current_offset-tvb_previous_offset,
+                    "%s",tvb_format_text(tvb, tvb_previous_offset, tvb_current_offset-tvb_previous_offset+1));
+            message_body_tree = proto_item_add_subtree(ti, ett_megaco_message_body);
 
             if(tree)
                 my_proto_tree_add_string(message_body_tree, hf_megaco_transaction, tvb,
@@ -870,10 +885,10 @@ nextcontext:
                 tvb_next_offset = tvb_command_start_offset + tokenlen;
 
                 /* Try to dissect Topology Descriptor before the command */
-                tempchar = tvb_get_guint8(tvb, tvb_command_start_offset);
-                if ( (tempchar >= 'a')&& (tempchar <= 'z')){
+				tempchar = tvb_get_guint8(tvb, tvb_command_start_offset);
+				if ( (tempchar >= 'a')&& (tempchar <= 'z')){
                     tempchar = tempchar - 0x20;
-                }
+				}
                 if ( tempchar == 'T') {
                     tempchar = tvb_get_guint8(tvb, tvb_command_start_offset+1);
 
@@ -947,7 +962,7 @@ nextcontext:
 
                 if ( tempchar != 'E' ){
 
-                    /* Short form used */
+					/* Short form used */
                     if ( tvb_get_guint8(tvb, 0 ) == '!'){
 
                         switch ( tempchar ){
@@ -1000,16 +1015,6 @@ nextcontext:
                             }
                             break;
 
-                        case 'I':
-                            /* "IEPS" */
-                            tempchar = tvb_get_guint8(tvb, tvb_command_start_offset+1);
-                            if(tempchar == 'E'){
-                                my_proto_tree_add_string(megaco_tree_command_line, hf_megaco_command, tvb,
-                                    tvb_command_start_offset, tokenlen,
-                                    "IEPSCall");
-                            }
-                            cmd_type = GCP_CMD_NONE;
-                            break;
                         case 'N':
                             switch(trx_type) {
                                 case GCP_TRX_REQUEST: cmd_type = GCP_CMD_NOTIFY_REQ; break;
@@ -1126,16 +1131,17 @@ nextcontext:
                             break;
 
                         default:
-                        {
-                            proto_item *item;
+							{
+								proto_item *item;
 
-                            tokenlen =  (tvb_RBRKT+1) - tvb_previous_offset;
-                            item = proto_tree_add_string(megaco_tree, hf_megaco_error_Frame, tvb,
-                                                         tvb_previous_offset, tokenlen,
-                                                         "No Command detectable !");
-                            proto_item_append_text(item,"[ tempchar 0x%x ]", tempchar);
-                            return;
-                        }
+								tokenlen =  (tvb_RBRKT+1) - tvb_previous_offset;
+								tvb_ensure_bytes_exist(tvb, tvb_previous_offset, tokenlen);
+								item = proto_tree_add_string(megaco_tree, hf_megaco_error_Frame, tvb,
+									tvb_previous_offset, tokenlen,
+									"No Command detectable !");
+								proto_item_append_text(item,"[ tempchar 0x%x ]", tempchar);
+								return;
+							}
                         }
                     }
                     else{
@@ -1288,8 +1294,6 @@ nextcontext:
                             "WildCard any");
                             col_append_str(pinfo->cinfo, COL_INFO, "=$");
                         break;
-                    case 'O':
-                        break;
 
                     default:
                         /*** TERM ***/
@@ -1420,7 +1424,7 @@ dissect_megaco_descriptors(tvbuff_t *tvb, proto_tree *megaco_tree_command_line, 
     gint        tvb_current_offset,tvb_previous_offset,tokenlen;
     gint        tvb_RBRKT, tvb_LBRKT;
 
-    tvb_len     = tvb_reported_length(tvb);
+    tvb_len     = tvb_length(tvb);
 
 
     tvb_LBRKT = megaco_tvb_skip_wsp(tvb, tvb_descriptors_start_offset +1);
@@ -1648,8 +1652,8 @@ dissect_megaco_mediadescriptor(tvbuff_t *tvb, proto_tree *megaco_tree_command_li
     proto_tree  *megaco_mediadescriptor_tree, *megaco_mediadescriptor_ti;
 
     /*
-    megaco_mediadescriptor_tree = proto_tree_add_subtree(megaco_tree_command_line,tvb,tvb_previous_offset,tokenlen,
-                                                         ett_megaco_mediadescriptor, NULL, "Media Descriptor");
+    megaco_mediadescriptor_ti = proto_tree_add_text(megaco_tree_command_line,tvb,tvb_previous_offset,tokenlen,"Media Descriptor");
+    megaco_mediadescriptor_tree = proto_item_add_subtree(megaco_mediadescriptor_ti, ett_megaco_mediadescriptor);
     */
     while ( tvb_previous_offset < tvb_last_RBRKT){
         /* Start of token */
@@ -2962,7 +2966,7 @@ dissect_megaco_Localdescriptor(tvbuff_t *tvb, proto_tree *megaco_mediadescriptor
 
     tokenlen = tvb_next_offset - tvb_current_offset;
     if ( tokenlen > 3 ){
-        next_tvb = tvb_new_subset_length(tvb, tvb_current_offset, tokenlen);
+        next_tvb = tvb_new_subset(tvb, tvb_current_offset, tokenlen, tokenlen);
         call_dissector(sdp_handle, next_tvb, pinfo, megaco_localdescriptor_tree);
     }
 }
@@ -3229,7 +3233,7 @@ static void tvb_raw_text_add(tvbuff_t *tvb, proto_tree *tree){
     gint tvb_linebegin,tvb_lineend,tvb_len,linelen;
 
     tvb_linebegin = 0;
-    tvb_len = tvb_reported_length(tvb);
+    tvb_len = tvb_length(tvb);
 
     proto_tree_add_text(tree, tvb, 0, -1,"-------------- (RAW text output) ---------------");
 
@@ -3257,7 +3261,7 @@ static gint megaco_tvb_skip_wsp(tvbuff_t* tvb, gint offset ){
     gint counter = offset;
     gint end,tvb_len;
     guint8 tempchar;
-    tvb_len = tvb_reported_length(tvb);
+    tvb_len = tvb_length(tvb);
     end = tvb_len;
 
     for(counter = offset; counter < end &&
@@ -3618,15 +3622,3 @@ proto_reg_handoff_megaco(void)
 
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

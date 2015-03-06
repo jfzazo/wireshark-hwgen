@@ -59,12 +59,17 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/conversation.h>
 
 #include "packet-tcp.h"
 #include "packet-udp.h"
 #include <epan/strutil.h>
+
+#include <epan/wmem/wmem.h>
 
 #define TCP_PORT_SOCKS 1080
 
@@ -121,10 +126,6 @@ static int hf_socks_password = -1;
 static int hf_socks_remote_name = -1;
 static int hf_socks_address_type = -1;
 static int hf_socks_fragment_number = -1;
-static int hf_socks_ping_end_command = -1;
-static int hf_socks_ping_results = -1;
-static int hf_socks_traceroute_end_command = -1;
-static int hf_socks_traceroute_results = -1;
 
 /************* Dissector handles ***********/
 
@@ -251,7 +252,7 @@ static int display_address(tvbuff_t *tvb, int offset, proto_tree *tree) {
 
     int a_type = tvb_get_guint8(tvb, offset);
 
-    proto_tree_add_item( tree, hf_socks_address_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item( tree, hf_socks_address_type, tvb, offset, 1, ENC_NA);
     offset += 1;
 
     switch (a_type)
@@ -266,7 +267,7 @@ static int display_address(tvbuff_t *tvb, int offset, proto_tree *tree) {
         gchar* str;
 
         len = tvb_get_guint8(tvb, offset);
-        str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+1, len, ENC_ASCII);
+        str = tvb_get_string(wmem_packet_scope(), tvb, offset+1, len);
         proto_tree_add_string(tree, hf_socks_remote_name, tvb, offset, len+1, str);
         offset += (len+1);
         }
@@ -296,7 +297,7 @@ static int get_address_v5(tvbuff_t *tvb, int offset,
     case 1: /* IPv4 address */
         if ( hash_info) {
             TVB_SET_ADDRESS(&addr, AT_IPv4, tvb, offset, 4);
-            WMEM_COPY_ADDRESS(wmem_file_scope(), &hash_info->dst_addr, &addr);
+            SE_COPY_ADDRESS(&hash_info->dst_addr, &addr);
         }
         offset += 4;
         break;
@@ -304,7 +305,7 @@ static int get_address_v5(tvbuff_t *tvb, int offset,
     case 4: /* IPv6 address */
         if ( hash_info) {
             TVB_SET_ADDRESS(&addr, AT_IPv6, tvb, offset, 16);
-            WMEM_COPY_ADDRESS(wmem_file_scope(), &hash_info->dst_addr, &addr);
+            SE_COPY_ADDRESS(&hash_info->dst_addr, &addr);
         }
         offset += 16;
         break;
@@ -352,7 +353,7 @@ socks_udp_dissector(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         proto_tree_add_item(socks_tree, hf_socks_reserved2, tvb, offset, 2, ENC_BIG_ENDIAN);
         offset += 2;
 
-        proto_tree_add_item(socks_tree, hf_socks_fragment_number, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(socks_tree, hf_socks_fragment_number, tvb, offset, 1, ENC_NA);
         offset += 1;
 
         offset = display_address( tvb, offset, socks_tree);
@@ -440,7 +441,7 @@ display_socks_v4(tvbuff_t *tvb, int offset, packet_info *pinfo,
             proto_tree_add_item( tree, hf_socks_ver, tvb, offset, 1, ENC_BIG_ENDIAN);
             offset += 1;
 
-            proto_tree_add_item( tree, hf_socks_cmd, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item( tree, hf_socks_cmd, tvb, offset, 1, ENC_NA);
             offset += 1;
 
             /* Do remote port */
@@ -518,12 +519,13 @@ client_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo,
         proto_item      *ti;
         guint8 num_auth_methods, auth;
 
-        AuthTree = proto_tree_add_subtree( tree, tvb, offset, -1, ett_socks_auth, &ti, "Client Authentication Methods");
+        ti = proto_tree_add_text( tree, tvb, offset, -1, "Client Authentication Methods");
+        AuthTree = proto_item_add_subtree(ti, ett_socks_auth);
 
         num_auth_methods = tvb_get_guint8(tvb, offset);
         proto_item_set_len(ti, num_auth_methods+1);
 
-        proto_tree_add_item( AuthTree, hf_client_auth_method_count, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item( AuthTree, hf_client_auth_method_count, tvb, offset, 1, ENC_NA);
         offset += 1;
 
         for( i = 0; i  < num_auth_methods; ++i) {
@@ -545,10 +547,10 @@ client_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo,
     }
     else if (state_info->client == clientV5Command) {
 
-        proto_tree_add_item( tree, hf_socks_cmd, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item( tree, hf_socks_cmd, tvb, offset, 1, ENC_NA);
         offset += 1;
 
-        proto_tree_add_item( tree, hf_socks_reserved, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item( tree, hf_socks_reserved, tvb, offset, 1, ENC_NA);
         offset += 1;
 
         offset = display_address(tvb, offset, tree);
@@ -566,12 +568,12 @@ client_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo,
         case USER_NAME_AUTHENTICATION:
             /* process user name */
             len = tvb_get_guint8(tvb, offset);
-            str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+1, len, ENC_ASCII);
+            str = tvb_get_string(wmem_packet_scope(), tvb, offset+1, len);
             proto_tree_add_string(tree, hf_socks_username, tvb, offset, len+1, str);
             offset += (len+1);
 
             len = tvb_get_guint8(tvb, offset);
-            str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+1, len, ENC_ASCII);
+            str = tvb_get_string(wmem_packet_scope(), tvb, offset+1, len);
             proto_tree_add_string(tree, hf_socks_password, tvb, offset, len+1, str);
             /* offset += (len+1); */
             break;
@@ -622,7 +624,7 @@ server_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
 
     case serverUserReply:
         auth_status = tvb_get_guint8(tvb, offset);
-        ti = proto_tree_add_item(tree, hf_server_auth_status, tvb, offset, 1, ENC_BIG_ENDIAN);
+        ti = proto_tree_add_item(tree, hf_server_auth_status, tvb, offset, 1, ENC_NA);
         if(auth_status != 0)
             proto_item_append_text(ti, " (failure)");
         else
@@ -699,7 +701,7 @@ state_machine_v4( socks_hash_entry_t *hash_info, tvbuff_t *tvb,
 
         /* get remote address */
         TVB_SET_ADDRESS(&addr, AT_IPv4, tvb, offset, 4);
-        WMEM_COPY_ADDRESS(wmem_file_scope(), &hash_info->dst_addr, &addr);
+        SE_COPY_ADDRESS(&hash_info->dst_addr, &addr);
 
         hash_info->clientState = clientDone;
     }
@@ -889,13 +891,20 @@ display_ping_and_tracert(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tr
     if ( pinfo->destport == TCP_PORT_SOCKS){
         col_append_str(pinfo->cinfo, COL_INFO, ", Terminate Request");
 
-        proto_tree_add_item(tree, (hash_info->command  == PING_COMMAND) ? hf_socks_ping_end_command : hf_socks_traceroute_end_command, tvb, offset, 1, ENC_NA);
+        if ( tree)
+            proto_tree_add_text(tree, tvb, offset, 1,
+                (hash_info->command  == PING_COMMAND) ?
+                "Ping: End command" :
+                "Traceroute: End command");
     }
     else {      /* display the PING or Traceroute results */
         col_append_str(pinfo->cinfo, COL_INFO, ", Results");
 
         if ( tree){
-            proto_tree_add_item(tree, (hash_info->command  == PING_COMMAND) ? hf_socks_ping_results : hf_socks_traceroute_results, tvb, offset, -1, ENC_NA);
+            proto_tree_add_text(tree, tvb, offset, -1,
+                (hash_info->command  == PING_COMMAND) ?
+                "Ping Results:" :
+                "Traceroute Results");
 
             data = tvb_get_ptr(tvb, offset, -1);
             dataend = data + tvb_length_remaining(tvb, offset);
@@ -905,7 +914,8 @@ display_ping_and_tracert(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tr
                 lineend = find_line_end(data, dataend, &eol);
                 linelen = (int)(lineend - data);
 
-                proto_tree_add_format_text( tree, tvb, offset, linelen);
+                proto_tree_add_text( tree, tvb, offset, linelen,
+                    "%s", format_text(data, linelen));
                 offset += linelen;
                 data = lineend;
             }
@@ -1269,26 +1279,6 @@ proto_register_socks( void){
         { &hf_socks_fragment_number,
             { "Fragment Number", "socks.fragment_number", FT_UINT8,
                 BASE_DEC, NULL, 0x0, NULL, HFILL
-            }
-        },
-        { &hf_socks_ping_end_command,
-            { "Ping: End command", "socks.ping_end_command", FT_NONE,
-                BASE_NONE, NULL, 0x0, NULL, HFILL
-            }
-        },
-        { &hf_socks_ping_results,
-            { "Ping Results", "socks.ping_results", FT_NONE,
-                BASE_NONE, NULL, 0x0, NULL, HFILL
-            }
-        },
-        { &hf_socks_traceroute_end_command,
-            { "Traceroute: End command", "socks.traceroute_end_command", FT_NONE,
-                BASE_NONE, NULL, 0x0, NULL, HFILL
-            }
-        },
-        { &hf_socks_traceroute_results,
-            { "Traceroute Results", "socks.traceroute_results", FT_NONE,
-                BASE_NONE, NULL, 0x0, NULL, HFILL
             }
         },
     };

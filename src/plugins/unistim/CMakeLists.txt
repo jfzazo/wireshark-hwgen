@@ -19,11 +19,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-include(WiresharkPlugin)
-
-# This info is from moduleinfo.nmake
-set_module_info(unistim 0 0 2 0)
-
 set(DISSECTOR_SRC
 	packet-unistim.c
 )
@@ -52,10 +47,18 @@ register_dissector_files(plugin.c
 	${DISSECTOR_SRC}
 )
 
-add_plugin_library(unistim)
+add_library(unistim ${LINK_MODE_MODULE}
+	${PLUGIN_FILES}
+)
+set_target_properties(unistim PROPERTIES PREFIX "")
+set_target_properties(unistim PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+set_target_properties(unistim PROPERTIES FOLDER "Plugins")
+
+target_link_libraries(unistim epan)
 
 install(TARGETS unistim
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION} NAMELINK_SKIP
 	RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}
 )
+

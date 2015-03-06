@@ -24,11 +24,16 @@
 
 #include "config.h"
 
+#include <glib.h>
+
+#include <wsutil/sha1.h>
+#include <wsutil/md5.h>
+
 #include <epan/packet.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
-#include <wsutil/sha1.h>
-#include <wsutil/md5.h>
+
+#include <string.h>
 
 #include "packet-ber.h"
 #include "packet-cms.h"
@@ -91,8 +96,8 @@ cms_verify_msg_digest(proto_item *pi, tvbuff_t *content, const char *alg, tvbuff
 
     sha1_starts(&sha1_ctx);
 
-    sha1_update(&sha1_ctx, tvb_get_ptr(content, 0, tvb_captured_length(content)),
-		tvb_captured_length(content));
+    sha1_update(&sha1_ctx, tvb_get_ptr(content, 0, tvb_length(content)),
+		tvb_length(content));
 
     sha1_finish(&sha1_ctx, digest_buf);
 
@@ -102,8 +107,8 @@ cms_verify_msg_digest(proto_item *pi, tvbuff_t *content, const char *alg, tvbuff
 
     md5_init(&md5_ctx);
 
-    md5_append(&md5_ctx, tvb_get_ptr(content, 0, tvb_captured_length(content)),
-	       tvb_captured_length(content));
+    md5_append(&md5_ctx, tvb_get_ptr(content, 0, tvb_length(content)),
+	       tvb_length(content));
 
     md5_finish(&md5_ctx, digest_buf);
 
@@ -155,8 +160,8 @@ void proto_register_cms(void) {
   proto_register_field_array(proto_cms, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
 
-  new_register_ber_syntax_dissector("ContentInfo", proto_cms, dissect_ContentInfo_PDU);
-  new_register_ber_syntax_dissector("SignedData", proto_cms, dissect_SignedData_PDU);
+  register_ber_syntax_dissector("ContentInfo", proto_cms, dissect_ContentInfo_PDU);
+  register_ber_syntax_dissector("SignedData", proto_cms, dissect_SignedData_PDU);
   register_ber_oid_syntax(".p7s", NULL, "ContentInfo");
   register_ber_oid_syntax(".p7m", NULL, "ContentInfo");
   register_ber_oid_syntax(".p7c", NULL, "ContentInfo");
@@ -167,15 +172,11 @@ void proto_register_cms(void) {
 
 /*--- proto_reg_handoff_cms -------------------------------------------*/
 void proto_reg_handoff_cms(void) {
-  dissector_handle_t content_info_handle;
 #include "packet-cms-dis-tab.c"
 
   oid_add_from_string("id-data","1.2.840.113549.1.7.1");
   oid_add_from_string("id-alg-des-ede3-cbc","1.2.840.113549.3.7");
   oid_add_from_string("id-alg-des-cbc","1.3.14.3.2.7");
 
-  content_info_handle = new_create_dissector_handle (dissect_ContentInfo_PDU, proto_cms);
-  dissector_add_string("media_type", "application/pkcs7-mime", content_info_handle);
-  dissector_add_string("media_type", "application/pkcs7-signature", content_info_handle);
 }
 

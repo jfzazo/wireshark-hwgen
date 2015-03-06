@@ -39,7 +39,6 @@
 
 #define WSLUA_DECLARE_FUNCTIONS() \
 	WSLUA_FUNCTION wslua_register_postdissector(lua_State* L);\
-	WSLUA_FUNCTION wslua_dissect_tcp_pdus(lua_State* L);\
 	WSLUA_FUNCTION wslua_gui_enabled(lua_State* L);\
 	WSLUA_FUNCTION wslua_register_menu(lua_State* L);\
 	WSLUA_FUNCTION wslua_new_dialog(lua_State* L);\

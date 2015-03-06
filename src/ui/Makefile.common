@@ -43,28 +43,20 @@ GENERATOR_FILES = \
 
 WIRESHARK_UI_SRC = \
 	alert_box.c		\
-	capture.c		\
-	capture_ui_utils.c	\
-	console.c		\
 	decode_as_utils.c	\
 	export_object.c		\
 	export_object_dicom.c	\
 	export_object_http.c	\
 	export_object_smb.c	\
-	export_object_tftp.c	\
-	filters.c		\
 	follow.c		\
 	iface_lists.c		\
 	io_graph_item.c		\
-	language.c		\
 	help_url.c		\
 	packet_list_utils.c	\
 	persfilepath_opt.c	\
 	preference_utils.c	\
 	profile.c		\
-	proto_hier_stats.c	\
 	recent.c		\
-	rtp_stream.c		\
 	software_update.c	\
 	ssl_key_export.c	\
 	tap_export_pdu.c	\
@@ -75,33 +67,25 @@ WIRESHARK_UI_SRC = \
 	tap-tcp-stream.c	\
 	text_import.c		\
 	time_shift.c		\
-	traffic_table_ui.c	\
-	util.c			\
-	voip_calls.c
+	util.c
 
 noinst_HEADERS = \
 	alert_box.h		\
-	capture.h		\
 	capture_globals.h	\
-	capture_ui_utils.h	\
-	console.h		\
 	decode_as_utils.h	\
 	export_object.h		\
 	last_open_dir.h		\
 	file_dialog.h		\
-	filters.h		\
 	follow.h		\
 	help_url.h		\
 	packet_list_utils.h	\
 	iface_lists.h		\
 	io_graph_item.h		\
-	language.h		\
 	main_statusbar.h	\
 	persfilepath_opt.h	\
 	preference_utils.h	\
 	profile.h		\
 	progress_dlg.h		\
-	proto_hier_stats.h	\
 	recent.h		\
 	recent_utils.h		\
 	rtp_analysis.h		\
@@ -118,8 +102,6 @@ noinst_HEADERS = \
 	text_import.h		\
 	text_import_scanner.h	\
 	time_shift.h		\
-	traffic_table_ui.h	\
 	ui_util.h		\
 	utf8_entities.h		\
-	util.h			\
-	voip_calls.h
+	util.h

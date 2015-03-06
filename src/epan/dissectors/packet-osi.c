@@ -26,6 +26,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/llcsaps.h>
@@ -35,16 +37,14 @@
 #include <epan/chdlctypes.h>
 #include <epan/ipproto.h>
 #include "packet-osi.h"
+#include "packet-isis.h"
+#include "packet-esis.h"
 #include "packet-tpkt.h"
-#include "packet-juniper.h"
 
 void proto_reg_handoff_osi(void);
 void proto_register_osi(void);
 
 int  proto_osi         = -1;
-
-static int hf_osi_nlpid = -1;
-
 static dissector_handle_t osi_handle;
 
 
@@ -458,19 +458,6 @@ dissect_osi_tpkt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   dissect_tpkt_encap(tvb, pinfo, tree, tpkt_desegment, osi_handle);
 }
 
-static void dissect_osi_juniper(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
-{
-  guint8     nlpid;
-  tvbuff_t   *next_tvb;
-
-  nlpid = tvb_get_guint8(tvb, 0);
-  if(dissector_try_uint(osinl_incl_subdissector_table, nlpid, tvb, pinfo, tree))
-     return;
-
-  next_tvb = tvb_new_subset_remaining(tvb, 1);
-  dissector_try_uint(osinl_excl_subdissector_table, nlpid, next_tvb, pinfo, tree);
-}
-
 static void dissect_osi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
   guint8    nlpid;
@@ -480,22 +467,10 @@ static void dissect_osi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
   nlpid = tvb_get_guint8(tvb, 0);
 
-  /*
-   * Try the subdissector table for protocols in which the NLPID is
-   * considered part of the PDU; it should be handed a tvbuff that
-   * includes the NLPID, and should put the NLPID into the protocol
-   * tree itself.
-   */
+  /* try lookup with the subdissector tables that includes the nlpid */
   if (dissector_try_uint(osinl_incl_subdissector_table, nlpid, tvb, pinfo, tree))
     return;
-
-  /*
-   * Try the subdissector table for protocols in which the NLPID is
-   * *not* considered part of the PDU; it should be handed a tvbuff
-   * that doesn't include the NLPID, and we should put the NLPID into
-   * the protocol tree ourselves.
-   */
-  proto_tree_add_uint(tree, hf_osi_nlpid, tvb, 0, 1, nlpid);
+  /* try lookup with the subdissector tables that excludes the nlpid */
   new_tvb = tvb_new_subset_remaining(tvb, 1);
   if (dissector_try_uint(osinl_excl_subdissector_table, nlpid, new_tvb, pinfo, tree))
     return;
@@ -525,7 +500,7 @@ void
 proto_reg_handoff_osi(void)
 {
   static gboolean           osi_prefs_initialized = FALSE;
-  static dissector_handle_t osi_tpkt_handle, osi_juniper_handle;
+  static dissector_handle_t osi_tpkt_handle;
   static guint              tcp_port_osi_over_tpkt;
 
   if (!osi_prefs_initialized) {
@@ -539,19 +514,13 @@ proto_reg_handoff_osi(void)
     dissector_add_uint("chdlc.protocol", CHDLCTYPE_OSI, osi_handle);
     dissector_add_uint("null.type", BSD_AF_ISO, osi_handle);
     dissector_add_uint("gre.proto", SAP_OSINL5, osi_handle);
-    dissector_add_uint("ip.proto", IP_PROTO_ISOIP, osi_handle); /* ISO network layer PDUs [RFC 1070] */
-
-    osi_juniper_handle = create_dissector_handle(dissect_osi_juniper, proto_osi);
-    dissector_add_uint("juniper.proto", JUNIPER_PROTO_ISO, osi_juniper_handle);
-    dissector_add_uint("juniper.proto", JUNIPER_PROTO_CLNP, osi_juniper_handle);
-    dissector_add_uint("juniper.proto", JUNIPER_PROTO_MPLS_CLNP, osi_juniper_handle);
-
+    dissector_add_uint("ip.proto", IP_PROTO_ISOIP, osi_handle); /*  ISO-TP4 ISO Transport Protocol Class 4 [RFC905,RC77] */
     data_handle = find_dissector("data");
     ppp_handle  = find_dissector("ppp");
 
 
     osi_tpkt_handle = create_dissector_handle(dissect_osi_tpkt, proto_osi);
-    dissector_add_for_decode_as("tcp.port", osi_tpkt_handle);
+    dissector_add_handle("tcp.port", osi_tpkt_handle); /* for 'decode-as' */
     osi_prefs_initialized = TRUE;
   } else {
     if (tcp_port_osi_over_tpkt != 0) {
@@ -568,11 +537,6 @@ proto_reg_handoff_osi(void)
 void
 proto_register_osi(void)
 {
-  static hf_register_info hf[] = {
-    { &hf_osi_nlpid,
-      { "Network Layer Protocol Identifier", "osi.nlpid", FT_UINT8, BASE_HEX,
-        VALS(nlpid_vals), 0x0, NULL, HFILL }},
-  };
   module_t *osi_module;
 
   /* There's no "OSI" protocol *per se*, but we do register a
@@ -591,7 +555,6 @@ proto_register_osi(void)
                                                            "OSI excl NLPID", FT_UINT8, BASE_HEX);
 
   proto_osi = proto_register_protocol("OSI", "OSI", "osi");
-  proto_register_field_array(proto_osi, hf, array_length(hf));
   /* Preferences how OSI protocols should be dissected */
   osi_module = prefs_register_protocol(proto_osi, proto_reg_handoff_osi);
 
@@ -607,15 +570,3 @@ proto_register_osi(void)
 
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

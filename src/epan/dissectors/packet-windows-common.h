@@ -242,10 +242,9 @@ extern value_string_ext ms_country_codes_ext;
 
 WS_DLL_PUBLIC
 int dissect_nt_64bit_time(tvbuff_t *tvb, proto_tree *tree, int offset, int hf_date);
+
 WS_DLL_PUBLIC
-int dissect_nt_64bit_time_opt(tvbuff_t *tvb, proto_tree *tree, int offset, int hf_date, gboolean onesec_resolution);
-WS_DLL_PUBLIC
-int dissect_nt_64bit_time_ex(tvbuff_t *tvb, proto_tree *tree, int offset, int hf_date, proto_item **createdItem, gboolean onesec_resolution);
+int dissect_nt_64bit_time_ex(tvbuff_t *tvb, proto_tree *tree, int offset, int hf_date, proto_item **createdItem);
 
 /*
  *  SIDs and RIDs
@@ -259,7 +258,7 @@ typedef struct _sid_strings {
 /* Dissect a NT SID.  Label it with 'name' and return a string version
  * of the SID in the 'sid_str' parameter which has a packet lifetime
  * scope and should NOT be freed by the caller. hf_sid can be -1 if
- * the caller doesn't care what name is used and then "nt.sid" will be
+ * the caller doesnt care what name is used and then "nt.sid" will be
  * the default instead. If the caller wants a more appropriate hf
  * field, it will just pass a FT_STRING hf field here
  */

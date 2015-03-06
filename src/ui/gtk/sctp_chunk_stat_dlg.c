@@ -26,11 +26,15 @@
 
 #include <gtk/gtk.h>
 
+#include "wsutil/filesystem.h"
 #include "epan/to_str.h"
 
+#include "../globals.h"
 
+#include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/main.h"
+#include "ui/tap-sctp-analysis.h"
 #include "ui/gtk/sctp_stat_gtk.h"
 #include "ui/gtk/stock_icons.h"
 
@@ -483,14 +487,16 @@ add_to_clist(sctp_addr_chunk* sac)
 {
     GtkListStore *list_store = NULL;
     GtkTreeIter  iter;
-    gchar *field;
+    gchar field[1][MAX_ADDRESS_LEN];
 
     list_store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW (clist))); /* Get store */
 
-    if ((sac->addr->type == AT_IPv4) || (sac->addr->type == AT_IPv6)) {
-        field = (gchar*)address_to_str(NULL, sac->addr);
+    if (sac->addr->type == AT_IPv4) {
+        g_snprintf(field[0], MAX_ADDRESS_LEN, "%s", ip_to_str((const guint8 *)(sac->addr->data)));
+    } else if (sac->addr->type == AT_IPv6) {
+        g_snprintf(field[0], MAX_ADDRESS_LEN, "%s", ip6_to_str((const struct e_in6_addr *)(sac->addr->data)));
     } else {
-        field = wmem_strdup(NULL, "NONE");
+        g_snprintf(field[0], MAX_ADDRESS_LEN, "%s", "NONE");
     }
 
     gtk_list_store_insert_with_values( list_store , &iter, G_MAXINT,
@@ -518,8 +524,6 @@ add_to_clist(sctp_addr_chunk* sac)
          ASCONF_COLUMN,          sac->addr_count[SCTP_ASCONF_CHUNK_ID],
          OTHERS_COLUMN,          sac->addr_count[OTHER_CHUNKS_INDEX],
          -1);
-
-    wmem_free(NULL, field);
 }
 
 void sctp_chunk_stat_dlg_update(struct sctp_udata* udata, unsigned int direction)

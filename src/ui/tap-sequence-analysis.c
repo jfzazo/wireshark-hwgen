@@ -29,6 +29,7 @@
 #include "tap-sequence-analysis.h"
 
 #include "epan/addr_resolv.h"
+#include "epan/column-utils.h"
 #include "epan/packet.h"
 #include "epan/tap.h"
 #include "epan/dissectors/packet-tcp.h"
@@ -46,27 +47,6 @@
 #define TIME_EMPTY_HEADER      "|         "
 #define CONV_TIME_HEADER_LENGTH 16
 #define TIME_HEADER_LENGTH 10
-
-seq_analysis_info_t *
-sequence_analysis_info_new(void)
-{
-    seq_analysis_info_t *sainfo = g_new0(seq_analysis_info_t, 1);
-    sainfo->items = g_queue_new();
-    sainfo->ht= g_hash_table_new(g_int_hash, g_int_equal);
-    return sainfo;
-}
-
-void sequence_analysis_info_free(seq_analysis_info_t *sainfo)
-{
-    if (!sainfo) return;
-
-    sequence_analysis_list_free(sainfo);
-
-    g_queue_free(sainfo->items);
-    g_hash_table_destroy(sainfo->ht);
-
-    g_free(sainfo);
-}
 
 /****************************************************************************/
 /* whenever a frame packet is seen by the tap listener */
@@ -149,7 +129,7 @@ seq_analysis_frame_packet( void *ptr, packet_info *pinfo, epan_dissect_t *edt _U
         sai->conv_num=0;
         sai->display=TRUE;
 
-        g_queue_push_tail(sainfo->items, sai);
+        sainfo->list = g_list_prepend(sainfo->list, sai);
     }
 
     return TRUE;
@@ -215,24 +195,18 @@ seq_analysis_tcp_packet( void *ptr _U_, packet_info *pinfo, epan_dissect_t *edt 
         sai->conv_num = 0;
         sai->display = TRUE;
 
-        g_queue_push_tail(sainfo->items, sai);
+        sainfo->list = g_list_prepend(sainfo->list, sai);
     }
 
     return TRUE;
 }
 
-static void sequence_analysis_item_set_timestamp(gpointer data, gpointer user_data)
-{
-    gchar time_str[COL_MAX_LEN];
-    seq_analysis_item_t *seq_item = (seq_analysis_item_t *)data;
-    const struct epan_session *epan = (const struct epan_session *)user_data;
-    set_fd_time(epan, seq_item->fd, time_str);
-    seq_item->time_str = g_strdup(time_str);
-}
-
 void
 sequence_analysis_list_get(capture_file *cf, seq_analysis_info_t *sainfo)
 {
+    GList *list;
+    gchar time_str[COL_MAX_LEN];
+
     if (!cf || !sainfo) return;
 
     switch (sainfo->type) {
@@ -255,78 +229,46 @@ sequence_analysis_list_get(capture_file *cf, seq_analysis_info_t *sainfo)
     case SEQ_ANALYSIS_VOIP:
     default:
         return;
+        break;
+
     }
 
     cf_retap_packets(cf);
+    sainfo->list = g_list_reverse(sainfo->list);
     remove_tap_listener(sainfo);
 
     /* Fill in the timestamps */
-    g_queue_foreach(sainfo->items, sequence_analysis_item_set_timestamp, cf->epan);
-}
-
-static void sequence_analysis_item_free(gpointer data)
-{
-    seq_analysis_item_t *seq_item = (seq_analysis_item_t *)data;
-    g_free(seq_item->frame_label);
-    g_free(seq_item->time_str);
-    g_free(seq_item->comment);
-    g_free((void *)seq_item->src_addr.data);
-    g_free((void *)seq_item->dst_addr.data);
-    g_free(data);
-}
-
-
-/* compare two list entries by packet no */
-static gint
-sequence_analysis_sort_compare(gconstpointer a, gconstpointer b, gpointer user_data _U_)
-{
-    const seq_analysis_item_t *entry_a = (const seq_analysis_item_t *)a;
-    const seq_analysis_item_t *entry_b = (const seq_analysis_item_t *)b;
-
-    if(entry_a->fd->num < entry_b->fd->num)
-        return -1;
-
-    if(entry_a->fd->num > entry_b->fd->num)
-        return 1;
-
-    return 0;
-}
-
-
-void
-sequence_analysis_list_sort(seq_analysis_info_t *sainfo)
-{
-    if (!sainfo) return;
-    g_queue_sort(sainfo->items, sequence_analysis_sort_compare, NULL);
+    list = g_list_first(sainfo->list);
+    while (list)
+    {
+        seq_analysis_item_t *seq_item = (seq_analysis_item_t *)list->data;
+        set_fd_time(cf->epan, seq_item->fd, time_str);
+        seq_item->time_str = g_strdup(time_str);
+        list = g_list_next(list);
+    }
 }
 
 void
 sequence_analysis_list_free(seq_analysis_info_t *sainfo)
 {
+    GList *list;
     int i;
 
     if (!sainfo) return;
 
     /* free the graph data items */
-
-#if GLIB_CHECK_VERSION (2, 32, 0)
-       g_queue_free_full(sainfo->items, sequence_analysis_item_free);
-       sainfo->items = g_queue_new();
-#else
+    list = g_list_first(sainfo->list);
+    while (list)
     {
-        GList *list = g_queue_peek_nth_link(sainfo->items, 0);
-        while (list)
-        {
-            sequence_analysis_item_free(list->data);
-            list = g_list_next(list);
-        }
-        g_queue_clear(sainfo->items);
+        seq_analysis_item_t *seq_item = (seq_analysis_item_t *)list->data;
+        g_free(seq_item->frame_label);
+        g_free(seq_item->time_str);
+        g_free(seq_item->comment);
+        g_free(list->data);
+        list = g_list_next(list);
     }
-#endif
-
-    if (NULL != sainfo->ht) {
-        g_hash_table_remove_all(sainfo->ht);
-    }
+    g_list_free(sainfo->list);
+    sainfo->list = NULL;
     sainfo->nconv = 0;
 
     for (i=0; i<MAX_NUM_NODES; i++) {
@@ -402,7 +344,7 @@ static void overwrite (GString *gstr, char *text_to_insert, guint32 p1, guint32 
  * and Return -2 if the array is full
  */
 /****************************************************************************/
-static guint add_or_get_node(seq_analysis_info_t *sainfo, address *node) {
+static gint add_or_get_node(seq_analysis_info_t *sainfo, address *node) {
     guint i;
 
     if (node->type == AT_NONE) return NODE_OVERFLOW;
@@ -411,7 +353,7 @@ static guint add_or_get_node(seq_analysis_info_t *sainfo, address *node) {
         if ( CMP_ADDRESS(&(sainfo->nodes[i]), node) == 0 ) return i; /* it is in the array */
     }
 
-    if (i >= MAX_NUM_NODES) {
+    if (i == MAX_NUM_NODES) {
         return  NODE_OVERFLOW;
     } else {
         sainfo->num_nodes++;
@@ -420,33 +362,37 @@ static guint add_or_get_node(seq_analysis_info_t *sainfo, address *node) {
     }
 }
 
-struct sainfo_counter {
-    seq_analysis_info_t *sainfo;
-    int num_items;
-};
-
-static void sequence_analysis_get_nodes_item_proc(gpointer data, gpointer user_data)
-{
-    seq_analysis_item_t *gai = (seq_analysis_item_t *)data;
-    struct sainfo_counter *sc = (struct sainfo_counter *)user_data;
-    if (gai->display) {
-        (sc->num_items)++;
-        gai->src_node = add_or_get_node(sc->sainfo, &(gai->src_addr));
-        gai->dst_node = add_or_get_node(sc->sainfo, &(gai->dst_addr));
-    }
-}
-
 /* Get the nodes from the list */
 /****************************************************************************/
 int
 sequence_analysis_get_nodes(seq_analysis_info_t *sainfo)
 {
-    struct sainfo_counter sc = {sainfo, 0};
+    GList *list;
+    seq_analysis_item_t *gai;
+    int num_items = 0;
 
-    /* Fill the node array */
-    g_queue_foreach(sainfo->items, sequence_analysis_get_nodes_item_proc, &sc);
-
-    return sc.num_items;
+    /* fill the node array */
+    list = g_list_first(sainfo->list);
+    while (list)
+    {
+        gai = (seq_analysis_item_t *)list->data;
+        if (gai->display) {
+            num_items++;
+#if 0 /* inverse is always false ? */
+            if (!user_data->dlg.inverse) {
+#endif
+                gai->src_node = (guint16)add_or_get_node(sainfo, &(gai->src_addr));
+                gai->dst_node = (guint16)add_or_get_node(sainfo, &(gai->dst_addr));
+#if 0 /* inverse is always false ? */
+            } else {
+                gai->dst_node = (guint16)add_or_get_node(sainfo, &(gai->src_addr));
+                gai->src_node = (guint16)add_or_get_node(sainfo, &(gai->dst_addr));
+            }
+#endif
+        }
+        list = g_list_next(list);
+    }
+    return num_items;
 }
 
 /****************************************************************************/
@@ -465,7 +411,6 @@ sequence_analysis_dump_to_file(const char *pathname, seq_analysis_info_t *sainfo
     char        src_port[8], dst_port[8];
     gchar      *time_str;
     GList      *list;
-    char       *addr_str;
 
     FILE  *of;
 
@@ -483,7 +428,7 @@ sequence_analysis_dump_to_file(const char *pathname, seq_analysis_info_t *sainfo
     tmp_str2       = g_string_new("");
 
     display_items = 0;
-    list = g_queue_peek_nth_link(sainfo->items, 0);
+    list = g_list_first(sainfo->list);
     while (list)
     {
         sai = (seq_analysis_item_t *)list->data;
@@ -523,9 +468,8 @@ sequence_analysis_dump_to_file(const char *pathname, seq_analysis_info_t *sainfo
     /* Write the node names on top */
     for (i=0; i<display_nodes; i+=2) {
         /* print the node identifiers */
-        addr_str = (char*)address_to_display(NULL, &(sainfo->nodes[i+first_node]));
-        g_string_printf(label_string, "| %s", addr_str);
-        wmem_free(NULL, addr_str);
+        g_string_printf(label_string, "| %s",
+            ep_address_to_display(&(sainfo->nodes[i+first_node])));
         enlarge_string(label_string, NODE_CHARS_WIDTH*2, ' ');
         fprintf(of, "%s", label_string->str);
         g_string_printf(label_string, "| ");
@@ -541,9 +485,8 @@ sequence_analysis_dump_to_file(const char *pathname, seq_analysis_info_t *sainfo
     /* Write the node names on top */
     for (i=1; i<display_nodes; i+=2) {
         /* print the node identifiers */
-        addr_str = (char*)address_to_display(NULL, &(sainfo->nodes[i+first_node]));
-        g_string_printf(label_string, "| %s", addr_str);
-        wmem_free(NULL, addr_str);
+        g_string_printf(label_string, "| %s",
+            ep_address_to_display(&(sainfo->nodes[i+first_node])));
         if (label_string->len < NODE_CHARS_WIDTH)
         {
             enlarge_string(label_string, NODE_CHARS_WIDTH, ' ');
@@ -566,7 +509,7 @@ sequence_analysis_dump_to_file(const char *pathname, seq_analysis_info_t *sainfo
      * Draw the items
      */
 
-    list = g_queue_peek_nth_link(sainfo->items, 0);
+    list = g_list_first(sainfo->list);
     while (list)
     {
         sai = (seq_analysis_item_t *)list->data;

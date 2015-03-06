@@ -23,7 +23,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/to_str.h>
 #include "packet-ipx.h"
 #include "packet-netbios.h"
 
@@ -54,20 +56,12 @@ static int hf_nbipx_session_offset = -1;
 static int hf_nbipx_session_data_length = -1;
 static int hf_nbipx_session_recv_seq_number = -1;
 static int hf_nbipx_session_bytes_received = -1;
-static int hf_nbipx_ipx_network = -1;
-static int hf_nbipx_opcode = -1;
-static int hf_nbipx_name_type = -1;
-static int hf_nbipx_messageid = -1;
 
 static gint ett_nbipx = -1;
 static gint ett_nbipx_conn_ctrl = -1;
 static gint ett_nbipx_name_type_flags = -1;
 
 static void dissect_conn_control(tvbuff_t *tvb, int offset, proto_tree *tree);
-
-static heur_dissector_list_t netbios_heur_subdissector_list;
-
-static dissector_handle_t data_handle;
 
 /* There is no RFC or public specification of Netware or Microsoft
  * NetBIOS over IPX packets. I have had to decode the protocol myself,
@@ -210,72 +204,27 @@ static const value_string nbipx_data_stream_type_vals[] = {
 	{0,				NULL}
 };
 
-/*
- * Opcodes.
- */
-#define	INAME_CLAIM	0xf1
-#define INAME_DELETE	0xf2
-#define INAME_QUERY	0xf3
-#define INAME_FOUND	0xf4
-#define IMSG_HANGUP	0xf5
-#define	IMSLOT_SEND	0xfc
-#define IMSLOT_FIND	0xfd
-#define IMSLOT_NAME	0xfe
-
-static const value_string nmpi_opcode_vals[] = {
-	{INAME_CLAIM,	"Claim name"},
-	{INAME_DELETE,	"Delete name"},
-	{INAME_QUERY,	"Query name"},
-	{INAME_FOUND,	"Name found"},
-	{IMSG_HANGUP,	"Messenger hangup"},
-	{IMSLOT_SEND,	"Mailslot write"},
-	{IMSLOT_FIND,	"Find mailslot name"},
-	{IMSLOT_NAME,	"Mailslot name found"},
-	{0,		NULL}
-};
-
-/*
- * Name types.
- */
-#define INTYPE_MACHINE		1
-#define INTYPE_WORKGROUP	2
-#define INTYPE_BROWSER		3
-
-static const value_string nmpi_name_type_vals[] = {
-	{INTYPE_MACHINE,	"Machine"},
-	{INTYPE_WORKGROUP,	"Workgroup"},
-	{INTYPE_BROWSER,	"Browser"},
-	{0,			NULL}
-};
-
 static const true_false_string tfs_system_non_system = { "System packet", "Non-system packet" };
+static const true_false_string tfs_required_not_required = { "Required", "Not required" };
 
 static void
 add_routers(proto_tree *tree, tvbuff_t *tvb, int offset)
 {
 	int		i;
+	int		rtr_offset;
+	guint32		router;
 
 	/* Eight routers are listed */
 	for (i = 0; i < 8; i++) {
-		if (tvb_get_ntohl(tvb, offset) != 0) {
-			proto_tree_add_item(tree, hf_nbipx_ipx_network, tvb, offset, 4, ENC_NA);
+		rtr_offset = offset + (i << 2);
+		tvb_memcpy(tvb, (guint8 *)&router, rtr_offset, 4);
+		if (router != 0) {
+			/* XXX - proto_tree_add_item with FT_IPXNET type? */
+			proto_tree_add_text(tree, tvb, rtr_offset, 4,
+			    "IPX Network: %s",
+			    ipxnet_to_string((guint8*)&router));
 		}
-		offset += 4;
 	}
-}
-
-static void
-dissect_netbios_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
-{
-	heur_dtbl_entry_t *hdtbl_entry;
-
-	/*
-	 * Try the heuristic dissectors for NetBIOS; if none of them
-	 * accept the packet, dissect it as data.
-	 */
-	if (!dissector_try_heuristic(netbios_heur_subdissector_list,
-				    tvb, pinfo, tree, &hdtbl_entry, NULL))
-		call_dissector(data_handle,tvb, pinfo, tree);
 }
 
 static int
@@ -619,26 +568,6 @@ proto_register_nbipx(void)
 			FT_UINT16, BASE_DEC, NULL, 0,
 			NULL, HFILL }
 		},
-		{ &hf_nbipx_ipx_network,
-		  { "IPX Network",   "nmpi.ipx_network",
-			FT_IPXNET, BASE_NONE, NULL, 0,
-			NULL, HFILL }
-		},
-		{ &hf_nbipx_opcode,
-		  { "Opcode",   "nmpi.opcode",
-			FT_UINT8, BASE_HEX, VALS(nmpi_opcode_vals), 0,
-			NULL, HFILL }
-		},
-		{ &hf_nbipx_name_type,
-		  { "Name Type",   "nmpi.name_type",
-			FT_UINT8, BASE_HEX, VALS(nmpi_name_type_vals), 0,
-			NULL, HFILL }
-		},
-		{ &hf_nbipx_messageid,
-		  { "Message ID",   "nmpi.messageid",
-			FT_UINT16, BASE_HEX, NULL, 0,
-			NULL, HFILL }
-		},
 	};
 
 	static gint *ett[] = {
@@ -659,8 +588,6 @@ proto_reg_handoff_nbipx(void)
 
 	nbipx_handle = new_create_dissector_handle(dissect_nbipx, proto_nbipx);
 	dissector_add_uint("ipx.socket", IPX_SOCKET_NETBIOS, nbipx_handle);
-	netbios_heur_subdissector_list = find_heur_dissector_list("netbios");
-	data_handle = find_dissector("data");
 }
 
 /*
@@ -747,6 +674,43 @@ static int proto_nmpi = -1;
 static gint ett_nmpi = -1;
 static gint ett_nmpi_name_type_flags = -1;
 
+/*
+ * Opcodes.
+ */
+#define	INAME_CLAIM	0xf1
+#define INAME_DELETE	0xf2
+#define INAME_QUERY	0xf3
+#define INAME_FOUND	0xf4
+#define IMSG_HANGUP	0xf5
+#define	IMSLOT_SEND	0xfc
+#define IMSLOT_FIND	0xfd
+#define IMSLOT_NAME	0xfe
+
+static const value_string nmpi_opcode_vals[] = {
+	{INAME_CLAIM,	"Claim name"},
+	{INAME_DELETE,	"Delete name"},
+	{INAME_QUERY,	"Query name"},
+	{INAME_FOUND,	"Name found"},
+	{IMSG_HANGUP,	"Messenger hangup"},
+	{IMSLOT_SEND,	"Mailslot write"},
+	{IMSLOT_FIND,	"Find mailslot name"},
+	{IMSLOT_NAME,	"Mailslot name found"},
+	{0,		NULL}
+};
+
+/*
+ * Name types.
+ */
+#define INTYPE_MACHINE		1
+#define INTYPE_WORKGROUP	2
+#define INTYPE_BROWSER		3
+
+static const value_string nmpi_name_type_vals[] = {
+	{INTYPE_MACHINE,	"Machine"},
+	{INTYPE_WORKGROUP,	"Workgroup"},
+	{INTYPE_BROWSER,	"Browser"},
+	{0,			NULL}
+};
 
 static void
 dissect_nmpi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
@@ -755,6 +719,7 @@ dissect_nmpi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	proto_item	*ti;
 	int		offset = 0;
 	guint8		opcode;
+	guint8		nmpi_name_type;
 	char		name[(NETBIOS_NAME_LEN - 1)*4 + 1];
 	int		name_type;
 	char		node_name[(NETBIOS_NAME_LEN - 1)*4 + 1];
@@ -777,6 +742,7 @@ dissect_nmpi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	 * XXX - we don't use "node_name" or "node_name_type".
 	 */
 	opcode = tvb_get_guint8(tvb, offset);
+	nmpi_name_type = tvb_get_guint8(tvb, offset+1);
 	name_type = get_netbios_name(tvb, offset+4, name, (NETBIOS_NAME_LEN - 1)*4 + 1);
 	/*node_name_type = */get_netbios_name(tvb, offset+20, node_name, (NETBIOS_NAME_LEN - 1)*4 + 1);
 
@@ -830,9 +796,17 @@ dissect_nmpi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	}
 
 	if (tree) {
-		proto_tree_add_item(nmpi_tree, hf_nbipx_opcode, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-		proto_tree_add_item(nmpi_tree, hf_nbipx_name_type, tvb, offset+1, 1, ENC_LITTLE_ENDIAN);
-		proto_tree_add_item(nmpi_tree, hf_nbipx_messageid, tvb, offset+2, 2, ENC_LITTLE_ENDIAN);
+		proto_tree_add_text(nmpi_tree, tvb, offset, 1,
+		    "Opcode: %s (0x%02x)",
+		    val_to_str_const(opcode, nmpi_opcode_vals, "Unknown"),
+		    opcode);
+		proto_tree_add_text(nmpi_tree, tvb, offset+1, 1,
+		    "Name Type: %s (0x%02x)",
+		    val_to_str_const(nmpi_name_type, nmpi_name_type_vals, "Unknown"),
+		    nmpi_name_type);
+		proto_tree_add_text(nmpi_tree, tvb, offset+2, 2,
+		    "Message ID: 0x%04x",
+		    tvb_get_letohs(tvb, offset+2));
 		netbios_add_name("Requested name", tvb, offset+4, nmpi_tree);
 		netbios_add_name("Source name", tvb, offset+20, nmpi_tree);
 	}
@@ -875,16 +849,3 @@ proto_reg_handoff_nmpi(void)
 	dissector_add_uint("ipx.socket", IPX_SOCKET_NWLINK_SMB_MAILSLOT,
 	    nmpi_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

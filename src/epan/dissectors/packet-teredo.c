@@ -27,9 +27,14 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/addr_resolv.h>
+#include <epan/ipproto.h>
 #include <epan/prefs.h>
 
+#include "packet-ip.h"
 #include <epan/tap.h>
 
 #define UDP_PORT_TEREDO 3544
@@ -418,15 +423,3 @@ proto_reg_handoff_teredo(void)
 	heur_dissector_add("udp", dissect_teredo_heur, proto_teredo);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

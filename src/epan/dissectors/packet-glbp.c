@@ -38,6 +38,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 
@@ -612,16 +613,3 @@ proto_reg_handoff_glbp(void)
   glbp_handle = new_create_dissector_handle(dissect_glbp_static, proto_glbp);
   dissector_add_uint("udp.port", 3222, glbp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

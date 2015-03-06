@@ -29,10 +29,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <string.h>
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/strutil.h>
 #include <epan/conversation.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 #include <epan/addr_resolv.h>
 
 void proto_register_ftp(void);
@@ -323,13 +326,6 @@ parse_eprt_request(const guchar* line, gint linelen, guint32 *eprt_af,
     /* Copy the rest of the line into a null-terminated buffer. */
     args = wmem_strndup(wmem_packet_scope(), line, linelen);
     p = args;
-    /*
-     * Handle a NUL being in the line; if there's a NUL in the line,
-     * strlen(args) will terminate at the NUL and will thus return
-     * a value less than linelen.
-     */
-    if ((gint)strlen(args) < linelen)
-        linelen = (gint)strlen(args);
 
     /*
      * RFC2428 sect. 2 states ...
@@ -575,12 +571,21 @@ dissect_ftp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     ti = proto_tree_add_item(tree, proto_ftp, tvb, 0, -1, ENC_NA);
     ftp_tree = proto_item_add_subtree(ti, ett_ftp);
 
-    hidden_item = proto_tree_add_boolean(ftp_tree,
-            hf_ftp_request, tvb, 0, 0, is_request);
-    PROTO_ITEM_SET_HIDDEN(hidden_item);
-    hidden_item = proto_tree_add_boolean(ftp_tree,
-            hf_ftp_response, tvb, 0, 0, is_request == FALSE);
-    PROTO_ITEM_SET_HIDDEN(hidden_item);
+    if (is_request) {
+        hidden_item = proto_tree_add_boolean(ftp_tree,
+                hf_ftp_request, tvb, 0, 0, TRUE);
+        PROTO_ITEM_SET_HIDDEN(hidden_item);
+        hidden_item = proto_tree_add_boolean(ftp_tree,
+                hf_ftp_response, tvb, 0, 0, FALSE);
+        PROTO_ITEM_SET_HIDDEN(hidden_item);
+    } else {
+        hidden_item = proto_tree_add_boolean(ftp_tree,
+                hf_ftp_request, tvb, 0, 0, FALSE);
+        PROTO_ITEM_SET_HIDDEN(hidden_item);
+        hidden_item = proto_tree_add_boolean(ftp_tree,
+                hf_ftp_response, tvb, 0, 0, TRUE);
+        PROTO_ITEM_SET_HIDDEN(hidden_item);
+    }
 
     /* Put the line into the protocol tree. */
     ti = proto_tree_add_format_text(ftp_tree, tvb, 0, next_offset);
@@ -805,8 +810,10 @@ dissect_ftp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             }
         }
         else {
-            proto_tree_add_expert(reqresp_tree, pinfo, &ei_ftp_eprt_args_invalid,
-                    tvb, offset - linelen - 1, linelen);
+            proto_item *item;
+            item = proto_tree_add_text(reqresp_tree,
+                    tvb, offset - linelen - 1, linelen, "Invalid EPRT arguments");
+            expert_add_info(pinfo, item, &ei_ftp_eprt_args_invalid);
         }
     }
 
@@ -853,8 +860,10 @@ dissect_ftp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                 }
             }
             else {
-                proto_tree_add_expert(reqresp_tree, pinfo, &ei_ftp_epsv_args_invalid,
-                        tvb, offset - linelen - 1, linelen);
+                proto_item *item;
+                item = proto_tree_add_text(reqresp_tree,
+                        tvb, offset - linelen - 1, linelen, "Invalid EPSV arguments");
+                expert_add_info(pinfo, item, &ei_ftp_epsv_args_invalid);
             }
         }
     }

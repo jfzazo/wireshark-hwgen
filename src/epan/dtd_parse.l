@@ -29,6 +29,8 @@
 	*
 	* Copyright 2004, Luis E. Garcia Ontanon <luis@ontanon.org>
 	*
+	* $Id$
+	*
 	* Wireshark - Network traffic analyzer
 	* By Gerald Combs <gerald@wireshark.org>
 	* Copyright 1998 Gerald Combs
@@ -63,8 +65,8 @@
 
 	static void* pParser;
 	static GString* input_string;
-	static size_t offsetx;
-	static size_t len;
+	static guint offsetx;
+	static guint len;
 	static gchar* location;
 	static gchar* attr_name;
 
@@ -328,7 +330,7 @@ extern dtd_build_data_t* dtd_parse(GString* s) {
 
 	input_string = s;
 	offsetx = 0;
-	len = input_string->len;
+	len = (guint) input_string->len;
 
 	pParser = DtdParseAlloc(g_malloc);
 

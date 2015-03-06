@@ -30,6 +30,7 @@
 #include <epan/prefs.h>
 #include <epan/tap.h>
 
+#include <wsutil/file_util.h>
 #include <wsutil/str_util.h>
 
 #include <ui/export_object.h>
@@ -507,11 +508,4 @@ eo_smb_cb(GtkWidget *widget _U_, gpointer data _U_)
 {
 	/* Call the export_object window */
 	export_object_window("smb_eo", "SMB", eo_smb_packet, eo_smb_cleanup);
-}
-
-void
-eo_tftp_cb(GtkWidget *widget _U_, gpointer data _U_)
-{
-	/* Call the export_object window */
-	export_object_window("tftp_eo", "TFTP", eo_tftp_packet, eo_tftp_cleanup);
 }

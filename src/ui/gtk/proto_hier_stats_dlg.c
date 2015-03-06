@@ -21,13 +21,13 @@
 
 
 #include "config.h"
-#include "globals.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include <gtk/gtk.h>
 
-#include "ui/proto_hier_stats.h"
+#include "../proto_hier_stats.h"
 #include "ui/simple_dialog.h"
 #include "ui/utf8_entities.h"
 
@@ -549,7 +549,7 @@ proto_hier_stats_cb(GtkWidget *w _U_, gpointer d _U_)
     const char *current_filter;
 
     /* Get the statistics. */
-    ps = ph_stats_new(&cfile);
+    ps = ph_stats_new();
     if (ps == NULL) {
         /* The user gave up before we finished; don't pop up
            a statistics window. */

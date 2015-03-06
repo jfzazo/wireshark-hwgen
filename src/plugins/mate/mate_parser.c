@@ -2471,6 +2471,6 @@ extern gboolean mate_load_config(const gchar* filename, mate_config* matecfg) {
  */
 
 int Matewrap(void) {
-	return 1;
+    return 1;
 }
 

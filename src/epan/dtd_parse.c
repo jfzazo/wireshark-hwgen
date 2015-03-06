@@ -678,6 +678,8 @@ char *Dtd_Parse_text;
 	*
 	* Copyright 2004, Luis E. Garcia Ontanon <luis@ontanon.org>
 	*
+	* $Id$
+	*
 	* Wireshark - Network traffic analyzer
 	* By Gerald Combs <gerald@wireshark.org>
 	* Copyright 1998 Gerald Combs
@@ -712,8 +714,8 @@ char *Dtd_Parse_text;
 
 	static void* pParser;
 	static GString* input_string;
-	static size_t offsetx;
-	static size_t len;
+	static guint offsetx;
+	static guint len;
 	static gchar* location;
 	static gchar* attr_name;
 
@@ -762,7 +764,7 @@ char *Dtd_Parse_text;
 #endif
 
 
-#line 766 "dtd_parse.c"
+#line 768 "dtd_parse.c"
 
 #define INITIAL 0
 #define DTD 1
@@ -957,10 +959,10 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 178 "dtd_parse.l"
+#line 180 "dtd_parse.l"
 
 
-#line 964 "dtd_parse.c"
+#line 966 "dtd_parse.c"
 
 	if ( !(yy_init) )
 		{
@@ -1042,79 +1044,79 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 180 "dtd_parse.l"
+#line 182 "dtd_parse.l"
 ;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 183 "dtd_parse.l"
+#line 185 "dtd_parse.l"
 { BEGIN IN_COMMENT; }
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
-#line 185 "dtd_parse.l"
+#line 187 "dtd_parse.l"
 case 4:
 /* rule 4 can match eol */
 YY_RULE_SETUP
-#line 185 "dtd_parse.l"
+#line 187 "dtd_parse.l"
 ;
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 186 "dtd_parse.l"
+#line 188 "dtd_parse.l"
 { BEGIN DTD; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 188 "dtd_parse.l"
+#line 190 "dtd_parse.l"
 { BEGIN IN_NOTATION; }
 	YY_BREAK
 case 7:
 /* rule 7 can match eol */
 YY_RULE_SETUP
-#line 189 "dtd_parse.l"
+#line 191 "dtd_parse.l"
 ;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 190 "dtd_parse.l"
+#line 192 "dtd_parse.l"
 { BEGIN DTD; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 192 "dtd_parse.l"
+#line 194 "dtd_parse.l"
 {
 	BEGIN XMLPI;
 }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 196 "dtd_parse.l"
+#line 198 "dtd_parse.l"
 {
 	BEGIN LOCATION;
 }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 200 "dtd_parse.l"
+#line 202 "dtd_parse.l"
 {
 	BEGIN PROTOCOL;
 }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 204 "dtd_parse.l"
+#line 206 "dtd_parse.l"
 ;
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 205 "dtd_parse.l"
+#line 207 "dtd_parse.l"
 BEGIN DTD;
 	YY_BREAK
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 207 "dtd_parse.l"
+#line 209 "dtd_parse.l"
 {
     if(location) g_free(location);
 	location = g_strdup(Dtd_Parse_text);
@@ -1123,12 +1125,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 213 "dtd_parse.l"
+#line 215 "dtd_parse.l"
 BEGIN DTD;
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 215 "dtd_parse.l"
+#line 217 "dtd_parse.l"
 {
 	attr_name = g_ascii_strdown(Dtd_Parse_text, -1);
 	BEGIN GET_ATTR_QUOTE;
@@ -1136,12 +1138,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 220 "dtd_parse.l"
+#line 222 "dtd_parse.l"
 { BEGIN GET_ATTR_VAL; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 222 "dtd_parse.l"
+#line 224 "dtd_parse.l"
 {
 	g_string_append_printf(build_data->error,
 					"error in wireshark:protocol xmpli at %s : could not find attribute value!",
@@ -1152,7 +1154,7 @@ YY_RULE_SETUP
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 229 "dtd_parse.l"
+#line 231 "dtd_parse.l"
 {
 	/*"*/
 	struct _proto_xmlpi_attr* pa;
@@ -1181,189 +1183,189 @@ YY_RULE_SETUP
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 255 "dtd_parse.l"
+#line 257 "dtd_parse.l"
 { BEGIN PROTOCOL;}
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 257 "dtd_parse.l"
+#line 259 "dtd_parse.l"
 BEGIN DTD;
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 259 "dtd_parse.l"
+#line 261 "dtd_parse.l"
 { DTD_PARSE(TOKEN_TAG_START); }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 260 "dtd_parse.l"
+#line 262 "dtd_parse.l"
 { DTD_PARSE(TOKEN_TAG_STOP); }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 262 "dtd_parse.l"
+#line 264 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATTLIST_KW); }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 263 "dtd_parse.l"
+#line 265 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ELEMENT_KW); }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 264 "dtd_parse.l"
+#line 266 "dtd_parse.l"
 { DTD_PARSE(TOKEN_DOCTYPE_KW); }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 266 "dtd_parse.l"
+#line 268 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ELEM_DATA); }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 267 "dtd_parse.l"
+#line 269 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ELEM_DATA); }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 268 "dtd_parse.l"
+#line 270 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ELEM_DATA); }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 269 "dtd_parse.l"
+#line 271 "dtd_parse.l"
 { DTD_PARSE(TOKEN_EMPTY_KW); }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 271 "dtd_parse.l"
+#line 273 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_TYPE); }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 272 "dtd_parse.l"
+#line 274 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_TYPE); }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 273 "dtd_parse.l"
+#line 275 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_TYPE); }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 274 "dtd_parse.l"
+#line 276 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_TYPE); }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 275 "dtd_parse.l"
+#line 277 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_TYPE); }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 276 "dtd_parse.l"
+#line 278 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_TYPE); }
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 277 "dtd_parse.l"
+#line 279 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_TYPE); }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 278 "dtd_parse.l"
+#line 280 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_TYPE); }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 279 "dtd_parse.l"
+#line 281 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_TYPE); }
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 280 "dtd_parse.l"
+#line 282 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_DEF_WITH_VALUE); }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 281 "dtd_parse.l"
+#line 283 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_DEF_WITH_VALUE); }
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 282 "dtd_parse.l"
+#line 284 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_DEF); }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 283 "dtd_parse.l"
+#line 285 "dtd_parse.l"
 { DTD_PARSE(TOKEN_ATT_DEF); }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 285 "dtd_parse.l"
+#line 287 "dtd_parse.l"
 { DTD_PARSE(TOKEN_STAR); }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 286 "dtd_parse.l"
+#line 288 "dtd_parse.l"
 { DTD_PARSE(TOKEN_QUESTION); }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 287 "dtd_parse.l"
+#line 289 "dtd_parse.l"
 { DTD_PARSE(TOKEN_PLUS); }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 288 "dtd_parse.l"
+#line 290 "dtd_parse.l"
 { DTD_PARSE(TOKEN_COMMA); }
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 289 "dtd_parse.l"
+#line 291 "dtd_parse.l"
 { DTD_PARSE(TOKEN_OPEN_PARENS); }
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 290 "dtd_parse.l"
+#line 292 "dtd_parse.l"
 { DTD_PARSE(TOKEN_CLOSE_PARENS); }
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 291 "dtd_parse.l"
+#line 293 "dtd_parse.l"
 { DTD_PARSE(TOKEN_OPEN_BRACKET); }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 292 "dtd_parse.l"
+#line 294 "dtd_parse.l"
 { DTD_PARSE(TOKEN_CLOSE_BRACKET); }
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
-#line 293 "dtd_parse.l"
+#line 295 "dtd_parse.l"
 { DTD_PARSE(TOKEN_PIPE); }
 	YY_BREAK
 case 53:
 /* rule 53 can match eol */
-#line 296 "dtd_parse.l"
+#line 298 "dtd_parse.l"
 case 54:
 /* rule 54 can match eol */
 YY_RULE_SETUP
-#line 296 "dtd_parse.l"
+#line 298 "dtd_parse.l"
 { DTD_PARSE(TOKEN_QUOTED); }
 	YY_BREAK
 case 55:
 YY_RULE_SETUP
-#line 297 "dtd_parse.l"
+#line 299 "dtd_parse.l"
 { DTD_PARSE(TOKEN_NAME); }
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 299 "dtd_parse.l"
+#line 301 "dtd_parse.l"
 ECHO;
 	YY_BREAK
-#line 1367 "dtd_parse.c"
+#line 1369 "dtd_parse.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(DTD):
 case YY_STATE_EOF(XMLPI):
@@ -2331,7 +2333,7 @@ void Dtd_Parse_free (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 299 "dtd_parse.l"
+#line 301 "dtd_parse.l"
 
 
 
@@ -2365,7 +2367,7 @@ extern dtd_build_data_t* dtd_parse(GString* s) {
 
 	input_string = s;
 	offsetx = 0;
-	len = input_string->len;
+	len = (guint) input_string->len;
 
 	pParser = DtdParseAlloc(g_malloc);
 

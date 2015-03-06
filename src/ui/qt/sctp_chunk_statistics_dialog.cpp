@@ -1,4 +1,4 @@
-/* sctp_chunk_statistics_dialog.cpp
+/* sctp_chunck_statistics_dialog.cpp
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -33,11 +33,6 @@ SCTPChunkStatisticsDialog::SCTPChunkStatisticsDialog(QWidget *parent, sctp_assoc
     cap_file_(cf)
 {
     ui->setupUi(this);
-    Qt::WindowFlags flags = Qt::Window | Qt::WindowSystemMenuHint
-            | Qt::WindowMinimizeButtonHint
-            | Qt::WindowMaximizeButtonHint
-            | Qt::WindowCloseButtonHint;
-    this->setWindowFlags(flags);
 #if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
     ui->tableWidget->verticalHeader()->setClickable(true);
     ui->tableWidget->verticalHeader()->setMovable(true);
@@ -137,11 +132,12 @@ void SCTPChunkStatisticsDialog::fillTable(bool all)
         }
     } else {
         char line[100];
+        size_t cap = 100;
         char *token, id[5];
         int i = 0, j = 0;
         struct chunkTypes temp;
 
-        while (fgets(line, (int)sizeof line, fp)) {
+        while (fgets(line, cap, fp)) {
             if (line[0] == '#')
                 continue;
             token = strtok(line, ",");
@@ -273,16 +269,15 @@ void SCTPChunkStatisticsDialog::on_actionHideChunkType_triggered()
 
 void SCTPChunkStatisticsDialog::on_actionChunkTypePreferences_triggered()
 {
-    gchar* err = NULL;
+    const gchar* err = NULL;
 
     pref_t *pref = prefs_find_preference(prefs_find_module("sctp"),"statistics_chunk_types");
     uat_t *uat = pref->varp.uat;
     uat_clear(uat);
 
-    if (!uat_load(pref->varp.uat, &err)) {
-        /* XXX - report this through the GUI */
+    uat_load(pref->varp.uat, &err);
+    if (err) {
         printf("Error loading table '%s': %s",pref->varp.uat->name,err);
-        g_free(err);
     }
 
     UatDialog *uatdialog = new UatDialog(this, pref->varp.uat);

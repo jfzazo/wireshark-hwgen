@@ -123,11 +123,7 @@
 #define NFS4_OP_WANT_DELEGATION             56
 #define NFS4_OP_DESTROY_CLIENTID            57
 #define NFS4_OP_RECLAIM_COMPLETE            58
-/* Minor version 2 */
-#define NFS4_OP_ALLOCATE                    59
-#define NFS4_OP_DEALLOCATE                  62
-#define NFS4_OP_SEEK                        69
-#define NFS4_LAST_OP                        69
+
 #define NFS4_OP_ILLEGAL                  10044
 
 /*
@@ -190,9 +186,9 @@ extern int dissect_nfs3_post_op_attr(tvbuff_t *tvb, int offset, packet_info *pin
 extern int dissect_nfs2_fattr(tvbuff_t *tvb, int offset, proto_tree *tree, const char* name);
 extern proto_tree* display_access_items(tvbuff_t* tvb, int offset, packet_info* pinfo,
 	                                    proto_tree* tree, guint32 amask, char mtype, int version,
-										wmem_strbuf_t* optext, const char* label);
+										GString* optext, const char* label);
 extern int dissect_access_reply(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree* tree,
-                                int version, wmem_strbuf_t *optext, rpc_call_info_value *civ);
+                                int version, GString *optext, rpc_call_info_value *civ);
 extern int hf_nfs_status;
 
 #endif /* packet-nfs.h */

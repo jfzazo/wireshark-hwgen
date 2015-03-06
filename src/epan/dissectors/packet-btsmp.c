@@ -29,7 +29,6 @@
 #include "config.h"
 
 #include <epan/packet.h>
-#include "packet-bluetooth.h"
 #include "packet-btl2cap.h"
 
 /* Initialize the protocol and registered fields */
@@ -54,8 +53,6 @@ static int hf_btsmp_ediv = -1;
 static int hf_btsmp_authreq = -1;
 static int hf_btsmp_initiator_key_distribution = -1;
 static int hf_btsmp_responder_key_distribution = -1;
-static int hf_bd_addr = -1;
-static int hf_address_type = -1;
 
 /* Initialize the subtree pointers */
 static gint ett_btsmp = -1;
@@ -200,11 +197,12 @@ dissect_btsmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
             col_set_str(pinfo->cinfo, COL_INFO, "Rcvd ");
             break;
         default:
-            col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection ");
+            col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction %d ",
+                pinfo->p2p_dir);
             break;
     }
 
-    if (tvb_reported_length(tvb) < 1)
+    if (tvb_length_remaining(tvb, 0) < 1)
         return FALSE;
 
     proto_tree_add_item(st, hf_btsmp_opcode, tvb, 0, 1, ENC_LITTLE_ENDIAN);
@@ -267,14 +265,7 @@ dissect_btsmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
         offset += 16;
         break;
 
-    case 0x09: /* Identity Address Information */
-        proto_tree_add_item(st, hf_address_type, tvb, offset, 1, ENC_NA);
-        offset += 1;
-
-        offset = dissect_bd_addr(hf_bd_addr, st, tvb, offset, NULL);
-        break;
-
-    case 0x0a: /* Signing Information */
+    case 0x0a: /* Signing Informationn */
         proto_tree_add_item(st, hf_btsmp_signature_key, tvb, offset, 16, ENC_NA);
         offset += 16;
         break;
@@ -389,16 +380,6 @@ proto_register_btsmp(void)
             {"Responder Key Distribution", "btsmp.responder_key_distribution",
             FT_NONE, BASE_NONE, NULL, 0x00,
             NULL, HFILL}
-        },
-        {&hf_bd_addr,
-          { "BD_ADDR", "btsmp.bd_addr",
-            FT_ETHER, BASE_NONE, NULL, 0x0,
-            "Bluetooth Device Address", HFILL}
-        },
-        { &hf_address_type,
-            { "Address Type", "btsmp.address_type",
-            FT_UINT8, BASE_HEX, VALS(bluetooth_address_type_vals), 0x0,
-            NULL, HFILL }
         }
     };
 

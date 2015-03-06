@@ -24,6 +24,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "packet-dcerpc.h"
 #include "packet-dcerpc-frsapi.h"
@@ -70,7 +71,7 @@ void
 proto_register_dcerpc_frsapi(void)
 {
 
-	static hf_register_info hf[] = {
+        static hf_register_info hf[] = {
 
 		{ &hf_frsapi_opnum,
 		  { "Operation", "frsapi.opnum", FT_UINT16, BASE_DEC,
@@ -78,9 +79,9 @@ proto_register_dcerpc_frsapi(void)
 	};
 
 
-	static gint *ett[] = {
-		&ett_dcerpc_frsapi,
-	};
+        static gint *ett[] = {
+                &ett_dcerpc_frsapi,
+        };
 
 
 	proto_dcerpc_frsapi = proto_register_protocol(
@@ -88,7 +89,7 @@ proto_register_dcerpc_frsapi(void)
 
 	proto_register_field_array(proto_dcerpc_frsapi, hf, array_length(hf));
 
-	proto_register_subtree_array(ett, array_length(ett));
+        proto_register_subtree_array(ett, array_length(ett));
 
 }
 
@@ -102,16 +103,3 @@ proto_reg_handoff_dcerpc_frsapi(void)
 		proto_dcerpc_frsapi, ett_dcerpc_frsapi, &uuid_dcerpc_frsapi,
 		ver_dcerpc_frsapi, dcerpc_frsapi_dissectors, hf_frsapi_opnum);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

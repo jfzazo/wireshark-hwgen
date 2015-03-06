@@ -400,7 +400,8 @@ dissect_btamp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
             col_set_str(pinfo->cinfo, COL_INFO, "Rcvd ");
             break;
         default:
-            col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection ");
+            col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction %d ",
+                pinfo->p2p_dir);
             break;
     }
 

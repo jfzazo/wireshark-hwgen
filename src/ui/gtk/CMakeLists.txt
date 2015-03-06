@@ -19,11 +19,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-ADD_CUSTOM_CMAKE_INCLUDE()
 
 set(WIRESHARK_GTK_SRC
 	about_dlg.c
 	addr_resolution_dlg.c
+	airpcap_dlg.c
+	airpcap_gui_utils.c
 	bytes_view.c
 	capture_dlg.c
 	capture_file_dlg.c
@@ -68,6 +69,7 @@ set(WIRESHARK_GTK_SRC
 	macros_dlg.c
 	main.c
 	main_80211_toolbar.c
+	main_airpcap_toolbar.c
 	main_filter_toolbar.c
 	main_menubar.c
 	main_statusbar.c
@@ -99,6 +101,8 @@ set(WIRESHARK_GTK_SRC
 	proto_hier_tree_model.c
 	proto_tree_model.c
 	range_utils.c
+	rtp_player.c
+	rtp_stream.c
 	sctp_byte_graph_dlg.c
 	sctp_error_dlg.c
 	sctp_graph_dlg.c
@@ -111,32 +115,9 @@ set(WIRESHARK_GTK_SRC
 	text_page_utils.c
 	time_shift_dlg.c
 	uat_gui.c
+	voip_calls.c
 	webbrowser.c
-	${WIRESHARK_CUSTOM_GTK_SRC}
 )
-
-if (AIRPCAP_FOUND)
-	set(WIRESHARK_GTK_SRC
-		${WIRESHARK_GTK_SRC}
-		airpcap_dlg.c
-		airpcap_gui_utils.c
-		main_airpcap_toolbar.c
-	)
-endif()
-
-if(PORTAUDIO_FOUND)
-	set(WIRESHARK_GTK_SRC
-		${WIRESHARK_GTK_SRC}
-		rtp_player.c
-	)
-endif()
-
-if(ENABLE_EXTCAP)
-	set(WIRESHARK_GTK_SRC
-		${WIRESHARK_GTK_SRC}
-		extcap_gtk.c
-	)
-endif()
 
 set(WIRESHARK_DIRTY_TAP_SRC
 )
@@ -149,6 +130,21 @@ set(WIRESHARK_TAP_SRC
 	camel_counter.c
 	camel_srt.c
 	compare_stat.c
+	conversations_eth.c
+	conversations_fc.c
+	conversations_fddi.c
+	conversations_ip.c
+	conversations_ipv6.c
+	conversations_ipx.c
+	conversations_jxta.c
+	conversations_ncp.c
+	conversations_rsvp.c
+	conversations_sctp.c
+	conversations_tcpip.c
+	conversations_tr.c
+	conversations_udpip.c
+	conversations_usb.c
+	conversations_wlan.c
 	dcerpc_stat.c
 	diameter_stat.c
 	expert_comp_dlg.c
@@ -161,6 +157,21 @@ set(WIRESHARK_TAP_SRC
 	gtp_stat.c
 	h225_counter.c
 	h225_ras_srt.c
+	hostlist_eth.c
+	hostlist_fc.c
+	hostlist_fddi.c
+	hostlist_ip.c
+	hostlist_ipv6.c
+	hostlist_ipx.c
+	hostlist_jxta.c
+	hostlist_ncp.c
+	hostlist_rsvp.c
+	hostlist_sctp.c
+	hostlist_tcpip.c
+	hostlist_tr.c
+	hostlist_udpip.c
+	hostlist_usb.c
+	hostlist_wlan.c
 	iax2_analysis.c
 	io_stat.c
 	lbm_stream_dlg.c
@@ -193,7 +204,6 @@ set(WIRESHARK_TAP_SRC
 	voip_calls_dlg.c
 	wlan_stat_dlg.c
 	wsp_stat.c
-	${WIRESHARK_CUSTOM_TAP_SRC}
 )
 
 set(CLEAN_FILES
@@ -233,6 +243,12 @@ else()
 	)
 endif()
 
+if (WANT_PACKET_EDITOR)
+	add_definitions(
+		-DWANT_PACKET_EDITOR
+	)
+endif()
+
 if(WIN32)
 	set(PLATFORM_UI_SRC
 		capture_if_details_dlg_win32.c
@@ -251,6 +267,17 @@ add_library(gtkui STATIC
 	${PLATFORM_UI_SRC}
 	wireshark-tap-register.c
 )
-set_target_properties(gtkui PROPERTIES
-	LINK_FLAGS "${WS_LINK_FLAGS}"
-	FOLDER "UI")
+set_target_properties(gtkui PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+set_target_properties(gtkui PROPERTIES FOLDER "UI")
+
+install(
+	DIRECTORY
+		ui
+	DIRECTORY_PERMISSIONS
+		OWNER_EXECUTE OWNER_WRITE OWNER_READ
+		GROUP_EXECUTE GROUP_READ
+		WORLD_EXECUTE WORLD_READ
+	DESTINATION
+		${CMAKE_INSTALL_DATADIR}/${CPACK_PACKAGE_NAME}
+	PATTERN ".svn" EXCLUDE
+)

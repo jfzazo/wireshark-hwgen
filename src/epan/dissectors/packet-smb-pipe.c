@@ -31,16 +31,21 @@ XXX  Fixme : shouldn't show [malformed frame] for long packets
 
 #include "config.h"
 
+#include <time.h>
+#include <string.h>
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/to_str.h>
 #include <epan/expert.h>
-#include <epan/reassemble.h>
-#include "packet-smb.h"
+#include <epan/dissectors/packet-smb.h>
 #include "packet-smb-pipe.h"
 #include "packet-smb-browse.h"
 #include "packet-smb-common.h"
 #include "packet-windows-common.h"
+#include "packet-dcerpc.h"
+#include <epan/reassemble.h>
 
 void proto_register_pipe_lanman(void);
 void proto_register_pipe_dcerpc(void);
@@ -100,7 +105,6 @@ static int hf_param_desc = -1;
 static int hf_return_desc = -1;
 static int hf_aux_data_desc = -1;
 static int hf_detail_level = -1;
-static int hf_padding = -1;
 static int hf_recv_buf_len = -1;
 static int hf_send_buf_len = -1;
 /* static int hf_continuation_from = -1; */
@@ -306,7 +310,7 @@ add_bytes_param(tvbuff_t *tvb, int offset, int count, packet_info *pinfo _U_,
 		}
 	} else {
 		if (count == 1) {
-			proto_tree_add_item(tree, hf_smb_pipe_byte_param, tvb, offset, count, ENC_LITTLE_ENDIAN);
+			proto_tree_add_item(tree, hf_smb_pipe_byte_param, tvb, offset, count, ENC_NA);
 		} else {
 			proto_tree_add_item(tree, hf_smb_pipe_bytes_param, tvb, offset, count, ENC_NA);
 		}
@@ -507,7 +511,7 @@ add_reltime(tvbuff_t *tvb, int offset, int count _U_, packet_info *pinfo _U_,
 	nstime.nsecs = 0;
 	proto_tree_add_time_format_value(tree, hf_index, tvb, offset, 4,
 	    &nstime, "%s",
-	    time_secs_to_str(wmem_packet_scope(),  (gint32) nstime.secs));
+	    time_secs_to_ep_str( (gint32) nstime.secs));
 	offset += 4;
 	return offset;
 }
@@ -629,7 +633,7 @@ add_logon_hours(tvbuff_t *tvb, int offset, int count, packet_info *pinfo _U_,
 			proto_tree_add_bytes_format_value(tree, hf_index, tvb,
 			    cptr, count, NULL,
 			    "%s (wrong length, should be 21, is %d",
-			    tvb_bytes_to_str(wmem_packet_scope(), tvb, cptr, count), count);
+			    tvb_bytes_to_ep_str(tvb, cptr, count), count);
 		}
 	} else {
 		proto_tree_add_bytes_format_value(tree, hf_index, tvb, 0, 0,
@@ -649,11 +653,11 @@ add_tzoffset(tvbuff_t *tvb, int offset, int count _U_, packet_info *pinfo _U_,
 	if (tzoffset < 0) {
 		proto_tree_add_int_format_value(tree, hf_tzoffset, tvb, offset, 2,
 		    tzoffset, "%s east of UTC",
-		    time_secs_to_str(wmem_packet_scope(), -tzoffset*60));
+		    time_secs_to_ep_str(-tzoffset*60));
 	} else if (tzoffset > 0) {
 		proto_tree_add_int_format_value(tree, hf_tzoffset, tvb, offset, 2,
 		    tzoffset, "%s west of UTC",
-		    time_secs_to_str(wmem_packet_scope(), tzoffset*60));
+		    time_secs_to_ep_str(tzoffset*60));
 	} else {
 		proto_tree_add_int_format_value(tree, hf_tzoffset, tvb, offset, 2,
 		    tzoffset, "at UTC");
@@ -793,7 +797,7 @@ netshareenum_share_entry(tvbuff_t *tvb, proto_tree *tree, int offset)
 {
 	if (tree) {
 		return proto_tree_add_text(tree, tvb, offset, -1,
-		    "Share %.13s", tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 13, ENC_ASCII));
+		    "Share %.13s", tvb_get_string(wmem_packet_scope(), tvb, offset, 13));
 	} else
 		return NULL;
 }
@@ -993,7 +997,7 @@ netserverenum2_server_entry(tvbuff_t *tvb, proto_tree *tree, int offset)
 {
 	if (tree) {
 		return proto_tree_add_text(tree, tvb, offset, -1,
-			    "Server %.16s", tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 16, ENC_ASCII));
+			    "Server %.16s", tvb_get_string(wmem_packet_scope(), tvb, offset, 16));
 	} else
 		return NULL;
 }
@@ -1710,7 +1714,7 @@ dissect_request_parameters(tvbuff_t *tvb, int offset, packet_info *pinfo,
 				    "%s: Value is %s, type is wrong (b)",
 				    proto_registrar_get_name((*items->hf_index == -1) ?
 				      hf_smb_pipe_bytes_param : *items->hf_index),
-				    tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, count));
+				    tvb_bytes_to_ep_str(tvb, offset, count));
 				offset += count;
 				items++;
 			} else {
@@ -1783,7 +1787,7 @@ dissect_request_parameters(tvbuff_t *tvb, int offset, packet_info *pinfo,
 			 * One or more pad bytes.
 			 */
 			desc = get_count(desc, &count);
-			proto_tree_add_item(tree, hf_padding, tvb, offset, count, ENC_NA);
+			proto_tree_add_text(tree, tvb, offset, count, "Padding");
 			offset += count;
 			break;
 
@@ -1863,7 +1867,7 @@ dissect_response_parameters(tvbuff_t *tvb, int offset, packet_info *pinfo,
 				    "%s: Value is %s, type is wrong (g)",
 				    proto_registrar_get_name((*items->hf_index == -1) ?
 				      hf_smb_pipe_bytes_param : *items->hf_index),
-				    tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, count));
+				    tvb_bytes_to_ep_str(tvb, offset, count));
 				offset += count;
 				items++;
 			} else {
@@ -2060,7 +2064,7 @@ dissect_transact_data(tvbuff_t *tvb, int offset, int convert,
 				    "%s: Value is %s, type is wrong (B)",
 				    proto_registrar_get_name((*items->hf_index == -1) ?
 				      hf_smb_pipe_bytes_param : *items->hf_index),
-				    tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, count));
+				    tvb_bytes_to_ep_str(tvb, offset, count));
 				offset += count;
 				items++;
 			} else {
@@ -2152,7 +2156,7 @@ dissect_transact_data(tvbuff_t *tvb, int offset, int convert,
 				    "%s: Value is %s, type is wrong (b)",
 				    proto_registrar_get_name((*items->hf_index == -1) ?
 				      hf_smb_pipe_bytes_param : *items->hf_index),
-				    tvb_bytes_to_str(wmem_packet_scope(), tvb, cptr, count));
+				    tvb_bytes_to_ep_str(tvb, cptr, count));
 				items++;
 			} else {
 				offset = (*items->func)(tvb, offset, count,
@@ -2459,8 +2463,8 @@ dissect_response_data(tvbuff_t *tvb, packet_info *pinfo, int convert,
 	const char *label;
 	gint ett;
 	const item_t *resp_data;
-	proto_item *data_item = NULL;
-	proto_tree *data_tree = NULL;
+	proto_item *data_item;
+	proto_tree *data_tree;
 	proto_item *entry_item;
 	proto_tree *entry_tree;
 	guint i, j;
@@ -2492,9 +2496,18 @@ dissect_response_data(tvbuff_t *tvb, packet_info *pinfo, int convert,
 				ett = *lanman->ett_data_entry_list;
 			else
 				ett = ett_lanman_unknown_entries;
-
-			data_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett, &data_item, label);
+			data_item = proto_tree_add_text(tree, tvb, offset, -1, "%s", label);
+			data_tree = proto_item_add_subtree(data_item, ett);
+		} else {
+			data_item = NULL;
+			data_tree = NULL;
 		}
+	} else {
+		/*
+		 * Just leave it at the top level.
+		 */
+		data_item = NULL;
+		data_tree = tree;
 	}
 
 	if (trp->data_descrip == NULL) {
@@ -2640,7 +2653,7 @@ dissect_pipe_lanman(tvbuff_t *pd_tvb, tvbuff_t *p_tvb, tvbuff_t *d_tvb,
 		offset += 2;
 
 		if(!trp){
-			return FALSE; /* can't dissect this request */
+			return FALSE; /* cant dissect this request */
 		}
 
 		/*
@@ -2884,10 +2897,6 @@ proto_register_pipe_lanman(void)
 		{ &hf_detail_level,
 			{ "Detail Level", "lanman.level", FT_UINT16, BASE_DEC,
 			NULL, 0, "LANMAN Detail Level", HFILL }},
-
-		{ &hf_padding,
-			{ "Padding", "lanman.padding", FT_BYTES, BASE_NONE,
-			NULL, 0, NULL, HFILL }},
 
 		{ &hf_recv_buf_len,
 			{ "Receive Buffer Length", "lanman.recv_buf_len", FT_UINT16, BASE_DEC,
@@ -3296,7 +3305,7 @@ dissect_pipe_dcerpc(tvbuff_t *d_tvb, packet_info *pinfo, proto_tree *parent_tree
 			 */
 			result = dissector_try_heuristic(smb_transact_heur_subdissector_list, d_tvb, pinfo, parent_tree, &hdtbl_entry, NULL);
 
-			/* no this didn't look like something we know */
+			/* no this didnt look like something we know */
 			if(!result){
 				goto clean_up_and_exit;
 			}
@@ -3362,14 +3371,14 @@ dissect_pipe_dcerpc(tvbuff_t *d_tvb, packet_info *pinfo, proto_tree *parent_tree
 	fd_head=fragment_add_check(&dcerpc_reassembly_table,
 	    d_tvb, 0, pinfo, fid, NULL, 0, 0, TRUE);
 	if(!fd_head){
-		/* we didn't find it, try any of the heuristic dissectors
+		/* we didnt find it, try any of the heuristic dissectors
 		   and bail out
 		*/
 		result = dissector_try_heuristic(smb_transact_heur_subdissector_list, d_tvb, pinfo, parent_tree, &hdtbl_entry, NULL);
 		goto clean_up_and_exit;
 	}
 	if(!(fd_head->flags&FD_DEFRAGMENTED)){
-		/* we don't have a fully reassembled frame */
+		/* we dont have a fully reassembled frame */
 		result = dissector_try_heuristic(smb_transact_heur_subdissector_list, d_tvb, pinfo, parent_tree, &hdtbl_entry, NULL);
 		goto clean_up_and_exit;
 	}
@@ -3414,7 +3423,7 @@ clean_up_and_exit:
 void
 proto_register_pipe_dcerpc(void)
 {
-	smb_transact_heur_subdissector_list = register_heur_dissector_list("smb_transact");
+	register_heur_dissector_list("smb_transact", &smb_transact_heur_subdissector_list);
 	register_init_routine(smb_dcerpc_reassembly_init);
 }
 

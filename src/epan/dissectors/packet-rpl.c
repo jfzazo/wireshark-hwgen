@@ -23,6 +23,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include <epan/llcsaps.h>
@@ -34,7 +35,6 @@ void proto_reg_handoff_rpl(void);
 static int proto_rpl          = -1;
 
 static int hf_rpl_type        = -1;
-static int hf_rpl_len         = -1;
 static int hf_rpl_corrval     = -1;
 static int hf_rpl_respval     = -1;
 static int hf_rpl_maxframe    = -1;
@@ -98,16 +98,18 @@ static void
 dissect_rpl_container(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	guint16 len, type, sublen, subtyp;
+	proto_item *ti;
 	proto_tree *rpl_container_tree;
 	guint16 offset;
 	gint ett_type;
 	gint length, reported_length;
 
 	len = tvb_get_ntohs(tvb, 0);
-	proto_tree_add_item(tree, hf_rpl_len, tvb, 0, 2, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, 0, 2, "Length: %u", len);
 
 	type = tvb_get_ntohs(tvb, 2);
-	proto_tree_add_item(tree, hf_rpl_type, tvb, 2, 2, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, 2, 2, "Type: %s",
+		val_to_str_const(type, rpl_type_vals, "Unknown Type"));
 	offset = 4;
 
 	switch (type) {
@@ -134,11 +136,13 @@ dissect_rpl_container(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				if(subtyp == 0x4018) ett_type = ett_rpl_4018;
 				if(subtyp == 0xc005) ett_type = ett_rpl_c005;
 				if(subtyp == 0xc014) ett_type = ett_rpl_c014;
-				rpl_container_tree = proto_tree_add_subtree(tree, tvb,
-					offset, sublen, ett_type, NULL,
+				ti = proto_tree_add_text(tree, tvb,
+					offset, sublen, "%s",
 					val_to_str_const(subtyp,
 						rpl_type_vals,
 						"Unknown Type"));
+				rpl_container_tree = proto_item_add_subtree(ti,
+					ett_type);
 				length = tvb_length_remaining(tvb, offset);
 				if (length > sublen)
 					length = sublen;
@@ -263,7 +267,7 @@ static void
 dissect_rpl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	guint16 rpl_len, rpl_type;
-	proto_item *ti;
+	proto_item *ti, *hidden_item;
 	proto_tree *rpl_tree;
 	tvbuff_t *next_tvb;
 
@@ -275,17 +279,22 @@ dissect_rpl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	col_set_str(pinfo->cinfo, COL_INFO,
 		    val_to_str_const(rpl_type, rpl_type_vals, "Unknown Type"));
 
-	ti = proto_tree_add_item(tree, proto_rpl, tvb, 0,
-		rpl_len, ENC_NA);
-	rpl_tree = proto_item_add_subtree(ti, ett_rpl);
-	next_tvb = tvb_new_subset_remaining(tvb, 0);
-	set_actual_length(next_tvb, rpl_len);
-	dissect_rpl_container(next_tvb, pinfo, rpl_tree);
+	if (tree) {
+		ti = proto_tree_add_item(tree, proto_rpl, tvb, 0,
+			rpl_len, ENC_NA);
+		rpl_tree = proto_item_add_subtree(ti, ett_rpl);
+		hidden_item = proto_tree_add_uint(rpl_tree, hf_rpl_type, tvb, 2, 2,
+			rpl_type);
+		PROTO_ITEM_SET_HIDDEN(hidden_item);
+		next_tvb = tvb_new_subset_remaining(tvb, 0);
+		set_actual_length(next_tvb, rpl_len);
+		dissect_rpl_container(next_tvb, pinfo, rpl_tree);
 
-	if (tvb_reported_length(tvb) > rpl_len)
-		call_dissector(data_handle,
-			tvb_new_subset_remaining(tvb, rpl_len), pinfo,
-				tree);
+		if (tvb_reported_length(tvb) > rpl_len)
+			call_dissector(data_handle,
+				tvb_new_subset_remaining(tvb, rpl_len), pinfo,
+				    tree);
+	}
 }
 
 void
@@ -294,12 +303,8 @@ proto_register_rpl(void)
 	static hf_register_info hf[] = {
 		{ &hf_rpl_type,
 			{ "Type", "rpl.type",
-				FT_UINT16, BASE_DEC, VALS(rpl_type_vals), 0x0,
-				"RPL Packet Type", HFILL }},
-		{ &hf_rpl_len,
-			{ "Length", "rpl.len",
 				FT_UINT16, BASE_DEC, NULL, 0x0,
-				"RPL Packet Length", HFILL }},
+				"RPL Packet Type", HFILL }},
 		{ &hf_rpl_corrval,
 			{ "Correlator Value", "rpl.corrval",
 				FT_UINT32, BASE_HEX, NULL, 0x0,
@@ -396,7 +401,7 @@ proto_register_rpl(void)
 		&ett_rpl_unkn
 	};
 
-	proto_rpl = proto_register_protocol("Remote Program Load",
+        proto_rpl = proto_register_protocol("Remote Program Load",
 	    "RPL", "rpl");
 	proto_register_field_array(proto_rpl, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
@@ -412,16 +417,3 @@ proto_reg_handoff_rpl(void)
 	rpl_handle = find_dissector("rpl");
 	dissector_add_uint("llc.dsap", SAP_RPL, rpl_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -23,8 +23,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include "epan/packet.h"
 #include "epan/prefs.h"
+#include "epan/tap.h"
 
 #include "packet-uaudp.h"
 
@@ -295,12 +298,12 @@ static void _dissect_uaudp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         {
             if (direction == SYS_TO_TERM)
                 call_dissector(ua_sys_to_term_handle,
-                           tvb_new_subset_length(tvb, offset, datalen),
+                           tvb_new_subset(tvb, offset, datalen, datalen),
                            pinfo,
                            tree);
             else if (direction == TERM_TO_SYS)
                 call_dissector(ua_term_to_sys_handle,
-                           tvb_new_subset_length(tvb, offset, datalen),
+                           tvb_new_subset(tvb, offset, datalen, datalen),
                            pinfo,
                            tree);
             else {
@@ -682,20 +685,8 @@ void proto_reg_handoff_uaudp(void)
         {
             /* If all ports are set to 0, then just register the handle so
              * at least "Decode As..." will work. */
-            dissector_add_for_decode_as("udp.port", uaudp_handle);
+            dissector_add_handle("udp.port", uaudp_handle);
         }
     }
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

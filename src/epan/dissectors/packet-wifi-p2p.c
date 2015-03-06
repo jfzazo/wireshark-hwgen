@@ -21,6 +21,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/to_str.h>
 #include <epan/expert.h>
@@ -421,9 +422,11 @@ static void dissect_wifi_p2p_capability(proto_item *tlv_root,
 static void dissect_device_id(proto_item *tlv_root, proto_item *tlv_item,
                               tvbuff_t *tvb, int offset)
 {
+  guint8 addr[6];
   proto_tree_add_item(tlv_root, hf_p2p_attr_device_id, tvb,
                       offset + 3, 6, ENC_NA);
-  proto_item_append_text(tlv_item, ": %s", tvb_ether_to_str(tvb, offset+3));
+  tvb_memcpy(tvb, addr, offset + 3, 6);
+  proto_item_append_text(tlv_item, ": %s", ether_to_str(addr));
 }
 
 static void dissect_group_owner_intent(proto_item *tlv_root,
@@ -620,9 +623,11 @@ static void dissect_intended_interface_addr(proto_item *tlv_root,
                                             proto_item *tlv_item,
                                             tvbuff_t *tvb, int offset)
 {
+  guint8 addr[6];
   proto_tree_add_item(tlv_root, hf_p2p_attr_intended_interface_addr, tvb,
                       offset + 3, 6, ENC_NA);
-  proto_item_append_text(tlv_item, ": %s", tvb_ether_to_str(tvb, offset + 3));
+  tvb_memcpy(tvb, addr, offset + 3, 6);
+  proto_item_append_text(tlv_item, ": %s", ether_to_str(addr));
 }
 
 static void dissect_extended_listen_timing(proto_item *tlv_root,
@@ -645,11 +650,13 @@ static void dissect_wifi_p2p_group_id(proto_item *tlv_root,
                                       int offset, guint16 slen)
 {
   int s_offset;
+  guint8 addr[6];
 
   s_offset = offset + 3;
   proto_tree_add_item(tlv_root, hf_p2p_attr_p2p_group_id_dev_addr, tvb,
                       s_offset, 6, ENC_NA);
-  proto_item_append_text(tlv_item, ": %s", tvb_ether_to_str(tvb, offset + 3));
+  tvb_memcpy(tvb, addr, offset + 3, 6);
+  proto_item_append_text(tlv_item, ": %s", ether_to_str(addr));
   s_offset += 6;
   proto_tree_add_item(tlv_root, hf_p2p_attr_p2p_group_id_ssid, tvb,
                       s_offset, offset + 3 + slen - s_offset, ENC_ASCII|ENC_NA);
@@ -661,6 +668,7 @@ static void dissect_wifi_p2p_group_bssid(packet_info *pinfo,
                                          int offset, guint16 slen)
 {
   int s_offset;
+  guint8 addr[6];
 
   if (slen != 6) {
     expert_add_info_format(pinfo, tlv_item, &ei_wifi_p2p_attr_len, "Invalid ethernet address");
@@ -670,7 +678,8 @@ static void dissect_wifi_p2p_group_bssid(packet_info *pinfo,
   s_offset = offset + 3;
   proto_tree_add_item(tlv_root, hf_p2p_attr_p2p_group_bssid, tvb,
                       s_offset, 6, ENC_NA);
-  proto_item_append_text(tlv_item, ": %s", tvb_ether_to_str(tvb, offset + 3));
+  tvb_memcpy(tvb, addr, offset + 3, 6);
+  proto_item_append_text(tlv_item, ": %s", ether_to_str(addr));
 }
 
 static void dissect_notice_of_absence(packet_info *pinfo, proto_item *tlv_root,
@@ -729,8 +738,9 @@ static void dissect_wifi_p2p_group_info(packet_info *pinfo,
     }
 
     ci_len = tvb_get_guint8(tvb, s_offset);
-    tree = proto_tree_add_subtree(tlv_root, tvb, s_offset, 1 + ci_len,
-                               ett_p2p_client_descr, NULL, "P2P Client Info Descriptor");
+    item = proto_tree_add_text(tlv_root, tvb, s_offset, 1 + ci_len,
+                               "P2P Client Info Descriptor");
+    tree = proto_item_add_subtree(item, ett_p2p_client_descr);
 
     item = proto_tree_add_item(tree, hf_p2p_attr_gi_length, tvb, s_offset,
                                1, ENC_BIG_ENDIAN);
@@ -886,9 +896,10 @@ void dissect_wifi_p2p_ie(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb,
     stype = tvb_get_guint8(tvb, offset);
     slen = tvb_get_letohs(tvb, offset + 1);
 
-    tlv_root = proto_tree_add_subtree(tree, tvb, offset, 3 + slen, ett_p2p_tlv, &tlv_item,
+    tlv_item = proto_tree_add_text(tree, tvb, offset, 3 + slen, "%s",
                                    val_to_str(stype, p2p_attr_types,
                                               "Unknown attribute type (%u)"));
+    tlv_root = proto_item_add_subtree(tlv_item, ett_p2p_tlv);
 
     proto_tree_add_item(tlv_root, hf_p2p_attr_type, tvb, offset, 1, ENC_BIG_ENDIAN);
     proto_tree_add_uint(tlv_root, hf_p2p_attr_len, tvb, offset + 1, 2,
@@ -1011,10 +1022,11 @@ void dissect_wifi_p2p_anqp(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb,
 
     type = tvb_get_guint8(tvb, offset + 2);
     id = tvb_get_guint8(tvb, offset + 3);
-    tlv = proto_tree_add_subtree_format(tree, tvb, offset, 2 + len,
-                               ett_p2p_service_tlv, &item, "Service TLV (Transaction ID: %u  Type: %s)",
+    item = proto_tree_add_text(tree, tvb, offset, 2 + len,
+                               "Service TLV (Transaction ID: %u  Type: %s)",
                                id, val_to_str(type, p2p_service_protocol_types,
                                               "Unknown (%u)"));
+    tlv = proto_item_add_subtree(item, ett_p2p_service_tlv);
 
     proto_tree_add_item(tlv, hf_p2p_anqp_length, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;

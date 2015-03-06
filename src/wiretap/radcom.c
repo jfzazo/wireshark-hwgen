@@ -24,6 +24,7 @@
 #include <string.h>
 #include "wtap-int.h"
 #include "file_wrappers.h"
+#include <wsutil/buffer.h>
 #include "radcom.h"
 
 struct frame_date {
@@ -53,7 +54,7 @@ static const guint8 encap_magic[4] = {
 };
 
 static const guint8 active_time_magic[11] = {
-	'A', 'c', 't', 'i', 'v', 'e', ' ', 'T', 'i', 'm', 'e'
+	0x41, 0x63, 0x74, 0x69, 0x76, 0x65, 0x20, 0x54, 0x69, 0x6d, 0x65
 };
 
 /* RADCOM record header - followed by frame data (perhaps including FCS).
@@ -89,9 +90,12 @@ static gboolean radcom_seek_read(wtap *wth, gint64 seek_off,
 	struct wtap_pkthdr *phdr, Buffer *buf, int *err, gchar **err_info);
 static gboolean radcom_read_rec(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr,
 	Buffer *buf, int *err, gchar **err_info);
+static gboolean radcom_read_rec_data(FILE_T fh, guint8 *pd, int length,
+	int *err, gchar **err_info);
 
-wtap_open_return_val radcom_open(wtap *wth, int *err, gchar **err_info)
+int radcom_open(wtap *wth, int *err, gchar **err_info)
 {
+	int bytes_read;
 	guint8 r_magic[8], t_magic[11], search_encap[7];
 	struct frame_date start_date;
 #if 0
@@ -100,10 +104,13 @@ wtap_open_return_val radcom_open(wtap *wth, int *err, gchar **err_info)
 #endif
 
 	/* Read in the string that should be at the start of a RADCOM file */
-	if (!wtap_read_bytes(wth->fh, r_magic, 8, err, err_info)) {
-		if (*err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(r_magic, 8, wth->fh);
+	if (bytes_read != 8) {
+		*err = file_error(wth->fh, err_info);
+		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+			return -1;
+		return 0;
 	}
 
 	/* XXX: bytes 2 and 3 of the "magic" header seem to be different in some
@@ -113,66 +120,43 @@ wtap_open_return_val radcom_open(wtap *wth, int *err, gchar **err_info)
 	r_magic[1] = 0xD2;
 	r_magic[2] = 0x00;
 	if (memcmp(r_magic, radcom_magic, 8) != 0) {
-		return WTAP_OPEN_NOT_MINE;
+		return 0;
 	}
 
 	/* Look for the "Active Time" string. The "frame_date" structure should
 	 * be located 32 bytes before the beginning of this string */
-	if (!wtap_read_bytes(wth->fh, t_magic, 11, err, err_info)) {
-		if (*err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(t_magic, 11, wth->fh);
+	if (bytes_read != 11) {
+		*err = file_error(wth->fh, err_info);
+		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+			return -1;
+		return 0;
 	}
 	while (memcmp(t_magic, active_time_magic, 11) != 0)
 	{
 		if (file_seek(wth->fh, -10, SEEK_CUR, err) == -1)
-			return WTAP_OPEN_ERROR;
-		if (!wtap_read_bytes(wth->fh, t_magic, 11, err, err_info)) {
-			if (*err != WTAP_ERR_SHORT_READ)
-				return WTAP_OPEN_ERROR;
-			return WTAP_OPEN_NOT_MINE;
+			return -1;
+		errno = WTAP_ERR_CANT_READ;
+		bytes_read = file_read(t_magic, 11, wth->fh);
+		if (bytes_read != 11) {
+			*err = file_error(wth->fh, err_info);
+			if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+				return -1;
+			return 0;
 		}
 	}
-	if (file_seek(wth->fh, -43, SEEK_CUR, err) == -1)
-		return WTAP_OPEN_ERROR;
+	if (file_seek(wth->fh, -43, SEEK_CUR, err) == -1) return -1;
 
 	/* Get capture start time */
-	if (!wtap_read_bytes(wth->fh, &start_date, sizeof(struct frame_date),
-	    err, err_info)) {
-		if (*err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
-	}
-
-	if (file_seek(wth->fh, sizeof(struct frame_date), SEEK_CUR, err) == -1)
-		return WTAP_OPEN_ERROR;
-
-	for (;;) {
-		if (!wtap_read_bytes(wth->fh, search_encap, 4,
-		    err, err_info)) {
-			if (*err != WTAP_ERR_SHORT_READ)
-				return WTAP_OPEN_ERROR;
-			return WTAP_OPEN_NOT_MINE;
-		}
-
-		if (memcmp(encap_magic, search_encap, 4) == 0)
-			break;
-
-		/*
-		 * OK, that's not it, go forward 1 byte - reading
-		 * the magic moved us forward 4 bytes, so seeking
-		 * backward 3 bytes moves forward 1 byte - and
-		 * try the 4 bytes at that offset.
-		 */
-		if (file_seek(wth->fh, -3, SEEK_CUR, err) == -1)
-			return WTAP_OPEN_ERROR;
-	}
-	if (file_seek(wth->fh, 12, SEEK_CUR, err) == -1)
-		return WTAP_OPEN_ERROR;
-	if (!wtap_read_bytes(wth->fh, search_encap, 4, err, err_info)) {
-		if (*err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(&start_date, sizeof(struct frame_date),
+			       wth->fh);
+	if (bytes_read != sizeof(struct frame_date)) {
+		*err = file_error(wth->fh, err_info);
+		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+			return -1;
+		return 0;
 	}
 
 	/* This is a radcom file */
@@ -180,7 +164,7 @@ wtap_open_return_val radcom_open(wtap *wth, int *err, gchar **err_info)
 	wth->subtype_read = radcom_read;
 	wth->subtype_seek_read = radcom_seek_read;
 	wth->snapshot_length = 0; /* not available in header, only in frame */
-	wth->file_tsprec = WTAP_TSPREC_USEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_USEC;
 
 #if 0
 	tm.tm_year = pletoh16(&start_date.year)-1900;
@@ -192,7 +176,30 @@ wtap_open_return_val radcom_open(wtap *wth, int *err, gchar **err_info)
 	tm.tm_sec = sec%60;
 	tm.tm_isdst = -1;
 #endif
+	if (file_seek(wth->fh, sizeof(struct frame_date), SEEK_CUR, err) == -1)
+		return -1;
 
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(search_encap, 4, wth->fh);
+	if (bytes_read != 4) {
+		goto read_error;
+	}
+	while (memcmp(encap_magic, search_encap, 4)) {
+		if (file_seek(wth->fh, -3, SEEK_CUR, err) == -1)
+			return -1;
+		errno = WTAP_ERR_CANT_READ;
+		bytes_read = file_read(search_encap, 4, wth->fh);
+		if (bytes_read != 4) {
+			goto read_error;
+		}
+	}
+	if (file_seek(wth->fh, 12, SEEK_CUR, err) == -1)
+		return -1;
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(search_encap, 4, wth->fh);
+	if (bytes_read != 4) {
+		goto read_error;
+	}
 	if (memcmp(search_encap, "LAPB", 4) == 0)
 		wth->file_encap = WTAP_ENCAP_LAPB;
 	else if (memcmp(search_encap, "Ethe", 4) == 0)
@@ -202,41 +209,53 @@ wtap_open_return_val radcom_open(wtap *wth, int *err, gchar **err_info)
 	else {
 		*err = WTAP_ERR_UNSUPPORTED;
 		*err_info = g_strdup_printf("radcom: network type \"%.4s\" unknown", search_encap);
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 
 #if 0
-	if (!wtap_read_bytes(wth->fh, &next_date, sizeof(struct frame_date),
-	    err, err_info))
-		return WTAP_OPEN_ERROR;
+	bytes_read = file_read(&next_date, sizeof(struct frame_date), wth->fh);
+	errno = WTAP_ERR_CANT_READ;
+	if (bytes_read != sizeof(struct frame_date)) {
+		goto read_error;
+	}
 
 	while (memcmp(&start_date, &next_date, 4)) {
 		if (file_seek(wth->fh, 1-sizeof(struct frame_date), SEEK_CUR, err) == -1)
-			return WTAP_OPEN_ERROR;
-		if (!wtap_read_bytes(wth->fh, &next_date, sizeof(struct frame_date),
-		    err, err_info))
-			return WTAP_OPEN_ERROR;
+			return -1;
+		errno = WTAP_ERR_CANT_READ;
+		bytes_read = file_read(&next_date, sizeof(struct frame_date),
+				   wth->fh);
+		if (bytes_read != sizeof(struct frame_date)) {
+			goto read_error;
+		}
 	}
 #endif
 
 	if (wth->file_encap == WTAP_ENCAP_ETHERNET) {
 		if (file_seek(wth->fh, 294, SEEK_CUR, err) == -1)
-			return WTAP_OPEN_ERROR;
+			return -1;
 	} else if (wth->file_encap == WTAP_ENCAP_LAPB) {
 		if (file_seek(wth->fh, 297, SEEK_CUR, err) == -1)
-			return WTAP_OPEN_ERROR;
+			return -1;
 	} else if (wth->file_encap == WTAP_ENCAP_ATM_RFC1483) {
 		if (file_seek(wth->fh, 504, SEEK_CUR, err) == -1)
-			return WTAP_OPEN_ERROR;
+			return -1;
 	}
 
-	return WTAP_OPEN_MINE;
+	return 1;
+
+read_error:
+	*err = file_error(wth->fh, err_info);
+	if (*err != 0)
+		return -1;
+	return 0;
 }
 
 /* Read the next packet */
 static gboolean radcom_read(wtap *wth, int *err, gchar **err_info,
 			    gint64 *data_offset)
 {
+	int	bytes_read;
 	char	fcs[2];
 
 	*data_offset = file_tell(wth->fh);
@@ -253,8 +272,14 @@ static gboolean radcom_read(wtap *wth, int *err, gchar **err_info,
 		   XXX - should we have some way of indicating the
 		   presence and size of an FCS to our caller?
 		   That'd let us handle other file types as well. */
-		if (!wtap_read_bytes(wth->fh, &fcs, sizeof fcs, err, err_info))
+		errno = WTAP_ERR_CANT_READ;
+		bytes_read = file_read(&fcs, sizeof fcs, wth->fh);
+		if (bytes_read != sizeof fcs) {
+			*err = file_error(wth->fh, err_info);
+			if (*err == 0)
+				*err = WTAP_ERR_SHORT_READ;
 			return FALSE;
+		}
 	}
 
 	return TRUE;
@@ -286,13 +311,20 @@ radcom_read_rec(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr, Buffer *buf,
 		int *err, gchar **err_info)
 {
 	struct radcomrec_hdr hdr;
+	int	bytes_read;
 	guint16 data_length, real_length, length;
 	guint32 sec;
 	struct tm tm;
 	guint8	atmhdr[8];
 
-	if (!wtap_read_bytes_or_eof(fh, &hdr, sizeof hdr, err, err_info))
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(&hdr, sizeof hdr, fh);
+	if (bytes_read != sizeof hdr) {
+		*err = file_error(fh, err_info);
+		if (*err == 0 && bytes_read != 0)
+			*err = WTAP_ERR_SHORT_READ;
 		return FALSE;
+	}
 
 	data_length = pletoh16(&hdr.data_length);
 	if (data_length == 0) {
@@ -340,7 +372,7 @@ radcom_read_rec(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr, Buffer *buf,
 		 * XXX - is this stuff a pseudo-header?
 		 * The direction appears to be in the "hdr.dce" field.
 		 */
-		if (!wtap_read_bytes(fh, atmhdr, sizeof atmhdr, err,
+		if (!radcom_read_rec_data(fh, atmhdr, sizeof atmhdr, err,
 		    err_info))
 			return FALSE;	/* Read error */
 		length -= 8;
@@ -360,15 +392,20 @@ radcom_read_rec(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr, Buffer *buf,
 	return TRUE;
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */
+static gboolean
+radcom_read_rec_data(FILE_T fh, guint8 *pd, int length, int *err,
+		     gchar **err_info)
+{
+	int	bytes_read;
+
+	errno = WTAP_ERR_CANT_READ;
+	bytes_read = file_read(pd, length, fh);
+
+	if (bytes_read != length) {
+		*err = file_error(fh, err_info);
+		if (*err == 0)
+			*err = WTAP_ERR_SHORT_READ;
+		return FALSE;
+	}
+	return TRUE;
+}

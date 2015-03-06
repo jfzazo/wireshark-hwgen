@@ -25,9 +25,12 @@
 
 #include <string.h>
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/to_str.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
 #include <epan/dissectors/packet-dcerpc.h>
 
@@ -386,7 +389,6 @@ dissect_PNDCP_Suboption_IP(tvbuff_t *tvb, int offset, packet_info *pinfo,
     guint16     block_qualifier;
     guint32     ip;
     proto_item *item = NULL;
-    address     addr;
 
 
     /* SuboptionIPParameter */
@@ -435,18 +437,15 @@ dissect_PNDCP_Suboption_IP(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
         /* IPAddress */
         offset = dissect_pn_ipv4(tvb, offset, pinfo, tree, hf_pn_dcp_suboption_ip_ip, &ip);
-        SET_ADDRESS(&addr, AT_IPv4, 4, &ip);
-        proto_item_append_text(block_item, ", IP: %s", address_to_str(wmem_packet_scope(), &addr));
+        proto_item_append_text(block_item, ", IP: %s", ip_to_str((guint8*)&ip));
 
         /* Subnetmask */
         offset = dissect_pn_ipv4(tvb, offset, pinfo, tree, hf_pn_dcp_suboption_ip_subnetmask, &ip);
-        SET_ADDRESS(&addr, AT_IPv4, 4, &ip);
-        proto_item_append_text(block_item, ", Subnet: %s", address_to_str(wmem_packet_scope(), &addr));
+        proto_item_append_text(block_item, ", Subnet: %s", ip_to_str((guint8*)&ip));
 
         /* StandardGateway */
         offset = dissect_pn_ipv4(tvb, offset, pinfo, tree, hf_pn_dcp_suboption_ip_standard_gateway, &ip);
-        SET_ADDRESS(&addr, AT_IPv4, 4, &ip);
-        proto_item_append_text(block_item, ", Gateway: %s", address_to_str(wmem_packet_scope(), &addr));
+        proto_item_append_text(block_item, ", Gateway: %s", ip_to_str((guint8*)&ip));
         break;
     default:
         offset = dissect_pn_undecoded(tvb, offset, pinfo, tree, block_length);
@@ -1010,13 +1009,15 @@ dissect_PNDCP_PDU(tvbuff_t *tvb,
 /* possibly dissect a PN-RT packet (frame ID must be in the appropriate range) */
 static gboolean
 dissect_PNDCP_Data_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-    void *data)
+    void *data _U_)
 {
-    /* the tvb will NOT contain the frame_id here, so get it from dissection data! */
-    guint16     u16FrameID = GPOINTER_TO_UINT(data);
+    guint16     u16FrameID;
     proto_item *item;
     proto_tree *dcp_tree;
 
+
+    /* the tvb will NOT contain the frame_id here, so get it from our private data! */
+    u16FrameID = GPOINTER_TO_UINT(pinfo->private_data);
 
     /* frame id must be in valid range (acyclic Real-Time, DCP) */
     if (u16FrameID < FRAME_ID_DCP_HELLO || u16FrameID > FRAME_ID_DCP_IDENT_RES) {
@@ -1262,16 +1263,3 @@ proto_reg_handoff_pn_dcp (void)
     /* register ourself as an heuristic pn-rt payload dissector */
     heur_dissector_add("pn_rt", dissect_PNDCP_Data_heur, proto_pn_dcp);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

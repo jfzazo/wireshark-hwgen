@@ -32,14 +32,9 @@
  * negative chars in their default char type.
  */
 
-/*
- * Modified 2014-10-29 to use the g_ascii_XXX() routines; this avoids
- * locale-dependent behavior.  The routine names were changed to
- * ws_ascii_XXX() to reflect this.
- */
-
-
-#include <glib.h>
+#include <ctype.h>
+#include <string.h>
+#include <stdio.h>
 
 #include "strnatcmp.h"
 
@@ -49,21 +44,21 @@
 static int
 nat_isdigit(nat_char a)
 {
-    return g_ascii_isdigit(a);
+    return isdigit((unsigned char) a);
 }
 
 
 static int
 nat_isspace(nat_char a)
 {
-    return g_ascii_isspace(a);
+    return isspace((unsigned char) a);
 }
 
 
 static nat_char
 nat_toupper(nat_char a)
 {
-    return g_ascii_toupper(a);
+    return toupper((unsigned char) a);
 }
 
 
@@ -177,14 +172,14 @@ static int strnatcmp0(nat_char const *a, nat_char const *b, int fold_case)
 }
 
 
-int ws_ascii_strnatcmp(nat_char const *a, nat_char const *b)
+int strnatcmp(nat_char const *a, nat_char const *b)
 {
     return strnatcmp0(a, b, 0);
 }
 
 
 /* Compare, recognizing numeric string and ignoring case. */
-int ws_ascii_strnatcasecmp(nat_char const *a, nat_char const *b)
+int strnatcasecmp(nat_char const *a, nat_char const *b)
 {
     return strnatcmp0(a, b, 1);
 }

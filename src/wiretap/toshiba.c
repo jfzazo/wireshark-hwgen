@@ -20,9 +20,11 @@
 
 #include "config.h"
 #include "wtap-int.h"
+#include <wsutil/buffer.h>
 #include "toshiba.h"
 #include "file_wrappers.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -117,30 +119,30 @@ static gboolean parse_toshiba_packet(FILE_T fh, struct wtap_pkthdr *phdr,
    and "*err_info" to null or an additional error string. */
 static gint64 toshiba_seek_next_packet(wtap *wth, int *err, gchar **err_info)
 {
-	int byte;
-	guint level = 0;
-	gint64 cur_off;
+  int byte;
+  guint level = 0;
+  gint64 cur_off;
 
-	while ((byte = file_getc(wth->fh)) != EOF) {
-		if (byte == toshiba_rec_magic[level]) {
-			level++;
-			if (level >= TOSHIBA_REC_MAGIC_SIZE) {
-				/* note: we're leaving file pointer right after the magic characters */
-				cur_off = file_tell(wth->fh);
-				if (cur_off == -1) {
-					/* Error. */
-					*err = file_error(wth->fh, err_info);
-					return -1;
-				}
-				return cur_off + 1;
-			}
-		} else {
-			level = 0;
-		}
-	}
-	/* EOF or error. */
-	*err = file_error(wth->fh, err_info);
-	return -1;
+  while ((byte = file_getc(wth->fh)) != EOF) {
+    if (byte == toshiba_rec_magic[level]) {
+      level++;
+      if (level >= TOSHIBA_REC_MAGIC_SIZE) {
+	      /* note: we're leaving file pointer right after the magic characters */
+        cur_off = file_tell(wth->fh);
+        if (cur_off == -1) {
+          /* Error. */
+          *err = file_error(wth->fh, err_info);
+          return -1;
+        }
+        return cur_off + 1;
+      }
+    } else {
+      level = 0;
+    }
+  }
+  /* EOF or error. */
+  *err = file_error(wth->fh, err_info);
+  return -1;
 }
 
 #define TOSHIBA_HEADER_LINES_TO_CHECK	200
@@ -192,13 +194,13 @@ static gboolean toshiba_check_file_type(wtap *wth, int *err, gchar **err_info)
 }
 
 
-wtap_open_return_val toshiba_open(wtap *wth, int *err, gchar **err_info)
+int toshiba_open(wtap *wth, int *err, gchar **err_info)
 {
 	/* Look for Toshiba header */
 	if (!toshiba_check_file_type(wth, err, err_info)) {
 		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+			return -1;
+		return 0;
 	}
 
 	wth->file_encap = WTAP_ENCAP_PER_PACKET;
@@ -206,9 +208,9 @@ wtap_open_return_val toshiba_open(wtap *wth, int *err, gchar **err_info)
 	wth->snapshot_length = 0; /* not known */
 	wth->subtype_read = toshiba_read;
 	wth->subtype_seek_read = toshiba_seek_read;
-	wth->file_tsprec = WTAP_TSPREC_CSEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_CSEC;
 
-	return WTAP_OPEN_MINE;
+	return 1;
 }
 
 /* Find the next packet and parse it; called from wtap_read(). */
@@ -341,8 +343,8 @@ parse_toshiba_packet(FILE_T fh, struct wtap_pkthdr *phdr, Buffer *buf,
 	}
 
 	/* Make sure we have enough room for the packet */
-	ws_buffer_assure_space(buf, TOSHIBA_MAX_PACKET_LEN);
-	pd = ws_buffer_start_ptr(buf);
+	buffer_assure_space(buf, TOSHIBA_MAX_PACKET_LEN);
+	pd = buffer_start_ptr(buf);
 
 	/* Calculate the number of hex dump lines, each
 	 * containing 16 bytes of data */
@@ -403,8 +405,8 @@ parse_single_hex_dump_line(char* rec, guint8 *buf, guint byte_offset) {
 	}
 
 	/* Go through the substring representing the values and:
-	 *      1. Replace any spaces with '0's
-	 *      2. Place \0's every 5 bytes (to terminate the string)
+	 * 	1. Replace any spaces with '0's
+	 * 	2. Place \0's every 5 bytes (to terminate the string)
 	 *
 	 * Then read the eight sets of hex bytes
 	 */
@@ -427,16 +429,3 @@ parse_single_hex_dump_line(char* rec, guint8 *buf, guint byte_offset) {
 
 	return TRUE;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

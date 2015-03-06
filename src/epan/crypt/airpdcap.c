@@ -48,6 +48,7 @@
 #include <epan/tvbuff.h>
 #include <epan/to_str.h>
 #include <epan/strutil.h>
+#include <epan/emem.h>
 #include <epan/crypt/airpdcap_rijndael.h>
 
 #include "airpdcap_system.h"
@@ -913,30 +914,6 @@ AirPDcapCleanKeys(
     AIRPDCAP_DEBUG_TRACE_END("AirPDcapCleanKeys");
 }
 
-static void
-AirPDcapRecurseCleanSA(
-    PAIRPDCAP_SEC_ASSOCIATION sa)
-{
-    if (sa->next != NULL) {
-        AirPDcapRecurseCleanSA(sa->next);
-        g_free(sa->next);
-        sa->next = NULL;
-    }
-}
-
-static void
-AirPDcapCleanSecAssoc(
-    PAIRPDCAP_CONTEXT ctx)
-{
-    PAIRPDCAP_SEC_ASSOCIATION psa;
-    int i;
-
-    for (psa = ctx->sa, i = 0; i < AIRPDCAP_MAX_SEC_ASSOCIATIONS_NR; i++, psa++) {
-        /* To iterate is human, to recurse, divine */
-        AirPDcapRecurseCleanSA(psa);
-    }
-}
-
 INT AirPDcapGetKeys(
     const PAIRPDCAP_CONTEXT ctx,
     AIRPDCAP_KEY_ITEM keys[],
@@ -1023,7 +1000,6 @@ INT AirPDcapDestroyContext(
     }
 
     AirPDcapCleanKeys(ctx);
-    AirPDcapCleanSecAssoc(ctx);
 
     ctx->first_free_index=0;
     ctx->index=-1;
@@ -1070,14 +1046,13 @@ AirPDcapRsnaMng(
     }
 
     /* allocate a temp buffer for the decryption loop */
-    try_data=(UCHAR *)g_malloc(try_data_len);
+    try_data=(UCHAR *)ep_alloc(try_data_len);
 
     /* start of loop added by GCS */
     for(/* sa */; sa != NULL ;sa=sa->next) {
 
         if (*decrypt_len > try_data_len) {
             AIRPDCAP_DEBUG_PRINT_LINE("AirPDcapRsnaMng", "Invalid decryption length", AIRPDCAP_DEBUG_LEVEL_3);
-            g_free(try_data);
             return AIRPDCAP_RET_UNSUCCESS;
         }
 
@@ -1117,20 +1092,16 @@ AirPDcapRsnaMng(
     /* end of loop */
 
     /* none of the keys worked */
-    if(sa == NULL) {
-        g_free(try_data);
+    if(sa == NULL)
         return ret_value;
-    }
 
     if (*decrypt_len > try_data_len || *decrypt_len < 8) {
         AIRPDCAP_DEBUG_PRINT_LINE("AirPDcapRsnaMng", "Invalid decryption length", AIRPDCAP_DEBUG_LEVEL_3);
-        g_free(try_data);
         return AIRPDCAP_RET_UNSUCCESS;
     }
 
     /* copy the decrypted data into the decrypt buffer GCS*/
     memcpy(decrypt_data, try_data, *decrypt_len);
-    g_free(try_data);
 
     /* remove protection bit */
     decrypt_data[1]&=0xBF;
@@ -1171,7 +1142,7 @@ AirPDcapWepMng(
     UCHAR *try_data;
     guint try_data_len = *decrypt_len;
 
-    try_data = (UCHAR *)g_malloc(try_data_len);
+    try_data = (UCHAR *)ep_alloc(try_data_len);
 
     if (sa->key!=NULL)
         useCache=TRUE;
@@ -1233,7 +1204,6 @@ AirPDcapWepMng(
         }
     }
 
-    g_free(try_data);
     if (ret_value)
         return ret_value;
 
@@ -1288,7 +1258,7 @@ AirPDcapRsna4WHandshake(
 
     /* This saves the sa since we are reauthenticating which will overwrite our current sa GCS*/
     if(sa->handshake == 4) {
-        tmp_sa= g_new(AIRPDCAP_SEC_ASSOCIATION, 1);
+        tmp_sa=(AIRPDCAP_SEC_ASSOCIATION *)se_alloc(sizeof(AIRPDCAP_SEC_ASSOCIATION));
         memcpy(tmp_sa, sa, sizeof(AIRPDCAP_SEC_ASSOCIATION));
         sa->next=tmp_sa;
     }
@@ -1865,7 +1835,7 @@ AirPDcapRsnaPwd2Psk(
 decryption_key_t*
 parse_key_string(gchar* input_string, guint8 key_type)
 {
-    gchar *key, *tmp_str;
+    gchar *key;
     gchar *ssid;
 
     GString    *key_string = NULL;
@@ -1904,13 +1874,11 @@ parse_key_string(gchar* input_string, guint8 key_type)
            dk->type = AIRPDCAP_KEY_TYPE_WEP;
            /* XXX - The current key handling code in the GUI requires
             * no separators and lower case */
-           tmp_str = bytes_to_str(NULL, key_ba->data, key_ba->len);
-           dk->key  = g_string_new(tmp_str);
+           dk->key  = g_string_new(bytes_to_ep_str(key_ba->data, key_ba->len));
            g_string_ascii_down(dk->key);
            dk->bits = key_ba->len * 8;
            dk->ssid = NULL;
 
-           wmem_free(NULL, tmp_str);
            g_byte_array_free(key_ba, TRUE);
            return dk;
        }

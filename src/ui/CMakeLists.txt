@@ -22,28 +22,20 @@
 
 set(COMMON_UI_SRC
 	alert_box.c
-	capture.c
-	capture_ui_utils.c
-	console.c
 	decode_as_utils.c
 	export_object.c
 	export_object_dicom.c
 	export_object_http.c
 	export_object_smb.c
-	export_object_tftp.c
-	filters.c
 	follow.c
 	help_url.c
+	packet_list_utils.c
 	iface_lists.c
 	io_graph_item.c
-	language.c
-	packet_list_utils.c
 	persfilepath_opt.c
 	preference_utils.c
 	profile.c
-	proto_hier_stats.c
 	recent.c
-	rtp_stream.c
 	software_update.c
 	ssl_key_export.c
 	tap_export_pdu.c
@@ -54,15 +46,7 @@ set(COMMON_UI_SRC
 	tap-tcp-stream.c
 	text_import.c
 	time_shift.c
-	traffic_table_ui.c
 	util.c
-	voip_calls.c
-)
-
-# Enables visibility in IDEs
-file(GLOB EXTRA_UI_HEADERS
-	rtp_analysis.h
-	rtp_stream.h
 )
 
 set(DIRTY_UI_SRC)

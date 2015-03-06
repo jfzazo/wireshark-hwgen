@@ -40,7 +40,7 @@
 #include "../globals.h"
 #include "../frame_tvbuff.h"
 #include "ui/simple_dialog.h"
-#include <epan/stat_groups.h>
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
@@ -799,12 +799,6 @@ static void graph_segment_list_get(struct graph *g, gboolean channel_known)
     struct segment current;
     GString    *error_string;
     rlc_scan_t  ts;
-    current.ueid = 0;
-    current.rlcMode = 0;
-    current.channelType = 0;
-    current.channelId = 0;
-    current.isControlPDU = 0;
-    current.direction = 0;
 
     debug(DBS_FENTRY) puts("graph_segment_list_get()");
 
@@ -892,7 +886,6 @@ static rlc_lte_tap_info *select_rlc_lte_session(capture_file *cf, struct segment
     frame_data     *fdata;
     epan_dissect_t  edt;
     dfilter_t      *sfcode;
-    gchar          *err_msg;
     GString        *error_string;
     nstime_t        rel_ts;
     th_t            th = {0, {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL}};
@@ -904,9 +897,8 @@ static rlc_lte_tap_info *select_rlc_lte_session(capture_file *cf, struct segment
     fdata = cf->current_frame;
 
     /* no real filter yet */
-    if (!dfilter_compile("rlc-lte", &sfcode, &err_msg)) {
-        simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", err_msg);
-        g_free(err_msg);
+    if (!dfilter_compile("rlc-lte", &sfcode)) {
+        simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", dfilter_error_msg);
         return NULL;
     }
 
@@ -3015,16 +3007,3 @@ static int rint(double x)
     return i;
 }
 #endif
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

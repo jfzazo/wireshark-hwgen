@@ -29,6 +29,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include "packet-gmr1_common.h"
@@ -38,9 +39,6 @@ void proto_reg_handoff_gmr1_dtap(void);
 
 /* GMR-1 DTAP proto */
 static int proto_gmr1_dtap = -1;
-
-static int hf_gmr1_dtap_protocol_discriminator = -1;
-static int hf_gmr1_dtap_message_elements = -1;
 
 /* GMR-1 DTAP sub tree */
 static gint ett_gmr1_dtap = -1;
@@ -116,8 +114,11 @@ dissect_gmr1_dtap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	offset = 0;
 
 	/* Protocol discriminator item */
-	/*pd_item =*/ proto_tree_add_uint(
-		dtap_tree, hf_gmr1_dtap_protocol_discriminator, tvb, 1, 1, pd);
+	/*pd_item =*/ proto_tree_add_text(
+		dtap_tree, tvb, 1, 1,
+		"Protocol Discriminator: %s",
+		val_to_str(pd, gmr1_pd_vals, "Unknown (%u)")
+	);
 
 	/*pd_tree = proto_item_add_subtree(pd_item, ett_gmr1_pd);*/
 
@@ -136,7 +137,8 @@ dissect_gmr1_dtap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	if (msg_func) {
 		(*msg_func)(tvb, dtap_tree, pinfo, offset, len - offset);
 	} else {
-		proto_tree_add_item(dtap_tree, hf_gmr1_dtap_message_elements, tvb, offset, len - offset, ENC_NA);
+		proto_tree_add_text(dtap_tree, tvb, offset, len - offset,
+		                    "Message Elements");
 	}
 
 	/* Done ! */
@@ -147,19 +149,10 @@ dissect_gmr1_dtap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 void
 proto_register_gmr1_dtap(void)
 {
+#if 0
 	static hf_register_info hf[] = {
-		{ &hf_gmr1_dtap_protocol_discriminator,
-		  { "Protocol Discriminator", "gmr1.dtap.protocol_discriminator",
-			FT_UINT8, BASE_DEC, VALS(gmr1_pd_vals), 0x0,
-			NULL, HFILL }
-		},
-		{ &hf_gmr1_dtap_message_elements,
-		  { "Message elements", "gmr1.dtap.message_elements",
-			FT_BYTES, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }
-		},
 	};
-
+#endif
 	static gint *ett[] = {
 		&ett_gmr1_dtap,
 		&ett_gmr1_pd,
@@ -170,8 +163,9 @@ proto_register_gmr1_dtap(void)
 
 	/* Register the protocol name and field description */
 	proto_gmr1_dtap = proto_register_protocol("GEO-Mobile Radio (1) DTAP", "GMR-1 DTAP", "gmr1.dtap");
+#if 0
 	proto_register_field_array(proto_gmr1_dtap, hf, array_length(hf));
-
+#endif
 	/* Register dissector */
 	register_dissector("gmr1_dtap", dissect_gmr1_dtap, proto_gmr1_dtap);
 }
@@ -187,16 +181,3 @@ proto_reg_handoff_gmr1_dtap(void)
 
 	gsm_dtap_handle = find_dissector("gsm_a_dtap");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -31,9 +31,9 @@ Time
 Validity
 Version
 
-#.PDU_NEW
+#.PDU
 
-#.REGISTER_NEW
+#.REGISTER
 Certificate				B "2.5.4.36" "id-at-userCertificate"
 Certificate				B "2.5.4.37" "id-at-cAcertificate"
 CertificateList			B "2.5.4.38" "id-at-authorityRevocationList"
@@ -73,7 +73,7 @@ CertificateList/signedCertificateList/revokedCertificates/_item/userCertificate	
   algorithm_id = actx->external.direct_reference;
 
   if(actx->external.direct_reference) {
-    name = oid_resolved_from_string(wmem_packet_scope(), actx->external.direct_reference);
+    name = oid_resolved_from_string(actx->external.direct_reference);
 
     proto_item_append_text(tree, " (%%s)", name ? name : actx->external.direct_reference);
   }
@@ -90,7 +90,7 @@ CertificateList/signedCertificateList/revokedCertificates/_item/userCertificate	
   %(DEFAULT_BODY)s
 
   if(actx->external.direct_reference) {
-    name = oid_resolved_from_string(wmem_packet_scope(), actx->external.direct_reference);
+    name = oid_resolved_from_string(actx->external.direct_reference);
 
     proto_item_append_text(tree, " (%%s)", name ? name : actx->external.direct_reference);
   }

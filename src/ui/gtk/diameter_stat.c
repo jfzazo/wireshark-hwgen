@@ -30,9 +30,12 @@
 #include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
+#include <epan/epan.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-diameter.h>
 
+#include "../file.h"
+#include "../stat_menu.h"
 
 #include "ui/simple_dialog.h"
 
@@ -40,8 +43,10 @@
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/service_response_time_table.h"
 #include "ui/gtk/tap_param_dlg.h"
+#include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkdiameterstat(void);
 
@@ -209,7 +214,7 @@ gtk_diameterstat_init(const char *opt_arg, void *userdata _U_)
 }
 
 static tap_param diameter_stat_params[] = {
-	{ PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+	{ PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg diameter_stat_dlg = {

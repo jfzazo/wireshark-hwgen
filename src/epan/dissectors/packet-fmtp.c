@@ -95,15 +95,15 @@ dissect_fmtp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 
         case FMTP_TYP_IDENTIFICATION:
             proto_item_append_text(ti, " (%s)",
-                tvb_get_string_enc(wmem_packet_scope(), tvb, FMTP_HEADER_LEN, packet_len-FMTP_HEADER_LEN, ENC_ASCII));
+                tvb_get_string(wmem_packet_scope(), tvb, FMTP_HEADER_LEN, packet_len-FMTP_HEADER_LEN));
             col_add_fstr(pinfo->cinfo, COL_INFO, "%s (%s)",
                 val_to_str(packet_type, packet_type_names, "Unknown (0x%02x)"),
-                tvb_get_string_enc(wmem_packet_scope(), tvb, FMTP_HEADER_LEN, packet_len-FMTP_HEADER_LEN, ENC_ASCII));
+                tvb_get_string(wmem_packet_scope(), tvb, FMTP_HEADER_LEN, packet_len-FMTP_HEADER_LEN));
             break;
 
         case FMTP_TYP_SYSTEM:
             proto_item_append_text(ti, " (%s)",
-                tvb_get_string_enc(wmem_packet_scope(), tvb, FMTP_HEADER_LEN, packet_len-FMTP_HEADER_LEN, ENC_ASCII));
+                tvb_get_string(wmem_packet_scope(), tvb, FMTP_HEADER_LEN, packet_len-FMTP_HEADER_LEN));
             col_add_fstr(pinfo->cinfo, COL_INFO, "%s (%s)",
                 val_to_str(packet_type, packet_type_names, "Unknown (0x%02x)"),
                 val_to_str(tvb_get_ntohs(tvb, FMTP_HEADER_LEN), system_message_names, "Unknown (0x%02x)"));
@@ -116,10 +116,10 @@ dissect_fmtp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
     }
     if (tree) { /* we are being asked for details */
         fmtp_tree = proto_item_add_subtree(ti, ett_fmtp);
-        proto_tree_add_item(fmtp_tree, hf_fmtp_pdu_version,  tvb, 0, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(fmtp_tree, hf_fmtp_pdu_reserved, tvb, 1, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(fmtp_tree, hf_fmtp_pdu_version,  tvb, 0, 1, ENC_NA);
+        proto_tree_add_item(fmtp_tree, hf_fmtp_pdu_reserved, tvb, 1, 1, ENC_NA);
         proto_tree_add_item(fmtp_tree, hf_fmtp_pdu_length,   tvb, 2, 2, ENC_BIG_ENDIAN);
-        proto_tree_add_item(fmtp_tree, hf_fmtp_pdu_type,     tvb, 4, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(fmtp_tree, hf_fmtp_pdu_type,     tvb, 4, 1, ENC_NA);
 
         next_tvb = tvb_new_subset_remaining(tvb, FMTP_HEADER_LEN);
         call_dissector(data_handle, next_tvb, pinfo, fmtp_tree);
@@ -129,7 +129,7 @@ dissect_fmtp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 }
 
 static guint
-get_fmtp_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_fmtp_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     return (guint)tvb_get_ntohs(tvb, offset+2);
 }

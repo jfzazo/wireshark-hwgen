@@ -27,8 +27,10 @@
 #include "config.h"
 
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "packet-dcerpc.h"
+#include "packet-dcerpc-dce122.h"
 
 void proto_register_rs_bind (void);
 void proto_reg_handoff_rs_bind (void);
@@ -77,16 +79,3 @@ proto_reg_handoff_rs_bind (void)
   dcerpc_init_uuid (proto_rs_bind, ett_rs_bind, &uuid_rs_bind, ver_rs_bind,
                     rs_bind_dissectors, hf_rs_bind_opnum);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

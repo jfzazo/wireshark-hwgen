@@ -253,6 +253,7 @@ am__objects_2 = libgtkui_a-about_dlg.$(OBJEXT) \
 	libgtkui_a-proto_tree_model.$(OBJEXT) \
 	libgtkui_a-range_utils.$(OBJEXT) \
 	libgtkui_a-rtp_player.$(OBJEXT) \
+	libgtkui_a-rtp_stream.$(OBJEXT) \
 	libgtkui_a-sctp_byte_graph_dlg.$(OBJEXT) \
 	libgtkui_a-sctp_error_dlg.$(OBJEXT) \
 	libgtkui_a-sctp_graph_dlg.$(OBJEXT) \
@@ -264,8 +265,8 @@ am__objects_2 = libgtkui_a-about_dlg.$(OBJEXT) \
 	libgtkui_a-tap_param_dlg.$(OBJEXT) \
 	libgtkui_a-text_page_utils.$(OBJEXT) \
 	libgtkui_a-time_shift_dlg.$(OBJEXT) \
-	libgtkui_a-uat_gui.$(OBJEXT) libgtkui_a-webbrowser.$(OBJEXT) \
-	libgtkui_a-extcap_gtk.$(OBJEXT) $(am__objects_1)
+	libgtkui_a-uat_gui.$(OBJEXT) libgtkui_a-voip_calls.$(OBJEXT) \
+	libgtkui_a-webbrowser.$(OBJEXT) $(am__objects_1)
 am__objects_3 = libgtkui_a-afp_stat.$(OBJEXT) \
 	libgtkui_a-ansi_a_stat.$(OBJEXT) \
 	libgtkui_a-ansi_map_stat.$(OBJEXT) \
@@ -273,6 +274,21 @@ am__objects_3 = libgtkui_a-afp_stat.$(OBJEXT) \
 	libgtkui_a-camel_counter.$(OBJEXT) \
 	libgtkui_a-camel_srt.$(OBJEXT) \
 	libgtkui_a-compare_stat.$(OBJEXT) \
+	libgtkui_a-conversations_eth.$(OBJEXT) \
+	libgtkui_a-conversations_fc.$(OBJEXT) \
+	libgtkui_a-conversations_fddi.$(OBJEXT) \
+	libgtkui_a-conversations_ip.$(OBJEXT) \
+	libgtkui_a-conversations_ipv6.$(OBJEXT) \
+	libgtkui_a-conversations_ipx.$(OBJEXT) \
+	libgtkui_a-conversations_jxta.$(OBJEXT) \
+	libgtkui_a-conversations_ncp.$(OBJEXT) \
+	libgtkui_a-conversations_rsvp.$(OBJEXT) \
+	libgtkui_a-conversations_sctp.$(OBJEXT) \
+	libgtkui_a-conversations_tcpip.$(OBJEXT) \
+	libgtkui_a-conversations_tr.$(OBJEXT) \
+	libgtkui_a-conversations_udpip.$(OBJEXT) \
+	libgtkui_a-conversations_usb.$(OBJEXT) \
+	libgtkui_a-conversations_wlan.$(OBJEXT) \
 	libgtkui_a-dcerpc_stat.$(OBJEXT) \
 	libgtkui_a-diameter_stat.$(OBJEXT) \
 	libgtkui_a-expert_comp_dlg.$(OBJEXT) \
@@ -285,6 +301,21 @@ am__objects_3 = libgtkui_a-afp_stat.$(OBJEXT) \
 	libgtkui_a-gtp_stat.$(OBJEXT) \
 	libgtkui_a-h225_counter.$(OBJEXT) \
 	libgtkui_a-h225_ras_srt.$(OBJEXT) \
+	libgtkui_a-hostlist_eth.$(OBJEXT) \
+	libgtkui_a-hostlist_fc.$(OBJEXT) \
+	libgtkui_a-hostlist_fddi.$(OBJEXT) \
+	libgtkui_a-hostlist_ip.$(OBJEXT) \
+	libgtkui_a-hostlist_ipv6.$(OBJEXT) \
+	libgtkui_a-hostlist_ipx.$(OBJEXT) \
+	libgtkui_a-hostlist_jxta.$(OBJEXT) \
+	libgtkui_a-hostlist_ncp.$(OBJEXT) \
+	libgtkui_a-hostlist_rsvp.$(OBJEXT) \
+	libgtkui_a-hostlist_sctp.$(OBJEXT) \
+	libgtkui_a-hostlist_tcpip.$(OBJEXT) \
+	libgtkui_a-hostlist_tr.$(OBJEXT) \
+	libgtkui_a-hostlist_udpip.$(OBJEXT) \
+	libgtkui_a-hostlist_usb.$(OBJEXT) \
+	libgtkui_a-hostlist_wlan.$(OBJEXT) \
 	libgtkui_a-iax2_analysis.$(OBJEXT) \
 	libgtkui_a-io_stat.$(OBJEXT) \
 	libgtkui_a-lbm_stream_dlg.$(OBJEXT) \
@@ -402,8 +433,8 @@ CCDEPMODE = @CCDEPMODE@
 CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
-CFLAGS_SSE42 = @CFLAGS_SSE42@
 CONFIG_ARGS = @CONFIG_ARGS@
+CONFIG_WITH_ARGS = @CONFIG_WITH_ARGS@
 COREFOUNDATION_FRAMEWORKS = @COREFOUNDATION_FRAMEWORKS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -429,7 +460,6 @@ ELINKS = @ELINKS@
 ENABLE_STATIC = @ENABLE_STATIC@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FLOORL_LO = @FLOORL_LO@
 FOP = @FOP@
 GEOIP_LIBS = @GEOIP_LIBS@
 GETOPT_LO = @GETOPT_LO@
@@ -502,7 +532,7 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
-LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDES = @LUA_INCLUDES@
 LUA_LIBS = @LUA_LIBS@
 LYNX = @LYNX@
 MAKEINFO = @MAKEINFO@
@@ -538,14 +568,14 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_LIBS = @PLUGIN_LIBS@
 POD2HTML = @POD2HTML@
 POD2MAN = @POD2MAN@
-POPCOUNT_LO = @POPCOUNT_LO@
 PORTAUDIO_INCLUDES = @PORTAUDIO_INCLUDES@
 PORTAUDIO_LIBS = @PORTAUDIO_LIBS@
 PYTHON = @PYTHON@
+PY_CFLAGS = @PY_CFLAGS@
+PY_LIBS = @PY_LIBS@
 QT_MIN_VERSION = @QT_MIN_VERSION@
 Qt_LIBS = @Qt_LIBS@
 RANLIB = @RANLIB@
-RCC = @RCC@
 RPMBUILD_WITH_ARGS = @RPMBUILD_WITH_ARGS@
 SBC_CFLAGS = @SBC_CFLAGS@
 SBC_LIBS = @SBC_LIBS@
@@ -556,6 +586,8 @@ SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+STRNCASECMP_LO = @STRNCASECMP_LO@
+STRPTIME_C = @STRPTIME_C@
 STRPTIME_LO = @STRPTIME_LO@
 SYSTEMCONFIGURATION_FRAMEWORKS = @SYSTEMCONFIGURATION_FRAMEWORKS@
 UIC = @UIC@
@@ -575,6 +607,7 @@ ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 ac_cv_wireshark_have_rpm = @ac_cv_wireshark_have_rpm@
+ac_ws_python_config = @ac_ws_python_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -604,8 +637,6 @@ echld_test_bin = @echld_test_bin@
 editcap_bin = @editcap_bin@
 editcap_man = @editcap_man@
 exec_prefix = @exec_prefix@
-extcapdir = @extcapdir@
-have_sw_vers = @have_sw_vers@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -626,10 +657,10 @@ mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 plugindir = @plugindir@
-plugins_dir = @plugins_dir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pythondir = @pythondir@
 randpkt_bin = @randpkt_bin@
 randpkt_man = @randpkt_man@
 rawshark_bin = @rawshark_bin@
@@ -767,6 +798,7 @@ WIRESHARK_GTK_SRC = \
 	proto_tree_model.c \
 	range_utils.c	\
 	rtp_player.c	\
+	rtp_stream.c	\
 	sctp_byte_graph_dlg.c	\
 	sctp_error_dlg.c	\
 	sctp_graph_dlg.c	\
@@ -779,8 +811,8 @@ WIRESHARK_GTK_SRC = \
 	text_page_utils.c	\
 	time_shift_dlg.c	\
 	uat_gui.c	\
+	voip_calls.c	\
 	webbrowser.c	\
-	extcap_gtk.c	\
 	$(WIRESHARK_CUSTOM_GTK_SRC)
 
 WIRESHARK_TAP_SRC = \
@@ -791,6 +823,21 @@ WIRESHARK_TAP_SRC = \
 	camel_counter.c	\
 	camel_srt.c	\
 	compare_stat.c	\
+	conversations_eth.c	\
+	conversations_fc.c	\
+	conversations_fddi.c	\
+	conversations_ip.c	\
+	conversations_ipv6.c	\
+	conversations_ipx.c	\
+	conversations_jxta.c		\
+	conversations_ncp.c     \
+	conversations_rsvp.c	\
+	conversations_sctp.c	\
+	conversations_tcpip.c	\
+	conversations_tr.c	\
+	conversations_udpip.c	\
+	conversations_usb.c	\
+	conversations_wlan.c	\
 	dcerpc_stat.c	\
 	diameter_stat.c	\
 	expert_comp_dlg.c     \
@@ -804,6 +851,21 @@ WIRESHARK_TAP_SRC = \
 	gtp_stat.c	\
 	h225_counter.c	\
 	h225_ras_srt.c	\
+	hostlist_eth.c	\
+	hostlist_fc.c	\
+	hostlist_fddi.c \
+	hostlist_ip.c	\
+	hostlist_ipv6.c	\
+	hostlist_ipx.c	\
+	hostlist_jxta.c	\
+	hostlist_ncp.c	\
+	hostlist_rsvp.c \
+	hostlist_sctp.c	\
+	hostlist_tcpip.c \
+	hostlist_tr.c	\
+	hostlist_udpip.c \
+	hostlist_usb.c \
+	hostlist_wlan.c \
 	iax2_analysis.c	\
 	io_stat.c	\
 	lbm_stream_dlg.c	\
@@ -938,10 +1000,10 @@ noinst_HEADERS = \
 	remote_icons.h	\
 	rtp_player.h	\
 	rtp_stream_dlg.h \
+	sat.h		\
 	sctp_stat_gtk.h	\
 	service_response_time_table.h	\
 	time_shift_dlg.h	\
-	simple_dialog.h	\
 	stock_icons.h	\
 	summary_dlg.h   \
 	supported_protos_dlg.h   \
@@ -949,12 +1011,12 @@ noinst_HEADERS = \
 	text_page_utils.h	\
 	toolbar_icons.h	\
 	uat_gui.h \
+	voip_calls.h	\
 	voip_calls_dlg.h \
 	webbrowser.h	\
 	wsiconcap.h \
 	wsicon.h \
 	wssplash.h \
-	extcap_gtk.h \
 	$(WIRESHARK_CUSTOM_HDRS)
 
 AUTOMAKE_OPTIONS = -Wno-portability
@@ -1002,7 +1064,12 @@ libgtkui_a_DEPENDENCIES =
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/wiretap $(PORTAUDIO_INCLUDES)
 TOOLBAR_COMMON_ICONS = \
 	capture_interfaces \
-	gnome_emblem_web
+	capture_options_alt1 \
+	capture_restart \
+	capture_start \
+	capture_stop \
+	gnome_emblem_web \
+	toolbar_wireshark_file
 
 EXTRA_DIST = \
 	$(GENERATOR_FILES)		\
@@ -1089,7 +1156,22 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-color_utils.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-compare_stat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversation_hastables_dlg.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_eth.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_fc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_fddi.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_ip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_ipv6.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_ipx.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_jxta.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_ncp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_rsvp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_sctp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_table.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_tcpip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_tr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_udpip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_usb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-conversations_wlan.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-dcerpc_stat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-decode_as_dlg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-dfilter_expr_dlg.Po@am__quote@
@@ -1103,7 +1185,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-export_object_dlg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-export_pdu_dlg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-export_sslkeys.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-extcap_gtk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-fc_stat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-file_dlg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-file_import_dlg.Po@am__quote@
@@ -1133,7 +1214,22 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-h225_counter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-h225_ras_srt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-help_dlg.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_eth.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_fc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_fddi.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_ip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_ipv6.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_ipx.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_jxta.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_ncp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_rsvp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_sctp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_table.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_tcpip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_tr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_udpip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_usb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-hostlist_wlan.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-iax2_analysis.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-io_stat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-lbm_stream_dlg.Po@am__quote@
@@ -1188,6 +1284,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-rpc_stat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-rtp_analysis.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-rtp_player.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-rtp_stream.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-rtp_stream_dlg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-scsi_stat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-sctp_assoc_analyse.Po@am__quote@
@@ -1211,6 +1308,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-text_page_utils.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-time_shift_dlg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-uat_gui.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-voip_calls.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-voip_calls_dlg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-webbrowser.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-wireshark-tap-register.Po@am__quote@
@@ -1218,25 +1316,22 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtkui_a-wsp_stat.Po@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
-@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
@@ -2361,6 +2456,20 @@ libgtkui_a-rtp_player.obj: rtp_player.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-rtp_player.obj `if test -f 'rtp_player.c'; then $(CYGPATH_W) 'rtp_player.c'; else $(CYGPATH_W) '$(srcdir)/rtp_player.c'; fi`
 
+libgtkui_a-rtp_stream.o: rtp_stream.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-rtp_stream.o -MD -MP -MF $(DEPDIR)/libgtkui_a-rtp_stream.Tpo -c -o libgtkui_a-rtp_stream.o `test -f 'rtp_stream.c' || echo '$(srcdir)/'`rtp_stream.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-rtp_stream.Tpo $(DEPDIR)/libgtkui_a-rtp_stream.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtp_stream.c' object='libgtkui_a-rtp_stream.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-rtp_stream.o `test -f 'rtp_stream.c' || echo '$(srcdir)/'`rtp_stream.c
+
+libgtkui_a-rtp_stream.obj: rtp_stream.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-rtp_stream.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-rtp_stream.Tpo -c -o libgtkui_a-rtp_stream.obj `if test -f 'rtp_stream.c'; then $(CYGPATH_W) 'rtp_stream.c'; else $(CYGPATH_W) '$(srcdir)/rtp_stream.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-rtp_stream.Tpo $(DEPDIR)/libgtkui_a-rtp_stream.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtp_stream.c' object='libgtkui_a-rtp_stream.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-rtp_stream.obj `if test -f 'rtp_stream.c'; then $(CYGPATH_W) 'rtp_stream.c'; else $(CYGPATH_W) '$(srcdir)/rtp_stream.c'; fi`
+
 libgtkui_a-sctp_byte_graph_dlg.o: sctp_byte_graph_dlg.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-sctp_byte_graph_dlg.o -MD -MP -MF $(DEPDIR)/libgtkui_a-sctp_byte_graph_dlg.Tpo -c -o libgtkui_a-sctp_byte_graph_dlg.o `test -f 'sctp_byte_graph_dlg.c' || echo '$(srcdir)/'`sctp_byte_graph_dlg.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-sctp_byte_graph_dlg.Tpo $(DEPDIR)/libgtkui_a-sctp_byte_graph_dlg.Po
@@ -2529,6 +2638,20 @@ libgtkui_a-uat_gui.obj: uat_gui.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-uat_gui.obj `if test -f 'uat_gui.c'; then $(CYGPATH_W) 'uat_gui.c'; else $(CYGPATH_W) '$(srcdir)/uat_gui.c'; fi`
 
+libgtkui_a-voip_calls.o: voip_calls.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-voip_calls.o -MD -MP -MF $(DEPDIR)/libgtkui_a-voip_calls.Tpo -c -o libgtkui_a-voip_calls.o `test -f 'voip_calls.c' || echo '$(srcdir)/'`voip_calls.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-voip_calls.Tpo $(DEPDIR)/libgtkui_a-voip_calls.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='voip_calls.c' object='libgtkui_a-voip_calls.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-voip_calls.o `test -f 'voip_calls.c' || echo '$(srcdir)/'`voip_calls.c
+
+libgtkui_a-voip_calls.obj: voip_calls.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-voip_calls.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-voip_calls.Tpo -c -o libgtkui_a-voip_calls.obj `if test -f 'voip_calls.c'; then $(CYGPATH_W) 'voip_calls.c'; else $(CYGPATH_W) '$(srcdir)/voip_calls.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-voip_calls.Tpo $(DEPDIR)/libgtkui_a-voip_calls.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='voip_calls.c' object='libgtkui_a-voip_calls.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-voip_calls.obj `if test -f 'voip_calls.c'; then $(CYGPATH_W) 'voip_calls.c'; else $(CYGPATH_W) '$(srcdir)/voip_calls.c'; fi`
+
 libgtkui_a-webbrowser.o: webbrowser.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-webbrowser.o -MD -MP -MF $(DEPDIR)/libgtkui_a-webbrowser.Tpo -c -o libgtkui_a-webbrowser.o `test -f 'webbrowser.c' || echo '$(srcdir)/'`webbrowser.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-webbrowser.Tpo $(DEPDIR)/libgtkui_a-webbrowser.Po
@@ -2542,20 +2665,6 @@ libgtkui_a-webbrowser.obj: webbrowser.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='webbrowser.c' object='libgtkui_a-webbrowser.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-webbrowser.obj `if test -f 'webbrowser.c'; then $(CYGPATH_W) 'webbrowser.c'; else $(CYGPATH_W) '$(srcdir)/webbrowser.c'; fi`
-
-libgtkui_a-extcap_gtk.o: extcap_gtk.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-extcap_gtk.o -MD -MP -MF $(DEPDIR)/libgtkui_a-extcap_gtk.Tpo -c -o libgtkui_a-extcap_gtk.o `test -f 'extcap_gtk.c' || echo '$(srcdir)/'`extcap_gtk.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-extcap_gtk.Tpo $(DEPDIR)/libgtkui_a-extcap_gtk.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='extcap_gtk.c' object='libgtkui_a-extcap_gtk.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-extcap_gtk.o `test -f 'extcap_gtk.c' || echo '$(srcdir)/'`extcap_gtk.c
-
-libgtkui_a-extcap_gtk.obj: extcap_gtk.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-extcap_gtk.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-extcap_gtk.Tpo -c -o libgtkui_a-extcap_gtk.obj `if test -f 'extcap_gtk.c'; then $(CYGPATH_W) 'extcap_gtk.c'; else $(CYGPATH_W) '$(srcdir)/extcap_gtk.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-extcap_gtk.Tpo $(DEPDIR)/libgtkui_a-extcap_gtk.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='extcap_gtk.c' object='libgtkui_a-extcap_gtk.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-extcap_gtk.obj `if test -f 'extcap_gtk.c'; then $(CYGPATH_W) 'extcap_gtk.c'; else $(CYGPATH_W) '$(srcdir)/extcap_gtk.c'; fi`
 
 libgtkui_a-afp_stat.o: afp_stat.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-afp_stat.o -MD -MP -MF $(DEPDIR)/libgtkui_a-afp_stat.Tpo -c -o libgtkui_a-afp_stat.o `test -f 'afp_stat.c' || echo '$(srcdir)/'`afp_stat.c
@@ -2654,6 +2763,216 @@ libgtkui_a-compare_stat.obj: compare_stat.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='compare_stat.c' object='libgtkui_a-compare_stat.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-compare_stat.obj `if test -f 'compare_stat.c'; then $(CYGPATH_W) 'compare_stat.c'; else $(CYGPATH_W) '$(srcdir)/compare_stat.c'; fi`
+
+libgtkui_a-conversations_eth.o: conversations_eth.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_eth.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_eth.Tpo -c -o libgtkui_a-conversations_eth.o `test -f 'conversations_eth.c' || echo '$(srcdir)/'`conversations_eth.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_eth.Tpo $(DEPDIR)/libgtkui_a-conversations_eth.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_eth.c' object='libgtkui_a-conversations_eth.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_eth.o `test -f 'conversations_eth.c' || echo '$(srcdir)/'`conversations_eth.c
+
+libgtkui_a-conversations_eth.obj: conversations_eth.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_eth.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_eth.Tpo -c -o libgtkui_a-conversations_eth.obj `if test -f 'conversations_eth.c'; then $(CYGPATH_W) 'conversations_eth.c'; else $(CYGPATH_W) '$(srcdir)/conversations_eth.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_eth.Tpo $(DEPDIR)/libgtkui_a-conversations_eth.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_eth.c' object='libgtkui_a-conversations_eth.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_eth.obj `if test -f 'conversations_eth.c'; then $(CYGPATH_W) 'conversations_eth.c'; else $(CYGPATH_W) '$(srcdir)/conversations_eth.c'; fi`
+
+libgtkui_a-conversations_fc.o: conversations_fc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_fc.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_fc.Tpo -c -o libgtkui_a-conversations_fc.o `test -f 'conversations_fc.c' || echo '$(srcdir)/'`conversations_fc.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_fc.Tpo $(DEPDIR)/libgtkui_a-conversations_fc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_fc.c' object='libgtkui_a-conversations_fc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_fc.o `test -f 'conversations_fc.c' || echo '$(srcdir)/'`conversations_fc.c
+
+libgtkui_a-conversations_fc.obj: conversations_fc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_fc.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_fc.Tpo -c -o libgtkui_a-conversations_fc.obj `if test -f 'conversations_fc.c'; then $(CYGPATH_W) 'conversations_fc.c'; else $(CYGPATH_W) '$(srcdir)/conversations_fc.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_fc.Tpo $(DEPDIR)/libgtkui_a-conversations_fc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_fc.c' object='libgtkui_a-conversations_fc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_fc.obj `if test -f 'conversations_fc.c'; then $(CYGPATH_W) 'conversations_fc.c'; else $(CYGPATH_W) '$(srcdir)/conversations_fc.c'; fi`
+
+libgtkui_a-conversations_fddi.o: conversations_fddi.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_fddi.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_fddi.Tpo -c -o libgtkui_a-conversations_fddi.o `test -f 'conversations_fddi.c' || echo '$(srcdir)/'`conversations_fddi.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_fddi.Tpo $(DEPDIR)/libgtkui_a-conversations_fddi.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_fddi.c' object='libgtkui_a-conversations_fddi.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_fddi.o `test -f 'conversations_fddi.c' || echo '$(srcdir)/'`conversations_fddi.c
+
+libgtkui_a-conversations_fddi.obj: conversations_fddi.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_fddi.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_fddi.Tpo -c -o libgtkui_a-conversations_fddi.obj `if test -f 'conversations_fddi.c'; then $(CYGPATH_W) 'conversations_fddi.c'; else $(CYGPATH_W) '$(srcdir)/conversations_fddi.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_fddi.Tpo $(DEPDIR)/libgtkui_a-conversations_fddi.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_fddi.c' object='libgtkui_a-conversations_fddi.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_fddi.obj `if test -f 'conversations_fddi.c'; then $(CYGPATH_W) 'conversations_fddi.c'; else $(CYGPATH_W) '$(srcdir)/conversations_fddi.c'; fi`
+
+libgtkui_a-conversations_ip.o: conversations_ip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_ip.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_ip.Tpo -c -o libgtkui_a-conversations_ip.o `test -f 'conversations_ip.c' || echo '$(srcdir)/'`conversations_ip.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_ip.Tpo $(DEPDIR)/libgtkui_a-conversations_ip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_ip.c' object='libgtkui_a-conversations_ip.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_ip.o `test -f 'conversations_ip.c' || echo '$(srcdir)/'`conversations_ip.c
+
+libgtkui_a-conversations_ip.obj: conversations_ip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_ip.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_ip.Tpo -c -o libgtkui_a-conversations_ip.obj `if test -f 'conversations_ip.c'; then $(CYGPATH_W) 'conversations_ip.c'; else $(CYGPATH_W) '$(srcdir)/conversations_ip.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_ip.Tpo $(DEPDIR)/libgtkui_a-conversations_ip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_ip.c' object='libgtkui_a-conversations_ip.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_ip.obj `if test -f 'conversations_ip.c'; then $(CYGPATH_W) 'conversations_ip.c'; else $(CYGPATH_W) '$(srcdir)/conversations_ip.c'; fi`
+
+libgtkui_a-conversations_ipv6.o: conversations_ipv6.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_ipv6.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_ipv6.Tpo -c -o libgtkui_a-conversations_ipv6.o `test -f 'conversations_ipv6.c' || echo '$(srcdir)/'`conversations_ipv6.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_ipv6.Tpo $(DEPDIR)/libgtkui_a-conversations_ipv6.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_ipv6.c' object='libgtkui_a-conversations_ipv6.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_ipv6.o `test -f 'conversations_ipv6.c' || echo '$(srcdir)/'`conversations_ipv6.c
+
+libgtkui_a-conversations_ipv6.obj: conversations_ipv6.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_ipv6.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_ipv6.Tpo -c -o libgtkui_a-conversations_ipv6.obj `if test -f 'conversations_ipv6.c'; then $(CYGPATH_W) 'conversations_ipv6.c'; else $(CYGPATH_W) '$(srcdir)/conversations_ipv6.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_ipv6.Tpo $(DEPDIR)/libgtkui_a-conversations_ipv6.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_ipv6.c' object='libgtkui_a-conversations_ipv6.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_ipv6.obj `if test -f 'conversations_ipv6.c'; then $(CYGPATH_W) 'conversations_ipv6.c'; else $(CYGPATH_W) '$(srcdir)/conversations_ipv6.c'; fi`
+
+libgtkui_a-conversations_ipx.o: conversations_ipx.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_ipx.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_ipx.Tpo -c -o libgtkui_a-conversations_ipx.o `test -f 'conversations_ipx.c' || echo '$(srcdir)/'`conversations_ipx.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_ipx.Tpo $(DEPDIR)/libgtkui_a-conversations_ipx.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_ipx.c' object='libgtkui_a-conversations_ipx.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_ipx.o `test -f 'conversations_ipx.c' || echo '$(srcdir)/'`conversations_ipx.c
+
+libgtkui_a-conversations_ipx.obj: conversations_ipx.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_ipx.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_ipx.Tpo -c -o libgtkui_a-conversations_ipx.obj `if test -f 'conversations_ipx.c'; then $(CYGPATH_W) 'conversations_ipx.c'; else $(CYGPATH_W) '$(srcdir)/conversations_ipx.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_ipx.Tpo $(DEPDIR)/libgtkui_a-conversations_ipx.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_ipx.c' object='libgtkui_a-conversations_ipx.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_ipx.obj `if test -f 'conversations_ipx.c'; then $(CYGPATH_W) 'conversations_ipx.c'; else $(CYGPATH_W) '$(srcdir)/conversations_ipx.c'; fi`
+
+libgtkui_a-conversations_jxta.o: conversations_jxta.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_jxta.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_jxta.Tpo -c -o libgtkui_a-conversations_jxta.o `test -f 'conversations_jxta.c' || echo '$(srcdir)/'`conversations_jxta.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_jxta.Tpo $(DEPDIR)/libgtkui_a-conversations_jxta.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_jxta.c' object='libgtkui_a-conversations_jxta.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_jxta.o `test -f 'conversations_jxta.c' || echo '$(srcdir)/'`conversations_jxta.c
+
+libgtkui_a-conversations_jxta.obj: conversations_jxta.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_jxta.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_jxta.Tpo -c -o libgtkui_a-conversations_jxta.obj `if test -f 'conversations_jxta.c'; then $(CYGPATH_W) 'conversations_jxta.c'; else $(CYGPATH_W) '$(srcdir)/conversations_jxta.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_jxta.Tpo $(DEPDIR)/libgtkui_a-conversations_jxta.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_jxta.c' object='libgtkui_a-conversations_jxta.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_jxta.obj `if test -f 'conversations_jxta.c'; then $(CYGPATH_W) 'conversations_jxta.c'; else $(CYGPATH_W) '$(srcdir)/conversations_jxta.c'; fi`
+
+libgtkui_a-conversations_ncp.o: conversations_ncp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_ncp.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_ncp.Tpo -c -o libgtkui_a-conversations_ncp.o `test -f 'conversations_ncp.c' || echo '$(srcdir)/'`conversations_ncp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_ncp.Tpo $(DEPDIR)/libgtkui_a-conversations_ncp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_ncp.c' object='libgtkui_a-conversations_ncp.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_ncp.o `test -f 'conversations_ncp.c' || echo '$(srcdir)/'`conversations_ncp.c
+
+libgtkui_a-conversations_ncp.obj: conversations_ncp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_ncp.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_ncp.Tpo -c -o libgtkui_a-conversations_ncp.obj `if test -f 'conversations_ncp.c'; then $(CYGPATH_W) 'conversations_ncp.c'; else $(CYGPATH_W) '$(srcdir)/conversations_ncp.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_ncp.Tpo $(DEPDIR)/libgtkui_a-conversations_ncp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_ncp.c' object='libgtkui_a-conversations_ncp.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_ncp.obj `if test -f 'conversations_ncp.c'; then $(CYGPATH_W) 'conversations_ncp.c'; else $(CYGPATH_W) '$(srcdir)/conversations_ncp.c'; fi`
+
+libgtkui_a-conversations_rsvp.o: conversations_rsvp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_rsvp.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_rsvp.Tpo -c -o libgtkui_a-conversations_rsvp.o `test -f 'conversations_rsvp.c' || echo '$(srcdir)/'`conversations_rsvp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_rsvp.Tpo $(DEPDIR)/libgtkui_a-conversations_rsvp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_rsvp.c' object='libgtkui_a-conversations_rsvp.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_rsvp.o `test -f 'conversations_rsvp.c' || echo '$(srcdir)/'`conversations_rsvp.c
+
+libgtkui_a-conversations_rsvp.obj: conversations_rsvp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_rsvp.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_rsvp.Tpo -c -o libgtkui_a-conversations_rsvp.obj `if test -f 'conversations_rsvp.c'; then $(CYGPATH_W) 'conversations_rsvp.c'; else $(CYGPATH_W) '$(srcdir)/conversations_rsvp.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_rsvp.Tpo $(DEPDIR)/libgtkui_a-conversations_rsvp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_rsvp.c' object='libgtkui_a-conversations_rsvp.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_rsvp.obj `if test -f 'conversations_rsvp.c'; then $(CYGPATH_W) 'conversations_rsvp.c'; else $(CYGPATH_W) '$(srcdir)/conversations_rsvp.c'; fi`
+
+libgtkui_a-conversations_sctp.o: conversations_sctp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_sctp.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_sctp.Tpo -c -o libgtkui_a-conversations_sctp.o `test -f 'conversations_sctp.c' || echo '$(srcdir)/'`conversations_sctp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_sctp.Tpo $(DEPDIR)/libgtkui_a-conversations_sctp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_sctp.c' object='libgtkui_a-conversations_sctp.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_sctp.o `test -f 'conversations_sctp.c' || echo '$(srcdir)/'`conversations_sctp.c
+
+libgtkui_a-conversations_sctp.obj: conversations_sctp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_sctp.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_sctp.Tpo -c -o libgtkui_a-conversations_sctp.obj `if test -f 'conversations_sctp.c'; then $(CYGPATH_W) 'conversations_sctp.c'; else $(CYGPATH_W) '$(srcdir)/conversations_sctp.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_sctp.Tpo $(DEPDIR)/libgtkui_a-conversations_sctp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_sctp.c' object='libgtkui_a-conversations_sctp.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_sctp.obj `if test -f 'conversations_sctp.c'; then $(CYGPATH_W) 'conversations_sctp.c'; else $(CYGPATH_W) '$(srcdir)/conversations_sctp.c'; fi`
+
+libgtkui_a-conversations_tcpip.o: conversations_tcpip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_tcpip.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_tcpip.Tpo -c -o libgtkui_a-conversations_tcpip.o `test -f 'conversations_tcpip.c' || echo '$(srcdir)/'`conversations_tcpip.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_tcpip.Tpo $(DEPDIR)/libgtkui_a-conversations_tcpip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_tcpip.c' object='libgtkui_a-conversations_tcpip.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_tcpip.o `test -f 'conversations_tcpip.c' || echo '$(srcdir)/'`conversations_tcpip.c
+
+libgtkui_a-conversations_tcpip.obj: conversations_tcpip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_tcpip.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_tcpip.Tpo -c -o libgtkui_a-conversations_tcpip.obj `if test -f 'conversations_tcpip.c'; then $(CYGPATH_W) 'conversations_tcpip.c'; else $(CYGPATH_W) '$(srcdir)/conversations_tcpip.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_tcpip.Tpo $(DEPDIR)/libgtkui_a-conversations_tcpip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_tcpip.c' object='libgtkui_a-conversations_tcpip.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_tcpip.obj `if test -f 'conversations_tcpip.c'; then $(CYGPATH_W) 'conversations_tcpip.c'; else $(CYGPATH_W) '$(srcdir)/conversations_tcpip.c'; fi`
+
+libgtkui_a-conversations_tr.o: conversations_tr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_tr.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_tr.Tpo -c -o libgtkui_a-conversations_tr.o `test -f 'conversations_tr.c' || echo '$(srcdir)/'`conversations_tr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_tr.Tpo $(DEPDIR)/libgtkui_a-conversations_tr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_tr.c' object='libgtkui_a-conversations_tr.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_tr.o `test -f 'conversations_tr.c' || echo '$(srcdir)/'`conversations_tr.c
+
+libgtkui_a-conversations_tr.obj: conversations_tr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_tr.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_tr.Tpo -c -o libgtkui_a-conversations_tr.obj `if test -f 'conversations_tr.c'; then $(CYGPATH_W) 'conversations_tr.c'; else $(CYGPATH_W) '$(srcdir)/conversations_tr.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_tr.Tpo $(DEPDIR)/libgtkui_a-conversations_tr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_tr.c' object='libgtkui_a-conversations_tr.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_tr.obj `if test -f 'conversations_tr.c'; then $(CYGPATH_W) 'conversations_tr.c'; else $(CYGPATH_W) '$(srcdir)/conversations_tr.c'; fi`
+
+libgtkui_a-conversations_udpip.o: conversations_udpip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_udpip.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_udpip.Tpo -c -o libgtkui_a-conversations_udpip.o `test -f 'conversations_udpip.c' || echo '$(srcdir)/'`conversations_udpip.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_udpip.Tpo $(DEPDIR)/libgtkui_a-conversations_udpip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_udpip.c' object='libgtkui_a-conversations_udpip.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_udpip.o `test -f 'conversations_udpip.c' || echo '$(srcdir)/'`conversations_udpip.c
+
+libgtkui_a-conversations_udpip.obj: conversations_udpip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_udpip.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_udpip.Tpo -c -o libgtkui_a-conversations_udpip.obj `if test -f 'conversations_udpip.c'; then $(CYGPATH_W) 'conversations_udpip.c'; else $(CYGPATH_W) '$(srcdir)/conversations_udpip.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_udpip.Tpo $(DEPDIR)/libgtkui_a-conversations_udpip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_udpip.c' object='libgtkui_a-conversations_udpip.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_udpip.obj `if test -f 'conversations_udpip.c'; then $(CYGPATH_W) 'conversations_udpip.c'; else $(CYGPATH_W) '$(srcdir)/conversations_udpip.c'; fi`
+
+libgtkui_a-conversations_usb.o: conversations_usb.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_usb.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_usb.Tpo -c -o libgtkui_a-conversations_usb.o `test -f 'conversations_usb.c' || echo '$(srcdir)/'`conversations_usb.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_usb.Tpo $(DEPDIR)/libgtkui_a-conversations_usb.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_usb.c' object='libgtkui_a-conversations_usb.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_usb.o `test -f 'conversations_usb.c' || echo '$(srcdir)/'`conversations_usb.c
+
+libgtkui_a-conversations_usb.obj: conversations_usb.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_usb.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_usb.Tpo -c -o libgtkui_a-conversations_usb.obj `if test -f 'conversations_usb.c'; then $(CYGPATH_W) 'conversations_usb.c'; else $(CYGPATH_W) '$(srcdir)/conversations_usb.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_usb.Tpo $(DEPDIR)/libgtkui_a-conversations_usb.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_usb.c' object='libgtkui_a-conversations_usb.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_usb.obj `if test -f 'conversations_usb.c'; then $(CYGPATH_W) 'conversations_usb.c'; else $(CYGPATH_W) '$(srcdir)/conversations_usb.c'; fi`
+
+libgtkui_a-conversations_wlan.o: conversations_wlan.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_wlan.o -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_wlan.Tpo -c -o libgtkui_a-conversations_wlan.o `test -f 'conversations_wlan.c' || echo '$(srcdir)/'`conversations_wlan.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_wlan.Tpo $(DEPDIR)/libgtkui_a-conversations_wlan.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_wlan.c' object='libgtkui_a-conversations_wlan.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_wlan.o `test -f 'conversations_wlan.c' || echo '$(srcdir)/'`conversations_wlan.c
+
+libgtkui_a-conversations_wlan.obj: conversations_wlan.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-conversations_wlan.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-conversations_wlan.Tpo -c -o libgtkui_a-conversations_wlan.obj `if test -f 'conversations_wlan.c'; then $(CYGPATH_W) 'conversations_wlan.c'; else $(CYGPATH_W) '$(srcdir)/conversations_wlan.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-conversations_wlan.Tpo $(DEPDIR)/libgtkui_a-conversations_wlan.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversations_wlan.c' object='libgtkui_a-conversations_wlan.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-conversations_wlan.obj `if test -f 'conversations_wlan.c'; then $(CYGPATH_W) 'conversations_wlan.c'; else $(CYGPATH_W) '$(srcdir)/conversations_wlan.c'; fi`
 
 libgtkui_a-dcerpc_stat.o: dcerpc_stat.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-dcerpc_stat.o -MD -MP -MF $(DEPDIR)/libgtkui_a-dcerpc_stat.Tpo -c -o libgtkui_a-dcerpc_stat.o `test -f 'dcerpc_stat.c' || echo '$(srcdir)/'`dcerpc_stat.c
@@ -2836,6 +3155,216 @@ libgtkui_a-h225_ras_srt.obj: h225_ras_srt.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='h225_ras_srt.c' object='libgtkui_a-h225_ras_srt.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-h225_ras_srt.obj `if test -f 'h225_ras_srt.c'; then $(CYGPATH_W) 'h225_ras_srt.c'; else $(CYGPATH_W) '$(srcdir)/h225_ras_srt.c'; fi`
+
+libgtkui_a-hostlist_eth.o: hostlist_eth.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_eth.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_eth.Tpo -c -o libgtkui_a-hostlist_eth.o `test -f 'hostlist_eth.c' || echo '$(srcdir)/'`hostlist_eth.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_eth.Tpo $(DEPDIR)/libgtkui_a-hostlist_eth.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_eth.c' object='libgtkui_a-hostlist_eth.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_eth.o `test -f 'hostlist_eth.c' || echo '$(srcdir)/'`hostlist_eth.c
+
+libgtkui_a-hostlist_eth.obj: hostlist_eth.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_eth.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_eth.Tpo -c -o libgtkui_a-hostlist_eth.obj `if test -f 'hostlist_eth.c'; then $(CYGPATH_W) 'hostlist_eth.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_eth.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_eth.Tpo $(DEPDIR)/libgtkui_a-hostlist_eth.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_eth.c' object='libgtkui_a-hostlist_eth.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_eth.obj `if test -f 'hostlist_eth.c'; then $(CYGPATH_W) 'hostlist_eth.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_eth.c'; fi`
+
+libgtkui_a-hostlist_fc.o: hostlist_fc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_fc.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_fc.Tpo -c -o libgtkui_a-hostlist_fc.o `test -f 'hostlist_fc.c' || echo '$(srcdir)/'`hostlist_fc.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_fc.Tpo $(DEPDIR)/libgtkui_a-hostlist_fc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_fc.c' object='libgtkui_a-hostlist_fc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_fc.o `test -f 'hostlist_fc.c' || echo '$(srcdir)/'`hostlist_fc.c
+
+libgtkui_a-hostlist_fc.obj: hostlist_fc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_fc.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_fc.Tpo -c -o libgtkui_a-hostlist_fc.obj `if test -f 'hostlist_fc.c'; then $(CYGPATH_W) 'hostlist_fc.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_fc.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_fc.Tpo $(DEPDIR)/libgtkui_a-hostlist_fc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_fc.c' object='libgtkui_a-hostlist_fc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_fc.obj `if test -f 'hostlist_fc.c'; then $(CYGPATH_W) 'hostlist_fc.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_fc.c'; fi`
+
+libgtkui_a-hostlist_fddi.o: hostlist_fddi.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_fddi.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_fddi.Tpo -c -o libgtkui_a-hostlist_fddi.o `test -f 'hostlist_fddi.c' || echo '$(srcdir)/'`hostlist_fddi.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_fddi.Tpo $(DEPDIR)/libgtkui_a-hostlist_fddi.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_fddi.c' object='libgtkui_a-hostlist_fddi.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_fddi.o `test -f 'hostlist_fddi.c' || echo '$(srcdir)/'`hostlist_fddi.c
+
+libgtkui_a-hostlist_fddi.obj: hostlist_fddi.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_fddi.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_fddi.Tpo -c -o libgtkui_a-hostlist_fddi.obj `if test -f 'hostlist_fddi.c'; then $(CYGPATH_W) 'hostlist_fddi.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_fddi.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_fddi.Tpo $(DEPDIR)/libgtkui_a-hostlist_fddi.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_fddi.c' object='libgtkui_a-hostlist_fddi.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_fddi.obj `if test -f 'hostlist_fddi.c'; then $(CYGPATH_W) 'hostlist_fddi.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_fddi.c'; fi`
+
+libgtkui_a-hostlist_ip.o: hostlist_ip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_ip.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_ip.Tpo -c -o libgtkui_a-hostlist_ip.o `test -f 'hostlist_ip.c' || echo '$(srcdir)/'`hostlist_ip.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_ip.Tpo $(DEPDIR)/libgtkui_a-hostlist_ip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_ip.c' object='libgtkui_a-hostlist_ip.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_ip.o `test -f 'hostlist_ip.c' || echo '$(srcdir)/'`hostlist_ip.c
+
+libgtkui_a-hostlist_ip.obj: hostlist_ip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_ip.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_ip.Tpo -c -o libgtkui_a-hostlist_ip.obj `if test -f 'hostlist_ip.c'; then $(CYGPATH_W) 'hostlist_ip.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_ip.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_ip.Tpo $(DEPDIR)/libgtkui_a-hostlist_ip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_ip.c' object='libgtkui_a-hostlist_ip.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_ip.obj `if test -f 'hostlist_ip.c'; then $(CYGPATH_W) 'hostlist_ip.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_ip.c'; fi`
+
+libgtkui_a-hostlist_ipv6.o: hostlist_ipv6.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_ipv6.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_ipv6.Tpo -c -o libgtkui_a-hostlist_ipv6.o `test -f 'hostlist_ipv6.c' || echo '$(srcdir)/'`hostlist_ipv6.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_ipv6.Tpo $(DEPDIR)/libgtkui_a-hostlist_ipv6.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_ipv6.c' object='libgtkui_a-hostlist_ipv6.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_ipv6.o `test -f 'hostlist_ipv6.c' || echo '$(srcdir)/'`hostlist_ipv6.c
+
+libgtkui_a-hostlist_ipv6.obj: hostlist_ipv6.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_ipv6.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_ipv6.Tpo -c -o libgtkui_a-hostlist_ipv6.obj `if test -f 'hostlist_ipv6.c'; then $(CYGPATH_W) 'hostlist_ipv6.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_ipv6.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_ipv6.Tpo $(DEPDIR)/libgtkui_a-hostlist_ipv6.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_ipv6.c' object='libgtkui_a-hostlist_ipv6.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_ipv6.obj `if test -f 'hostlist_ipv6.c'; then $(CYGPATH_W) 'hostlist_ipv6.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_ipv6.c'; fi`
+
+libgtkui_a-hostlist_ipx.o: hostlist_ipx.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_ipx.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_ipx.Tpo -c -o libgtkui_a-hostlist_ipx.o `test -f 'hostlist_ipx.c' || echo '$(srcdir)/'`hostlist_ipx.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_ipx.Tpo $(DEPDIR)/libgtkui_a-hostlist_ipx.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_ipx.c' object='libgtkui_a-hostlist_ipx.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_ipx.o `test -f 'hostlist_ipx.c' || echo '$(srcdir)/'`hostlist_ipx.c
+
+libgtkui_a-hostlist_ipx.obj: hostlist_ipx.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_ipx.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_ipx.Tpo -c -o libgtkui_a-hostlist_ipx.obj `if test -f 'hostlist_ipx.c'; then $(CYGPATH_W) 'hostlist_ipx.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_ipx.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_ipx.Tpo $(DEPDIR)/libgtkui_a-hostlist_ipx.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_ipx.c' object='libgtkui_a-hostlist_ipx.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_ipx.obj `if test -f 'hostlist_ipx.c'; then $(CYGPATH_W) 'hostlist_ipx.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_ipx.c'; fi`
+
+libgtkui_a-hostlist_jxta.o: hostlist_jxta.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_jxta.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_jxta.Tpo -c -o libgtkui_a-hostlist_jxta.o `test -f 'hostlist_jxta.c' || echo '$(srcdir)/'`hostlist_jxta.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_jxta.Tpo $(DEPDIR)/libgtkui_a-hostlist_jxta.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_jxta.c' object='libgtkui_a-hostlist_jxta.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_jxta.o `test -f 'hostlist_jxta.c' || echo '$(srcdir)/'`hostlist_jxta.c
+
+libgtkui_a-hostlist_jxta.obj: hostlist_jxta.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_jxta.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_jxta.Tpo -c -o libgtkui_a-hostlist_jxta.obj `if test -f 'hostlist_jxta.c'; then $(CYGPATH_W) 'hostlist_jxta.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_jxta.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_jxta.Tpo $(DEPDIR)/libgtkui_a-hostlist_jxta.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_jxta.c' object='libgtkui_a-hostlist_jxta.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_jxta.obj `if test -f 'hostlist_jxta.c'; then $(CYGPATH_W) 'hostlist_jxta.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_jxta.c'; fi`
+
+libgtkui_a-hostlist_ncp.o: hostlist_ncp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_ncp.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_ncp.Tpo -c -o libgtkui_a-hostlist_ncp.o `test -f 'hostlist_ncp.c' || echo '$(srcdir)/'`hostlist_ncp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_ncp.Tpo $(DEPDIR)/libgtkui_a-hostlist_ncp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_ncp.c' object='libgtkui_a-hostlist_ncp.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_ncp.o `test -f 'hostlist_ncp.c' || echo '$(srcdir)/'`hostlist_ncp.c
+
+libgtkui_a-hostlist_ncp.obj: hostlist_ncp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_ncp.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_ncp.Tpo -c -o libgtkui_a-hostlist_ncp.obj `if test -f 'hostlist_ncp.c'; then $(CYGPATH_W) 'hostlist_ncp.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_ncp.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_ncp.Tpo $(DEPDIR)/libgtkui_a-hostlist_ncp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_ncp.c' object='libgtkui_a-hostlist_ncp.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_ncp.obj `if test -f 'hostlist_ncp.c'; then $(CYGPATH_W) 'hostlist_ncp.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_ncp.c'; fi`
+
+libgtkui_a-hostlist_rsvp.o: hostlist_rsvp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_rsvp.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_rsvp.Tpo -c -o libgtkui_a-hostlist_rsvp.o `test -f 'hostlist_rsvp.c' || echo '$(srcdir)/'`hostlist_rsvp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_rsvp.Tpo $(DEPDIR)/libgtkui_a-hostlist_rsvp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_rsvp.c' object='libgtkui_a-hostlist_rsvp.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_rsvp.o `test -f 'hostlist_rsvp.c' || echo '$(srcdir)/'`hostlist_rsvp.c
+
+libgtkui_a-hostlist_rsvp.obj: hostlist_rsvp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_rsvp.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_rsvp.Tpo -c -o libgtkui_a-hostlist_rsvp.obj `if test -f 'hostlist_rsvp.c'; then $(CYGPATH_W) 'hostlist_rsvp.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_rsvp.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_rsvp.Tpo $(DEPDIR)/libgtkui_a-hostlist_rsvp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_rsvp.c' object='libgtkui_a-hostlist_rsvp.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_rsvp.obj `if test -f 'hostlist_rsvp.c'; then $(CYGPATH_W) 'hostlist_rsvp.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_rsvp.c'; fi`
+
+libgtkui_a-hostlist_sctp.o: hostlist_sctp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_sctp.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_sctp.Tpo -c -o libgtkui_a-hostlist_sctp.o `test -f 'hostlist_sctp.c' || echo '$(srcdir)/'`hostlist_sctp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_sctp.Tpo $(DEPDIR)/libgtkui_a-hostlist_sctp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_sctp.c' object='libgtkui_a-hostlist_sctp.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_sctp.o `test -f 'hostlist_sctp.c' || echo '$(srcdir)/'`hostlist_sctp.c
+
+libgtkui_a-hostlist_sctp.obj: hostlist_sctp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_sctp.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_sctp.Tpo -c -o libgtkui_a-hostlist_sctp.obj `if test -f 'hostlist_sctp.c'; then $(CYGPATH_W) 'hostlist_sctp.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_sctp.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_sctp.Tpo $(DEPDIR)/libgtkui_a-hostlist_sctp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_sctp.c' object='libgtkui_a-hostlist_sctp.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_sctp.obj `if test -f 'hostlist_sctp.c'; then $(CYGPATH_W) 'hostlist_sctp.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_sctp.c'; fi`
+
+libgtkui_a-hostlist_tcpip.o: hostlist_tcpip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_tcpip.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_tcpip.Tpo -c -o libgtkui_a-hostlist_tcpip.o `test -f 'hostlist_tcpip.c' || echo '$(srcdir)/'`hostlist_tcpip.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_tcpip.Tpo $(DEPDIR)/libgtkui_a-hostlist_tcpip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_tcpip.c' object='libgtkui_a-hostlist_tcpip.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_tcpip.o `test -f 'hostlist_tcpip.c' || echo '$(srcdir)/'`hostlist_tcpip.c
+
+libgtkui_a-hostlist_tcpip.obj: hostlist_tcpip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_tcpip.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_tcpip.Tpo -c -o libgtkui_a-hostlist_tcpip.obj `if test -f 'hostlist_tcpip.c'; then $(CYGPATH_W) 'hostlist_tcpip.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_tcpip.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_tcpip.Tpo $(DEPDIR)/libgtkui_a-hostlist_tcpip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_tcpip.c' object='libgtkui_a-hostlist_tcpip.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_tcpip.obj `if test -f 'hostlist_tcpip.c'; then $(CYGPATH_W) 'hostlist_tcpip.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_tcpip.c'; fi`
+
+libgtkui_a-hostlist_tr.o: hostlist_tr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_tr.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_tr.Tpo -c -o libgtkui_a-hostlist_tr.o `test -f 'hostlist_tr.c' || echo '$(srcdir)/'`hostlist_tr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_tr.Tpo $(DEPDIR)/libgtkui_a-hostlist_tr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_tr.c' object='libgtkui_a-hostlist_tr.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_tr.o `test -f 'hostlist_tr.c' || echo '$(srcdir)/'`hostlist_tr.c
+
+libgtkui_a-hostlist_tr.obj: hostlist_tr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_tr.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_tr.Tpo -c -o libgtkui_a-hostlist_tr.obj `if test -f 'hostlist_tr.c'; then $(CYGPATH_W) 'hostlist_tr.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_tr.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_tr.Tpo $(DEPDIR)/libgtkui_a-hostlist_tr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_tr.c' object='libgtkui_a-hostlist_tr.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_tr.obj `if test -f 'hostlist_tr.c'; then $(CYGPATH_W) 'hostlist_tr.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_tr.c'; fi`
+
+libgtkui_a-hostlist_udpip.o: hostlist_udpip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_udpip.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_udpip.Tpo -c -o libgtkui_a-hostlist_udpip.o `test -f 'hostlist_udpip.c' || echo '$(srcdir)/'`hostlist_udpip.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_udpip.Tpo $(DEPDIR)/libgtkui_a-hostlist_udpip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_udpip.c' object='libgtkui_a-hostlist_udpip.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_udpip.o `test -f 'hostlist_udpip.c' || echo '$(srcdir)/'`hostlist_udpip.c
+
+libgtkui_a-hostlist_udpip.obj: hostlist_udpip.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_udpip.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_udpip.Tpo -c -o libgtkui_a-hostlist_udpip.obj `if test -f 'hostlist_udpip.c'; then $(CYGPATH_W) 'hostlist_udpip.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_udpip.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_udpip.Tpo $(DEPDIR)/libgtkui_a-hostlist_udpip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_udpip.c' object='libgtkui_a-hostlist_udpip.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_udpip.obj `if test -f 'hostlist_udpip.c'; then $(CYGPATH_W) 'hostlist_udpip.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_udpip.c'; fi`
+
+libgtkui_a-hostlist_usb.o: hostlist_usb.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_usb.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_usb.Tpo -c -o libgtkui_a-hostlist_usb.o `test -f 'hostlist_usb.c' || echo '$(srcdir)/'`hostlist_usb.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_usb.Tpo $(DEPDIR)/libgtkui_a-hostlist_usb.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_usb.c' object='libgtkui_a-hostlist_usb.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_usb.o `test -f 'hostlist_usb.c' || echo '$(srcdir)/'`hostlist_usb.c
+
+libgtkui_a-hostlist_usb.obj: hostlist_usb.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_usb.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_usb.Tpo -c -o libgtkui_a-hostlist_usb.obj `if test -f 'hostlist_usb.c'; then $(CYGPATH_W) 'hostlist_usb.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_usb.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_usb.Tpo $(DEPDIR)/libgtkui_a-hostlist_usb.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_usb.c' object='libgtkui_a-hostlist_usb.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_usb.obj `if test -f 'hostlist_usb.c'; then $(CYGPATH_W) 'hostlist_usb.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_usb.c'; fi`
+
+libgtkui_a-hostlist_wlan.o: hostlist_wlan.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_wlan.o -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_wlan.Tpo -c -o libgtkui_a-hostlist_wlan.o `test -f 'hostlist_wlan.c' || echo '$(srcdir)/'`hostlist_wlan.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_wlan.Tpo $(DEPDIR)/libgtkui_a-hostlist_wlan.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_wlan.c' object='libgtkui_a-hostlist_wlan.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_wlan.o `test -f 'hostlist_wlan.c' || echo '$(srcdir)/'`hostlist_wlan.c
+
+libgtkui_a-hostlist_wlan.obj: hostlist_wlan.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-hostlist_wlan.obj -MD -MP -MF $(DEPDIR)/libgtkui_a-hostlist_wlan.Tpo -c -o libgtkui_a-hostlist_wlan.obj `if test -f 'hostlist_wlan.c'; then $(CYGPATH_W) 'hostlist_wlan.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_wlan.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtkui_a-hostlist_wlan.Tpo $(DEPDIR)/libgtkui_a-hostlist_wlan.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hostlist_wlan.c' object='libgtkui_a-hostlist_wlan.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -c -o libgtkui_a-hostlist_wlan.obj `if test -f 'hostlist_wlan.c'; then $(CYGPATH_W) 'hostlist_wlan.c'; else $(CYGPATH_W) '$(srcdir)/hostlist_wlan.c'; fi`
 
 libgtkui_a-iax2_analysis.o: iax2_analysis.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtkui_a_CFLAGS) $(CFLAGS) -MT libgtkui_a-iax2_analysis.o -MD -MP -MF $(DEPDIR)/libgtkui_a-iax2_analysis.Tpo -c -o libgtkui_a-iax2_analysis.o `test -f 'iax2_analysis.c' || echo '$(srcdir)/'`iax2_analysis.c
@@ -3542,9 +4071,14 @@ abi-descriptor.xml: ../abi-descriptor.template
 # The first argument is the directory in which the source files live.
 # All subsequent arguments are the files to scan.
 #
-wireshark-tap-register.c: $(WIRESHARK_TAP_SRC) $(top_srcdir)/tools/make-tap-reg.py
-	@echo Making wireshark-tap-register.c
-	@$(PYTHON) $(top_srcdir)/tools/make-tap-reg.py $(srcdir) taps $(WIRESHARK_TAP_SRC)
+wireshark-tap-register.c: $(WIRESHARK_TAP_SRC) $(top_srcdir)/tools/make-tapreg-dotc $(top_srcdir)/tools/make-tap-reg.py
+	@if test -n "$(PYTHON)"; then \
+		echo Making wireshark-tap-register.c with python ; \
+		$(PYTHON) $(top_srcdir)/tools/make-tap-reg.py $(srcdir) taps $(WIRESHARK_TAP_SRC); \
+	else \
+		echo Making wireshark-tap-register.c; \
+		$(top_srcdir)/tools/make-tapreg-dotc wireshark-tap-register.c $(srcdir) $(WIRESHARK_TAP_SRC); \
+	fi
 
 doxygen:
 @HAVE_DOXYGEN_TRUE@	$(DOXYGEN) doxygen.cfg
@@ -3606,13 +4140,6 @@ toolbar_icons.h:
 	for icon24 in $(TOOLBAR_COMMON_ICONS) ; do \
 		gdk-pixbuf-csource --raw --name=$${icon24}_24_pb_data $(top_srcdir)/image/toolbar/$${icon24}_24.png >> $@ ;\
 	done
-	for icon_size in 16 24 ; do \
-		gdk-pixbuf-csource --raw --name=toolbar_wireshark_file_$${icon_size}_pb_data $(top_srcdir)/image/toolbar/$${icon_size}x$${icon_size}/x-capture-file-save.png >> $@ ;\
-		gdk-pixbuf-csource --raw --name=capture_options_alt1_$${icon_size}_pb_data $(top_srcdir)/image/toolbar/$${icon_size}x$${icon_size}/x-capture-options.png >> $@ ;\
-		gdk-pixbuf-csource --raw --name=capture_restart_$${icon_size}_pb_data $(top_srcdir)/image/toolbar/$${icon_size}x$${icon_size}/x-capture-restart.png >> $@ ;\
-		gdk-pixbuf-csource --raw --name=capture_start_$${icon_size}_pb_data $(top_srcdir)/image/toolbar/$${icon_size}x$${icon_size}/x-capture-start.png >> $@ ;\
-		gdk-pixbuf-csource --raw --name=capture_stop_$${icon_size}_pb_data $(top_srcdir)/image/toolbar/$${icon_size}x$${icon_size}/x-capture-stop.png >> $@ ;\
-	done
 
 layouts.h:
 	echo "/* This file was automatically generated. DO NOT EDIT. */" > $@
@@ -3638,7 +4165,7 @@ wsiconcap.h:
 wssplash.h:
 	echo "/* This file was automatically generated. DO NOT EDIT. */" > $@
 	echo >> $@
-	gdk-pixbuf-csource --raw --name=wssplash_pb_data $(top_srcdir)/image/wssplash_dev.png >> $@
+	gdk-pixbuf-csource --raw --name=wssplash_pb_data $(top_srcdir)/image/wssplash.png >> $@
 
 clean-pixbufs:
 	rm expert_indicators.h capture_comment_icons.h network_icons.h remote_icons.h pipe_icon.h \

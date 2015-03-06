@@ -32,8 +32,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 void proto_register_iso7816(void);
 void proto_reg_handoff_iso7816(void);
 
@@ -50,16 +54,11 @@ static int ett_iso7816_param = -1;
 static int ett_iso7816_p1 = -1;
 static int ett_iso7816_p2 = -1;
 static int ett_iso7816_atr = -1;
-static int ett_iso7816_atr_ta = -1;
 static int ett_iso7816_atr_td = -1;
 
 static int hf_iso7816_atr_init_char = -1;
 static int hf_iso7816_atr_t0 = -1;
 static int hf_iso7816_atr_ta = -1;
-/* these two fields hold the converted values Fi and Di,
-   not the binary representations FI and DI */
-static int hf_iso7816_atr_ta1_fi = -1;
-static int hf_iso7816_atr_ta1_di = -1;
 static int hf_iso7816_atr_tb = -1;
 static int hf_iso7816_atr_tc = -1;
 static int hf_iso7816_atr_td = -1;
@@ -204,78 +203,6 @@ static const range_string iso7816_sw1[] = {
   { 0,0,  NULL }
 };
 
-static inline
-guint16 FI_to_Fi(guint8 FI)
-{
-    if (FI<=1)
-        return 372;
-    else if (FI<=6)
-        return (FI-1) * 372;
-    else if (FI==9)
-        return 512;
-    else if (FI==10)
-        return 768;
-    else if (FI==11)
-        return 1024;
-    else if (FI==12)
-        return 1536;
-    else if (FI==13)
-        return 2048;
-
-    return 0; /* 0 means RFU (reserved for future use) here */
-}
-
-static inline
-guint8 DI_to_Di(guint8 DI)
-{
-    if (DI>=1 && DI<=6)
-        return 1 << (DI-1);
-    else if (DI==8)
-        return 12;
-    else if (DI==9)
-        return 20;
-
-    return 0; /* 0 means RFU (reserved for future use) here */
-}
-
-/* dissect TA(ta_index) */
-static void
-dissect_iso7816_atr_ta(tvbuff_t *tvb, gint offset, guint ta_index,
-        packet_info *pinfo _U_, proto_tree *tree)
-{
-    guint8      ta, FI, DI;
-    guint16     Fi;
-    guint8      Di;
-    proto_item *ta_it;
-    proto_tree *ta_tree;
-
-    ta = tvb_get_guint8(tvb, offset);
-    ta_it = proto_tree_add_uint_format(tree, hf_iso7816_atr_ta,
-            tvb, offset, 1, ta,
-            "Interface character TA(%d): 0x%02x", ta_index, ta);
-    ta_tree = proto_item_add_subtree(ta_it, ett_iso7816_atr_ta);
-
-    if (ta_index==1) {
-        FI = (tvb_get_guint8(tvb, offset) & 0xF0) >> 4;
-        Fi = FI_to_Fi(FI);
-        if (Fi>0) {
-            proto_tree_add_uint_format(ta_tree, hf_iso7816_atr_ta1_fi,
-                    tvb, offset, 1, Fi,
-                    "Clock rate conversion factor Fi: %d (FI 0x%x)",
-                    Fi, FI);
-        }
-
-        DI = tvb_get_guint8(tvb, offset) & 0x0F;
-        Di = DI_to_Di(DI);
-        if (Di>0) {
-            proto_tree_add_uint_format(ta_tree, hf_iso7816_atr_ta1_di,
-                    tvb, offset, 1, Di,
-                    "Baud rate adjustment factor Di: %d (DI 0x%x)",
-                    Di, DI);
-        }
-    }
-}
-
 static int
 dissect_iso7816_atr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
@@ -284,7 +211,7 @@ dissect_iso7816_atr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *d
     guint       i=0;  /* loop index for TA(i)...TD(i) */
     proto_item *proto_it;
     proto_tree *proto_tr;
-    guint8      tb, tc, td, k=0;
+    guint8      ta, tb, tc, td, k=0;
     gint        tck_len;
     proto_item *err_it;
 
@@ -353,8 +280,11 @@ dissect_iso7816_atr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *d
         offset++;
 
         if (td&0x10) {
+            ta = tvb_get_guint8(tvb, offset);
             /* we read TA(i+1), see comment above */
-            dissect_iso7816_atr_ta(tvb, offset, i+1, pinfo, proto_tr);
+            proto_tree_add_uint_format(proto_tr, hf_iso7816_atr_ta,
+                    tvb, offset, 1, ta,
+                    "Interface character TA(%d): 0x%02x", i+1, ta);
             offset++;
         }
         if (td&0x20) {
@@ -463,7 +393,8 @@ dissect_iso7816_params(guint8 ins, tvbuff_t *tvb, gint offset,
                  packet_info *pinfo _U_, proto_tree *tree)
 {
     gint        offset_start, p1_offset, p2_offset;
-    proto_tree *params_tree;
+    proto_item *ti;
+    proto_tree *params_tree = NULL;
     guint8      p1, p2;
     proto_item *p1_it = NULL, *p2_it = NULL;
     proto_tree *p1_tree = NULL, *p2_tree = NULL;
@@ -471,8 +402,8 @@ dissect_iso7816_params(guint8 ins, tvbuff_t *tvb, gint offset,
 
     offset_start = offset;
 
-    params_tree = proto_tree_add_subtree(tree, tvb, offset_start, 2,
-                                ett_iso7816_param, NULL, "Parameters");
+    ti = proto_tree_add_text(tree, tvb, offset_start, 2, "Parameters");
+    params_tree = proto_item_add_subtree(ti, ett_iso7816_param);
 
     p1 = tvb_get_guint8(tvb,offset);
     p1_it = proto_tree_add_item(params_tree, hf_iso7816_p1, tvb,
@@ -768,14 +699,6 @@ proto_register_iso7816(void)
             { "Interface character TA(i)", "iso7816.atr.ta",
                 FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }
         },
-        { &hf_iso7816_atr_ta1_fi,
-            { "Fi", "iso7816.atr.ta1.fi",
-                FT_UINT16, BASE_DEC, NULL, 0xF0, NULL, HFILL }
-        },
-        { &hf_iso7816_atr_ta1_di,
-            { "Di", "iso7816.atr.ta1.di",
-                FT_UINT8, BASE_HEX, NULL, 0x0F, NULL, HFILL }
-        },
         { &hf_iso7816_atr_tb,
             { "Interface character TB(i)", "iso7816.atr.tb",
                 FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }
@@ -897,7 +820,6 @@ proto_register_iso7816(void)
         &ett_iso7816_p1,
         &ett_iso7816_p2,
         &ett_iso7816_atr,
-        &ett_iso7816_atr_ta,
         &ett_iso7816_atr_td
     };
 

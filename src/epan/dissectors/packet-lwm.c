@@ -24,6 +24,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
 
@@ -350,7 +352,8 @@ static int dissect_lwm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
             guint16     lwm_multi_header;
 
             lwm_multi_header =  tvb_get_letohs(tvb, 7);
-            multi_tree = proto_tree_add_subtree(lwm_tree, tvb, 7, 2, ett_lwm_multi_tree, NULL, "Multicast Header");
+            ti = proto_tree_add_text(lwm_tree, tvb, 7, 2, "Multicast Header");
+            multi_tree = proto_item_add_subtree(ti, ett_lwm_multi_tree);
 
             proto_tree_add_uint(multi_tree, hf_lwm_multi_nmrad, tvb, 7, 2,
                                 (lwm_multi_header & LWM_MULTI_NON_MEM_RAD_MASK) >> LWM_MULTI_NON_MEM_RAD_OFFSET);
@@ -420,8 +423,9 @@ static int dissect_lwm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
         col_add_fstr(pinfo->cinfo, COL_INFO, "%s",
             val_to_str(lwm_cmd, lwm_cmd_names, LWM_CMD_UNKNOWN_VAL_STRING));
 
-        lwm_cmd_tree = proto_tree_add_subtree(lwm_tree, new_tvb, 0, -1, ett_lwm_cmd_tree, &ti,
+        ti = proto_tree_add_text(lwm_tree, new_tvb, 0, -1, "%s",
             val_to_str(lwm_cmd, lwm_cmd_names, LWM_CMD_UNKNOWN_VAL_STRING));
+        lwm_cmd_tree = proto_item_add_subtree(ti, ett_lwm_cmd_tree);
 
         proto_tree_add_uint(lwm_cmd_tree, hf_lwm_cmd, new_tvb, 0, 1, lwm_cmd);
 
@@ -810,7 +814,7 @@ void proto_reg_handoff_lwm(void)
     data_handle     = find_dissector("data");
 
     /* Register our dissector with IEEE 802.15.4 */
-    dissector_add_for_decode_as(IEEE802154_PROTOABBREV_WPAN_PANID, find_dissector("lwm"));
+    dissector_add_handle(IEEE802154_PROTOABBREV_WPAN_PANID, find_dissector("lwm"));
     heur_dissector_add(IEEE802154_PROTOABBREV_WPAN, dissect_lwm_heur, proto_lwm);
 
 } /* proto_reg_handoff_lwm */

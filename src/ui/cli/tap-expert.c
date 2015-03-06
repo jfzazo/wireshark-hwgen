@@ -28,15 +28,16 @@
 #include <string.h>
 
 #include <epan/packet.h>
+#include <epan/packet_info.h>
 #include <epan/tap.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/expert.h>
 
 void register_tap_listener_expert_info(void);
 
 /* Tap data */
 typedef enum severity_level_t {
-    chat_level = 0,
+    chat_level=0,
     note_level,
     warn_level,
     error_level,
@@ -51,15 +52,15 @@ typedef struct expert_entry
 {
     guint32      group;
     int          frequency;
-    const gchar *protocol;
-    gchar       *summary;
+    const gchar  *protocol;
+    gchar        *summary;
 } expert_entry;
 
 
 /* Overall struct for storing all data seen */
 typedef struct expert_tapdata_t {
-    GArray       *ei_array[max_level]; /* expert info items */
-    GStringChunk *text;         /* for efficient storage of summary strings */
+    GArray         *ei_array[max_level];   /* expert info items */
+    GStringChunk*  text;    /* for efficient storage of summary strings */
 } expert_tapdata_t;
 
 
@@ -67,7 +68,7 @@ typedef struct expert_tapdata_t {
 static void
 expert_stat_reset(void *tapdata)
 {
-    gint              n;
+    gint n;
     expert_tapdata_t *etd = (expert_tapdata_t *)tapdata;
 
     /* Free & reallocate chunk of strings */
@@ -85,12 +86,12 @@ static int
 expert_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_,
                    const void *pointer)
 {
-    const expert_info_t *ei   = (const expert_info_t *)pointer;
-    expert_tapdata_t    *data = (expert_tapdata_t *)tapdata;
-    severity_level_t     severity_level;
-    expert_entry         tmp_entry;
-    expert_entry        *entry;
-    guint                n;
+    const expert_info_t *ei = (const expert_info_t *)pointer;
+    expert_tapdata_t *data = (expert_tapdata_t *)tapdata;
+    severity_level_t severity_level;
+    expert_entry     tmp_entry;
+    expert_entry     *entry;
+    guint            n;
 
     switch (ei->severity) {
         case PI_CHAT:
@@ -142,10 +143,9 @@ expert_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U
 /* Output for all of the items of one severity */
 static void draw_items_for_severity(GArray *items, const gchar *label)
 {
-    guint         n;
+    guint n;
     expert_entry *ei;
-    int           total = 0;
-    gchar        *tmp_str;
+    int total = 0;
 
     /* Don't print title if no items */
     if (items->len == 0) {
@@ -168,12 +168,10 @@ static void draw_items_for_severity(GArray *items, const gchar *label)
     /* Items */
     for (n=0; n < items->len; n++) {
         ei = &g_array_index(items, expert_entry, n);
-        tmp_str = val_to_str_wmem(NULL, ei->group, expert_group_vals, "Unknown (%d)");
         printf("%12u %10s %18s  %s\n",
               ei->frequency,
-              tmp_str,
+              val_to_str(ei->group, expert_group_vals, "Unknown"),
               ei->protocol, ei->summary);
-        wmem_free(NULL, tmp_str);
     }
 }
 
@@ -193,11 +191,11 @@ expert_stat_draw(void *phs _U_)
 /* Create a new expert stats struct */
 static void expert_stat_init(const char *opt_arg, void *userdata _U_)
 {
-    const char       *args   = NULL;
-    const char       *filter = NULL;
-    GString          *error_string;
-    expert_tapdata_t *hs;
-    int               n;
+    const char        *args = NULL;
+    const char        *filter = NULL;
+    GString           *error_string;
+    expert_tapdata_t  *hs;
+    int n;
 
     /* Check for args. */
     if (strncmp(opt_arg, "expert", 6) == 0) {
@@ -236,7 +234,7 @@ static void expert_stat_init(const char *opt_arg, void *userdata _U_)
 
 
     /* Create top-level struct */
-    hs = g_new(expert_tapdata_t, 1);
+    hs = g_new(expert_tapdata_t,1);
     memset(hs, 0,  sizeof(expert_tapdata_t));
 
     /* Allocate chunk of strings */
@@ -264,32 +262,11 @@ static void expert_stat_init(const char *opt_arg, void *userdata _U_)
     }
 }
 
-static stat_tap_ui expert_stat_ui = {
-    REGISTER_STAT_GROUP_GENERIC,
-    NULL,
-    "expert",
-    expert_stat_init,
-    -1,
-    0,
-    NULL
-};
 
 /* Register this tap listener (need void on own so line register function found) */
 void
 register_tap_listener_expert_info(void)
 {
-    register_stat_tap_ui(&expert_stat_ui, NULL);
+    register_stat_cmd_arg("expert", expert_stat_init, NULL);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

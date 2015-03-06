@@ -17,7 +17,7 @@ export docdir = /usr/share/doc/wireshark-doc
 	dh $@ --with python2 --buildsystem cmake --with quilt # --parallel
 
 override_dh_auto_configure:
-	dh_auto_configure -- -DENABLE_HTML_GUIDES=ON -DCMAKE_INSTALL_LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH) \
+	dh_auto_configure -- -DENABLE_GUIDES=ON -DCMAKE_INSTALL_LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH) \
 	-DENABLE_QT5=OFF
 
 override_dh_auto_build:
@@ -25,7 +25,7 @@ override_dh_auto_build:
 	# create menu icon
 	convert image/wsicon32.png image/wsicon32.xpm
 	# fix links in documentation
-	sed -i "s|$(CURDIR)/docbook|..|" obj-*/docbook/ws*g_html_chunked/*.html
+	sed -i "s|$(CURDIR)/docbook|..|" obj-*/docbook/ws*g_html_chunked/*
 
 override_dh_strip:
 	dh_strip --dbg-package=wireshark-dbg
@@ -40,8 +40,8 @@ override_dh_auto_install:
 		$(CURDIR)/debian/tmp/usr/share/mime/packages/
 	install -m 644 image/wsicon.svg $(CURDIR)/debian/tmp/usr/share/icons/hicolor/scalable/apps/wireshark.svg
 	install -m 644 wireshark-mime-package.xml $(CURDIR)/debian/tmp/usr/share/mime/packages/wireshark.xml
-	# upstream uses wireshark for binary's name
-	# mv $(CURDIR)/debian/tmp/usr/bin/wireshark $(CURDIR)/debian/tmp/usr/bin/wireshark-qt
+	# upstream uses qtshark for binary's name
+	mv $(CURDIR)/debian/tmp/usr/bin/qtshark $(CURDIR)/debian/tmp/usr/bin/wireshark-qt
 	mkdir -p $(CURDIR)/debian/tmp/etc/wireshark/
 	mv $(CURDIR)/debian/tmp/usr/share/wireshark/init.lua \
 		$(CURDIR)/debian/tmp/etc/wireshark/
@@ -55,7 +55,6 @@ override_dh_install:
 
 override_dh_fixperms:
 	dh_fixperms
-	chmod 644 debian/wireshark-dev/usr/share/pyshared/make-dissector-reg.py \
-		debian/wireshark-dev/usr/share/pyshared/wireshark_be.py \
+	chmod 644 debian/wireshark-dev/usr/share/pyshared/wireshark_be.py \
 		debian/wireshark-dev/usr/share/pyshared/wireshark_gen.py
 

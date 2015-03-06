@@ -23,6 +23,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/oui.h>
 #include <epan/nlpid.h>
@@ -55,86 +56,6 @@ static int hf_q2931_message_len = -1;
 static int hf_q2931_ie_handling_instructions = -1;
 static int hf_q2931_ie_coding_standard = -1;
 static int hf_q2931_ie_action_indicator = -1;
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_q2931_number_bytes = -1;
-static int hf_q2931_conn_id_vci = -1;
-static int hf_q2931_restart_indicator = -1;
-static int hf_q2931_conn_id_vpci = -1;
-static int hf_q2931_bband_low_layer_info_mode = -1;
-static int hf_q2931_cause_rejection_insufficient_information_element = -1;
-static int hf_q2931_bband_low_layer_info_user_info_l3_proto = -1;
-static int hf_q2931_number_string = -1;
-static int hf_q2931_aal1_backward_max_cpcs_sdu_size = -1;
-static int hf_q2931_user_plane_connection_configuration = -1;
-static int hf_q2931_party_subaddr_subaddress = -1;
-static int hf_q2931_aal1_mode = -1;
-static int hf_q2931_cause_location = -1;
-static int hf_q2931_bband_low_layer_info_user_specified_l2_proto = -1;
-static int hf_q2931_information_element = -1;
-static int hf_q2931_conn_id_preferred_exclusive = -1;
-static int hf_q2931_cause_vci = -1;
-static int hf_q2931_cause_information_element = -1;
-static int hf_q2931_oam_traffic_descriptor_backward_f5_flow_indicator = -1;
-static int hf_q2931_cause_rejection_reason = -1;
-static int hf_q2931_ethernet_type = -1;
-static int hf_q2931_cause_value = -1;
-static int hf_q2931_information_element_length = -1;
-static int hf_q2931_cause_rejection_user_specific_diagnostic = -1;
-static int hf_q2931_transit_network_sel_type = -1;
-static int hf_q2931_user_defined_aal_information = -1;
-static int hf_q2931_aal1_forward_max_cpcs_sdu_size = -1;
-static int hf_q2931_atm_transfer_capability = -1;
-static int hf_q2931_aal1_subtype = -1;
-static int hf_q2931_information_element_extension = -1;
-static int hf_q2931_party_subaddr_type_of_subaddress = -1;
-static int hf_q2931_number_plan = -1;
-static int hf_q2931_aal1_error_correction_method = -1;
-static int hf_q2931_call_state = -1;
-static int hf_q2931_bearer_class = -1;
-static int hf_q2931_protocol_id = -1;
-static int hf_q2931_information_element_data = -1;
-static int hf_q2931_aal1_partially_filled_cells_method = -1;
-static int hf_q2931_lane_protocol_id = -1;
-static int hf_q2931_party_subaddr_odd_even_indicator = -1;
-static int hf_q2931_qos_class_backward = -1;
-static int hf_q2931_cause_rejection_condition = -1;
-static int hf_q2931_aal1_source_clock_frequency_recovery_method = -1;
-static int hf_q2931_broadband_repeat_indicator = -1;
-static int hf_q2931_cause_rejection_missing_information_element = -1;
-static int hf_q2931_e2e_transit_delay_maximum_end_to_end = -1;
-static int hf_q2931_endpoint_reference_identifier_value = -1;
-static int hf_q2931_cause_vpci = -1;
-static int hf_q2931_endpoint_state = -1;
-static int hf_q2931_high_layer_information_type = -1;
-static int hf_q2931_transit_network_sel_network_id = -1;
-static int hf_q2931_aal1_sscs_type = -1;
-static int hf_q2931_bband_low_layer_info_packet_window_size = -1;
-static int hf_q2931_aal1_structured_data_transfer_block_size = -1;
-static int hf_q2931_cause_timer = -1;
-static int hf_q2931_cause_message_type = -1;
-static int hf_q2931_e2e_transit_delay_cumulative = -1;
-static int hf_q2931_oam_traffic_descriptor_shaping_indicator = -1;
-static int hf_q2931_oam_traffic_descriptor_forward_f5_flow_indicator = -1;
-static int hf_q2931_organization_code = -1;
-static int hf_q2931_bband_low_layer_info_additional_l3_proto = -1;
-static int hf_q2931_transit_network_sel_plan = -1;
-static int hf_q2931_bband_low_layer_info_user_info_l2_proto = -1;
-static int hf_q2931_aal1_multiplier = -1;
-static int hf_q2931_aal_type = -1;
-static int hf_q2931_aal1_cbr_rate = -1;
-static int hf_q2931_number_type = -1;
-static int hf_q2931_cause_rejection_diagnostic = -1;
-static int hf_q2931_bband_low_layer_info_default_packet_size = -1;
-static int hf_q2931_susceptibility_to_clipping = -1;
-static int hf_q2931_oam_traffic_descriptor_management_indicator = -1;
-static int hf_q2931_qos_class_forward = -1;
-static int hf_q2931_endpoint_reference_type = -1;
-static int hf_q2931_number_presentation_indicator = -1;
-static int hf_q2931_bband_low_layer_info_user_info_l1_proto = -1;
-static int hf_q2931_number_screening_indicator = -1;
-static int hf_q2931_bband_low_layer_info_window_size = -1;
-static int hf_q2931_conn_id_vp_associated_signalling = -1;
-static int hf_q2931_cause_cell_rate_subfield_identifier = -1;
 
 static gint ett_q2931 = -1;
 static gint ett_q2931_ext = -1;
@@ -142,27 +63,27 @@ static gint ett_q2931_ie = -1;
 static gint ett_q2931_ie_ext = -1;
 static gint ett_q2931_nsap = -1;
 
-static void dissect_q2931_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
-			     proto_tree *tree, guint8 info_element, guint8 info_element_ext);
+static void dissect_q2931_ie(tvbuff_t *tvb, int offset, int len,
+    proto_tree *tree, guint8 info_element, guint8 info_element_ext);
 
 /*
  * Q.2931 message types.
  */
 #define	Q2931_ALERTING		0x01
 #define	Q2931_CALL_PROCEEDING	0x02
+#define	Q2931_CONNECT		0x07
+#define	Q2931_CONNECT_ACK	0x0F
 #define	Q2931_PROGRESS		0x03
 #define	Q2931_SETUP		0x05
-#define	Q2931_CONNECT		0x07
 #define	Q2931_SETUP_ACK		0x0B
-#define	Q2931_CONNECT_ACK	0x0F
-#define	Q2931_RESTART		0x46
 #define	Q2931_RELEASE		0x4D
-#define	Q2931_RESTART_ACK	0x4E
 #define	Q2931_RELEASE_COMPLETE	0x5A
-#define	Q2931_NOTIFY		0x6E
-#define	Q2931_STATUS_ENQUIRY	0x75
+#define	Q2931_RESTART		0x46
+#define	Q2931_RESTART_ACK	0x4E
 #define	Q2931_INFORMATION	0x7B
+#define	Q2931_NOTIFY		0x6E
 #define	Q2931_STATUS		0x7D
+#define	Q2931_STATUS_ENQUIRY	0x75
 #define	Q2931_ADD_PARTY		0x80
 #define	Q2931_ADD_PARTY_ACK	0x81
 #define	Q2931_ADD_PARTY_REJ	0x82
@@ -174,19 +95,19 @@ static void dissect_q2931_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int 
 static const value_string q2931_message_type_vals[] = {
 	{ Q2931_ALERTING,		"ALERTING" },
 	{ Q2931_CALL_PROCEEDING,	"CALL PROCEEDING" },
+	{ Q2931_CONNECT,		"CONNECT" },
+	{ Q2931_CONNECT_ACK,		"CONNECT ACKNOWLEDGE" },
 	{ Q2931_PROGRESS,		"PROGRESS" },
 	{ Q2931_SETUP,			"SETUP" },
-	{ Q2931_CONNECT,		"CONNECT" },
 	{ Q2931_SETUP_ACK,		"SETUP ACKNOWLEDGE" },
-	{ Q2931_CONNECT_ACK,		"CONNECT ACKNOWLEDGE" },
-	{ Q2931_RESTART,		"RESTART" },
 	{ Q2931_RELEASE,		"RELEASE" },
-	{ Q2931_RESTART_ACK,		"RESTART ACKNOWLEDGE" },
 	{ Q2931_RELEASE_COMPLETE,	"RELEASE COMPLETE" },
-	{ Q2931_NOTIFY,			"NOTIFY" },
-	{ Q2931_STATUS_ENQUIRY,		"STATUS ENQUIRY" },
+	{ Q2931_RESTART,		"RESTART" },
+	{ Q2931_RESTART_ACK,		"RESTART ACKNOWLEDGE" },
 	{ Q2931_INFORMATION,		"INFORMATION" },
+	{ Q2931_NOTIFY,			"NOTIFY" },
 	{ Q2931_STATUS,			"STATUS" },
+	{ Q2931_STATUS_ENQUIRY,		"STATUS ENQUIRY" },
 	{ Q2931_ADD_PARTY,		"ADD PARTY" },
 	{ Q2931_ADD_PARTY_ACK,		"ADD PARTY ACKNOWLEDGE" },
 	{ Q2931_ADD_PARTY_REJ,		"ADD PARTY REJECT" },
@@ -196,8 +117,6 @@ static const value_string q2931_message_type_vals[] = {
 	{ Q2931_LEAF_SETUP_REQ,		"LEAF SETUP REQUEST" },
 	{ 0,				NULL }
 };
-
-static value_string_ext q2931_message_type_vals_ext = VALUE_STRING_EXT_INIT(q2931_message_type_vals);
 
 static const true_false_string tfs_call_ref_flag = {
 	"Message sent to originating side",
@@ -320,8 +239,6 @@ static const value_string q2931_info_element_vals[] = {
 	{ 0,					NULL }
 };
 
-static value_string_ext q2931_info_element_vals_ext = VALUE_STRING_EXT_INIT(q2931_info_element_vals);
-
 /*
  * Dissect a locking or non-locking shift information element.
  */
@@ -339,7 +256,7 @@ static const true_false_string tfs_q2931_handling_instructions = { "Follow expli
 
 static void
 dissect_q2931_shift_ie(tvbuff_t *tvb, int offset, int len,
-		       proto_tree *tree, guint8 info_element)
+    proto_tree *tree, guint8 info_element)
 {
 	gboolean non_locking_shift;
 	guint8 codeset;
@@ -433,7 +350,7 @@ static const value_string q2931_sscs_type_vals[] = {
 
 static void
 dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
-				proto_tree *tree)
+    proto_tree *tree)
 {
 	guint8 aal_type;
 	guint8 identifier;
@@ -443,7 +360,8 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 	if (len == 0)
 		return;
 	aal_type = tvb_get_guint8(tvb, offset);
-	proto_tree_add_item(tree, hf_q2931_aal_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 1, "AAL type: %s",
+	    val_to_str(aal_type, q9231_aal_type_vals, "Unknown (0x%02X)"));
 	offset += 1;
 	len -= 1;
 
@@ -456,7 +374,9 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 		 */
 		if (len > 4)
 			len = 4;
-		proto_tree_add_item(tree, hf_q2931_user_defined_aal_information, tvb, offset, len, ENC_NA);
+		proto_tree_add_text(tree, tvb, offset, len,
+		    "User defined AAL information: %s",
+		    tvb_bytes_to_ep_str(tvb, offset, len));
 		return;
 	}
 
@@ -468,7 +388,10 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 2)
 				return;
 			value = tvb_get_guint8(tvb, offset + 1);
-			proto_tree_add_uint(tree, hf_q2931_aal1_subtype, tvb, offset, 2, value);
+			proto_tree_add_text(tree, tvb, offset, 2,
+			    "Subtype: %s",
+			    val_to_str(value, q9231_aal1_subtype_vals,
+			    "Unknown (0x%02X)"));
 			offset += 2;
 			len -= 2;
 			break;
@@ -477,7 +400,10 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 2)
 				return;
 			value = tvb_get_guint8(tvb, offset + 1);
-			proto_tree_add_uint(tree, hf_q2931_aal1_cbr_rate, tvb, offset, 2, value);
+			proto_tree_add_text(tree, tvb, offset, 2,
+			    "CBR rate: %s",
+			    val_to_str(value, q9231_aal1_cbr_rate_vals,
+			    "Unknown (0x%02X)"));
 			offset += 2;
 			len -= 2;
 			break;
@@ -486,7 +412,8 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 3)
 				return;
 			value = tvb_get_ntohs(tvb, offset + 1);
-			proto_tree_add_uint(tree, hf_q2931_aal1_multiplier, tvb, offset, 3, value);
+			proto_tree_add_text(tree, tvb, offset, 3,
+			    "Multiplier: %u", value);
 			offset += 3;
 			len -= 3;
 			break;
@@ -495,7 +422,10 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 2)
 				return;
 			value = tvb_get_guint8(tvb, offset + 1);
-			proto_tree_add_uint(tree, hf_q2931_aal1_source_clock_frequency_recovery_method, tvb, offset, 2, value);
+			proto_tree_add_text(tree, tvb, offset, 2,
+			    "Source clock frequency recovery method: %s",
+			    val_to_str(value, q2931_aal1_src_clk_rec_meth_vals,
+			    "Unknown (0x%02X)"));
 			offset += 2;
 			len -= 2;
 			break;
@@ -504,7 +434,10 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 2)
 				return;
 			value = tvb_get_guint8(tvb, offset + 1);
-			proto_tree_add_uint(tree, hf_q2931_aal1_error_correction_method, tvb, offset, 2, value);
+			proto_tree_add_text(tree, tvb, offset, 2,
+			    "Error correction method: %s",
+			    val_to_str(value, q2931_aal1_err_correction_method_vals,
+			    "Unknown (0x%02X)"));
 			offset += 2;
 			len -= 2;
 			break;
@@ -513,7 +446,8 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 3)
 				return;
 			value = tvb_get_ntohs(tvb, offset + 1);
-			proto_tree_add_uint(tree, hf_q2931_aal1_structured_data_transfer_block_size, tvb, offset, 3, value);
+			proto_tree_add_text(tree, tvb, offset, 3,
+			    "Structured data transfer block size: %u", value);
 			offset += 3;
 			len -= 3;
 			break;
@@ -522,8 +456,8 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 2)
 				return;
 			value = tvb_get_guint8(tvb, offset + 1);
-			proto_tree_add_uint_format_value(tree, hf_q2931_aal1_partially_filled_cells_method, tvb, offset, 2,
-			    value, "%u octets", value);
+			proto_tree_add_text(tree, tvb, offset, 2,
+			    "Partially filled cells method: %u octets", value);
 			offset += 2;
 			len -= 2;
 			break;
@@ -532,7 +466,8 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 3)
 				return;
 			value = tvb_get_ntohs(tvb, offset + 1);
-			proto_tree_add_uint(tree, hf_q2931_aal1_forward_max_cpcs_sdu_size, tvb, offset, 3, value);
+			proto_tree_add_text(tree, tvb, offset, 3,
+			    "Forward maximum CPCS-SDU size: %u", value);
 			offset += 3;
 			len -= 3;
 			break;
@@ -541,7 +476,8 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 3)
 				return;
 			value = tvb_get_ntohs(tvb, offset + 1);
-			proto_tree_add_uint(tree, hf_q2931_aal1_backward_max_cpcs_sdu_size, tvb, offset, 3, value);
+			proto_tree_add_text(tree, tvb, offset, 3,
+			    "Backward maximum CPCS-SDU size: %u", value);
 			offset += 3;
 			len -= 3;
 			break;
@@ -561,7 +497,10 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 2)
 				return;
 			value = tvb_get_guint8(tvb, offset + 1);
-			proto_tree_add_uint(tree, hf_q2931_aal1_mode, tvb, offset, 2, value);
+			proto_tree_add_text(tree, tvb, offset, 2,
+			    "Mode: %s",
+			    val_to_str(value, q2931_aal_mode_vals,
+			    "Unknown (0x%02X)"));
 			offset += 2;
 			len -= 2;
 			break;
@@ -570,7 +509,10 @@ dissect_q2931_aal_parameters_ie(tvbuff_t *tvb, int offset, int len,
 			if (len < 2)
 				return;
 			value = tvb_get_guint8(tvb, offset + 1);
-			proto_tree_add_uint(tree, hf_q2931_aal1_sscs_type, tvb, offset, 2, value);
+			proto_tree_add_text(tree, tvb, offset, 2,
+			    "SSCS type: %s",
+			    val_to_str(value, q2931_sscs_type_vals,
+			    "Unknown (0x%02X)"));
 			offset += 2;
 			len -= 2;
 			break;
@@ -622,7 +564,7 @@ static const value_string q2931_atm_td_subfield_vals[] = {
 
 static void
 dissect_q2931_atm_cell_rate_ie(tvbuff_t *tvb, int offset, int len,
-			       proto_tree *tree)
+    proto_tree *tree)
 {
 	guint8 identifier;
 	guint32 value;
@@ -739,29 +681,43 @@ static const value_string q2931_up_conn_config_vals[] = {
 
 static void
 dissect_q2931_bband_bearer_cap_ie(tvbuff_t *tvb, int offset, int len,
-				  proto_tree *tree)
+    proto_tree *tree)
 {
 	guint8 octet;
 
 	if (len == 0)
 		return;
 	octet = tvb_get_guint8(tvb, offset);
-	proto_tree_add_item(tree, hf_q2931_bearer_class, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Bearer class: %s",
+	    val_to_str(octet & 0x1F, q2931_bearer_class_vals,
+	    "Unknown (0x%02X)"));
 	offset += 1;
 	len -= 1;
 
 	if (len == 0)
 		return;
 	if (!(octet & Q2931_IE_EXTENSION)) {
-		proto_tree_add_item(tree, hf_q2931_atm_transfer_capability, tvb, offset, 1, ENC_BIG_ENDIAN);
+		octet = tvb_get_guint8(tvb, offset);
+		proto_tree_add_text(tree, tvb, offset, 1,
+		    "ATM Transfer Capability: %s",
+		    val_to_str(octet & 0x1F, q2931_transfer_capability_vals,
+		    "Unknown (0x%02X)"));
 		offset += 1;
 		len -= 1;
 	}
 
 	if (len == 0)
 		return;
-	proto_tree_add_item(tree, hf_q2931_susceptibility_to_clipping, tvb, offset, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_q2931_user_plane_connection_configuration, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Susceptibility to clipping: %s",
+	    val_to_str(octet & 0x60, q2931_susc_clip_vals,
+	    "Unknown (0x%02X)"));
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "User-plane connection configuration: %s",
+	    val_to_str(octet & 0x03, q2931_up_conn_config_vals,
+	    "Unknown (0x%02X)"));
 }
 
 /*
@@ -777,12 +733,17 @@ static const value_string q2931_hi_layer_info_type_vals[] = {
 
 static void
 dissect_q2931_bband_hi_layer_info_ie(tvbuff_t *tvb, int offset, int len,
-				     proto_tree *tree)
+    proto_tree *tree)
 {
+	guint8 octet;
+
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_high_layer_information_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "High layer information type: %s",
+	    val_to_str(octet & 0x7F, q2931_hi_layer_info_type_vals,
+	    "Unknown (0x%02X)"));
 	/*offset += 1; */
 	/* len -= 1; */
 }
@@ -846,13 +807,14 @@ static const value_string lane_pid_vals[] = {
  */
 static void
 dissect_q2931_bband_low_layer_info_ie(tvbuff_t *tvb, int offset, int len,
-				      proto_tree *tree)
+    proto_tree *tree)
 {
 	guint8 octet;
 	guint8 uil2_protocol;
 	guint8 uil3_protocol;
 	guint8 add_l3_info;
 	guint32 organization_code;
+	guint16 pid;
 
 	if (len == 0)
 		return;
@@ -861,7 +823,9 @@ dissect_q2931_bband_low_layer_info_ie(tvbuff_t *tvb, int offset, int len,
 		/*
 		 * Layer 1 information.
 		 */
-		proto_tree_add_item(tree, hf_q2931_bband_low_layer_info_user_info_l1_proto, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_text(tree, tvb, offset, 1,
+		    "User information layer 1 protocol: 0x%02X",
+		    octet & 0x1F);
 		offset += 1;
 		len -= 1;
 	}
@@ -874,7 +838,10 @@ dissect_q2931_bband_low_layer_info_ie(tvbuff_t *tvb, int offset, int len,
 		 * Layer 2 information.
 		 */
 		uil2_protocol = octet & 0x1F;
-		proto_tree_add_item(tree, hf_q2931_bband_low_layer_info_user_info_l2_proto, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_text(tree, tvb, offset, 1,
+		    "User information layer 2 protocol: %s",
+		    val_to_str(uil2_protocol, q2931_uil2_vals,
+		      "Unknown (0x%02X)"));
 		offset += 1;
 		len -= 1;
 
@@ -884,9 +851,14 @@ dissect_q2931_bband_low_layer_info_ie(tvbuff_t *tvb, int offset, int len,
 			return;
 		octet = tvb_get_guint8(tvb, offset);
 		if (uil2_protocol == Q2931_UIL2_USER_SPEC) {
-			proto_tree_add_item(tree, hf_q2931_bband_low_layer_info_user_specified_l2_proto, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_text(tree, tvb, offset, 1,
+			    "User-specified layer 2 protocol information: 0x%02X",
+			    octet & 0x7F);
 		} else {
-			proto_tree_add_item(tree, hf_q2931_bband_low_layer_info_mode, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_text(tree, tvb, offset, 1,
+			    "Mode: %s",
+			    val_to_str(octet & 0x60, q2931_mode_vals,
+			      "Unknown (0x%02X)"));
 		}
 		offset += 1;
 		len -= 1;
@@ -896,8 +868,8 @@ dissect_q2931_bband_low_layer_info_ie(tvbuff_t *tvb, int offset, int len,
 		if (len == 0)
 			return;
 		octet = tvb_get_guint8(tvb, offset);
-		proto_tree_add_uint_format_value(tree, hf_q2931_bband_low_layer_info_window_size, tvb, offset, 1,
-		    octet & 0x7F, "%u k", octet & 0x7F);
+		proto_tree_add_text(tree, tvb, offset, 1,
+		    "Window size: %u k", octet & 0x7F);
 		offset += 1;
 		len -= 1;
 	}
@@ -912,7 +884,10 @@ l2_done:
 		 * Layer 3 information.
 		 */
 		uil3_protocol = octet & 0x1F;
-		proto_tree_add_item(tree, hf_q2931_bband_low_layer_info_user_info_l3_proto, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_text(tree, tvb, offset, 1,
+		    "User information layer 3 protocol: %s",
+		    val_to_str(uil3_protocol, q2931_uil3_vals,
+		      "Unknown (0x%02X)"));
 		offset += 1;
 		len -= 1;
 
@@ -930,7 +905,10 @@ l2_done:
 		case Q2931_UIL3_X25_PL:
 		case Q2931_UIL3_ISO_8208:
 		case Q2931_UIL3_X223:
-			proto_tree_add_item(tree, hf_q2931_bband_low_layer_info_mode, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_text(tree, tvb, offset, 1,
+			    "Mode: %s",
+			    val_to_str(octet & 0x60, q2931_mode_vals,
+			      "Unknown (0x%02X)"));
 			offset += 1;
 			len -= 1;
 
@@ -939,7 +917,8 @@ l2_done:
 			if (len == 0)
 				return;
 			octet = tvb_get_guint8(tvb, offset);
-			proto_tree_add_item(tree, hf_q2931_bband_low_layer_info_default_packet_size, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_text(tree, tvb, offset, 1,
+			    "Default packet size: %u", octet & 0x0F);
 			offset += 1;
 			len -= 1;
 
@@ -947,14 +926,17 @@ l2_done:
 				goto l3_done;
 			if (len == 0)
 				return;
-			proto_tree_add_item(tree, hf_q2931_bband_low_layer_info_packet_window_size, tvb, offset, 1, ENC_BIG_ENDIAN);
+			octet = tvb_get_guint8(tvb, offset);
+			proto_tree_add_text(tree, tvb, offset, 1,
+			    "Packet window size: %u", octet & 0x7F);
 			/*offset += 1;*/
 			/*len -= 1;*/
 			break;
 
 		case Q2931_UIL3_USER_SPEC:
-			proto_tree_add_uint_format_value(tree, hf_q2931_bband_low_layer_info_default_packet_size, tvb, offset, 1,
-			    1 << (octet & 0x0F), "%u octets", 1 << (octet & 0x0F));
+			proto_tree_add_text(tree, tvb, offset, 1,
+			    "Default packet size: %u octets",
+			    1 << (octet & 0x0F));
 			/*offset += 1;*/
 			/*len -= 1;*/
 			break;
@@ -966,7 +948,10 @@ l2_done:
 			if (len < 2)
 				return;
 			add_l3_info |= (tvb_get_guint8(tvb, offset + 1) & 0x40) >> 6;
-			proto_tree_add_uint(tree, hf_q2931_bband_low_layer_info_additional_l3_proto, tvb, offset, 2, add_l3_info);
+			proto_tree_add_text(tree, tvb, offset, 2,
+			    "Additional layer 3 protocol information: %s",
+			    val_to_str(add_l3_info, nlpid_vals,
+			      "Unknown (0x%02X)"));
 			offset += 2;
 			len -= 2;
 			if (add_l3_info == NLPID_SNAP) {
@@ -975,22 +960,34 @@ l2_done:
 				offset += 1;
 				/*len -= 1;*/
 				organization_code = tvb_get_ntoh24(tvb, offset);
-				proto_tree_add_item(tree, hf_q2931_organization_code, tvb, offset, 3, ENC_BIG_ENDIAN);
+				proto_tree_add_text(tree, tvb, offset, 3,
+				    "Organization Code: 0x%06X (%s)",
+				    organization_code,
+				    val_to_str_const(organization_code, oui_vals,
+				        "Unknown"));
 				offset += 3;
 				/*len -= 3;*/
 
+				pid = tvb_get_ntohs(tvb, offset);
 				switch (organization_code) {
 
 				case OUI_ENCAP_ETHER:
-					proto_tree_add_item(tree, hf_q2931_ethernet_type, tvb, offset, 2, ENC_BIG_ENDIAN);
+					proto_tree_add_text(tree, tvb, offset, 2,
+					    "Ethernet type: %s",
+					    val_to_str(pid, etype_vals,
+					        "Unknown (0x%04X)"));
 					break;
 
 				case OUI_ATM_FORUM:
-					proto_tree_add_item(tree, hf_q2931_lane_protocol_id, tvb, offset, 2, ENC_BIG_ENDIAN);
+					proto_tree_add_text(tree, tvb, offset, 2,
+					    "LANE Protocol ID: %s",
+					    val_to_str(pid, lane_pid_vals,
+					        "Unknown (0x%04X)"));
 					break;
 
 				default:
-					proto_tree_add_item(tree, hf_q2931_protocol_id, tvb, offset, 2, ENC_BIG_ENDIAN);
+					proto_tree_add_text(tree, tvb, offset, 2,
+					    "Protocol ID: 0x%04X", pid);
 					break;
 				}
 			}
@@ -1118,8 +1115,6 @@ static const value_string q2931_cause_code_vals[] = {
 	{ 0,				NULL }
 };
 
-static value_string_ext q2931_cause_code_vals_ext = VALUE_STRING_EXT_INIT(q2931_cause_code_vals);
-
 static const value_string q2931_cause_condition_vals[] = {
 	{ 0x00, "Unknown" },
 	{ 0x01, "Permanent" },
@@ -1139,8 +1134,8 @@ static const value_string q2931_rejection_reason_vals[] = {
 };
 
 static void
-dissect_q2931_cause_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
-		       proto_tree *tree)
+dissect_q2931_cause_ie(tvbuff_t *tvb, int offset, int len,
+    proto_tree *tree)
 {
 	guint8 octet;
 	guint8 cause_value;
@@ -1151,7 +1146,11 @@ dissect_q2931_cause_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
 
 	if (len == 0)
 		return;
-	proto_tree_add_item(tree, hf_q2931_cause_location, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Location: %s",
+	    val_to_str(octet & 0x0F, q2931_cause_location_vals,
+	      "Unknown (0x%X)"));
 	offset += 1;
 	len -= 1;
 
@@ -1159,7 +1158,10 @@ dissect_q2931_cause_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
 		return;
 	octet = tvb_get_guint8(tvb, offset);
 	cause_value = octet & 0x7F;
-	proto_tree_add_item(tree, hf_q2931_cause_value, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Cause value: %s",
+	    val_to_str(cause_value, q2931_cause_code_vals,
+	      "Unknown (0x%X)"));
 	offset += 1;
 	len -= 1;
 
@@ -1185,8 +1187,14 @@ dissect_q2931_cause_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
 
 	case Q2931_CAUSE_CALL_REJECTED:
 		rejection_reason = octet & 0x7C;
-		proto_tree_add_item(tree, hf_q2931_cause_rejection_reason, tvb, offset, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(tree, hf_q2931_cause_rejection_condition, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_text(tree, tvb, offset, 1,
+		    "Rejection reason: %s",
+		    val_to_str(octet & 0x7C, q2931_rejection_reason_vals,
+		      "Unknown (0x%X)"));
+		proto_tree_add_text(tree, tvb, offset, 1,
+		    "Condition: %s",
+		    val_to_str(octet & 0x03, q2931_cause_condition_vals,
+		      "Unknown (0x%X)"));
 		offset += 1;
 		len -= 1;
 
@@ -1195,19 +1203,29 @@ dissect_q2931_cause_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
 		switch (rejection_reason) {
 
 		case Q2931_REJ_USER_SPECIFIC:
-			proto_tree_add_item(tree, hf_q2931_cause_rejection_user_specific_diagnostic, tvb, offset, len, ENC_NA);
+			proto_tree_add_text(tree, tvb, offset, len,
+			    "User specific diagnostic: %s",
+			    tvb_bytes_to_ep_str(tvb, offset, len));
 			break;
 
 		case Q2931_REJ_IE_MISSING:
-			proto_tree_add_item(tree, hf_q2931_cause_rejection_missing_information_element, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_text(tree, tvb, offset, 1,
+			    "Missing information element: %s",
+			    val_to_str(tvb_get_guint8(tvb, offset), q2931_info_element_vals,
+			      "Unknown (0x%02X)"));
 			break;
 
 		case Q2931_REJ_IE_INSUFFICIENT:
-			proto_tree_add_item(tree, hf_q2931_cause_rejection_insufficient_information_element, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_text(tree, tvb, offset, 1,
+			    "Insufficient information element: %s",
+			    val_to_str(tvb_get_guint8(tvb, offset), q2931_info_element_vals,
+			      "Unknown (0x%02X)"));
 			break;
 
 		default:
-			proto_tree_add_item(tree, hf_q2931_cause_rejection_diagnostic, tvb, offset, len, ENC_NA);
+			proto_tree_add_text(tree, tvb, offset, len,
+			    "Diagnostic: %s",
+			    tvb_bytes_to_ep_str(tvb, offset, len));
 			break;
 		}
 		break;
@@ -1221,7 +1239,7 @@ dissect_q2931_cause_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
 		info_element = tvb_get_guint8(tvb, offset);
 		info_element_ext = tvb_get_guint8(tvb, offset + 1);
 		info_element_len = tvb_get_ntohs(tvb, offset + 2);
-		dissect_q2931_ie(tvb, pinfo, offset, info_element_len, tree,
+		dissect_q2931_ie(tvb, offset, info_element_len, tree,
 		    info_element, info_element_ext);
 		break;
 
@@ -1231,7 +1249,10 @@ dissect_q2931_cause_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
 	case Q2931_CAUSE_IE_NONEX_OR_UNIMPL:
 	case Q2931_CAUSE_INVALID_IE_CONTENTS:
 		do {
-			proto_tree_add_item(tree, hf_q2931_cause_information_element, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_text(tree, tvb, offset, 1,
+			    "Information element: %s",
+			    val_to_str(tvb_get_guint8(tvb, offset), q2931_info_element_vals,
+			      "Unknown (0x%02X)"));
 			offset += 1;
 			len -= 1;
 		} while (len >= 0);
@@ -1239,7 +1260,10 @@ dissect_q2931_cause_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
 
 	case Q2931_CAUSE_CELL_RATE_UNAVAIL:
 		do {
-			proto_tree_add_item(tree, hf_q2931_cause_cell_rate_subfield_identifier, tvb, offset, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_text(tree, tvb, offset, 1,
+			    "Cell rate subfield identifier: %s",
+			    val_to_str(tvb_get_guint8(tvb, offset), q2931_atm_td_subfield_vals,
+			      "Unknown (0x%02X)"));
 			offset += 1;
 			len -= 1;
 		} while (len >= 0);
@@ -1248,28 +1272,36 @@ dissect_q2931_cause_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
 	case Q2931_CAUSE_CHAN_NONEXISTENT:
 		if (len < 2)
 			return;
-		proto_tree_add_item(tree, hf_q2931_cause_vpci, tvb, offset, 2, ENC_BIG_ENDIAN);
+		proto_tree_add_text(tree, tvb, offset, 2,
+		    "VPCI: %u", tvb_get_ntohs(tvb, offset));
 		offset += 2;
 		len -= 2;
 
 		if (len < 2)
 			return;
-		proto_tree_add_item(tree, hf_q2931_cause_vci, tvb, offset, 2, ENC_BIG_ENDIAN);
+		proto_tree_add_text(tree, tvb, offset, 2,
+		    "VCI: %u", tvb_get_ntohs(tvb, offset));
 		break;
 
 	case Q2931_CAUSE_MT_NONEX_OR_UNIMPL:
 	case Q2931_CAUSE_MSG_INCOMPAT_W_CS:
-		proto_tree_add_item(tree, hf_q2931_cause_message_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_text(tree, tvb, offset, 1,
+		    "Message type: %s",
+		    val_to_str(tvb_get_guint8(tvb, offset), q2931_message_type_vals,
+		      "Unknown (0x%02X)"));
 		break;
 
 	case Q2931_CAUSE_REC_TIMER_EXP:
 		if (len < 3)
 			return;
-		proto_tree_add_item(tree, hf_q2931_cause_timer, tvb, offset, 3, ENC_ASCII|ENC_NA);
+		proto_tree_add_text(tree, tvb, offset, 3,
+		    "Timer: %.3s", tvb_get_string(wmem_packet_scope(), tvb, offset, 3));
 		break;
 
 	default:
-		proto_tree_add_item(tree, hf_q2931_cause_rejection_diagnostic, tvb, offset, len, ENC_NA);
+		proto_tree_add_text(tree, tvb, offset, len,
+		    "Diagnostics: %s",
+		    tvb_bytes_to_ep_str(tvb, offset, len));
 	}
 }
 
@@ -1300,12 +1332,17 @@ static const value_string q2931_call_state_vals[] = {
 
 static void
 dissect_q2931_call_state_ie(tvbuff_t *tvb, int offset, int len,
-			    proto_tree *tree)
+    proto_tree *tree)
 {
+	guint8 octet;
+
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_call_state, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Call state: %s",
+	    val_to_str(octet & 0x3F, q2931_call_state_vals,
+	      "Unknown (0x%02X)"));
 }
 
 /*
@@ -1348,28 +1385,41 @@ static const value_string q2931_screening_indicator_vals[] = {
 };
 
 static void
-dissect_q2931_number_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
-			proto_tree *tree)
+dissect_q2931_number_ie(tvbuff_t *tvb, int offset, int len,
+    proto_tree *tree)
 {
 	guint8 octet;
 	guint8 numbering_plan;
+	proto_item *ti;
 	proto_tree *nsap_tree;
 
 	if (len == 0)
 		return;
 	octet = tvb_get_guint8(tvb, offset);
-	proto_tree_add_item(tree, hf_q2931_number_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Type of number: %s",
+	    val_to_str(octet & 0x70, q2931_number_type_vals,
+	      "Unknown (0x%02X)"));
 	numbering_plan = octet & 0x0F;
-	proto_tree_add_item(tree, hf_q2931_number_plan, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Numbering plan: %s",
+	    val_to_str(numbering_plan, q2931_numbering_plan_vals,
+	      "Unknown (0x%02X)"));
 	offset += 1;
 	len -= 1;
 
 	if (!(octet & Q2931_IE_EXTENSION)) {
 		if (len == 0)
 			return;
-
-		proto_tree_add_item(tree, hf_q2931_number_presentation_indicator, tvb, offset, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(tree, hf_q2931_number_screening_indicator, tvb, offset, 1, ENC_BIG_ENDIAN);
+		octet = tvb_get_guint8(tvb, offset);
+		proto_tree_add_text(tree, tvb, offset, 1,
+		    "Presentation indicator: %s",
+		    val_to_str(octet & 0x60, q2931_presentation_indicator_vals,
+		      "Unknown (0x%X)"));
+		proto_tree_add_text(tree, tvb, offset, 1,
+		    "Screening indicator: %s",
+		    val_to_str(octet & 0x03, q2931_screening_indicator_vals,
+		      "Unknown (0x%X)"));
 		offset += 1;
 		len -= 1;
 	}
@@ -1379,22 +1429,25 @@ dissect_q2931_number_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
 	switch (numbering_plan) {
 
 	case Q2931_ISDN_NUMBERING:
-		proto_tree_add_item(tree, hf_q2931_number_string, tvb, offset, len, ENC_ASCII|ENC_NA);
+		proto_tree_add_text(tree, tvb, offset, len, "Number: %.*s",
+		    len, tvb_get_string(wmem_packet_scope(), tvb, offset, len));
 		break;
 
 	case Q2931_NSAP_ADDRESSING:
 		if (len < 20) {
 			proto_tree_add_text(tree, tvb, offset, len,
 			    "Number (too short): %s",
-			    tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, len));
+			    tvb_bytes_to_ep_str(tvb, offset, len));
 			return;
 		}
-		nsap_tree = proto_tree_add_subtree(tree, tvb, offset, len, ett_q2931_nsap, NULL, "Number");
-		dissect_atm_nsap(tvb, pinfo, offset, len, nsap_tree);
+		ti = proto_tree_add_text(tree, tvb, offset, len, "Number");
+		nsap_tree = proto_item_add_subtree(ti, ett_q2931_nsap);
+		dissect_atm_nsap(tvb, offset, len, nsap_tree);
 		break;
 
 	default:
-		proto_tree_add_item(tree, hf_q2931_number_bytes, tvb, offset, len, ENC_NA);
+		proto_tree_add_text(tree, tvb, offset, len, "Number: %s",
+		    tvb_bytes_to_ep_str(tvb, offset, len));
 		break;
 	}
 }
@@ -1417,19 +1470,28 @@ static const value_string q2931_odd_even_indicator_vals[] = {
 
 static void
 dissect_q2931_party_subaddr_ie(tvbuff_t *tvb, int offset, int len,
-			       proto_tree *tree)
+    proto_tree *tree)
 {
+	guint8 octet;
+
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_party_subaddr_type_of_subaddress, tvb, offset, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_q2931_party_subaddr_odd_even_indicator, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Type of subaddress: %s",
+	    val_to_str(octet & 0x70, q2931_subaddress_type_vals,
+	      "Unknown (0x%02X)"));
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Odd/even indicator: %s",
+	    val_to_str(octet & 0x10, q2931_odd_even_indicator_vals,
+	      "Unknown (0x%02X)"));
 	offset += 1;
 	len -= 1;
 
 	if (len == 0)
 		return;
-	proto_tree_add_item(tree, hf_q2931_party_subaddr_subaddress, tvb, offset, len, ENC_NA);
+	proto_tree_add_text(tree, tvb, offset, len, "Subaddress: %s",
+	    tvb_bytes_to_ep_str(tvb, offset, len));
 }
 
 /*
@@ -1450,25 +1512,35 @@ static const value_string q2931_preferred_exclusive_vals[] = {
 
 static void
 dissect_q2931_connection_identifier_ie(tvbuff_t *tvb, int offset, int len,
-				       proto_tree *tree)
+    proto_tree *tree)
 {
+	guint8 octet;
+
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_conn_id_vp_associated_signalling, tvb, offset, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_q2931_conn_id_preferred_exclusive, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "VP-associated signalling: %s",
+	    val_to_str(octet & 0x18, q2931_vp_associated_signalling_vals,
+	      "Unknown (0x%02X)"));
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Preferred/exclusive: %s",
+	    val_to_str(octet & 0x07, q2931_preferred_exclusive_vals,
+	      "Unknown (0x%02X)"));
 	offset += 1;
 	len -= 1;
 
 	if (len < 2)
 		return;
-	proto_tree_add_item(tree, hf_q2931_conn_id_vpci, tvb, offset, 2, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 2, "VPCI: %u",
+	    tvb_get_ntohs(tvb, offset));
 	offset += 2;
 	len -= 2;
 
 	if (len < 2)
 		return;
-	proto_tree_add_item(tree, hf_q2931_conn_id_vci, tvb, offset, 2, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 2, "VCI: %u",
+	    tvb_get_ntohs(tvb, offset));
 }
 
 /*
@@ -1476,7 +1548,7 @@ dissect_q2931_connection_identifier_ie(tvbuff_t *tvb, int offset, int len,
  */
 static void
 dissect_q2931_e2e_transit_delay_ie(tvbuff_t *tvb, int offset, int len,
-				   proto_tree *tree)
+    proto_tree *tree)
 {
 	guint8 identifier;
 	guint16 value;
@@ -1488,17 +1560,18 @@ dissect_q2931_e2e_transit_delay_ie(tvbuff_t *tvb, int offset, int len,
 		switch (identifier) {
 
 		case 0x01:	/* Cumulative transit delay identifier */
-			proto_tree_add_uint_format_value(tree, hf_q2931_e2e_transit_delay_cumulative, tvb, offset, 3,
-			    value, "%u ms", value);
+			proto_tree_add_text(tree, tvb, offset, 3,
+			    "Cumulative transit delay: %u ms", value);
 			break;
 
 		case 0x03:	/* Maximum transit delay identifier */
 			if (value == 0xFFFF) {
-				proto_tree_add_uint_format_value(tree, hf_q2931_e2e_transit_delay_maximum_end_to_end, tvb, offset, 3,
-				    value, "Any end-to-end transit delay value acceptable");
+				proto_tree_add_text(tree, tvb, offset, 3,
+				    "Any end-to-end transit delay value acceptable");
 			} else {
-				proto_tree_add_uint_format_value(tree, hf_q2931_e2e_transit_delay_maximum_end_to_end, tvb, offset, 3,
-				    value, "%u ms", value);
+				proto_tree_add_text(tree, tvb, offset, 3,
+				    "Maximum end-to-end transit delay: %u ms",
+				    value);
 			}
 			break;
 
@@ -1521,18 +1594,27 @@ static const value_string q2931_qos_parameter_vals[] = {
 
 static void
 dissect_q2931_qos_parameter_ie(tvbuff_t *tvb, int offset, int len,
-			       proto_tree *tree)
+    proto_tree *tree)
 {
+	guint8 octet;
+
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_qos_class_forward, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "QOS class forward: %s",
+	    val_to_str(octet, q2931_qos_parameter_vals,
+	      "Unknown (0x%02X)"));
 	offset += 1;
 	len -= 1;
 
 	if (len == 0)
 		return;
-	proto_tree_add_item(tree, hf_q2931_qos_class_backward, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "QOS class backward: %s",
+	    val_to_str(octet, q2931_qos_parameter_vals,
+	      "Unknown (0x%02X)"));
 }
 
 /*
@@ -1545,12 +1627,17 @@ static const value_string q2931_bband_rpt_indicator_vals[] = {
 
 static void
 dissect_q2931_bband_rpt_indicator(tvbuff_t *tvb, int offset, int len,
-				  proto_tree *tree)
+    proto_tree *tree)
 {
+	guint8 octet;
+
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_broadband_repeat_indicator, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Broadband repeat indicator: %s",
+	    val_to_str(octet & 0x0F, q2931_bband_rpt_indicator_vals,
+	      "Unknown (0x%02X)"));
 }
 
 /*
@@ -1565,12 +1652,17 @@ static const value_string q2931_class_vals[] = {
 
 static void
 dissect_q2931_restart_indicator(tvbuff_t *tvb, int offset, int len,
-				proto_tree *tree)
+    proto_tree *tree)
 {
+	guint8 octet;
+
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_restart_indicator, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Restart indicator: %s",
+	    val_to_str(octet & 0x07, q2931_class_vals,
+	      "Unknown (0x%02X)"));
 }
 
 /*
@@ -1578,7 +1670,7 @@ dissect_q2931_restart_indicator(tvbuff_t *tvb, int offset, int len,
  */
 static void
 dissect_q2931_bband_sending_compl_ie(tvbuff_t *tvb, int offset, int len,
-				     proto_tree *tree)
+    proto_tree *tree)
 {
 	guint8 identifier;
 
@@ -1621,19 +1713,28 @@ static const value_string q2931_netid_plan_vals[] = {
 
 static void
 dissect_q2931_transit_network_sel_ie(tvbuff_t *tvb, int offset, int len,
-				     proto_tree *tree)
+    proto_tree *tree)
 {
+	guint8 octet;
+
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_transit_network_sel_type, tvb, offset, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_q2931_transit_network_sel_plan, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Type of network identification: %s",
+	    val_to_str(octet & 0x70, q2931_netid_type_vals,
+	      "Unknown (0x%02X)"));
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Network identification plan: %s",
+	    val_to_str(octet & 0x0F, q2931_netid_plan_vals,
+	      "Unknown (0x%02X)"));
 	offset += 1;
 	len -= 1;
 
 	if (len == 0)
 		return;
-	proto_tree_add_item(tree, hf_q2931_transit_network_sel_network_id, tvb, offset, len, ENC_NA|ENC_ASCII);
+	proto_tree_add_text(tree, tvb, offset, len,
+	    "Network identification: %.*s", len, tvb_get_string(wmem_packet_scope(), tvb, offset, len));
 }
 
 /*
@@ -1667,26 +1768,38 @@ static const value_string q2931_bwd_e2e_oam_f5_flow_indicator_vals[] = {
 
 static void
 dissect_q2931_oam_traffic_descriptor_ie(tvbuff_t *tvb, int offset, int len,
-					proto_tree *tree)
+    proto_tree *tree)
 {
 	guint8 octet;
 
 	if (len == 0)
 		return;
 	octet = tvb_get_guint8(tvb, offset);
-	proto_tree_add_item(tree, hf_q2931_oam_traffic_descriptor_shaping_indicator, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Shaping indicator: %s",
+	    val_to_str(octet & 0x60, q2931_shaping_indicator_vals,
+	      "Unknown (0x%02X)"));
 	proto_tree_add_text(tree, tvb, offset, 1,
 	    "Use of end-to-end OAM F5 flow is %s",
 	    (octet & 0x10) ? "mandatory" : "optional");
-	proto_tree_add_item(tree, hf_q2931_oam_traffic_descriptor_management_indicator, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "User-Network fault management indicator: %s",
+	    val_to_str(octet & 0x07, q2931_user_net_fault_mgmt_vals,
+	      "Unknown (0x%02X)"));
 	offset += 1;
 	len -= 1;
 
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_oam_traffic_descriptor_forward_f5_flow_indicator, tvb, offset, 1, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_q2931_oam_traffic_descriptor_backward_f5_flow_indicator, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Forward end-to-end OAM F5 flow indicator: %s",
+	    val_to_str(octet & 0x70, q2931_fwd_e2e_oam_f5_flow_indicator_vals,
+	      "Unknown (0x%02X)"));
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Backward end-to-end OAM F5 flow indicator: %s",
+	    val_to_str(octet & 0x07, q2931_bwd_e2e_oam_f5_flow_indicator_vals,
+	      "Unknown (0x%02X)"));
 }
 
 /*
@@ -1699,14 +1812,18 @@ static const value_string q2931_endpoint_reference_type_vals[] = {
 
 static void
 dissect_q2931_endpoint_reference_ie(tvbuff_t *tvb, int offset, int len,
-				    proto_tree *tree)
+    proto_tree *tree)
 {
+	guint8 octet;
 	guint16 value;
 
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_endpoint_reference_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Endpoint reference type: %s",
+	    val_to_str(octet, q2931_endpoint_reference_type_vals,
+	      "Unknown (0x%02X)"));
 	offset += 1;
 	len -= 1;
 
@@ -1716,8 +1833,10 @@ dissect_q2931_endpoint_reference_ie(tvbuff_t *tvb, int offset, int len,
 	proto_tree_add_text(tree, tvb, offset, 2,
 	    "Endpoint reference flag: %s",
 	    (value & 0x8000) ? "Message sent to side that originates the endpoint reference" :
-			       "Message sent from side that originates the endpoint reference");
-	proto_tree_add_item(tree, hf_q2931_endpoint_reference_identifier_value, tvb, offset, 2, ENC_BIG_ENDIAN);
+		 	       "Message sent from side that originates the endpoint reference");
+	proto_tree_add_text(tree, tvb, offset, 2,
+	    "Endpoint reference identifier value: %u",
+	    value & 0x7FFF);
 }
 
 /*
@@ -1735,17 +1854,22 @@ static const value_string q2931_endpoint_reference_party_state_vals[] = {
 
 static void
 dissect_q2931_endpoint_state_ie(tvbuff_t *tvb, int offset, int len,
-				proto_tree *tree)
+    proto_tree *tree)
 {
+	guint8 octet;
+
 	if (len == 0)
 		return;
-
-	proto_tree_add_item(tree, hf_q2931_endpoint_state, tvb, offset, 1, ENC_BIG_ENDIAN);
+	octet = tvb_get_guint8(tvb, offset);
+	proto_tree_add_text(tree, tvb, offset, 1,
+	    "Endpoint reference party-state: %s",
+	    val_to_str(octet & 0x3F, q2931_endpoint_reference_party_state_vals,
+	      "Unknown (0x%02X)"));
 }
 
 static void
-dissect_q2931_ie_contents(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
-			  proto_tree *tree, guint8 info_element)
+dissect_q2931_ie_contents(tvbuff_t *tvb, int offset, int len,
+    proto_tree *tree, guint8 info_element)
 {
 	switch (info_element) {
 
@@ -1793,7 +1917,7 @@ dissect_q2931_ie_contents(tvbuff_t *tvb, packet_info* pinfo, int offset, int len
 
 	case Q2931_IE_CALLED_PARTY_NUMBER:
 	case Q2931_IE_CALLING_PARTY_NUMBER:
-		dissect_q2931_number_ie(tvb, pinfo, offset, len, tree);
+		dissect_q2931_number_ie(tvb, offset, len, tree);
 		break;
 
 	case Q2931_IE_CALLED_PARTY_SUBADDR:
@@ -1802,7 +1926,7 @@ dissect_q2931_ie_contents(tvbuff_t *tvb, packet_info* pinfo, int offset, int len
 		break;
 
 	case Q2931_IE_CAUSE:
-		dissect_q2931_cause_ie(tvb, pinfo, offset, len, tree);
+		dissect_q2931_cause_ie(tvb, offset, len, tree);
 		break;
 
 	case Q2931_IE_CONNECTION_IDENTIFIER:
@@ -1848,66 +1972,64 @@ dissect_q2931_ie_contents(tvbuff_t *tvb, packet_info* pinfo, int offset, int len
 }
 
 static void
-dissect_q2931_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len, proto_tree *tree,
-		 guint8 info_element, guint8 info_element_ext)
+dissect_q2931_ie(tvbuff_t *tvb, int offset, int len, proto_tree *tree,
+    guint8 info_element, guint8 info_element_ext)
 {
 	proto_item	*ti;
 	proto_tree	*ie_tree;
 	proto_tree	*ie_ext_tree;
 
-	ie_tree = proto_tree_add_subtree(tree, tvb, offset, 1+1+2+len, ett_q2931_ie, NULL,
-	    val_to_str_ext(info_element, &q2931_info_element_vals_ext,
+	ti = proto_tree_add_text(tree, tvb, offset, 1+1+2+len, "%s",
+	    val_to_str(info_element, q2931_info_element_vals,
 	      "Unknown information element (0x%02X)"));
-	proto_tree_add_uint(ie_tree, hf_q2931_information_element, tvb, offset, 1, info_element);
-	ti = proto_tree_add_uint(ie_tree, hf_q2931_information_element_extension, tvb, offset + 1, 1, info_element_ext);
+	ie_tree = proto_item_add_subtree(ti, ett_q2931_ie);
+	proto_tree_add_text(ie_tree, tvb, offset, 1, "Information element: %s",
+	    val_to_str(info_element, q2931_info_element_vals,
+	      "Unknown (0x%02X)"));
+	ti = proto_tree_add_text(ie_tree, tvb, offset + 1, 1,
+	    "Information element extension: 0x%02x",
+	    info_element_ext);
 	ie_ext_tree = proto_item_add_subtree(ti, ett_q2931_ie_ext);
 	proto_tree_add_item(ie_ext_tree, hf_q2931_ie_coding_standard, tvb, offset+1, 1, ENC_BIG_ENDIAN);
 	proto_tree_add_item(ie_ext_tree, hf_q2931_ie_handling_instructions, tvb, offset+1, 1, ENC_BIG_ENDIAN);
 	if (info_element_ext & Q2931_IE_COMPAT_FOLLOW_INST) {
 	    proto_tree_add_item(ie_ext_tree, hf_q2931_ie_action_indicator, tvb, offset+1, 1, ENC_BIG_ENDIAN);
 	}
-	proto_tree_add_uint(ie_tree, hf_q2931_information_element_length, tvb, offset + 2, 2, len);
+	proto_tree_add_text(ie_tree, tvb, offset + 2, 2, "Length: %u", len);
 
 	if ((info_element_ext & Q2931_IE_COMPAT_CODING_STD)
 	    == Q2931_ITU_STANDARDIZED_CODING) {
-		dissect_q2931_ie_contents(tvb, pinfo, offset + 4,
+		dissect_q2931_ie_contents(tvb, offset + 4,
 		    len, ie_tree, info_element);
 	} else {
 		/*
 		 * We don't know how it's encoded, so just
 		 * dump it as data and be done with it.
 		 */
-		proto_tree_add_item(ie_tree, hf_q2931_information_element_data, tvb, offset + 4, len, ENC_NA);
+		proto_tree_add_text(ie_tree, tvb, offset + 4,  len,
+		    "Data: %s", tvb_bytes_to_ep_str(tvb, offset + 4, len));
 	}
 }
 
 static void
 dissect_q2931(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	int	    offset     = 0;
-	proto_tree *q2931_tree = NULL;
-	proto_item *ti;
-	guint8	    call_ref_len;
-	guint8	    call_ref[15];
-	guint8	    message_type;
-	guint8	    message_type_ext;
-	guint16	    message_len;
-	guint8	    info_element;
-	guint8	    info_element_ext;
-	guint16	    info_element_len;
+	int		offset = 0;
+	proto_tree	*q2931_tree = NULL;
+	proto_item	*ti;
+	proto_tree	*ext_tree;
+	guint8		call_ref_len;
+	guint8		call_ref[15];
+	guint8		message_type;
+	guint8		message_type_ext;
+	guint16		message_len;
+	guint8		info_element;
+	guint8		info_element_ext;
+	guint16		info_element_len;
 #if 0
-	int	    codeset;
-	gboolean    non_locking_shift;
+	int		codeset;
+	gboolean	non_locking_shift;
 #endif
-	static const int * ext_flags[] = {
-		&hf_q2931_message_flag,
-		NULL
-	};
-	static const int * ext_flags_follow_inst[] = {
-		&hf_q2931_message_flag,
-		&hf_q2931_message_action_indicator,
-		NULL
-	};
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "Q.2931");
 
@@ -1925,25 +2047,34 @@ dissect_q2931(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	offset += 1;
 	if (call_ref_len != 0) {
 		tvb_memcpy(tvb, call_ref, offset, call_ref_len);
-		proto_tree_add_boolean(q2931_tree, hf_q2931_call_ref_flag,
-			tvb, offset, 1, (call_ref[0] & 0x80) != 0);
-		call_ref[0] &= 0x7F;
-		proto_tree_add_bytes(q2931_tree, hf_q2931_call_ref, tvb, offset, call_ref_len, call_ref);
+		if (q2931_tree != NULL) {
+			proto_tree_add_boolean(q2931_tree, hf_q2931_call_ref_flag,
+			    tvb, offset, 1, (call_ref[0] & 0x80) != 0);
+			call_ref[0] &= 0x7F;
+			proto_tree_add_bytes(q2931_tree, hf_q2931_call_ref, tvb, offset, call_ref_len, call_ref);
+		}
 		offset += call_ref_len;
 	}
 	message_type = tvb_get_guint8(tvb, offset);
 	col_add_str(pinfo->cinfo, COL_INFO,
-		    val_to_str_ext(message_type, &q2931_message_type_vals_ext,
+		    val_to_str(message_type, q2931_message_type_vals,
 		      "Unknown message type (0x%02X)"));
 
-	proto_tree_add_uint(q2931_tree, hf_q2931_message_type, tvb, offset, 1, message_type);
+	if (q2931_tree != NULL)
+		proto_tree_add_uint(q2931_tree, hf_q2931_message_type, tvb, offset, 1, message_type);
 	offset += 1;
 
 	message_type_ext = tvb_get_guint8(tvb, offset);
-	if (message_type_ext & Q2931_MSG_TYPE_EXT_FOLLOW_INST) {
-		proto_tree_add_bitmask(q2931_tree, tvb, offset, hf_q2931_message_type_ext, ett_q2931_ext, ext_flags_follow_inst, ENC_NA);
-	} else {
-		proto_tree_add_bitmask(q2931_tree, tvb, offset, hf_q2931_message_type_ext, ett_q2931_ext, ext_flags, ENC_NA);
+	if (q2931_tree != NULL) {
+		ti = proto_tree_add_uint(q2931_tree, hf_q2931_message_type_ext, tvb,
+		    offset, 1, message_type_ext);
+		ext_tree = proto_item_add_subtree(ti, ett_q2931_ext);
+		proto_tree_add_boolean(ext_tree, hf_q2931_message_flag, tvb,
+		    offset, 1, message_type_ext);
+		if (message_type_ext & Q2931_MSG_TYPE_EXT_FOLLOW_INST) {
+			proto_tree_add_uint(ext_tree, hf_q2931_message_action_indicator, tvb,
+			    offset, 1, message_type_ext);
+		}
 	}
 	offset += 1;
 
@@ -1964,7 +2095,7 @@ dissect_q2931(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		info_element_ext = tvb_get_guint8(tvb, offset + 1);
 		info_element_len = tvb_get_ntohs(tvb, offset + 2);
 		if (q2931_tree != NULL) {
-			dissect_q2931_ie(tvb, pinfo, offset, info_element_len,
+			dissect_q2931_ie(tvb, offset, info_element_len,
 			    q2931_tree, info_element, info_element_ext);
 		}
 #if 0 /* XXX: Is codeset & etc supoosed to be used somehow ? */
@@ -1999,473 +2130,52 @@ proto_register_q2931(void)
 {
 	static hf_register_info hf[] = {
 		{ &hf_q2931_discriminator,
-		  { "Protocol discriminator", "q2931.disc",
-		    FT_UINT8, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
-		},
+		  { "Protocol discriminator", "q2931.disc", FT_UINT8, BASE_HEX, NULL, 0x0,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_call_ref_len,
-		  { "Call reference value length", "q2931.call_ref_len",
-		    FT_UINT8, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
+		  { "Call reference value length", "q2931.call_ref_len", FT_UINT8, BASE_DEC, NULL, 0x0,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_call_ref_flag,
-		  { "Call reference flag", "q2931.call_ref_flag",
-		    FT_BOOLEAN, BASE_NONE, TFS(&tfs_call_ref_flag), 0x0,
-		    NULL, HFILL }
-		},
+		  { "Call reference flag", "q2931.call_ref_flag", FT_BOOLEAN, BASE_NONE, TFS(&tfs_call_ref_flag), 0x0,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_call_ref,
-		  { "Call reference value", "q2931.call_ref",
-		    FT_BYTES, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
-		},
+		  { "Call reference value", "q2931.call_ref", FT_BYTES, BASE_NONE, NULL, 0x0,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_message_type,
-		  { "Message type", "q2931.message_type",
-		    FT_UINT8, BASE_HEX|BASE_EXT_STRING, &q2931_message_type_vals_ext, 0x0,
-		    NULL, HFILL }
-		},
+		  { "Message type", "q2931.message_type", FT_UINT8, BASE_HEX, VALS(q2931_message_type_vals), 0x0,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_message_type_ext,
-		  { "Message type extension", "q2931.message_type_ext",
-		    FT_UINT8, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
-		},
+		  { "Message type extension", "q2931.message_type_ext", FT_UINT8, BASE_HEX, NULL, 0x0,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_message_flag,
-		  { "Flag", "q2931.message_flag",
-		    FT_BOOLEAN, 8, TFS(&tos_msg_flag), Q2931_MSG_TYPE_EXT_FOLLOW_INST,
-		    NULL, HFILL }
-		},
+		  { "Flag", "q2931.message_flag", FT_BOOLEAN, 8, TFS(&tos_msg_flag), Q2931_MSG_TYPE_EXT_FOLLOW_INST,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_message_action_indicator,
-		  { "Action indicator", "q2931.message_action_indicator",
-		    FT_UINT8, BASE_DEC, VALS(msg_action_ind_vals), Q2931_MSG_TYPE_EXT_ACTION_IND,
-		    NULL, HFILL }
-		},
+		  { "Action indicator", "q2931.message_action_indicator", FT_UINT8, BASE_DEC, VALS(msg_action_ind_vals), Q2931_MSG_TYPE_EXT_ACTION_IND,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_message_len,
-		  { "Message length", "q2931.message_len",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
+		  { "Message length", "q2931.message_len", FT_UINT16, BASE_DEC, NULL, 0x0,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_ie_handling_instructions,
-		  { "Handling Instructions", "q2931.ie_handling_instructions",
-		    FT_BOOLEAN, 8, TFS(&tfs_q2931_handling_instructions), Q2931_IE_COMPAT_FOLLOW_INST,
-		    NULL, HFILL }
-		},
+		  { "Handling Instructions", "q2931.ie_handling_instructions", FT_BOOLEAN, 8, TFS(&tfs_q2931_handling_instructions), Q2931_IE_COMPAT_FOLLOW_INST,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_ie_coding_standard,
-		  { "Coding standard", "q2931.ie_coding_standard",
-		    FT_UINT8, BASE_DEC, VALS(coding_std_vals), Q2931_IE_COMPAT_CODING_STD,
-		    NULL, HFILL }
-		},
+		  { "Coding standard", "q2931.ie_coding_standard", FT_UINT8, BASE_DEC, VALS(coding_std_vals), Q2931_IE_COMPAT_CODING_STD,
+		  	NULL, HFILL }},
 
 		{ &hf_q2931_ie_action_indicator,
-		  { "Action indicator", "q2931.ie_action_indicator",
-		    FT_UINT8, BASE_DEC, VALS(ie_action_ind_vals), Q2931_IE_COMPAT_ACTION_IND,
-		    NULL, HFILL }
-		},
-
-		/* Generated from convert_proto_tree_add_text.pl */
-		{ &hf_q2931_aal_type,
-		  { "AAL type", "q2931.aal_type",
-		    FT_UINT8, BASE_HEX, VALS(q9231_aal_type_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_user_defined_aal_information,
-		  { "User defined AAL information", "q2931.user_defined_aal_information",
-		    FT_BYTES, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_subtype,
-		  { "Subtype", "q2931.aal1.subtype",
-		    FT_UINT8, BASE_HEX, VALS(q9231_aal1_subtype_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_cbr_rate,
-		  { "CBR rate", "q2931.aal1.cbr_rate",
-		    FT_UINT8, BASE_HEX, VALS(q9231_aal1_cbr_rate_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_multiplier,
-		  { "Multiplier", "q2931.aal1.multiplier",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_source_clock_frequency_recovery_method,
-		  { "Source clock frequency recovery method", "q2931.aal1.source_clock_frequency_recovery_method",
-		    FT_UINT8, BASE_HEX, VALS(q2931_aal1_src_clk_rec_meth_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_error_correction_method,
-		  { "Error correction method", "q2931.aal1.error_correction_method",
-		    FT_UINT8, BASE_HEX, VALS(q2931_aal1_err_correction_method_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_structured_data_transfer_block_size,
-		  { "Structured data transfer block size", "q2931.aal1.structured_data_transfer_block_size",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_partially_filled_cells_method,
-		  { "Partially filled cells method", "q2931.aal1.partially_filled_cells_method",
-		    FT_UINT8, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_forward_max_cpcs_sdu_size,
-		  { "Forward maximum CPCS-SDU size", "q2931.aal1.forward_max_cpcs_sdu_size",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_backward_max_cpcs_sdu_size,
-		  { "Backward maximum CPCS-SDU size", "q2931.aal1.backward_max_cpcs_sdu_size",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_mode,
-		  { "Mode", "q2931.aal1.mode",
-		    FT_UINT8, BASE_HEX, VALS(q2931_aal_mode_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_aal1_sscs_type,
-		  { "SSCS type", "q2931.aal1.sscs_type",
-		    FT_UINT8, BASE_HEX, VALS(q2931_sscs_type_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_bearer_class,
-		  { "Bearer class", "q2931.bearer_class",
-		    FT_UINT8, BASE_HEX, VALS(q2931_bearer_class_vals), 0x1F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_atm_transfer_capability,
-		  { "ATM Transfer Capability", "q2931.atm_transfer_capability",
-		    FT_UINT8, BASE_HEX, VALS(q2931_transfer_capability_vals), 0x1F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_susceptibility_to_clipping,
-		  { "Susceptibility to clipping", "q2931.susceptibility_to_clipping",
-		    FT_UINT8, BASE_HEX, VALS(q2931_susc_clip_vals), 0x60,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_user_plane_connection_configuration,
-		  { "User-plane connection configuration", "q2931.user_plane_connection_configuration",
-		    FT_UINT8, BASE_HEX, VALS(q2931_up_conn_config_vals), 0x03,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_high_layer_information_type,
-		  { "High layer information type", "q2931.high_layer_information_type",
-		    FT_UINT8, BASE_HEX, VALS(q2931_hi_layer_info_type_vals), 0x7F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_bband_low_layer_info_user_info_l1_proto,
-		  { "User information layer 1 protocol", "q2931.bband_low_layer_info.user_info_l1_proto",
-		    FT_UINT8, BASE_HEX, NULL, 0x1F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_bband_low_layer_info_user_info_l2_proto,
-		  { "User information layer 2 protocol", "q2931.bband_low_layer_info.user_info_l2_proto",
-		    FT_UINT8, BASE_HEX, VALS(q2931_uil2_vals), 0x1F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_bband_low_layer_info_user_specified_l2_proto,
-		  { "User-specified layer 2 protocol information", "q2931.bband_low_layer_info.user_specified_l2_proto",
-		    FT_UINT8, BASE_HEX, NULL, 0x7F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_bband_low_layer_info_mode,
-		  { "Mode", "q2931.bband_low_layer_info.mode",
-		    FT_UINT8, BASE_HEX, VALS(q2931_mode_vals), 0x60,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_bband_low_layer_info_window_size,
-		  { "Window size", "q2931.bband_low_layer_info.window_size",
-		    FT_UINT8, BASE_DEC, NULL, 0x7F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_bband_low_layer_info_user_info_l3_proto,
-		  { "User information layer 3 protocol", "q2931.bband_low_layer_info.user_info_l3_proto",
-		    FT_UINT8, BASE_HEX, VALS(q2931_uil3_vals), 0x1F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_bband_low_layer_info_default_packet_size,
-		  { "Default packet size", "q2931.bband_low_layer_info.default_packet_size",
-		    FT_UINT8, BASE_DEC, NULL, 0x0F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_bband_low_layer_info_packet_window_size,
-		  { "Packet window size", "q2931.bband_low_layer_info.packet_window_size",
-		    FT_UINT8, BASE_DEC, NULL, 0x7F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_bband_low_layer_info_additional_l3_proto,
-		  { "Additional layer 3 protocol information", "q2931.bband_low_layer_info.additional_l3_proto",
-		    FT_UINT8, BASE_HEX, VALS(nlpid_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_organization_code,
-		  { "Organization Code", "q2931.bband_low_layer_info.organization_code",
-		    FT_UINT24, BASE_HEX, VALS(oui_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_ethernet_type,
-		  { "Ethernet type", "q2931.bband_low_layer_info.ethernet_type",
-		    FT_UINT16, BASE_HEX, VALS(etype_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_lane_protocol_id,
-		  { "LANE Protocol ID", "q2931.bband_low_layer_info.lane_protocol_id",
-		    FT_UINT16, BASE_HEX, VALS(lane_pid_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_protocol_id,
-		  { "Protocol ID", "q2931.bband_low_layer_info.protocol_id",
-		    FT_UINT16, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_location,
-		  { "Location", "q2931.cause.location",
-		    FT_UINT8, BASE_HEX, VALS(q2931_cause_location_vals), 0x0F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_value,
-		  { "Cause value", "q2931.cause.value",
-		    FT_UINT8, BASE_HEX|BASE_EXT_STRING, &q2931_cause_code_vals_ext, 0x7F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_rejection_reason,
-		  { "Rejection reason", "q2931.cause.rejection.reason",
-		    FT_UINT8, BASE_HEX, VALS(q2931_rejection_reason_vals), 0x7C,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_rejection_condition,
-		  { "Condition", "q2931.cause.rejection.condition",
-		    FT_UINT8, BASE_HEX, VALS(q2931_cause_condition_vals), 0x03,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_rejection_user_specific_diagnostic,
-		  { "User specific diagnostic", "q2931.cause.rejection.user_specific_diagnostic",
-		    FT_BYTES, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_rejection_missing_information_element,
-		  { "Missing information element", "q2931.cause.rejection.missing_information_element",
-		    FT_UINT8, BASE_HEX|BASE_EXT_STRING, &q2931_info_element_vals_ext, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_rejection_insufficient_information_element,
-		  { "Insufficient information element", "q2931.cause.rejection.insufficient_information_element",
-		    FT_UINT8, BASE_HEX|BASE_EXT_STRING, &q2931_info_element_vals_ext, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_rejection_diagnostic,
-		  { "Diagnostic", "q2931.cause.rejection.diagnostic",
-		    FT_BYTES, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_information_element,
-		  { "Information element", "q2931.cause.information_element",
-		    FT_UINT8, BASE_HEX|BASE_EXT_STRING, &q2931_info_element_vals_ext, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_cell_rate_subfield_identifier,
-		  { "Cell rate subfield identifier", "q2931.cause.cell_rate_subfield_identifier",
-		    FT_UINT8, BASE_HEX, VALS(q2931_atm_td_subfield_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_vpci,
-		  { "VPCI", "q2931.cause.vpci",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_vci,
-		  { "VCI", "q2931.cause.vci",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_message_type,
-		  { "Message type", "q2931.cause.message_type",
-		    FT_UINT8, BASE_HEX|BASE_EXT_STRING, &q2931_message_type_vals_ext, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_cause_timer,
-		  { "Timer", "q2931.cause.timer",
-		    FT_STRING, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_call_state,
-		  { "Call state", "q2931.call_state",
-		    FT_UINT8, BASE_HEX, VALS(q2931_call_state_vals), 0x3F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_number_type,
-		  { "Type of number", "q2931.number.type",
-		    FT_UINT8, BASE_HEX, VALS(q2931_number_type_vals), 0x70,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_number_plan,
-		  { "Numbering plan", "q2931.number.plan",
-		    FT_UINT8, BASE_HEX, VALS(q2931_numbering_plan_vals), 0x0F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_number_presentation_indicator,
-		  { "Presentation indicator", "q2931.number.presentation_indicator",
-		    FT_UINT8, BASE_HEX, VALS(q2931_presentation_indicator_vals), 0x60,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_number_screening_indicator,
-		  { "Screening indicator", "q2931.number.screening_indicator",
-		    FT_UINT8, BASE_HEX, VALS(q2931_screening_indicator_vals), 0x03,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_number_string,
-		  { "Number", "q2931.number.string",
-		    FT_STRING, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_number_bytes,
-		  { "Number", "q2931.number.bytes",
-		    FT_BYTES, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_party_subaddr_type_of_subaddress,
-		  { "Type of subaddress", "q2931.party_subaddr.type_of_subaddress",
-		    FT_UINT8, BASE_HEX, VALS(q2931_subaddress_type_vals), 0x70,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_party_subaddr_odd_even_indicator,
-		  { "Odd/even indicator", "q2931.party_subaddr.odd_even_indicator",
-		    FT_UINT8, BASE_HEX, VALS(q2931_odd_even_indicator_vals), 0x10,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_party_subaddr_subaddress,
-		  { "Subaddress", "q2931.party_subaddr.subaddress",
-		    FT_BYTES, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_conn_id_vp_associated_signalling,
-		  { "VP-associated signalling", "q2931.conn_id.vp_associated_signalling",
-		    FT_UINT8, BASE_HEX, VALS(q2931_vp_associated_signalling_vals), 0x18,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_conn_id_preferred_exclusive,
-		  { "Preferred/exclusive", "q2931.conn_id.preferred_exclusive",
-		    FT_UINT8, BASE_HEX, VALS(q2931_preferred_exclusive_vals), 0x07,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_conn_id_vpci,
-		  { "VPCI", "q2931.conn_id.vpci",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_conn_id_vci,
-		  { "VCI", "q2931.conn_id.vci",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_e2e_transit_delay_cumulative,
-		  { "Cumulative transit delay", "q2931.e2e_transit_delay.cumulative",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_e2e_transit_delay_maximum_end_to_end,
-		  { "Maximum end-to-end transit delay", "q2931.e2e_transit_delay.maximum_end_to_end",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_qos_class_forward,
-		  { "QOS class forward", "q2931.qos_class_forward",
-		    FT_UINT8, BASE_HEX, VALS(q2931_qos_parameter_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_qos_class_backward,
-		  { "QOS class backward", "q2931.qos_class_backward",
-		    FT_UINT8, BASE_HEX, VALS(q2931_qos_parameter_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_broadband_repeat_indicator,
-		  { "Broadband repeat indicator", "q2931.broadband_repeat_indicator",
-		    FT_UINT8, BASE_HEX, VALS(q2931_bband_rpt_indicator_vals), 0x0F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_restart_indicator,
-		  { "Restart indicator", "q2931.restart_indicator",
-		    FT_UINT8, BASE_HEX, VALS(q2931_class_vals), 0x07,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_transit_network_sel_type,
-		  { "Type of network identification", "q2931.transit_network_sel.type",
-		    FT_UINT8, BASE_HEX, VALS(q2931_netid_type_vals), 0x70,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_transit_network_sel_plan,
-		  { "Network identification plan", "q2931.transit_network_sel.plan",
-		    FT_UINT8, BASE_HEX, VALS(q2931_netid_plan_vals), 0x0F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_transit_network_sel_network_id,
-		  { "Network identification", "q2931.transit_network_sel.network_identification",
-		    FT_STRING, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_oam_traffic_descriptor_shaping_indicator,
-		  { "Shaping indicator", "q2931.oam_traffic_descriptor.shaping_indicator",
-		    FT_UINT8, BASE_HEX, VALS(q2931_shaping_indicator_vals), 0x60,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_oam_traffic_descriptor_management_indicator,
-		  { "User-Network fault management indicator", "q2931.oam_traffic_descriptor.management_indicator",
-		    FT_UINT8, BASE_HEX, VALS(q2931_user_net_fault_mgmt_vals), 0x07,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_oam_traffic_descriptor_forward_f5_flow_indicator,
-		  { "Forward end-to-end OAM F5 flow indicator", "q2931.oam_traffic_descriptor.forward_f5_flow_indicator",
-		    FT_UINT8, BASE_HEX, VALS(q2931_fwd_e2e_oam_f5_flow_indicator_vals), 0x70,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_oam_traffic_descriptor_backward_f5_flow_indicator,
-		  { "Backward end-to-end OAM F5 flow indicator", "q2931.oam_traffic_descriptor.backward_f5_flow_indicator",
-		    FT_UINT8, BASE_HEX, VALS(q2931_bwd_e2e_oam_f5_flow_indicator_vals), 0x07,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_endpoint_reference_type,
-		  { "Endpoint reference type", "q2931.endpoint_reference.type",
-		    FT_UINT8, BASE_HEX, VALS(q2931_endpoint_reference_type_vals), 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_endpoint_reference_identifier_value,
-		  { "Endpoint reference identifier value", "q2931.endpoint_reference.identifier_value",
-		    FT_UINT16, BASE_DEC, NULL, 0x7FFF,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_endpoint_state,
-		  { "Endpoint reference party-state", "q2931.endpoint_state",
-		    FT_UINT8, BASE_HEX, VALS(q2931_endpoint_reference_party_state_vals), 0x3F,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_information_element,
-		  { "Information element", "q2931.information_element",
-		    FT_UINT8, BASE_HEX|BASE_EXT_STRING, &q2931_info_element_vals_ext, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_information_element_extension,
-		  { "Information element extension", "q2931.information_element.extension",
-		    FT_UINT8, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_information_element_length,
-		  { "Length", "q2931.information_element.length",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
-		},
-		{ &hf_q2931_information_element_data,
-		  { "Data", "q2931.information_element.data",
-		    FT_BYTES, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
-		},
+		  { "Action indicator", "q2931.ie_action_indicator", FT_UINT8, BASE_DEC, VALS(ie_action_ind_vals), Q2931_IE_COMPAT_ACTION_IND,
+		  	NULL, HFILL }},
 	};
 	static gint *ett[] = {
 		&ett_q2931,
@@ -2481,16 +2191,3 @@ proto_register_q2931(void)
 
 	register_dissector("q2931", dissect_q2931, proto_q2931);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

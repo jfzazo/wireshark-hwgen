@@ -24,7 +24,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/crypt/wep-wpadefs.h>
 #include <epan/etypes.h>
 #include <epan/eapol_keydes_types.h>
 
@@ -56,7 +58,6 @@ static dissector_table_t eapol_keydes_type_dissector_table;
 static dissector_handle_t eapol_handle;
 
 static dissector_handle_t eap_handle;
-static dissector_handle_t mka_handle;
 static dissector_handle_t data_handle;
 
 #define EAPOL_HDR_LEN   4
@@ -70,7 +71,6 @@ static dissector_handle_t data_handle;
 #define EAPOL_LOGOFF            2
 #define EAPOL_KEY               3
 #define EAPOL_ENCAP_ASF_ALERT   4
-#define EAPOL_MKA               5
 
 static const value_string eapol_version_vals[] = {
   { EAPOL_2001,   "802.1X-2001" },
@@ -85,7 +85,6 @@ static const value_string eapol_type_vals[] = {
   { EAPOL_LOGOFF,          "Logoff" },
   { EAPOL_KEY,             "Key" },
   { EAPOL_ENCAP_ASF_ALERT, "Encapsulated ASF Alert" },
-  { EAPOL_MKA,             "MKA" },
   { 0, NULL }
 };
 
@@ -109,21 +108,24 @@ dissect_eapol(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   guint16     eapol_len;
   guint8      keydesc_type;
   guint       len;
-  proto_tree *ti;
-  proto_tree *eapol_tree;
+  proto_tree *ti = NULL;
+  proto_tree *eapol_tree = NULL;
   tvbuff_t   *next_tvb;
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "EAPOL");
   col_clear(pinfo->cinfo, COL_INFO);
 
-  ti = proto_tree_add_item(tree, proto_eapol, tvb, 0, -1, ENC_NA);
-  eapol_tree = proto_item_add_subtree(ti, ett_eapol);
+  if (tree) {
+    ti = proto_tree_add_item(tree, proto_eapol, tvb, 0, -1, ENC_NA);
+    eapol_tree = proto_item_add_subtree(ti, ett_eapol);
 
-  proto_tree_add_item(eapol_tree, hf_eapol_version, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(eapol_tree, hf_eapol_version, tvb, offset, 1, ENC_BIG_ENDIAN);
+  }
   offset++;
 
   eapol_type = tvb_get_guint8(tvb, offset);
-  proto_tree_add_item(eapol_tree, hf_eapol_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+  if (tree)
+    proto_tree_add_item(eapol_tree, hf_eapol_type, tvb, offset, 1, ENC_BIG_ENDIAN);
   col_add_str(pinfo->cinfo, COL_INFO,
                 val_to_str(eapol_type, eapol_type_vals, "Unknown Type (0x%02X)"));
   offset++;
@@ -155,11 +157,6 @@ dissect_eapol(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       proto_tree_add_item(eapol_tree, hf_eapol_keydes_body, tvb, offset, -1, ENC_NA);
     break;
 
-  case EAPOL_MKA:
-    next_tvb = tvb_new_subset_remaining(tvb, offset);
-    call_dissector(mka_handle, next_tvb, pinfo, eapol_tree);
-    break;
-
   case EAPOL_ENCAP_ASF_ALERT:   /* XXX - is this an SNMP trap? */
   default:
     next_tvb = tvb_new_subset_remaining(tvb, offset);
@@ -174,7 +171,7 @@ dissect_eapol_rc4_key(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, v
   int         offset = 0;
   guint16     eapol_key_len;
   gboolean    generated_locally;
-  proto_tree *ti;
+  proto_tree *ti = NULL;
   proto_tree *key_index_tree;
   gint        eapol_len;
 
@@ -320,7 +317,6 @@ proto_reg_handoff_eapol(void)
    * Get handles for the EAP and raw data dissectors.
    */
   eap_handle  = find_dissector("eap");
-  mka_handle  = find_dissector("mka");
   data_handle = find_dissector("data");
 
   dissector_add_uint("ethertype", ETHERTYPE_EAPOL, eapol_handle);

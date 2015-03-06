@@ -22,7 +22,7 @@
 #ifndef BYTE_VIEW_TAB_H
 #define BYTE_VIEW_TAB_H
 
-#include <config.h>
+#include "config.h"
 
 #include <epan/packet.h>
 #include <epan/proto.h>
@@ -44,20 +44,16 @@ public:
 private:
     void setTabsVisible();
     capture_file *cap_file_;
-    QFont mono_font_;
 
 protected:
     void tabInserted(int index);
     void tabRemoved(int index);
 
 signals:
-    void monospaceFontChanged(const QFont &mono_font);
-    void byteFieldHovered(QString &);
 
 public slots:
     void protoTreeItemChanged(QTreeWidgetItem *current);
     void setCaptureFile(capture_file *cf);
-    void setMonospaceFont(const QFont &mono_font);
 };
 
 #endif // BYTE_VIEW_TAB_H

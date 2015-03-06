@@ -26,9 +26,13 @@
 #include "config.h"
 
 #include <stdlib.h>
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 #include <epan/asn1.h>
 #include "packet-kerberos.h"
 #include "packet-tn3270.h"
@@ -60,24 +64,13 @@ static int hf_telnet_comport_subopt_data_size = -1;
 static int hf_telnet_comport_subopt_parity = -1;
 static int hf_telnet_comport_subopt_stop = -1;
 static int hf_telnet_comport_subopt_control = -1;
-static int hf_telnet_comport_linestate = -1;
-static int hf_telnet_comport_set_linestate_mask = -1;
-static int hf_telnet_comport_modemstate = -1;
-static int hf_telnet_comport_set_modemstate_mask = -1;
-static int hf_telnet_comport_subopt_flow_control_suspend = -1;
-static int hf_telnet_comport_subopt_flow_control_resume = -1;
 static int hf_telnet_comport_subopt_purge = -1;
 static int hf_telnet_rfc_subopt_cmd = -1;
-static int hf_telnet_tabstop = -1;
 
 static int hf_telnet_enc_cmd = -1;
 static int hf_telnet_enc_type = -1;
-static int hf_telnet_enc_type_data = -1;
-static int hf_telnet_enc_key_id = -1;
 
 static int hf_telnet_data = -1;
-static int hf_telnet_option_data = -1;
-static int hf_telnet_subcommand_data = -1;
 
 static int hf_tn3270_subopt = -1;
 static int hf_tn3270_connect = -1;
@@ -86,7 +79,6 @@ static int hf_tn3270_request_string = -1;
 static int hf_tn3270_reason = -1;
 static int hf_tn3270_request = -1;
 static int hf_tn3270_regime_subopt_value = -1;
-static int hf_tn3270_regime_cmd = -1;
 
 static gint ett_telnet = -1;
 static gint ett_telnet_cmd = -1;
@@ -261,7 +253,7 @@ dissect_string_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, in
   switch (cmd) {
 
   case 0:       /* IS */
-    proto_tree_add_uint_format(tree, hf_telnet_subcmd, tvb, offset, 1, cmd, "Here's my %s", optname);
+    proto_tree_add_text(tree, tvb, offset, 1, "Here's my %s", optname);
     offset++;
     len--;
     if (len > 0) {
@@ -271,11 +263,11 @@ dissect_string_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, in
     break;
 
   case 1:       /* SEND */
-    proto_tree_add_uint_format(tree, hf_telnet_subcmd, tvb, offset, 1, cmd, "Send your %s", optname);
+    proto_tree_add_text(tree, tvb, offset, 1, "Send your %s", optname);
     offset++;
     len--;
     if (len > 0)
-      proto_tree_add_bytes_format(tree, hf_telnet_subcommand_data, tvb, offset, len, NULL, "Extra data");
+      proto_tree_add_text(tree, tvb, offset, len, "Extra data");
     break;
 
   default:
@@ -284,14 +276,14 @@ dissect_string_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, in
     offset++;
     len--;
     if (len > 0)
-      proto_tree_add_item(tree, hf_telnet_subcommand_data, tvb, offset, len, ENC_NA);
+      proto_tree_add_text(tree, tvb, offset, len, "Subcommand data");
     break;
   }
 }
 
 static void
 dissect_tn3270_regime_subopt(packet_info *pinfo, const char *optname _U_, tvbuff_t *tvb, int offset,
-                       int len, proto_tree *tree, proto_item *item _U_)
+                       int len, proto_tree *tree, proto_item *item)
 {
 #define TN3270_REGIME_ARE          0x01
 #define TN3270_REGIME_IS           0x00
@@ -304,16 +296,16 @@ dissect_tn3270_regime_subopt(packet_info *pinfo, const char *optname _U_, tvbuff
     case TN3270_REGIME_ARE:
     case TN3270_REGIME_IS:
       if (cmd == TN3270_REGIME_ARE) {
-        proto_tree_add_uint_format(tree, hf_tn3270_regime_cmd, tvb, offset, 1, cmd, "ARE");
+        proto_tree_add_text(tree, tvb, offset, 1, "ARE");
         add_tn3270_conversation(pinfo, 0, 0);
       } else {
-        proto_tree_add_uint_format(tree, hf_tn3270_regime_cmd, tvb, offset, 1, cmd, "IS");
+        proto_tree_add_text(tree, tvb, offset, 1, "IS");
       }
       proto_tree_add_item(tree, hf_tn3270_regime_subopt_value, tvb, offset + 1, len - 1, ENC_NA|ENC_ASCII);
       len -= len;
       return;
     default:
-      proto_tree_add_uint_format(tree, hf_tn3270_regime_cmd, tvb, offset, 1, cmd, "Bogus value: %u", cmd);
+      expert_add_info_format(pinfo, item, &ei_telnet_invalid_subcommand, "Bogus value: %u", cmd);
       break;
     }
     offset++;
@@ -394,7 +386,7 @@ dissect_tn3270e_subopt(packet_info *pinfo _U_, const char *optname _U_, tvbuff_t
 
   while (len > 0) {
     cmd = tvb_get_guint8(tvb, offset);
-    proto_tree_add_item( tree, hf_tn3270_subopt, tvb, offset, 1, ENC_BIG_ENDIAN );
+    proto_tree_add_item( tree, hf_tn3270_subopt, tvb, offset, 1, ENC_NA );
     switch (cmd) {
       case TN3270_CONNECT:
             proto_tree_add_item( tree, hf_tn3270_connect, tvb, offset + 1, len, ENC_NA|ENC_ASCII );
@@ -420,7 +412,7 @@ dissect_tn3270e_subopt(packet_info *pinfo _U_, const char *optname _U_, tvbuff_t
       case TN3270_REASON:
             offset++;
             len--;
-            proto_tree_add_item( tree, hf_tn3270_reason, tvb, offset, 1, ENC_BIG_ENDIAN );
+            proto_tree_add_item( tree, hf_tn3270_reason, tvb, offset, 1, ENC_NA );
             break;
       case TN3270_REQUEST:
             add_tn3270_conversation(pinfo, 1, 0);
@@ -432,7 +424,7 @@ dissect_tn3270e_subopt(packet_info *pinfo _U_, const char *optname _U_, tvbuff_t
             }else if (device_type == TN3270_FUNCTIONS) {
               while (len > 0) {
                 rsn = tvb_get_guint8(tvb, offset);
-                proto_tree_add_item( tree, hf_tn3270_request, tvb, offset, 1, ENC_BIG_ENDIAN );
+                proto_tree_add_item( tree, hf_tn3270_request, tvb, offset, 1, ENC_NA );
                 if (try_val_to_str(rsn, tn3270_request_vals) == NULL)
                     break;
 
@@ -466,7 +458,7 @@ dissect_outmark_subopt(packet_info *pinfo _U_, const char *optname _U_, tvbuff_t
   int    gs_offset, datalen;
 
   while (len > 0) {
-    proto_tree_add_item(tree, hf_telnet_outmark_subopt_cmd, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_telnet_outmark_subopt_cmd, tvb, offset, 1, ENC_NA);
 
     offset++;
     len--;
@@ -497,13 +489,13 @@ dissect_htstops_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
   switch (cmd) {
 
   case 0:       /* IS */
-    proto_tree_add_uint_format(tree, hf_telnet_subcmd, tvb, offset, 1, cmd, "Here's my %s", optname);
+    proto_tree_add_text(tree, tvb, offset, 1, "Here's my %s", optname);
     offset++;
     len--;
     break;
 
   case 1:       /* SEND */
-    proto_tree_add_uint_format(tree, hf_telnet_subcmd, tvb, offset, 1, cmd, "Send your %s", optname);
+    proto_tree_add_text(tree, tvb, offset, 1, "Send your %s", optname);
     offset++;
     len--;
     break;
@@ -513,7 +505,7 @@ dissect_htstops_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
     offset++;
     len--;
     if (len > 0)
-      proto_tree_add_item(tree, hf_telnet_subcommand_data, tvb, offset, len, ENC_NA);
+      proto_tree_add_text(tree, tvb, offset, len, "Subcommand data");
     return;
   }
 
@@ -522,13 +514,13 @@ dissect_htstops_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
     switch (tabval) {
 
     case 0:
-      proto_tree_add_uint_format(tree, hf_telnet_tabstop, tvb, offset, 1,
-                          tabval, "Sender wants to handle tab stops");
+      proto_tree_add_text(tree, tvb, offset, 1,
+                          "Sender wants to handle tab stops");
       break;
 
     default:
-      proto_tree_add_uint_format(tree, hf_telnet_tabstop, tvb, offset, 1,
-                          tabval, "Sender wants receiver to handle tab stop at %u",
+      proto_tree_add_text(tree, tvb, offset, 1,
+                          "Sender wants receiver to handle tab stop at %u",
                           tabval);
       break;
 
@@ -536,13 +528,13 @@ dissect_htstops_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
     case 252:
     case 253:
     case 254:
-      proto_tree_add_uint_format(tree, hf_telnet_tabstop, tvb, offset, 1,
-                          tabval, "Invalid value: %u", tabval);
+      proto_tree_add_text(tree, tvb, offset, 1,
+                          "Invalid value: %u", tabval);
       break;
 
     case 255:
-      proto_tree_add_uint_format(tree, hf_telnet_tabstop, tvb, offset, 1,
-                          tabval, "Sender wants receiver to handle tab stops");
+      proto_tree_add_text(tree, tvb, offset, 1,
+                          "Sender wants receiver to handle tab stops");
       break;
     }
     offset++;
@@ -667,10 +659,10 @@ dissect_comport_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
   case TNCOMPORT_SIGNATURE:
     len--;
     if (len == 0) {
-      proto_tree_add_string_format(tree, hf_telnet_comport_subopt_signature, tvb, offset, 1, "", "%s Requests Signature", source);
+      proto_tree_add_text(tree, tvb, offset, 1, "%s Requests Signature",source);
     } else {
-      guint8 *sig = tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 1, len, ENC_ASCII);
-      proto_tree_add_string_format(tree, hf_telnet_comport_subopt_signature, tvb, offset, 1 + len, sig,
+      guint8 *sig = tvb_get_string(wmem_packet_scope(), tvb, offset + 1, len);
+      proto_tree_add_string_format_value(tree, hf_telnet_comport_subopt_signature, tvb, offset, 1 + len, sig,
                                          "%s Signature: %s",source, sig);
     }
     break;
@@ -742,8 +734,6 @@ dissect_comport_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
     if (len >= 1) {
       const char *print_pattern = (cmd == TNCOMPORT_SETLINESTATEMASK) ?
         "%s Set Linestate Mask: %s" : "%s Linestate: %s";
-      int hf_line = (cmd == TNCOMPORT_SETLINESTATEMASK) ?
-        hf_telnet_comport_set_linestate_mask : hf_telnet_comport_linestate;
       char ls_buffer[512];
       guint8 ls = tvb_get_guint8(tvb, offset+1);
       int print_count = 0;
@@ -760,7 +750,7 @@ dissect_comport_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
         }
         ls = ls >> 1;
       }
-      proto_tree_add_string_format(tree, hf_line, tvb, offset, 2, ls_buffer, print_pattern, source, ls_buffer);
+      proto_tree_add_text(tree, tvb, offset, 2, print_pattern, source, ls_buffer);
     } else {
       const char *print_pattern = (cmd == TNCOMPORT_SETLINESTATEMASK) ?
         "%s <Invalid Linestate Mask>" : "%s <Invalid Linestate Packet>";
@@ -774,8 +764,6 @@ dissect_comport_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
     if (len >= 1) {
       const char *print_pattern = (cmd == TNCOMPORT_SETMODEMSTATEMASK) ?
         "%s Set Modemstate Mask: %s" : "%s Modemstate: %s";
-      int hf_modem = (cmd == TNCOMPORT_SETMODEMSTATEMASK) ?
-        hf_telnet_comport_set_modemstate_mask : hf_telnet_comport_modemstate;
       char ms_buffer[256];
       guint8 ms = tvb_get_guint8(tvb, offset+1);
       int print_count = 0;
@@ -792,7 +780,7 @@ dissect_comport_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
         }
         ms = ms >> 1;
       }
-      proto_tree_add_string_format(tree, hf_modem, tvb, offset, 2, ms_buffer, print_pattern, source, ms_buffer);
+      proto_tree_add_text(tree, tvb, offset, 2, print_pattern, source, ms_buffer);
     } else {
       const char *print_pattern = (cmd == TNCOMPORT_SETMODEMSTATEMASK) ?
         "%s <Invalid Modemstate Mask>" : "%s <Invalid Modemstate Packet>";
@@ -802,12 +790,12 @@ dissect_comport_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
 
   case TNCOMPORT_FLOWCONTROLSUSPEND:
     len--;
-    proto_tree_add_none_format(tree, hf_telnet_comport_subopt_flow_control_suspend, tvb, offset, 1, "%s Flow Control Suspend",source);
+    proto_tree_add_text(tree, tvb, offset, 1, "%s Flow Control Suspend",source);
     break;
 
   case TNCOMPORT_FLOWCONTROLRESUME:
     len--;
-    proto_tree_add_none_format(tree, hf_telnet_comport_subopt_flow_control_resume, tvb, offset, 1, "%s Flow Control Resume",source);
+    proto_tree_add_text(tree, tvb, offset, 1, "%s Flow Control Resume",source);
     break;
 
   case TNCOMPORT_PURGEDATA:
@@ -827,7 +815,7 @@ dissect_comport_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
     offset++;
     len--;
     if (len > 0)
-      proto_tree_add_item(tree, hf_telnet_subcommand_data, tvb, offset, len, ENC_NA);
+      proto_tree_add_text(tree, tvb, offset, len, "Subcommand data");
     return;
   }
 
@@ -979,9 +967,10 @@ static const value_string auth_krb5_types[] = {
 static void
 dissect_authentication_type_pair(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, proto_tree *tree)
 {
-  guint8 mod;
+  guint8 type, mod;
 
-  proto_tree_add_item(tree, hf_telnet_auth_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+  type=tvb_get_guint8(tvb, offset);
+  proto_tree_add_uint(tree, hf_telnet_auth_type, tvb, offset, 1, type);
 
   mod=tvb_get_guint8(tvb, offset+1);
   proto_tree_add_uint(tree, hf_telnet_auth_mod_enc, tvb, offset+1, 1, mod);
@@ -1110,7 +1099,7 @@ dissect_authentication_subopt(packet_info *pinfo, const char *optname _U_, tvbuf
   switch(acmd){
   case TN_AC_REPLY:
   case TN_AC_IS:
-    /* XXX here we shouldn't just assume it is krb5 */
+    /* XXX here we shouldnt just assume it is krb5 */
     dissect_krb5_authentication_data(pinfo, tvb, offset, len, tree, acmd);
     break;
   case TN_AC_SEND:
@@ -1153,7 +1142,7 @@ dissect_encryption_subopt(packet_info *pinfo, const char *optname _U_, tvbuff_t 
       dissect_encryption_type(tvb, offset, tree);
       offset++;
       len--;
-      proto_tree_add_item(tree, hf_telnet_enc_type_data, tvb, offset, len, ENC_NA);
+      proto_tree_add_text(tree, tvb, offset, len, "Type-specific data");
     }
     break;
 
@@ -1170,7 +1159,7 @@ dissect_encryption_subopt(packet_info *pinfo, const char *optname _U_, tvbuff_t 
     /* keyid ... */
     if (len > 0) {
       key_first_octet = tvb_get_guint8(tvb, offset);
-      proto_tree_add_bytes_format(tree, hf_telnet_enc_key_id, tvb, offset, len, NULL, (key_first_octet == 0) ? "Default key" : "Key ID");
+      proto_tree_add_text(tree, tvb, offset, len, (key_first_octet == 0) ? "Default key" : "Key ID");
     }
     break;
 
@@ -1181,7 +1170,7 @@ dissect_encryption_subopt(packet_info *pinfo, const char *optname _U_, tvbuff_t 
   case TN_ENC_REQUEST_START:
     /* (optional) keyid */
     if (len > 0)
-      proto_tree_add_bytes_format(tree, hf_telnet_enc_key_id, tvb, offset, len, NULL, "Key ID (advisory)");
+      proto_tree_add_text(tree, tvb, offset, len, "Key ID (advisory)");
     break;
 
   case TN_ENC_REQUEST_END:
@@ -1192,7 +1181,7 @@ dissect_encryption_subopt(packet_info *pinfo, const char *optname _U_, tvbuff_t 
   case TN_ENC_DEC_KEYID:
     /* (optional) keyid - if not supplied, there are no more known keys */
     if (len > 0)
-      proto_tree_add_item(tree, hf_telnet_enc_key_id, tvb, offset, len, ENC_NA);
+      proto_tree_add_text(tree, tvb, offset, len, "Key ID");
     break;
 
   default:
@@ -1628,9 +1617,11 @@ telnet_sub_option(packet_info *pinfo, proto_tree *option_tree, proto_item *optio
       if (iac_data > 0) {
         /* Data is escaped, we have to unescape it. */
         unescaped_tvb = unescape_and_tvbuffify_telnet_option(pinfo, tvb, start_offset, subneg_len);
-        proto_tree_add_item(option_tree, hf_telnet_option_data, unescaped_tvb, 0, subneg_len - iac_data, ENC_NA);
+        proto_tree_add_text(option_tree, unescaped_tvb, 0, subneg_len - iac_data,
+                            "Option data");
       } else {
-        proto_tree_add_item(option_tree, hf_telnet_option_data, tvb, start_offset, subneg_len, ENC_NA);
+        proto_tree_add_text(option_tree, tvb, start_offset, subneg_len,
+                            "Option data");
       }
     }
   }
@@ -1673,8 +1664,9 @@ telnet_command(packet_info *pinfo, proto_tree *telnet_tree, tvbuff_t *tvb, int s
   offset += 1;  /* skip IAC */
   optcode = tvb_get_guint8(tvb, offset);
 
-  cmd_tree = proto_tree_add_subtree(telnet_tree, tvb, start_offset, 2, ett_telnet_cmd, &cmd_item, "Command header");
-  proto_tree_add_item(cmd_tree, hf_telnet_cmd, tvb, offset, 1, ENC_BIG_ENDIAN);
+  cmd_item = proto_tree_add_text(telnet_tree, tvb, start_offset, 2, "Command header");
+  cmd_tree = proto_item_add_subtree(cmd_item, ett_telnet_cmd);
+  proto_tree_add_item(cmd_tree, hf_telnet_cmd, tvb, offset, 1, ENC_NA);
   offset++;
 
   switch(optcode) {
@@ -1823,10 +1815,10 @@ dissect_telnet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       data_len = iac_offset - offset;
       if (data_len > 0) {
         if (is_tn3270) {
-          next_tvb = tvb_new_subset_length(tvb, offset, data_len);
+          next_tvb = tvb_new_subset(tvb, offset, data_len, data_len);
           call_dissector(tn3270_handle, next_tvb, pinfo, telnet_tree);
         } else if (is_tn5250) {
-          next_tvb = tvb_new_subset_length(tvb, offset, data_len);
+          next_tvb = tvb_new_subset(tvb, offset, data_len, data_len);
           call_dissector(tn5250_handle, next_tvb, pinfo, telnet_tree);
         } else
           telnet_add_text(telnet_tree, tvb, offset, data_len);
@@ -1941,30 +1933,6 @@ proto_register_telnet(void)
       { "Control", "telnet.comport_subopt.control", FT_UINT8, BASE_DEC,
         NULL, 0, NULL, HFILL }
     },
-    { &hf_telnet_comport_linestate,
-      { "Linestate", "telnet.comport_subopt.linestate", FT_STRING, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
-    { &hf_telnet_comport_set_linestate_mask,
-      { "Set Linestate Mask", "telnet.comport_subopt.set_linestate_mask", FT_STRING, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
-    { &hf_telnet_comport_modemstate,
-      { "Modemstate", "telnet.comport_subopt.modemstate", FT_STRING, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
-    { &hf_telnet_comport_set_modemstate_mask,
-      { "Set Modemstate Mask", "telnet.comport_subopt.set_modemstate_mask", FT_STRING, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
-    { &hf_telnet_comport_subopt_flow_control_suspend,
-      { "Flow Control Suspend", "telnet.comport_subopt.flow_control_suspend", FT_NONE, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
-    { &hf_telnet_comport_subopt_flow_control_resume,
-      { "Flow Control Resume", "telnet.comport_subopt.flow_control_resume", FT_NONE, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
     { &hf_telnet_comport_subopt_purge,
       { "Purge", "telnet.comport_subopt.purge", FT_UINT8, BASE_DEC,
         NULL, 0, NULL, HFILL }
@@ -1972,10 +1940,6 @@ proto_register_telnet(void)
     { &hf_telnet_rfc_subopt_cmd,
       { "Command", "telnet.rfc_subopt.cmd", FT_UINT8, BASE_DEC,
         VALS(rfc_opt_vals), 0, NULL, HFILL }
-    },
-    { &hf_telnet_tabstop,
-      { "Tabstop value", "telnet.tabstop", FT_UINT8, BASE_DEC,
-        NULL, 0, NULL, HFILL }
     },
     { &hf_telnet_enc_cmd,
       { "Enc Cmd", "telnet.enc.cmd", FT_UINT8, BASE_DEC,
@@ -1985,24 +1949,8 @@ proto_register_telnet(void)
       { "Enc Type", "telnet.enc.type", FT_UINT8, BASE_DEC,
         VALS(enc_type_vals), 0, "Encryption type", HFILL }
     },
-    { &hf_telnet_enc_type_data,
-      { "Type-specific data", "telnet.enc.type_data", FT_BYTES, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
-    { &hf_telnet_enc_key_id,
-      { "Key ID", "telnet.enc.key_id", FT_BYTES, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
     { &hf_telnet_data,
       { "Data", "telnet.data", FT_STRING, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
-    { &hf_telnet_option_data,
-      { "Option data", "telnet.option_data", FT_BYTES, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
-    { &hf_telnet_subcommand_data,
-      { "Subcommand data", "telnet.subcommand_data", FT_BYTES, BASE_NONE,
         NULL, 0, NULL, HFILL }
     },
     { &hf_tn3270_subopt,
@@ -2031,10 +1979,6 @@ proto_register_telnet(void)
     },
     { &hf_tn3270_regime_subopt_value,
       { "Value", "telnet.tn3270.regime_subopt.value", FT_STRING, BASE_NONE,
-        NULL, 0, NULL, HFILL }
-    },
-    { &hf_tn3270_regime_cmd,
-      { "Cmd", "telnet.regime_cmd", FT_UINT8, BASE_DEC,
         NULL, 0, NULL, HFILL }
     },
   };
@@ -2114,16 +2058,3 @@ proto_reg_handoff_telnet(void)
   tn3270_handle = find_dissector("tn3270");
   tn5250_handle = find_dissector("tn5250");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

@@ -34,6 +34,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/asn1.h>
 
@@ -472,12 +473,12 @@ static int hf_rrlp_cnavDeltaA = -1;               /* INTEGER_M33554432_33554431 
 static int hf_rrlp_cnavAdot = -1;                 /* INTEGER_M16777216_16777215 */
 static int hf_rrlp_cnavDeltaNo = -1;              /* INTEGER_M65536_65535 */
 static int hf_rrlp_cnavDeltaNoDot = -1;           /* INTEGER_M4194304_4194303 */
-static int hf_rrlp_cnavMo = -1;                   /* INTEGER_M4294967296_4294967295 */
-static int hf_rrlp_cnavE = -1;                    /* INTEGER_0_8589934591 */
-static int hf_rrlp_cnavOmega = -1;                /* INTEGER_M4294967296_4294967295 */
-static int hf_rrlp_cnavOMEGA0 = -1;               /* INTEGER_M4294967296_4294967295 */
+static int hf_rrlp_cnavMo = -1;                   /* T_cnavMo */
+static int hf_rrlp_cnavE = -1;                    /* T_cnavE */
+static int hf_rrlp_cnavOmega = -1;                /* T_cnavOmega */
+static int hf_rrlp_cnavOMEGA0 = -1;               /* T_cnavOMEGA0 */
 static int hf_rrlp_cnavDeltaOmegaDot = -1;        /* INTEGER_M65536_65535 */
-static int hf_rrlp_cnavIo = -1;                   /* INTEGER_M4294967296_4294967295 */
+static int hf_rrlp_cnavIo = -1;                   /* T_cnavIo */
 static int hf_rrlp_cnavIoDot = -1;                /* INTEGER_M16384_16383 */
 static int hf_rrlp_cnavCis = -1;                  /* INTEGER_M32768_32767 */
 static int hf_rrlp_cnavCic = -1;                  /* INTEGER_M32768_32767 */
@@ -656,6 +657,7 @@ static int hf_rrlp_ephemerisExtensionDuration = -1;  /* INTEGER_1_512 */
 static int hf_rrlp_ganssEphExtDay = -1;           /* INTEGER_0_8191 */
 static int hf_rrlp_ganssEphExtTOD = -1;           /* GANSSTOD */
 static int hf_rrlp_keplerToe_01 = -1;             /* INTEGER_0_37799 */
+static int hf_rrlp_keplerW_01 = -1;               /* T_keplerW */
 static int hf_rrlp_SeqOfGANSSRefOrbit_item = -1;  /* GANSSReferenceOrbit */
 static int hf_rrlp_ganssOrbitModel_01 = -1;       /* ReferenceNavModel */
 static int hf_rrlp_GANSSEphemerisDeltaMatrix_item = -1;  /* GANSSEphemerisDeltaEpoch */
@@ -884,7 +886,7 @@ static int hf_rrlp_GANSSModelID_model7 = -1;
 static int hf_rrlp_GANSSModelID_model8 = -1;
 
 /*--- End of included file: packet-rrlp-hf.c ---*/
-#line 55 "../../asn1/rrlp/packet-rrlp-template.c"
+#line 56 "../../asn1/rrlp/packet-rrlp-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_rrlp = -1;
@@ -1145,7 +1147,7 @@ static gint ett_rrlp_GANSSModelID = -1;
 static gint ett_rrlp_AssistanceNeeded = -1;
 
 /*--- End of included file: packet-rrlp-ett.c ---*/
-#line 59 "../../asn1/rrlp/packet-rrlp-template.c"
+#line 60 "../../asn1/rrlp/packet-rrlp-template.c"
 
 /* Include constants */
 
@@ -1157,7 +1159,7 @@ static gint ett_rrlp_AssistanceNeeded = -1;
 #define maxGANSSAssistanceData         40
 
 /*--- End of included file: packet-rrlp-val.h ---*/
-#line 62 "../../asn1/rrlp/packet-rrlp-template.c"
+#line 63 "../../asn1/rrlp/packet-rrlp-template.c"
 
 
 
@@ -3568,7 +3570,7 @@ dissect_rrlp_INTEGER_M4194304_4194303(tvbuff_t *tvb _U_, int offset _U_, asn1_ct
 
 
 static int
-dissect_rrlp_INTEGER_M4294967296_4294967295(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+dissect_rrlp_T_cnavMo(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_per_constrained_integer_64b(tvb, offset, actx, tree, hf_index,
                                                             G_GINT64_CONSTANT(-4294967296), 4294967295U, NULL, FALSE);
 
@@ -3578,9 +3580,39 @@ dissect_rrlp_INTEGER_M4294967296_4294967295(tvbuff_t *tvb _U_, int offset _U_, a
 
 
 static int
-dissect_rrlp_INTEGER_0_8589934591(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+dissect_rrlp_T_cnavE(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_per_constrained_integer_64b(tvb, offset, actx, tree, hf_index,
                                                             0U, G_GUINT64_CONSTANT(8589934591), NULL, FALSE);
+
+  return offset;
+}
+
+
+
+static int
+dissect_rrlp_T_cnavOmega(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_integer_64b(tvb, offset, actx, tree, hf_index,
+                                                            G_GINT64_CONSTANT(-4294967296), 4294967295U, NULL, FALSE);
+
+  return offset;
+}
+
+
+
+static int
+dissect_rrlp_T_cnavOMEGA0(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_integer_64b(tvb, offset, actx, tree, hf_index,
+                                                            G_GINT64_CONSTANT(-4294967296), 4294967295U, NULL, FALSE);
+
+  return offset;
+}
+
+
+
+static int
+dissect_rrlp_T_cnavIo(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_integer_64b(tvb, offset, actx, tree, hf_index,
+                                                            G_GINT64_CONSTANT(-4294967296), 4294967295U, NULL, FALSE);
 
   return offset;
 }
@@ -3593,12 +3625,12 @@ static const per_sequence_t NavModel_CNAVKeplerianSet_sequence[] = {
   { &hf_rrlp_cnavAdot       , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M16777216_16777215 },
   { &hf_rrlp_cnavDeltaNo    , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M65536_65535 },
   { &hf_rrlp_cnavDeltaNoDot , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M4194304_4194303 },
-  { &hf_rrlp_cnavMo         , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M4294967296_4294967295 },
-  { &hf_rrlp_cnavE          , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_0_8589934591 },
-  { &hf_rrlp_cnavOmega      , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M4294967296_4294967295 },
-  { &hf_rrlp_cnavOMEGA0     , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M4294967296_4294967295 },
+  { &hf_rrlp_cnavMo         , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_T_cnavMo },
+  { &hf_rrlp_cnavE          , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_T_cnavE },
+  { &hf_rrlp_cnavOmega      , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_T_cnavOmega },
+  { &hf_rrlp_cnavOMEGA0     , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_T_cnavOMEGA0 },
   { &hf_rrlp_cnavDeltaOmegaDot, ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M65536_65535 },
-  { &hf_rrlp_cnavIo         , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M4294967296_4294967295 },
+  { &hf_rrlp_cnavIo         , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_T_cnavIo },
   { &hf_rrlp_cnavIoDot      , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M16384_16383 },
   { &hf_rrlp_cnavCis        , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M32768_32767 },
   { &hf_rrlp_cnavCic        , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M32768_32767 },
@@ -4424,9 +4456,19 @@ dissect_rrlp_GANSSEphemerisExtensionHeader(tvbuff_t *tvb _U_, int offset _U_, as
 }
 
 
+
+static int
+dissect_rrlp_T_keplerW(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_integer_64b(tvb, offset, actx, tree, hf_index,
+                                                            G_MININT32, 2147483647U, NULL, FALSE);
+
+  return offset;
+}
+
+
 static const per_sequence_t ReferenceNavModel_sequence[] = {
   { &hf_rrlp_keplerToe_01   , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_0_37799 },
-  { &hf_rrlp_keplerW        , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M2147483648_2147483647 },
+  { &hf_rrlp_keplerW_01     , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_T_keplerW },
   { &hf_rrlp_keplerDeltaN   , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M32768_32767 },
   { &hf_rrlp_keplerM0       , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M2147483648_2147483647 },
   { &hf_rrlp_keplerOmegaDot , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_rrlp_INTEGER_M8388608_8388607 },
@@ -7102,18 +7144,15 @@ dissect_rrlp_PDU(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_
 
 /*--- PDUs ---*/
 
-static int dissect_PDU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_PDU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, FALSE, pinfo);
-  offset = dissect_rrlp_PDU(tvb, offset, &asn1_ctx, tree, hf_rrlp_PDU_PDU);
-  offset += 7; offset >>= 3;
-  return offset;
+  dissect_rrlp_PDU(tvb, 0, &asn1_ctx, tree, hf_rrlp_PDU_PDU);
 }
 
 
 /*--- End of included file: packet-rrlp-fn.c ---*/
-#line 65 "../../asn1/rrlp/packet-rrlp-template.c"
+#line 66 "../../asn1/rrlp/packet-rrlp-template.c"
 
 
 /*--- proto_register_rrlp -------------------------------------------*/
@@ -8768,19 +8807,19 @@ void proto_register_rrlp(void) {
     { &hf_rrlp_cnavMo,
       { "cnavMo", "rrlp.cnavMo",
         FT_INT64, BASE_DEC, NULL, 0,
-        "INTEGER_M4294967296_4294967295", HFILL }},
+        NULL, HFILL }},
     { &hf_rrlp_cnavE,
       { "cnavE", "rrlp.cnavE",
         FT_UINT64, BASE_DEC, NULL, 0,
-        "INTEGER_0_8589934591", HFILL }},
+        NULL, HFILL }},
     { &hf_rrlp_cnavOmega,
       { "cnavOmega", "rrlp.cnavOmega",
         FT_INT64, BASE_DEC, NULL, 0,
-        "INTEGER_M4294967296_4294967295", HFILL }},
+        NULL, HFILL }},
     { &hf_rrlp_cnavOMEGA0,
       { "cnavOMEGA0", "rrlp.cnavOMEGA0",
         FT_INT64, BASE_DEC, NULL, 0,
-        "INTEGER_M4294967296_4294967295", HFILL }},
+        NULL, HFILL }},
     { &hf_rrlp_cnavDeltaOmegaDot,
       { "cnavDeltaOmegaDot", "rrlp.cnavDeltaOmegaDot",
         FT_INT32, BASE_DEC, NULL, 0,
@@ -8788,7 +8827,7 @@ void proto_register_rrlp(void) {
     { &hf_rrlp_cnavIo,
       { "cnavIo", "rrlp.cnavIo",
         FT_INT64, BASE_DEC, NULL, 0,
-        "INTEGER_M4294967296_4294967295", HFILL }},
+        NULL, HFILL }},
     { &hf_rrlp_cnavIoDot,
       { "cnavIoDot", "rrlp.cnavIoDot",
         FT_INT32, BASE_DEC, NULL, 0,
@@ -9501,6 +9540,10 @@ void proto_register_rrlp(void) {
       { "keplerToe", "rrlp.keplerToe",
         FT_UINT32, BASE_DEC, NULL, 0,
         "INTEGER_0_37799", HFILL }},
+    { &hf_rrlp_keplerW_01,
+      { "keplerW", "rrlp.keplerW",
+        FT_INT32, BASE_DEC, NULL, 0,
+        NULL, HFILL }},
     { &hf_rrlp_SeqOfGANSSRefOrbit_item,
       { "GANSSReferenceOrbit", "rrlp.GANSSReferenceOrbit_element",
         FT_NONE, BASE_NONE, NULL, 0,
@@ -10403,7 +10446,7 @@ void proto_register_rrlp(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-rrlp-hfarr.c ---*/
-#line 74 "../../asn1/rrlp/packet-rrlp-template.c"
+#line 75 "../../asn1/rrlp/packet-rrlp-template.c"
   };
 
   /* List of subtrees */
@@ -10666,13 +10709,13 @@ void proto_register_rrlp(void) {
     &ett_rrlp_AssistanceNeeded,
 
 /*--- End of included file: packet-rrlp-ettarr.c ---*/
-#line 80 "../../asn1/rrlp/packet-rrlp-template.c"
+#line 81 "../../asn1/rrlp/packet-rrlp-template.c"
   };
 
 
   /* Register protocol */
   proto_rrlp = proto_register_protocol(PNAME, PSNAME, PFNAME);
-  new_register_dissector("rrlp", dissect_PDU_PDU, proto_rrlp);
+  register_dissector("rrlp", dissect_PDU_PDU, proto_rrlp);
 
   /* Register fields and subtrees */
   proto_register_field_array(proto_rrlp, hf, array_length(hf));

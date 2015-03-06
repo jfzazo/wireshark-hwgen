@@ -23,6 +23,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/reassemble.h>
 
@@ -50,7 +52,6 @@ static int hf_sndcp_pcomp    = -1;
 static int hf_sndcp_segment  = -1;
 static int hf_sndcp_npdu1    = -1;
 static int hf_sndcp_npdu2    = -1;
-static int hf_sndcp_payload  = -1;
 
 /* These fields are used when reassembling N-PDU fragments
 */
@@ -201,8 +202,8 @@ dissect_sndcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
   /* Set up structures needed to add the protocol subtree and manage it
    */
-  proto_item *ti, *address_field_item;
-  proto_tree *sndcp_tree, *address_field_tree, *compression_field_tree, *npdu_field_tree;
+  proto_item *ti, *address_field_item, *compression_field_item, *npdu_field_item;
+  proto_tree *sndcp_tree = NULL, *address_field_tree, *compression_field_tree, *npdu_field_tree;
 
   /* Make entries in Protocol column and clear Info column on summary display
    */
@@ -211,8 +212,10 @@ dissect_sndcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
   /* create display subtree for the protocol
    */
-  ti         = proto_tree_add_item(tree, proto_sndcp, tvb, 0, -1, ENC_NA);
-  sndcp_tree = proto_item_add_subtree(ti, ett_sndcp);
+  if (tree) {
+    ti         = proto_tree_add_item(tree, proto_sndcp, tvb, 0, -1, ENC_NA);
+    sndcp_tree = proto_item_add_subtree(ti, ett_sndcp);
+  }
 
   /* get address field from next byte
    */
@@ -249,20 +252,21 @@ dissect_sndcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     if (tree) {
       if (!pcomp) {
         if (!dcomp) {
-          compression_field_tree = proto_tree_add_subtree(sndcp_tree, tvb, offset, 1, ett_sndcp_compression_field, NULL, "No compression");
+          compression_field_item = proto_tree_add_text(sndcp_tree, tvb, offset,1, "No compression");
         }
         else {
-          compression_field_tree = proto_tree_add_subtree(sndcp_tree, tvb, offset, 1, ett_sndcp_compression_field, NULL, "Data compression");
+          compression_field_item = proto_tree_add_text(sndcp_tree, tvb, offset,1, "Data compression");
         }
       }
       else {
         if (!dcomp) {
-          compression_field_tree = proto_tree_add_subtree(sndcp_tree, tvb, offset, 1, ett_sndcp_compression_field, NULL, "Protocol compression");
+          compression_field_item = proto_tree_add_text(sndcp_tree, tvb, offset,1, "Protocol compression");
         }
         else {
-          compression_field_tree = proto_tree_add_subtree(sndcp_tree, tvb, offset, 1, ett_sndcp_compression_field, NULL, "Data and Protocol compression");
+          compression_field_item = proto_tree_add_text(sndcp_tree, tvb, offset,1, "Data and Protocol compression");
         }
       }
+      compression_field_tree = proto_item_add_subtree(compression_field_item, ett_sndcp_compression_field);
       proto_tree_add_uint(compression_field_tree, hf_sndcp_dcomp, tvb, offset, 1, comp_field );
       proto_tree_add_uint(compression_field_tree, hf_sndcp_pcomp, tvb, offset, 1, comp_field );
     }
@@ -274,7 +278,8 @@ dissect_sndcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       npdu = npdu_field1 = tvb_get_guint8(tvb,offset);
       col_add_fstr(pinfo->cinfo, COL_INFO, "SN-DATA N-PDU %d", npdu_field1);
       if (tree) {
-        npdu_field_tree = proto_tree_add_subtree_format(sndcp_tree, tvb, offset, 1, ett_sndcp_npdu_field, NULL, "Acknowledged mode, N-PDU %d", npdu_field1 );
+        npdu_field_item = proto_tree_add_text(sndcp_tree, tvb, offset,1, "Acknowledged mode, N-PDU %d", npdu_field1 );
+        npdu_field_tree = proto_item_add_subtree(npdu_field_item, ett_sndcp_npdu_field);
         proto_tree_add_uint(npdu_field_tree, hf_sndcp_npdu1, tvb, offset, 1, npdu_field1 );
       }
       offset++;
@@ -289,8 +294,8 @@ dissect_sndcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     npdu            = (npdu_field2 & 0x0FFF);
     col_add_fstr(pinfo->cinfo, COL_INFO, "SN-UNITDATA N-PDU %d (segment %d)", npdu, segment);
     if (tree) {
-      npdu_field_tree = proto_tree_add_subtree_format(sndcp_tree, tvb, offset, 2, ett_sndcp_npdu_field, NULL,
-            "Unacknowledged mode, N-PDU %d (segment %d)", npdu, segment );
+      npdu_field_item = proto_tree_add_text(sndcp_tree, tvb, offset,2, "Unacknowledged mode, N-PDU %d (segment %d)", npdu, segment );
+      npdu_field_tree = proto_item_add_subtree(npdu_field_item, ett_sndcp_npdu_field);
       proto_tree_add_uint(npdu_field_tree, hf_sndcp_segment, tvb, offset, 2, npdu_field2 );
       proto_tree_add_uint(npdu_field_tree, hf_sndcp_npdu2, tvb, offset, 2, npdu_field2 );
     }
@@ -349,7 +354,9 @@ dissect_sndcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         col_append_fstr(pinfo->cinfo, COL_INFO,
                           " (N-PDU payload reassembled in packet %u)",
                           fd_npdu->reassembled_in);
-        proto_tree_add_item(sndcp_tree, hf_sndcp_payload, tvb, offset, -1, ENC_NA);
+        if (tree) {
+          proto_tree_add_text(sndcp_tree, tvb, offset, -1, "Payload");
+        }
       }
     } else {
       /* Not reassembled yet, or not reassembled at all
@@ -359,7 +366,9 @@ dissect_sndcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       else
         col_append_str(pinfo->cinfo, COL_INFO, " (Unreassembled fragment)");
 
-      proto_tree_add_item(sndcp_tree, hf_sndcp_payload, tvb, offset, -1, ENC_NA);
+      if (tree) {
+        proto_tree_add_text(sndcp_tree, tvb, offset, -1, "Payload");
+      }
     }
     /* Now reset fragmentation information in pinfo
      */
@@ -456,86 +465,79 @@ proto_register_sndcp(void)
         NULL, HFILL
       }
     },
-    { &hf_sndcp_payload,
-      { "Payload",
-        "sndcp.payload",
-        FT_BYTES, BASE_NONE, NULL, 0x0,
-        NULL, HFILL
-      }
-    },
 
     /* Fragment fields
      */
     { &hf_npdu_fragment_overlap,
       { "Fragment overlap",
-        "sndcp.npdu.fragment.overlap",
+        "npdu.fragment.overlap",
         FT_BOOLEAN, BASE_NONE, NULL, 0x0,
         "Fragment overlaps with other fragments", HFILL
       }
     },
     { &hf_npdu_fragment_overlap_conflict,
       { "Conflicting data in fragment overlap",
-        "sndcp.npdu.fragment.overlap.conflict",
+        "npdu.fragment.overlap.conflict",
         FT_BOOLEAN, BASE_NONE, NULL, 0x0,
         "Overlapping fragments contained conflicting data", HFILL
       }
     },
     { &hf_npdu_fragment_multiple_tails,
       { "Multiple tail fragments found",
-        "sndcp.npdu.fragment.multipletails",
+        "npdu.fragment.multipletails",
         FT_BOOLEAN, BASE_NONE, NULL, 0x0,
         "Several tails were found when defragmenting the packet", HFILL
       }
     },
     { &hf_npdu_fragment_too_long_fragment,
       { "Fragment too long",
-        "sndcp.npdu.fragment.toolongfragment",
+        "npdu.fragment.toolongfragment",
         FT_BOOLEAN, BASE_NONE, NULL, 0x0,
         "Fragment contained data past end of packet", HFILL
       }
     },
     { &hf_npdu_fragment_error,
       { "Defragmentation error",
-        "sndcp.npdu.fragment.error",
+        "npdu.fragment.error",
         FT_FRAMENUM, BASE_NONE, NULL, 0x0,
         "Defragmentation error due to illegal fragments", HFILL
       }
     },
     { &hf_npdu_fragment_count,
       { "Fragment count",
-        "sndcp.npdu.fragment.count",
+        "npdu.fragment.count",
         FT_UINT32, BASE_DEC, NULL, 0x0,
         NULL, HFILL
       }
     },
     { &hf_npdu_reassembled_in,
       { "Reassembled in",
-        "sndcp.npdu.reassembled.in",
+        "npdu.reassembled.in",
         FT_FRAMENUM, BASE_NONE, NULL, 0x0,
         "N-PDU fragments are reassembled in the given packet", HFILL
       }
     },
     { &hf_npdu_reassembled_length,
       { "Reassembled N-PDU length",
-        "sndcp.npdu.reassembled.length",
+        "npdu.reassembled.length",
         FT_UINT32, BASE_DEC, NULL, 0x0,
         "The total length of the reassembled payload", HFILL
       }
     },
     { &hf_npdu_fragment,
       { "N-PDU Fragment",
-        "sndcp.npdu.fragment",
+        "npdu.fragment",
         FT_FRAMENUM, BASE_NONE, NULL, 0x0,
         NULL, HFILL
       }
     },
     { &hf_npdu_fragments,
       { "N-PDU Fragments",
-        "sndcp.npdu.fragments",
+        "npdu.fragments",
         FT_NONE, BASE_NONE, NULL, 0x0,
         NULL, HFILL
       }
-    },
+    }
   };
 
     /* Setup protocol subtree array */
@@ -582,16 +584,3 @@ proto_reg_handoff_sndcp(void)
   ip_handle   = find_dissector("ip");
   data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

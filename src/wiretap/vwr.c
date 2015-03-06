@@ -26,6 +26,7 @@
 
 #include "wtap-int.h"
 #include "file_wrappers.h"
+#include <wsutil/buffer.h>
 #include "vwr.h"
 
 
@@ -424,69 +425,69 @@
 /* Per-capture file private data structure */
 
 typedef struct {
-    /* offsets in stats block; these are dependent on the frame type (Ethernet/WLAN) and */
-    /* version number of .vwr file, and are set up by setup_defaults() */
-    guint32      STATS_LEN;                      /* length of stats block trailer */
-    guint32      STATS_START_OFF;                /* STATS OFF AFTER HEADER */
-    guint32      VALID_OFF;                      /* bit 6 (0x40) is flow-is-valid flag */
-    guint32      MTYPE_OFF;                      /* offset of modulation type */
-    guint32      VCID_OFF;                       /* offset of VC ID */
-    guint32      FLOWSEQ_OFF;                    /* offset of signature sequence number */
-    guint32      FLOWID_OFF;                     /* offset of flow ID */
-    guint32      OCTET_OFF;                      /* offset of octets */
-    guint32      ERRORS_OFF;                     /* offset of error vector */
-    guint32      PATN_OFF;                       /* offset of pattern match vector */
-    guint32      RSSI_OFF;                       /* RSSI (NOTE: RSSI must be negated!) */
-    guint32      STARTT_OFF;                     /* offset of start time, 64 bits */
-    guint32      ENDT_OFF;                       /* offset of end time, 64 bits */
-    guint32      LATVAL_OFF;                     /* offset of latency, 32 bits */
-    guint32      INFO_OFF;                       /* offset of INFO field, 16 bits */
-    guint32      L1P_1_OFF;                      /* offset 1ST Byte of l1params */
-    guint32      L1P_2_OFF;                      /* offset 2nd Byte of l1params */
-    guint32      L4ID_OFF;                       /* LAYER 4 id offset*/
-    guint32      IPLEN_OFF;                      /* */
-    guint32      PLCP_LENGTH_OFF;                /* plcp length offset*/
-    guint32      FPGA_VERSION_OFF;               /* offset of fpga version field, 16 bits */
-    guint32      HEADER_VERSION_OFF;             /* offset of header version, 16 bits */
-    guint32      RXTX_OFF;                       /* offset of CMD bit, rx or tx */
-    guint32      FRAME_TYPE_OFF;
+        /* offsets in stats block; these are dependent on the frame type (Ethernet/WLAN) and */
+        /* version number of .vwr file, and are set up by setup_defaults() */
+        guint32      STATS_LEN;                      /* length of stats block trailer */
+        guint32      STATS_START_OFF;                /* STATS OFF AFTER HEADER */
+        guint32      VALID_OFF;                      /* bit 6 (0x40) is flow-is-valid flag */
+        guint32      MTYPE_OFF;                      /* offset of modulation type */
+        guint32      VCID_OFF;                       /* offset of VC ID */
+        guint32      FLOWSEQ_OFF;                    /* offset of signature sequence number */
+        guint32      FLOWID_OFF;                     /* offset of flow ID */
+        guint32      OCTET_OFF;                      /* offset of octets */
+        guint32      ERRORS_OFF;                     /* offset of error vector */
+        guint32      PATN_OFF;                       /* offset of pattern match vector */
+        guint32      RSSI_OFF;                       /* RSSI (NOTE: RSSI must be negated!) */
+        guint32      STARTT_OFF;                     /* offset of start time, 64 bits */
+        guint32      ENDT_OFF;                       /* offset of end time, 64 bits */
+        guint32      LATVAL_OFF;                     /* offset of latency, 32 bits */
+        guint32      INFO_OFF;                       /* offset of INFO field, 16 bits */
+        guint32      L1P_1_OFF;                      /* offset 1ST Byte of l1params */
+        guint32      L1P_2_OFF;                      /* offset 2nd Byte of l1params */
+        guint32      L4ID_OFF;                       /* LAYER 4 id offset*/
+        guint32      IPLEN_OFF;                      /* */
+        guint32      PLCP_LENGTH_OFF;                /* plcp length offset*/
+        guint32      FPGA_VERSION_OFF;               /* offset of fpga version field, 16 bits */
+        guint32      HEADER_VERSION_OFF;             /* offset of header version, 16 bits */
+        guint32      RXTX_OFF;                       /* offset of CMD bit, rx or tx */
+        guint32      FRAME_TYPE_OFF;
 
-    /* other information about the file in question */
-    guint32      MT_10_HALF;                     /* 10 Mb/s half-duplex */
-    guint32      MT_10_FULL;                     /* 10 Mb/s full-duplex */
-    guint32      MT_100_HALF;                    /* 100 Mb/s half-duplex */
-    guint32      MT_100_FULL;                    /* 100 Mb/s full-duplex */
-    guint32      MT_1G_HALF;                     /* 1 Gb/s half-duplex */
-    guint32      MT_1G_FULL;                     /* 1 Gb/s full-duplex */
-    guint32      FCS_ERROR;                      /* FCS error in frame */
-    guint32      CRYPTO_ERR;                     /* RX decrypt error flags */
-    guint32      PAYCHK_ERR;                     /* payload checksum failure */
-    guint32      RETRY_ERR;                      /* excessive retries on TX failure */
-    guint8       IS_RX;                          /* TX/RX bit in STATS block */
-    guint8       MT_MASK;                        /* modulation type mask */
-    guint16      VCID_MASK;                      /* VC ID is only 9 bits */
-    guint32      FLOW_VALID;                     /* flow-is-valid flag (else force to 0) */
-    guint16      QOS_VALID;
-    guint32      RX_DECRYPTS;                    /* RX-frame-was-decrypted bits */
-    guint32      TX_DECRYPTS;                    /* TX-frame-was-decrypted bits */
-    guint32      FC_PROT_BIT;                    /* Protected Frame bit in FC1 of frame */
-    guint32      MT_CCKL;                        /* CCK modulation, long preamble */
-    guint32      MT_CCKS;                        /* CCK modulation, short preamble */
-    guint32      MT_OFDM;                        /* OFDM modulation */
-    guint32      MCS_INDEX_MASK;                 /* mcs index type mask */
-    guint32      FPGA_VERSION;
-    guint32      HEADER_IS_RX;
-    guint32      HEADER_IS_TX;
-    guint32      WEPTYPE;                        /* frame is WEP */
-    guint32      TKIPTYPE;                       /* frame is TKIP */
-    guint32      CCMPTYPE;                       /* frame is CCMP */
-    guint32      IS_TCP;
-    guint32      IS_UDP;
-    guint32      IS_ICMP;
-    guint32      IS_IGMP;
-    guint16      IS_QOS;
-    guint32      IS_VLAN;
-    guint32      MPDU_OFF;
+        /* other information about the file in question */
+        guint32      MT_10_HALF;                     /* 10 Mb/s half-duplex */
+        guint32      MT_10_FULL;                     /* 10 Mb/s full-duplex */
+        guint32      MT_100_HALF;                    /* 100 Mb/s half-duplex */
+        guint32      MT_100_FULL;                    /* 100 Mb/s full-duplex */
+        guint32      MT_1G_HALF;                     /* 1 Gb/s half-duplex */
+        guint32      MT_1G_FULL;                     /* 1 Gb/s full-duplex */
+        guint32      FCS_ERROR;                      /* FCS error in frame */
+        guint32      CRYPTO_ERR;                     /* RX decrypt error flags */
+        guint32      PAYCHK_ERR;                     /* payload checksum failure */
+        guint32      RETRY_ERR;                      /* excessive retries on TX failure */
+        guint8       IS_RX;                          /* TX/RX bit in STATS block */
+        guint8       MT_MASK;                        /* modulation type mask */
+        guint16      VCID_MASK;                      /* VC ID is only 9 bits */
+        guint32      FLOW_VALID;                     /* flow-is-valid flag (else force to 0) */
+        guint16      QOS_VALID;
+        guint32      RX_DECRYPTS;                    /* RX-frame-was-decrypted bits */
+        guint32      TX_DECRYPTS;                    /* TX-frame-was-decrypted bits */
+        guint32      FC_PROT_BIT;                    /* Protected Frame bit in FC1 of frame */
+        guint32      MT_CCKL;                        /* CCK modulation, long preamble */
+        guint32      MT_CCKS;                        /* CCK modulation, short preamble */
+        guint32      MT_OFDM;                        /* OFDM modulation */
+        guint32      MCS_INDEX_MASK;                 /* mcs index type mask */
+        guint32      FPGA_VERSION;
+        guint32      HEADER_IS_RX;
+        guint32      HEADER_IS_TX;
+        guint32      WEPTYPE;                        /* frame is WEP */
+        guint32      TKIPTYPE;                       /* frame is TKIP */
+        guint32      CCMPTYPE;                       /* frame is CCMP */
+        guint32      IS_TCP;
+        guint32      IS_UDP;
+        guint32      IS_ICMP;
+        guint32      IS_IGMP;
+        guint16      IS_QOS;
+        guint32      IS_VLAN;
+        guint32      MPDU_OFF;
 } vwr_t;
 
 /* internal utility functions */
@@ -524,7 +525,7 @@ static float        getRate( guint8 plcpType, guint8 mcsIndex, guint16 rflags, g
 /* This does very little, except setting the wiretap header for a VWR file type */
 /*  and setting the timestamp precision to microseconds.                        */
 
-wtap_open_return_val vwr_open(wtap *wth, int *err, gchar **err_info)
+int vwr_open(wtap *wth, int *err, gchar **err_info)
 {
     int    fpgaVer;
     vwr_t *vwr;
@@ -533,10 +534,10 @@ wtap_open_return_val vwr_open(wtap *wth, int *err, gchar **err_info)
 
     fpgaVer = vwr_get_fpga_version(wth, err, err_info);
     if (fpgaVer == -1) {
-        return WTAP_OPEN_ERROR; /* I/O error */
+        return -1; /* I/O error */
     }
     if (fpgaVer == UNKNOWN_FPGA) {
-        return WTAP_OPEN_NOT_MINE; /* not a VWR file */
+        return 0; /* not a VWR file */
     }
 
     /* This is a vwr file */
@@ -550,7 +551,7 @@ wtap_open_return_val vwr_open(wtap *wth, int *err, gchar **err_info)
     wth->snapshot_length = 0;
     wth->subtype_read = vwr_read;
     wth->subtype_seek_read = vwr_seek_read;
-    wth->file_tsprec = WTAP_TSPREC_USEC;
+    wth->tsprecision = WTAP_FILE_TSPREC_USEC;
     wth->file_encap = WTAP_ENCAP_IXVERIWAVE;
 
     if (fpgaVer == S2_W_FPGA || fpgaVer == S1_W_FPGA || fpgaVer == S3_W_FPGA)
@@ -558,7 +559,7 @@ wtap_open_return_val vwr_open(wtap *wth, int *err, gchar **err_info)
     else if (fpgaVer == vVW510012_E_FPGA || fpgaVer == vVW510024_E_FPGA)
         wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_VWR_ETH;
 
-    return WTAP_OPEN_MINE;
+    return 1;
 }
 
 
@@ -634,6 +635,7 @@ static gboolean vwr_read_rec_header(vwr_t *vwr, FILE_T fh, int *rec_size, int *I
     int     f_len, v_type;
     guint8  header[VW_RECORD_HEADER_LENGTH];
 
+    errno = WTAP_ERR_CANT_READ;
     *rec_size = 0;
 
     /* Read out the file data in 16-byte messages, stopping either after we find a frame,  */
@@ -642,8 +644,10 @@ static gboolean vwr_read_rec_header(vwr_t *vwr, FILE_T fh, int *rec_size, int *I
     /*  variable-length item, we read the variable length item out and discard it.         */
     /* If we find a frame, we return (with the header in the passed buffer).               */
     while (1) {
-        if (!wtap_read_bytes_or_eof(fh, header, VW_RECORD_HEADER_LENGTH, err, err_info))
+        if (file_read(header, VW_RECORD_HEADER_LENGTH, fh) != VW_RECORD_HEADER_LENGTH) {
+            *err = file_error(fh, err_info);
             return FALSE;
+        }
 
         /* Got a header; invoke decode-message function to parse and process it.     */
         /* If the function returns a length, then a frame or variable-length message */
@@ -656,7 +660,7 @@ static gboolean vwr_read_rec_header(vwr_t *vwr, FILE_T fh, int *rec_size, int *I
                 return FALSE;
             }
             else if (v_type != VT_FRAME) {
-                if (!file_skip(fh, f_len, err))
+                if (file_seek(fh, f_len, SEEK_CUR, err) < 0)
                     return FALSE;
             }
             else {
@@ -701,7 +705,7 @@ static int vwr_get_fpga_version(wtap *wth, int *err, gchar **err_info)
     /* Each 16-byte message is decoded; if we run across a non-frame message followed by a */
     /*  variable-length item, we read the variable length item out and discard it.         */
     /* If we find a frame, we return (with the header in the passed buffer).               */
-    while (wtap_read_bytes(wth->fh, header, VW_RECORD_HEADER_LENGTH, err, err_info)) {
+    while ((file_read(header, VW_RECORD_HEADER_LENGTH, wth->fh)) == VW_RECORD_HEADER_LENGTH) {
         /* Got a header; invoke decode-message function to parse and process it.     */
         /* If the function returns a length, then a frame or variable-length message */
         /*  follows the 16-byte message.                                             */
@@ -722,10 +726,11 @@ static int vwr_get_fpga_version(wtap *wth, int *err, gchar **err_info)
                 rec_size = f_len;
                 /* Got a frame record; read over entire record (frame + trailer) into a local buffer */
                 /* If we don't get it all, assume this isn't a vwr file */
-                if (!wtap_read_bytes(wth->fh, rec, rec_size, err, err_info)) {
-                    if (*err == WTAP_ERR_SHORT_READ)
-                        return UNKNOWN_FPGA; /* short read - not a vwr file */
-                    return -1;
+                if (file_read(rec, rec_size, wth->fh) != rec_size) {
+                    *err = file_error(wth->fh, err_info);
+                    if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+                        return -1;
+                    return UNKNOWN_FPGA; /* short read - not a vwr file */
                 }
 
 
@@ -815,9 +820,10 @@ static int vwr_get_fpga_version(wtap *wth, int *err, gchar **err_info)
     if (valid_but_empty_file > 0)
         return(S3_W_FPGA);
 
-    if (*err == WTAP_ERR_SHORT_READ)
-        return UNKNOWN_FPGA; /* short read - not a vwr file */
-    return -1;
+    *err = file_error(wth->fh, err_info);
+    if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+        return -1;
+    return UNKNOWN_FPGA; /* short read - not a vwr file */
 }
 
 /* Copy the actual packet data from the capture file into the target data block. */
@@ -976,8 +982,8 @@ static gboolean vwr_read_s1_W_rec(vwr_t *vwr, struct wtap_pkthdr *phdr,
     phdr->rec_type = REC_TYPE_PACKET;
     phdr->presence_flags = WTAP_HAS_TS;
 
-    ws_buffer_assure_space(buf, phdr->caplen);
-    data_ptr = ws_buffer_start_ptr(buf);
+    buffer_assure_space(buf, phdr->caplen);
+    data_ptr = buffer_start_ptr(buf);
 
     /*
      * Generate and copy out the common metadata headers,
@@ -1145,20 +1151,20 @@ static gboolean vwr_read_s2_W_rec(vwr_t *vwr, struct wtap_pkthdr *phdr,
         /* we do the range checks at the end before copying the values
            into the wtap header */
         msdu_length = ((s_start_ptr[vVW510021_W_MSDU_LENGTH_OFF+1] & 0x1f) << 8)
-                        + s_start_ptr[vVW510021_W_MSDU_LENGTH_OFF];
+	                + s_start_ptr[vVW510021_W_MSDU_LENGTH_OFF];
 
         vc_id = pntoh16(&s_start_ptr[vVW510021_W_VCID_OFF]);
         if (IS_TX)
         {
             rssi[0] = (s_start_ptr[vVW510021_W_RSSI_TXPOWER_OFF] & 0x80) ?
-                       -1 * (s_start_ptr[vVW510021_W_RSSI_TXPOWER_OFF] & 0x7f) :
-                       s_start_ptr[vVW510021_W_RSSI_TXPOWER_OFF] & 0x7f;
+	               -1 * (s_start_ptr[vVW510021_W_RSSI_TXPOWER_OFF] & 0x7f) :
+		       s_start_ptr[vVW510021_W_RSSI_TXPOWER_OFF] & 0x7f;
         }
         else
         {
             rssi[0] = (s_start_ptr[vVW510021_W_RSSI_TXPOWER_OFF] & 0x80) ?
-                      (s_start_ptr[vVW510021_W_RSSI_TXPOWER_OFF]- 256) :
-                      s_start_ptr[vVW510021_W_RSSI_TXPOWER_OFF];
+	              (s_start_ptr[vVW510021_W_RSSI_TXPOWER_OFF]- 256) :
+		      s_start_ptr[vVW510021_W_RSSI_TXPOWER_OFF];
         }
         rssi[1] = 100;
         rssi[2] = 100;
@@ -1333,8 +1339,8 @@ static gboolean vwr_read_s2_W_rec(vwr_t *vwr, struct wtap_pkthdr *phdr,
     phdr->rec_type = REC_TYPE_PACKET;
     phdr->presence_flags = WTAP_HAS_TS;
 
-    ws_buffer_assure_space(buf, phdr->caplen);
-    data_ptr = ws_buffer_start_ptr(buf);
+    buffer_assure_space(buf, phdr->caplen);
+    data_ptr = buffer_start_ptr(buf);
 
     /*
      * Generate and copy out the common metadata headers,
@@ -1629,8 +1635,8 @@ static gboolean vwr_read_rec_data_ethernet(vwr_t *vwr, struct wtap_pkthdr *phdr,
 
     /*etap_hdr.vw_ip_length = (guint16)ip_len;*/
 
-    ws_buffer_assure_space(buf, phdr->caplen);
-    data_ptr = ws_buffer_start_ptr(buf);
+    buffer_assure_space(buf, phdr->caplen);
+    data_ptr = buffer_start_ptr(buf);
 
     /*
      * Generate and copy out the common metadata headers,
@@ -2155,8 +2161,12 @@ vwr_process_rec_data(FILE_T fh, int rec_size,
 
     /* Read over the entire record (frame + trailer) into a local buffer.         */
     /* If we don't get it all, then declare an error, we can't process the frame. */
-    if (!wtap_read_bytes(fh, rec, rec_size, err, err_info))
+    if (file_read(rec, rec_size, fh) != rec_size) {
+        *err = file_error(fh, err_info);
+        if (*err == 0)
+            *err = WTAP_ERR_SHORT_READ;
         return FALSE;
+    }
 
     /* now format up the frame data */
     switch (vwr->FPGA_VERSION)

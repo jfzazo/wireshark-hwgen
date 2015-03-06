@@ -21,6 +21,7 @@
 
 #include "wtap-int.h"
 #include "file_wrappers.h"
+#include <wsutil/buffer.h>
 #include "hcidump.h"
 
 struct dump_hdr {
@@ -37,10 +38,15 @@ static gboolean hcidump_process_packet(FILE_T fh, struct wtap_pkthdr *phdr,
     Buffer *buf, int *err, gchar **err_info)
 {
 	struct dump_hdr dh;
-	int packet_size;
+	int bytes_read, packet_size;
 
-	if (!wtap_read_bytes_or_eof(fh, &dh, DUMP_HDR_SIZE, err, err_info))
+	bytes_read = file_read(&dh, DUMP_HDR_SIZE, fh);
+	if (bytes_read != DUMP_HDR_SIZE) {
+		*err = file_error(fh, err_info);
+		if (*err == 0 && bytes_read != 0)
+			*err = WTAP_ERR_SHORT_READ;
 		return FALSE;
+	}
 
 	packet_size = GUINT16_FROM_LE(dh.len);
 	if (packet_size > WTAP_MAX_PACKET_SIZE) {
@@ -84,32 +90,37 @@ static gboolean hcidump_seek_read(wtap *wth, gint64 seek_off,
 	return hcidump_process_packet(wth->random_fh, phdr, buf, err, err_info);
 }
 
-wtap_open_return_val hcidump_open(wtap *wth, int *err, gchar **err_info)
+int hcidump_open(wtap *wth, int *err, gchar **err_info)
 {
 	struct dump_hdr dh;
 	guint8 type;
+	int bytes_read;
 
-	if (!wtap_read_bytes(wth->fh, &dh, DUMP_HDR_SIZE, err, err_info)) {
-		if (*err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+	bytes_read = file_read(&dh, DUMP_HDR_SIZE, wth->fh);
+	if (bytes_read != DUMP_HDR_SIZE) {
+		*err = file_error(wth->fh, err_info);
+		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+			return -1;
+		return 0;
 	}
 
 	if ((dh.in != 0 && dh.in != 1) || dh.pad != 0
 	    || GUINT16_FROM_LE(dh.len) < 1)
-		return WTAP_OPEN_NOT_MINE;
+		return 0;
 
-	if (!wtap_read_bytes(wth->fh, &type, 1, err, err_info)) {
-		if (*err != WTAP_ERR_SHORT_READ)
-			return WTAP_OPEN_ERROR;
-		return WTAP_OPEN_NOT_MINE;
+	bytes_read = file_read(&type, 1, wth->fh);
+	if (bytes_read != 1) {
+		*err = file_error(wth->fh, err_info);
+		if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+			return -1;
+		return 0;
 	}
 
 	if (type < 1 || type > 4)
-		return WTAP_OPEN_NOT_MINE;
+		return 0;
 
 	if (file_seek(wth->fh, 0, SEEK_SET, err) == -1)
-		return WTAP_OPEN_ERROR;
+		return -1;
 
 	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_HCIDUMP;
 	wth->file_encap = WTAP_ENCAP_BLUETOOTH_H4_WITH_PHDR;
@@ -117,20 +128,7 @@ wtap_open_return_val hcidump_open(wtap *wth, int *err, gchar **err_info)
 
 	wth->subtype_read = hcidump_read;
 	wth->subtype_seek_read = hcidump_seek_read;
-	wth->file_tsprec = WTAP_TSPREC_USEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_USEC;
 
-	return WTAP_OPEN_MINE;
+	return 1;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -55,7 +55,6 @@
 #define VENDOR_JUNIPER               2636
 #define VENDOR_APTIS                 2637
 #define VENDOR_DT_AG                 2937
-#define VENDOR_IXIA                  3054
 #define VENDOR_CISCO_VPN3000         3076
 #define VENDOR_COSINE                3085
 #define VENDOR_SHASTA                3199
@@ -79,7 +78,6 @@
 #define VENDOR_COLUMBIA_UNIVERSITY  11862
 #define VENDOR_THE3GPP              10415
 #define VENDOR_GEMTEK_SYSTEMS       10529
-#define VENDOR_FORTINET             12356
 #define VENDOR_VERIZON              12951
 #define VENDOR_PLIXER               13745
 #define VENDOR_WIFI_ALLIANCE        14122
@@ -88,7 +86,6 @@
 #define VENDOR_CACE                 32622
 /* Greater than 32,767 need to be tagged unsigned. */
 #define VENDOR_NTOP                 35632u
-#define VENDOR_CISCO_WIFI           4232704
 
 WS_DLL_PUBLIC value_string_ext sminmpec_values_ext;
 

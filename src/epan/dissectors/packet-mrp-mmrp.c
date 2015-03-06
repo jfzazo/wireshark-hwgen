@@ -334,7 +334,7 @@ dissect_mmrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                 vect_offset += vect_attr_len; /* Move to next Vector Attribute, if there is one */
             } /* Multiple VectorAttribute while() */
 
-            proto_tree_add_item(attr_list_tree, hf_mmrp_end_mark, tvb, offset, 2, ENC_BIG_ENDIAN); /* VectorAttribute EndMark */
+            proto_tree_add_item(attr_list_tree, hf_mmrp_end_mark, tvb, offset, 2, ENC_NA); /* VectorAttribute EndMark */
 
             proto_item_set_len(attr_list_ti, vect_offset); /*without an endmark*/
             msg_offset += vect_offset + 2; /*  + endmark; Move to next Message, if there is one */
@@ -342,7 +342,7 @@ dissect_mmrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         } /* Multiple Message while() */
 
-        proto_tree_add_item(mmrp_tree, hf_mmrp_end_mark, tvb, offset+2, 2, ENC_BIG_ENDIAN); /* Message EndMark */
+        proto_tree_add_item(mmrp_tree, hf_mmrp_end_mark, tvb, offset+2, 2, ENC_NA); /* Message EndMark */
     }
 }
 
@@ -393,7 +393,7 @@ proto_register_mrp_mmrp(void)
               FT_NONE,  BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_mmrp_three_packed_event,
-            { "Attribute Event",       "mrp-mmrp.three_packed_event",
+            { "Attribute Event",       "mrp-msrp.three_packed_event",
               FT_UINT8, BASE_DEC,  VALS(three_packed_vals), 0x0, NULL, HFILL }
         },
         { &hf_mmrp_end_mark,
@@ -429,16 +429,3 @@ proto_reg_handoff_mrp_mmrp(void)
     mmrp_handle = create_dissector_handle(dissect_mmrp, proto_mmrp);
     dissector_add_uint("ethertype", ETHERTYPE_MMRP, mmrp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

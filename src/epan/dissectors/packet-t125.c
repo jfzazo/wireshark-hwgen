@@ -32,6 +32,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 
@@ -81,7 +82,7 @@ static int hf_t125_connect_additional = -1;       /* Connect_Additional */
 static int hf_t125_connect_result = -1;           /* Connect_Result */
 
 /*--- End of included file: packet-t125-hf.c ---*/
-#line 47 "../../asn1/t125/packet-t125-template.c"
+#line 48 "../../asn1/t125/packet-t125-template.c"
 
 /* Initialize the subtree pointers */
 static int ett_t125 = -1;
@@ -97,7 +98,7 @@ static gint ett_t125_Connect_Result_U = -1;
 static gint ett_t125_ConnectMCSPDU = -1;
 
 /*--- End of included file: packet-t125-ett.c ---*/
-#line 52 "../../asn1/t125/packet-t125-template.c"
+#line 53 "../../asn1/t125/packet-t125-template.c"
 
 static heur_dissector_list_t t125_heur_subdissector_list;
 
@@ -383,7 +384,7 @@ static int dissect_ConnectMCSPDU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, 
 
 
 /*--- End of included file: packet-t125-fn.c ---*/
-#line 56 "../../asn1/t125/packet-t125-template.c"
+#line 57 "../../asn1/t125/packet-t125-template.c"
 
 static int
 dissect_t125(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *data _U_)
@@ -399,7 +400,7 @@ dissect_t125(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *d
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "T.125");
   col_clear(pinfo->cinfo, COL_INFO);
 
-  item = proto_tree_add_item(parent_tree, proto_t125, tvb, 0, tvb_captured_length(tvb), ENC_NA);
+  item = proto_tree_add_item(parent_tree, proto_t125, tvb, 0, tvb_length(tvb), ENC_NA);
   tree = proto_item_add_subtree(item, ett_t125);
 
   get_ber_identifier(tvb, 0, &ber_class, &pc, &tag);
@@ -411,7 +412,7 @@ dissect_t125(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *d
     dissect_DomainMCSPDU_PDU(tvb, pinfo, tree);
   }
 
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 static gboolean
@@ -558,7 +559,7 @@ void proto_register_t125(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-t125-hfarr.c ---*/
-#line 126 "../../asn1/t125/packet-t125-template.c"
+#line 127 "../../asn1/t125/packet-t125-template.c"
   };
 
   /* List of subtrees */
@@ -575,7 +576,7 @@ void proto_register_t125(void) {
     &ett_t125_ConnectMCSPDU,
 
 /*--- End of included file: packet-t125-ettarr.c ---*/
-#line 132 "../../asn1/t125/packet-t125-template.c"
+#line 133 "../../asn1/t125/packet-t125-template.c"
   };
 
   /* Register protocol */
@@ -584,7 +585,7 @@ void proto_register_t125(void) {
   proto_register_field_array(proto_t125, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
 
-  t125_heur_subdissector_list= register_heur_dissector_list("t125");
+  register_heur_dissector_list("t125", &t125_heur_subdissector_list);
 
   new_register_dissector("t125", dissect_t125, proto_t125);
 }

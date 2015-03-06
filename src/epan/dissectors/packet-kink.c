@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/asn1.h>
@@ -47,10 +48,6 @@ static int hf_kink_length = -1;
 static int hf_kink_transactionId = -1;
 static int hf_kink_checkSumLength = -1;
 static int hf_kink_A = -1;
-static int hf_kink_version = -1;
-static int hf_kink_domain_of_interpretation = -1;
-static int hf_kink_qmversion = -1;
-static int hf_kink_error_code = -1;
 static int hf_kink_reserved8 = -1;
 static int hf_kink_reserved15 = -1;
 static int hf_kink_reserved16 = -1;
@@ -66,7 +63,6 @@ static int hf_kink_princ_name_length = -1;
 static int hf_kink_princ_name = -1;
 static int hf_kink_tgt_length = -1;
 static int hf_kink_tgt = -1;
-static int hf_kink_payload = -1;
 
 /* Argument for making the subtree */
 static gint ett_kink = -1;
@@ -203,6 +199,7 @@ dissect_kink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree){
   proto_item *ti = NULL;
   proto_tree *kink_tree = NULL;
   guint8 type;
+  guint8 major_version, minor_version, version;
   guint32 doi;
   guint chsumlen;
   guint8 next_payload;
@@ -224,7 +221,19 @@ dissect_kink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree){
   proto_tree_add_uint(kink_tree, hf_kink_type, tvb, offset, 1, type);
   offset++;
 
-  proto_tree_add_item(kink_tree, hf_kink_version, tvb, offset, 1, ENC_BIG_ENDIAN);
+  /* This part is the version. Consider less than 1 octet value.
+   * Major version and minor version is 4bit. Front half of 1octet
+   * is major version, and second half of 1octet is minor version.
+   * The calculation of major version is shown below.
+   * The logical product of the value of 1octet and 0xf0 is performed.
+   * And It is performed 4bit right shift.
+   * Secondarily, the calculation of minor version is shown below.
+   * The logical product of the value of 1octet and 0x0f is performed.
+   */
+  version = tvb_get_guint8(tvb,offset);
+  major_version = (version & FRONT_FOUR_BIT) >> VERSION_BIT_SHIFT;
+  minor_version = version & SECOND_FOUR_BIT;
+  proto_tree_add_text(kink_tree, tvb, offset, 1, "version: %u.%u", major_version, minor_version);
   offset++;
 
   proto_tree_add_item(kink_tree, hf_kink_length, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -233,10 +242,10 @@ dissect_kink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree){
   doi = tvb_get_ntohl(tvb, offset);
 
   if(doi == IPSEC){
-    proto_tree_add_uint_format_value(kink_tree, hf_kink_domain_of_interpretation, tvb, offset, 4, doi, "IPsec (%u)", doi);
+    proto_tree_add_text(kink_tree, tvb, offset, 4, "Domain Of Interpretation: %s (%u)", "IPsec", doi);
   }
   else{
-    proto_tree_add_uint_format_value(kink_tree, hf_kink_domain_of_interpretation, tvb, offset, 4, doi, "Not IPsec (%u)", doi);
+    proto_tree_add_text(kink_tree, tvb, offset, 4, "Domain Of Interpretation: %s (%u)", "Not IPsec", doi);
   }
   offset += 4;
 
@@ -331,8 +340,8 @@ dissect_payload_kink_ap_req(packet_info *pinfo, tvbuff_t *tvb, int offset, proto
   payload_length = tvb_get_ntohs(tvb, offset + TO_PAYLOAD_LENGTH);
 
   /* Make the subtree. */
-  payload_kink_ap_req_tree = proto_tree_add_subtree(tree, tvb, offset, payload_length,
-                        ett_payload_kink_ap_req, NULL, "KINK_AP_REQ");
+  ti = proto_tree_add_text(tree, tvb, offset, payload_length, "KINK_AP_REQ");
+  payload_kink_ap_req_tree = proto_item_add_subtree(ti, ett_payload_kink_ap_req);
 
   next_payload = tvb_get_guint8(tvb, offset);
   proto_tree_add_uint(payload_kink_ap_req_tree, hf_kink_next_payload, tvb, offset, 1, next_payload);
@@ -386,8 +395,8 @@ dissect_payload_kink_ap_rep(packet_info *pinfo, tvbuff_t *tvb, int offset, proto
   start_payload_offset = offset;
 
   /* Make the subtree */
-  payload_kink_ap_rep_tree = proto_tree_add_subtree(tree, tvb, offset, payload_length,
-                        ett_payload_kink_ap_rep, NULL, "KINK_AP_REP");
+  ti = proto_tree_add_text(tree, tvb, offset, payload_length,"KINK_AP_REP");
+  payload_kink_ap_rep_tree = proto_item_add_subtree(ti, ett_payload_kink_ap_rep);
 
   next_payload = tvb_get_guint8(tvb, offset);
   proto_tree_add_uint(payload_kink_ap_rep_tree, hf_kink_next_payload, tvb, offset, 1, next_payload);
@@ -441,8 +450,8 @@ dissect_payload_kink_krb_error(packet_info *pinfo, tvbuff_t *tvb, int offset, pr
   start_payload_offset = offset;
 
   /* Make the subtree */
-  payload_kink_krb_error_tree = proto_tree_add_subtree(tree, tvb, offset, payload_length,
-                                    ett_payload_kink_krb_error, NULL, "KINK_KRB_ERROR");
+  ti = proto_tree_add_text(tree, tvb, offset, payload_length,"KINK_KRB_ERROR");
+  payload_kink_krb_error_tree = proto_item_add_subtree(ti, ett_payload_kink_krb_error);
 
   next_payload = tvb_get_guint8(tvb, offset);
   proto_tree_add_uint(payload_kink_krb_error_tree, hf_kink_next_payload, tvb, offset, 1, next_payload);
@@ -483,6 +492,7 @@ dissect_payload_kink_krb_error(packet_info *pinfo, tvbuff_t *tvb, int offset, pr
 static void
 dissect_payload_kink_tgt_req(packet_info *pinfo, tvbuff_t *tvb, int offset, proto_tree *tree){
   proto_tree *payload_kink_tgt_req_tree;
+  proto_item *ti;
   guint8 next_payload;
   guint payload_length;
   guint16 realm_name_length;
@@ -493,8 +503,8 @@ dissect_payload_kink_tgt_req(packet_info *pinfo, tvbuff_t *tvb, int offset, prot
   start_payload_offset = offset;
 
   /* Make the subtree */
-  payload_kink_tgt_req_tree = proto_tree_add_subtree(tree, tvb, offset, payload_length,
-                                        ett_payload_kink_tgt_req, NULL, "KINK_TGT_REQ");
+  ti = proto_tree_add_text(tree, tvb, offset, payload_length,"KINK_TGT_REQ");
+  payload_kink_tgt_req_tree = proto_item_add_subtree(ti, ett_payload_kink_tgt_req);
 
   next_payload = tvb_get_guint8(tvb, offset);
   proto_tree_add_uint(payload_kink_tgt_req_tree, hf_kink_next_payload, tvb, offset, 1, next_payload);
@@ -525,6 +535,7 @@ dissect_payload_kink_tgt_req(packet_info *pinfo, tvbuff_t *tvb, int offset, prot
 static void
 dissect_payload_kink_tgt_rep(packet_info *pinfo, tvbuff_t *tvb, int offset, proto_tree *tree){
   proto_tree *payload_kink_tgt_rep_tree;
+  proto_item *ti;
   guint8 next_payload;
   guint payload_length;
   guint princ_name_length;
@@ -535,8 +546,8 @@ dissect_payload_kink_tgt_rep(packet_info *pinfo, tvbuff_t *tvb, int offset, prot
   start_payload_offset = offset;
 
   /* Make the subtree */
-  payload_kink_tgt_rep_tree = proto_tree_add_subtree(tree, tvb, offset, payload_length,
-                                ett_payload_kink_tgt_rep, NULL, "KINK_TGT_REP");
+  ti = proto_tree_add_text(tree, tvb, offset, payload_length,"KINK_TGT_REP");
+  payload_kink_tgt_rep_tree = proto_item_add_subtree(ti, ett_payload_kink_tgt_rep);
 
   next_payload = tvb_get_guint8(tvb, offset);
   proto_tree_add_uint(payload_kink_tgt_rep_tree, hf_kink_next_payload, tvb, offset, 1, next_payload);
@@ -588,6 +599,7 @@ dissect_payload_kink_isakmp(packet_info *pinfo, tvbuff_t *tvb, int offset, proto
   guint payload_length,isakmp_length;
   int length, reported_length;
   guint8 inner_next_pload;
+  guint8 qm, qmmaj, qmmin;
   int start_payload_offset = 0;      /* Keep the beginning of the payload offset */
   tvbuff_t *isakmp_tvb;
 
@@ -595,8 +607,8 @@ dissect_payload_kink_isakmp(packet_info *pinfo, tvbuff_t *tvb, int offset, proto
   start_payload_offset = offset;
 
   /* Make the subtree. */
-  payload_kink_isakmp_tree = proto_tree_add_subtree(tree, tvb, offset, payload_length,
-                                        ett_payload_kink_isakmp, NULL, "KINK_ISAKMP");
+  ti = proto_tree_add_text(tree, tvb, offset, payload_length,"KINK_ISAKMP");
+  payload_kink_isakmp_tree = proto_item_add_subtree(ti, ett_payload_kink_isakmp);
 
   next_payload = tvb_get_guint8(tvb, offset);
   proto_tree_add_uint(payload_kink_isakmp_tree, hf_kink_next_payload, tvb, offset, 1, next_payload);
@@ -615,7 +627,16 @@ dissect_payload_kink_isakmp(packet_info *pinfo, tvbuff_t *tvb, int offset, proto
   proto_tree_add_uint(payload_kink_isakmp_tree, hf_kink_inner_next_pload, tvb, offset, 1, inner_next_pload);
   offset += 1;
 
-  proto_tree_add_item(payload_kink_isakmp_tree, hf_kink_qmversion, tvb, offset, 1, ENC_BIG_ENDIAN);
+  /* The qmmaj is first half 4bit field of the octet. Therefore, the logical product
+   * of the 1octet value and 0xf0 is performed, and performed 4bit right shift.
+   * The qmmin is second half 4bit field of the octet. Therefore, the logical product
+   * of the 1octet value and 0x0f is performed.
+   */
+  qm = tvb_get_guint8(tvb,offset);
+  qmmaj = (qm & FRONT_FOUR_BIT) >> VERSION_BIT_SHIFT;
+  qmmin = qm & SECOND_FOUR_BIT;
+
+  proto_tree_add_text(payload_kink_isakmp_tree, tvb, offset, 1, "QMVersion: %u.%u", qmmaj, qmmin);
   offset += 1;
 
   proto_tree_add_item(payload_kink_isakmp_tree, hf_kink_reserved16, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -664,8 +685,8 @@ dissect_payload_kink_encrypt(packet_info *pinfo, tvbuff_t *tvb, int offset, prot
   encrypt_length = payload_length - FROM_NP_TO_PL;
 #endif
   /* Make the subtree */
-  payload_kink_encrypt_tree = proto_tree_add_subtree(tree, tvb, offset, payload_length,
-                                            ett_payload_kink_encrypt, NULL, "KINK_ENCRYPT");
+  ti = proto_tree_add_text(tree, tvb, offset, payload_length,"KINK_ENCRYPT");
+  payload_kink_encrypt_tree = proto_item_add_subtree(ti, ett_payload_kink_encrypt);
 
   next_payload = tvb_get_guint8(tvb, offset);
   proto_tree_add_uint(payload_kink_encrypt_tree, hf_kink_next_payload, tvb, offset, 1, next_payload);
@@ -707,7 +728,7 @@ dissect_payload_kink_encrypt(packet_info *pinfo, tvbuff_t *tvb, int offset, prot
 
     if(payload_length > PAYLOAD_HEADER){
       inner_payload_length = payload_length - PAYLOAD_HEADER;
-      proto_tree_add_item(payload_kink_encrypt_tree, hf_kink_payload, tvb, offset, inner_payload_length, ENC_NA);
+      proto_tree_add_text(payload_kink_encrypt_tree, tvb, offset, inner_payload_length, "Payload");
       /*offset += inner_payload_length;*/
     }
   }
@@ -727,11 +748,12 @@ static void
 dissect_decrypt_kink_encrypt(packet_info *pinfo, tvbuff_t *tvb, proto_tree *tree, int payload_length){
 
   proto_tree *decrypt_kink_encrypt_tree;
+  proto_item *ti;
   int offset=0;
   guint8 next_payload;
 
-  decrypt_kink_encrypt_tree = proto_tree_add_subtree(tree, tvb, offset, payload_length,
-                                    ett_decrypt_kink_encrypt, NULL, "decrypted data");
+  ti = proto_tree_add_text(tree, tvb, offset, payload_length, "decrypted data");
+  decrypt_kink_encrypt_tree = proto_item_add_subtree(ti, ett_decrypt_kink_encrypt);
 
   next_payload = tvb_get_guint8(tvb, offset);
 
@@ -745,34 +767,30 @@ dissect_decrypt_kink_encrypt(packet_info *pinfo, tvbuff_t *tvb, proto_tree *tree
 }
 #endif
 
-static const range_string kink_error_rvals[] = {
-    { 0, 0,  "KINK_OK" },
-    { 1, 1,  "KINK_PROTOERR" },
-    { 2, 2,  "KINK_INVDOI" },
-    { 3, 3,  "KINK_INVMAJ" },
-    { 4, 4,  "KINK_INVMIN" },
-    { 5, 5,  "KINK_INTERR" },
-    { 6, 6,  "KINK_BADQMVERS" },
-    { BOTTOM_RESERVED, TOP_RESERVED,  "RESERVED" },
-    { BOTTOM_PRIVATE_USE, TOP_PRIVATE_USE,  "PRIVATE USE" },
-    { TOP_PRIVATE_USE+1, 0xffffffff,  "This Error Code is not Defined." },
-    { 0, 0, NULL }
-};
-
 static void
 dissect_payload_kink_error(packet_info *pinfo, tvbuff_t *tvb, int offset, proto_tree *tree){
   proto_tree *payload_kink_error_tree;
   proto_item *ti;
   guint8 next_payload;
   guint16 payload_length;
+  guint32 error_code;
   int start_payload_offset = 0; /* Keep the beginning of the payload offset */
+  static const char *char_error_code[] = {
+    "KINK_OK",
+    "KINK_PROTOERR",
+    "KINK_INVDOI",
+    "KINK_INVMAJ",
+    "KINK_INVMIN",
+    "KINK_INTERR",
+    "KINK_BADQMVERS"
+  };
 
   payload_length = tvb_get_ntohs(tvb,offset + TO_PAYLOAD_LENGTH);
   start_payload_offset = offset;
 
   /* Make the subtree */
-  payload_kink_error_tree = proto_tree_add_subtree(tree, tvb, offset, payload_length,
-                                            ett_payload_kink_error, NULL, "KINK_ERROR");
+  ti = proto_tree_add_text(tree, tvb, offset, payload_length,"KINK_ERROR");
+  payload_kink_error_tree = proto_item_add_subtree(ti, ett_payload_kink_error);
 
   next_payload = tvb_get_guint8(tvb, offset);
   proto_tree_add_uint(payload_kink_error_tree, hf_kink_next_payload, tvb, offset, 1, next_payload);
@@ -787,7 +805,31 @@ dissect_payload_kink_error(packet_info *pinfo, tvbuff_t *tvb, int offset, proto_
   }
   offset += 2;
 
-  proto_tree_add_item(payload_kink_error_tree, hf_kink_error_code, tvb, offset, 4, ENC_BIG_ENDIAN);
+  error_code = tvb_get_ntohl(tvb, offset);
+
+  /* Choosed the error code by erro_code */
+  switch(error_code){
+  case KINK_OK:
+  case KINK_PROTOERR:
+  case KINK_INVDOI:
+  case KINK_INVMAJ:
+  case KINK_INVMIN:
+  case KINK_INTERR:
+  case KINK_BADQMVERS:
+    proto_tree_add_text(payload_kink_error_tree, tvb, offset, 4, "ErrorCode: %s (%u)", char_error_code[error_code], error_code);
+    break;
+  default:
+    if(BOTTOM_RESERVED <= error_code && TOP_RESERVED >= error_code){
+      proto_tree_add_text(payload_kink_error_tree, tvb, offset, 4, "ErrorCode: %s (%u)", "RESERVED", error_code);
+    }
+    else if(BOTTOM_PRIVATE_USE <= error_code && TOP_PRIVATE_USE >= error_code){
+      proto_tree_add_text(payload_kink_error_tree, tvb, offset, 4, "ErrorCode: %s (%u)", "PRIVATE USE", error_code);
+    }
+    else{
+      proto_tree_add_text(payload_kink_error_tree, tvb, offset, 4, "ErrorCode: %s (%u)", "This Error Code is not Defined.", error_code);
+    }
+    break;
+  }
 
   offset = start_payload_offset + KINK_ERROR_LENGTH;
   control_payload(pinfo, tvb, offset, next_payload, tree);  /* Recur control_payload() */
@@ -796,6 +838,7 @@ dissect_payload_kink_error(packet_info *pinfo, tvbuff_t *tvb, int offset, proto_
 static void
 dissect_payload_kink_not_defined(packet_info *pinfo, tvbuff_t *tvb, int offset, proto_tree *tree){
   proto_tree *payload_kink_not_defined_tree;
+  proto_item *ti;
   guint8 next_payload;
   guint payload_length;
   int start_payload_offset = 0;   /* Keep the beginning of the payload offset */
@@ -804,8 +847,8 @@ dissect_payload_kink_not_defined(packet_info *pinfo, tvbuff_t *tvb, int offset, 
   payload_length = tvb_get_ntohs(tvb, offset + TO_PAYLOAD_LENGTH);
 
   /* Make the subtree */
-  payload_kink_not_defined_tree = proto_tree_add_subtree(tree, tvb, offset, payload_length,
-                                    ett_payload_not_defined, NULL, "UNKNOWN PAYLOAD");
+  ti = proto_tree_add_text(tree, tvb, offset, payload_length, "UNKNOWN PAYLOAD");
+  payload_kink_not_defined_tree = proto_item_add_subtree(ti, ett_payload_not_defined);
 
   next_payload = tvb_get_guint8(tvb, offset);
   proto_tree_add_uint(payload_kink_not_defined_tree, hf_kink_next_payload, tvb, offset, 1, next_payload);
@@ -828,26 +871,6 @@ dissect_payload_kink_not_defined(packet_info *pinfo, tvbuff_t *tvb, int offset, 
   }
 }
 
-static void
-kink_fmt_version( gchar *result, guint32 version )
-{
-  guint8 major_version, minor_version;
-
-  /* This part is the version. Consider less than 1 octet value.
-   * Major version and minor version is 4bit. Front half of 1octet
-   * is major version, and second half of 1octet is minor version.
-   * The calculation of major version is shown below.
-   * The logical product of the value of 1octet and 0xf0 is performed.
-   * And It is performed 4bit right shift.
-   * Secondarily, the calculation of minor version is shown below.
-   * The logical product of the value of 1octet and 0x0f is performed.
-   */
-  major_version = (guint8)((version & FRONT_FOUR_BIT) >> VERSION_BIT_SHIFT);
-  minor_version = (guint8)(version & SECOND_FOUR_BIT);
-
-  g_snprintf( result, ITEM_LABEL_LENGTH, "%d.%02d", major_version, minor_version);
-}
-
 /* Output part */
 void
 proto_register_kink(void) {
@@ -856,63 +879,47 @@ proto_register_kink(void) {
     { &hf_kink_type,
       { "Type", "kink.type",
         FT_UINT8,       BASE_DEC,       VALS(kink_type_vals),   0x0,
-        NULL, HFILL }},
+        "the type of the kink", HFILL }},
     { &hf_kink_length,
       { "Length",       "kink.length",
         FT_UINT16,      BASE_DEC,       NULL,   0x0,
-        NULL, HFILL }},
+        "the length of the kink length", HFILL }},
     { &hf_kink_transactionId,
       { "Transaction ID",       "kink.transactionId",
         FT_UINT32,      BASE_DEC,       NULL,   0x0,
-        NULL, HFILL }},
+        "the transactionID of kink", HFILL }},
     { &hf_kink_checkSumLength,
       { "Checksum Length",       "kink.checkSumLength",
         FT_UINT8,       BASE_DEC,       NULL,   0x0,
-        NULL, HFILL }},
+        "the check sum length of kink", HFILL }},
     { &hf_kink_A,
       { "A",       "kink.A",
         FT_UINT8,       BASE_DEC,       VALS(kink_A_vals),      0x0,
-        NULL, HFILL }},
-    { &hf_kink_version,
-      { "Version",       "kink.version",
-        FT_UINT8,       BASE_CUSTOM,       kink_fmt_version,      0x0,
-        NULL, HFILL }},
-    { &hf_kink_domain_of_interpretation,
-      { "Domain Of Interpretation",       "kink.domain_of_interpretation",
-        FT_UINT32,      BASE_DEC,       NULL,   0x0,
-        NULL, HFILL }},
-    { &hf_kink_qmversion,
-      { "QMVersion",       "kink.qmversion",
-        FT_UINT8,       BASE_CUSTOM,       kink_fmt_version,      0x0,
-        NULL, HFILL }},
-    { &hf_kink_error_code,
-      { "ErrorCode",       "kink.error_code",
-        FT_UINT32,      BASE_DEC|BASE_RANGE_STRING,       RVALS(kink_error_rvals),   0x0,
-        NULL, HFILL }},
+        "the A of kink", HFILL }},
     { &hf_kink_reserved8,
       { "Reserved",       "kink.reserved",
         FT_UINT8,      BASE_DEC,       NULL,   0x0,
-        NULL, HFILL }},
+        "the reserved of kink", HFILL }},
     { &hf_kink_reserved15,
       { "Reserved",       "kink.reserved",
         FT_UINT16,      BASE_DEC,       NULL,   SECOND_FIFTEEN_BIT,
-        NULL, HFILL }},
+        "the reserved of kink", HFILL }},
     { &hf_kink_reserved16,
       { "Reserved",       "kink.reserved",
         FT_UINT16,      BASE_DEC,       NULL,   0,
-        NULL, HFILL }},
+        "the reserved of kink", HFILL }},
     { &hf_kink_reserved24,
       { "Reserved",       "kink.reserved",
         FT_UINT24,      BASE_DEC,       NULL,   0,
-        NULL, HFILL }},
+        "the reserved of kink", HFILL }},
     { &hf_kink_checkSum,
       { "Checksum",       "kink.checkSum",
         FT_BYTES,       BASE_NONE,      NULL,   0x0,
-        NULL, HFILL }},
+        "the checkSum of kink", HFILL }},
     { &hf_kink_next_payload,
       { "Next Payload",       "kink.nextPayload",
         FT_UINT8,       BASE_DEC,       VALS(kink_next_payload),        0x0,
-        NULL, HFILL }},
+        "the next payload of kink", HFILL }},
     { &hf_kink_payload_length,
       { "Payload Length",       "kink.payloadLength",
         FT_UINT8,       BASE_DEC,       NULL,        0x0,
@@ -948,10 +955,6 @@ proto_register_kink(void) {
     { &hf_kink_tgt,
       { "TGT",       "kink.tgt",
         FT_STRING,      BASE_NONE,       NULL,   0,
-        NULL, HFILL }},
-    { &hf_kink_payload,
-      { "Payload",       "kink.payload",
-        FT_BYTES,      BASE_NONE,       NULL,   0,
         NULL, HFILL }},
   };
 
@@ -998,15 +1001,3 @@ void proto_reg_handoff_kink(void) {
 
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

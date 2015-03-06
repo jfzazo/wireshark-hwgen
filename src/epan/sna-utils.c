@@ -28,13 +28,14 @@
 #include "packet_info.h"
 #include "wsutil/pint.h"
 #include "sna-utils.h"
+#include "emem.h"
 
 gchar *
 sna_fid_to_str(const address *addr)
 {
-  gchar *cur;
+  gchar	*cur;
 
-  cur=(gchar *)wmem_alloc(wmem_packet_scope(), 14);
+  cur=(gchar *)ep_alloc(14);
   sna_fid_to_str_buf(addr, cur, 14);
   return cur;
 }
@@ -61,20 +62,7 @@ sna_fid_to_str_buf(const address *addr, gchar *buf, int buf_len)
     /* FID Type 4 */
     memcpy(&sna_fid_type_4_addr, addr->data, SNA_FID_TYPE_4_ADDR_LEN);
     g_snprintf(buf, buf_len, "%08X.%04X", sna_fid_type_4_addr.saf,
-               sna_fid_type_4_addr.ef);
+	    sna_fid_type_4_addr.ef);
     break;
   }
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

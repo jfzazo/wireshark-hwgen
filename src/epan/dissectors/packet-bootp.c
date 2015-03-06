@@ -7,12 +7,12 @@
  * Added option field filters
  * Copyright 2011, Michael Mann
  *
- * Added option	 77 : RFC 3004 - The User Class Option for DHCP
+ * Added option  77 : RFC 3004 - The User Class Option for DHCP
  * Added option 117 : RFC 2937 - The Name Service Search Option for DHCP
  * Added option 119 : RFC 3397 - Dynamic Host Configuration Protocol (DHCP) Domain Search Option
- *		      RFC 3396 - Encoding Long Options in the Dynamic Host Configuration Protocol (DHCPv4)
+ *                    RFC 3396 - Encoding Long Options in the Dynamic Host Configuration Protocol (DHCPv4)
  * Improved opt 120 : Add support of RFC 3396 - Encoding Long Options in the Dynamic Host Configuration Protocol (DHCPv4)
- *		      Add support compression according to the encoding in Section 4.1.4 of RFC 1035 - DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION
+ *                    Add support compression according to the encoding in Section 4.1.4 of RFC 1035 - DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION
  *
  *
  * Copyright 2012, Jerome LAFORGE <jerome.laforge [AT] gmail.com>
@@ -107,6 +107,10 @@
 #include "config.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
@@ -119,6 +123,8 @@
 #include <epan/sminmpec.h>
 #include <epan/expert.h>
 #include <epan/uat.h>
+#include <epan/wmem/wmem.h>
+
 void proto_register_bootp(void);
 void proto_reg_handoff_bootp(void);
 
@@ -363,15 +369,15 @@ static int hf_bootp_option82_vi_cl_docsis_version = -1;
 									/* 82:9 suboptions end */
 static int hf_bootp_option82_flags = -1;				/* 82:10 */
 static int hf_bootp_option82_server_id_override = -1;			/* 82:11 */
-static int hf_bootp_option82_link_selection_cisco = -1;			/* 82:150 */
-static int hf_bootp_option82_vrf_name_vpn_id = -1;			/* 82:151 */
-									/* 82:151 suboptions */
+static int hf_bootp_option82_link_selection_cisco = -1;                 /* 82:150 */
+static int hf_bootp_option82_vrf_name_vpn_id = -1;                      /* 82:151 */
+                                                                        /* 82:151 suboptions */
 static int hf_bootp_option82_vrf_name_global = -1;
 static int hf_bootp_option82_vrf_name = -1;
 static int hf_bootp_option82_vrf_name_vpn_id_oui = -1;
 static int hf_bootp_option82_vrf_name_vpn_id_index = -1;
-									/* 82:151 suboptions end */
-static int hf_bootp_option82_server_id_override_cisco = -1;		/* 82:152 */
+                                                                        /* 82:151 suboptions end */
+static int hf_bootp_option82_server_id_override_cisco = -1;             /* 82:152 */
 
 static int hf_bootp_option_novell_dss_string = -1;			/* 85 */
 static int hf_bootp_option_novell_dss_ip = -1;				/* 85 */
@@ -488,11 +494,11 @@ static expert_field ei_bootp_end_option_missing = EI_INIT;
 static dissector_handle_t bootp_handle;
 
 /* RFC2937 The Name Service Search Option for DHCP */
-#define RFC2937_LOCAL_NAMING_INFORMATION			   0
-#define RFC2937_DOMAIN_NAME_SERVER_OPTION			   6
-#define RFC2937_NETWORK_INFORMATION_SERVERS_OPTION		  41
-#define RFC2937_NETBIOS_OVER_TCP_IP_NAME_SERVER_OPTION		  44
-#define RFC2937_NETWORK_INFORMATION_SERVICE_PLUS_SERVERS_OPTION	  65
+#define RFC2937_LOCAL_NAMING_INFORMATION                           0
+#define RFC2937_DOMAIN_NAME_SERVER_OPTION                          6
+#define RFC2937_NETWORK_INFORMATION_SERVERS_OPTION                41
+#define RFC2937_NETBIOS_OVER_TCP_IP_NAME_SERVER_OPTION            44
+#define RFC2937_NETWORK_INFORMATION_SERVICE_PLUS_SERVERS_OPTION   65
 
 /* RFC3825decoder error codes of the conversion function */
 #define RFC3825_NOERROR				  0
@@ -1213,7 +1219,7 @@ static void* uat_bootp_record_copy_cb(void* n, const void* o, size_t siz _U_) {
 	return new_record;
 }
 
-static void uat_bootp_record_update_cb(void* r, char** err) {
+static void uat_bootp_record_update_cb(void* r, const char** err) {
 	uat_bootp_record_t* rec = (uat_bootp_record_t *)r;
 
 	if ((rec->opt == 0) || (rec->opt >=BOOTP_OPT_NUM-1))
@@ -1267,10 +1273,10 @@ bootp_handle_basic_types(packet_info *pinfo, proto_tree *tree, proto_item *item,
 			 enum field_type ftype, int offset, int total_len,
 			 gint *hf, struct basic_types_hfs* hf_default)
 {
-	int	i, left;
-	gint32	time_s_secs;
+	int     i, left;
+	gint32  time_s_secs;
 	guint32 time_u_secs;
-	int	consumed = 0;
+	int     consumed = 0;
 
 	switch (ftype) {
 	case bytes:
@@ -1407,7 +1413,7 @@ bootp_handle_basic_types(packet_info *pinfo, proto_tree *tree, proto_item *item,
 		if (hf != NULL) {
 			time_s_secs = (gint32) tvb_get_ntohl(tvb, offset);
 			proto_tree_add_int_format_value(tree, *hf,
-				tvb, offset, 4, time_s_secs, "(%ds) %s", time_s_secs, time_secs_to_str(wmem_packet_scope(), time_s_secs));
+				tvb, offset, 4, time_s_secs, "(%ds) %s", time_s_secs, time_secs_to_ep_str(time_s_secs));
 		}
 		else if (hf_default->time_in_s_secs != NULL)
 			proto_tree_add_item(tree, *hf_default->time_in_s_secs, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -1425,7 +1431,7 @@ bootp_handle_basic_types(packet_info *pinfo, proto_tree *tree, proto_item *item,
 			time_u_secs = tvb_get_ntohl(tvb, offset);
 			proto_tree_add_uint_format_value(tree, *hf,
 				tvb, offset, 4, time_u_secs, "(%us) %s", time_u_secs,
-				((time_u_secs == 0xffffffff) ? "infinity" : time_secs_to_str_unsigned(wmem_packet_scope(), time_u_secs)));
+				((time_u_secs == 0xffffffff) ? "infinity" : time_secs_to_ep_str_unsigned(time_u_secs)));
 		}
 		else if (hf_default->time_in_u_secs != NULL)
 			proto_tree_add_item(tree, *hf_default->time_in_u_secs, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -1434,9 +1440,9 @@ bootp_handle_basic_types(packet_info *pinfo, proto_tree *tree, proto_item *item,
 	default:
 		/* Ignore other field_types */
 		break;
-	}
+   }
 
-	return consumed;
+   return consumed;
 }
 
 /* Returns the number of bytes consumed by this option. */
@@ -1446,7 +1452,7 @@ bootp_option(tvbuff_t *tvb, packet_info *pinfo, proto_tree *bp_tree, proto_item 
 	     const guint8 **vendor_class_id_p, guint8 *overload_p)
 {
 	struct opt_info *opt;
-	enum field_type	 ftype;
+	enum field_type  ftype;
 	guchar		 code = tvb_get_guint8(tvb, voff);
 	int		 optlen;
 	guchar		 byte;
@@ -1899,7 +1905,7 @@ bootp_option(tvbuff_t *tvb, packet_info *pinfo, proto_tree *bp_tree, proto_item 
 					    val_to_str_ext_const( enterprise, &sminmpec_values_ext, "Unknown"),
 					    enterprise);
 				if (optlen > 6) {
-						buf = tvb_bytes_to_str(wmem_packet_scope(), tvb, optoff + 6, optlen - 11);
+						buf = tvb_bytes_to_ep_str(tvb, optoff + 6, optlen - 11);
 					proto_tree_add_text(v_tree, tvb, optoff + 6,
 						optlen - 11, "identifier: %s", buf);
 				}
@@ -2265,8 +2271,8 @@ bootp_option(tvbuff_t *tvb, packet_info *pinfo, proto_tree *bp_tree, proto_item 
 		break;
 
 	case 119: { /* Dynamic Host Configuration Protocol (DHCP) Domain Search Option (RFC 3397) */
-		    /* Encoding Long Options in the Dynamic Host Configuration Protocol (DHCPv4) (RFC 3396) */
-		    /* Domain Names - Implementation And Specification (RFC 1035) */
+	            /* Encoding Long Options in the Dynamic Host Configuration Protocol (DHCPv4) (RFC 3396) */
+	            /* Domain Names - Implementation And Specification (RFC 1035) */
 		char tmpChar[BOOTP_MAX_NO_CHAR];
 		rfc3396_dns_domain_search_list.index_current_block++;
 		if (rfc3396_dns_domain_search_list.total_number_of_block > 1) {
@@ -2285,7 +2291,7 @@ bootp_option(tvbuff_t *tvb, packet_info *pinfo, proto_tree *bp_tree, proto_item 
 
 		/* Concatenate the block before being interpreted for managing RFC 3396 */
 		if (optlen)
-			tvb_composite_append(rfc3396_dns_domain_search_list.tvb_composite, tvb_new_subset_length(tvb, optoff, optlen));
+			tvb_composite_append(rfc3396_dns_domain_search_list.tvb_composite, tvb_new_subset(tvb, optoff, optlen, optlen));
 
 		if (rfc3396_dns_domain_search_list.index_current_block == rfc3396_dns_domain_search_list.total_number_of_block
 		    && rfc3396_dns_domain_search_list.tvb_composite) {
@@ -2312,8 +2318,8 @@ bootp_option(tvbuff_t *tvb, packet_info *pinfo, proto_tree *bp_tree, proto_item 
 		break;
 	}
 	case 120: { /* SIP Servers (RFC 3361) */
-		    /* Encoding Long Options in the Dynamic Host Configuration Protocol (DHCPv4) (RFC 3396) */
-		    /* Domain Names - Implementation And Specification (RFC 1035) */
+	            /* Encoding Long Options in the Dynamic Host Configuration Protocol (DHCPv4) (RFC 3396) */
+	            /* Domain Names - Implementation And Specification (RFC 1035) */
 		char tmpChar[BOOTP_MAX_NO_CHAR];
 		rfc3396_sip_server.index_current_block++;
 		if (rfc3396_sip_server.total_number_of_block > 1) {
@@ -2332,7 +2338,7 @@ bootp_option(tvbuff_t *tvb, packet_info *pinfo, proto_tree *bp_tree, proto_item 
 
 		/* Concatenate the block before being interpreted for managing RFC 3396 */
 		if (optlen)
-			tvb_composite_append(rfc3396_sip_server.tvb_composite, tvb_new_subset_length(tvb, optoff, optlen));
+			tvb_composite_append(rfc3396_sip_server.tvb_composite, tvb_new_subset(tvb, optoff, optlen, optlen));
 
 		if (rfc3396_sip_server.index_current_block == rfc3396_sip_server.total_number_of_block
 		    && rfc3396_sip_server.tvb_composite) {
@@ -2398,15 +2404,15 @@ bootp_option(tvbuff_t *tvb, packet_info *pinfo, proto_tree *bp_tree, proto_item 
 						/* RFC 3396 is used, so the option is split into several option 120. We don't link fqdn with v_tree. */
 						/* Since we don't use the "numbered argument" as described by README.developer, we have to repeat the arguments :( */
 						g_snprintf(tmpChar, BOOTP_MAX_NO_CHAR, "%u.%u.%u.%u (%u.%u.%u.%u)",
-							   tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset),
-							   tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 1),
-							   tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 2),
-							   tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 3),
-							   tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset),
-							   tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 1),
-							   tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 2),
-							   tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 3)
-							   );
+						           tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset),
+						           tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 1),
+						           tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 2),
+						           tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 3),
+						           tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset),
+						           tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 1),
+						           tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 2),
+						           tvb_get_guint8(rfc3396_sip_server.tvb_composite, offset + 3)
+						           );
 						proto_tree_add_string(v_tree, hf_bootp_option_sip_server_address_stringz, tvb, 0, 0, tmpChar);
 					}
 					offset += 4;
@@ -2710,13 +2716,13 @@ static int
 bootp_dhcp_decode_agent_info(packet_info *pinfo, proto_item *v_ti, proto_tree *v_tree, tvbuff_t *tvb, int optoff,
 			     int optend)
 {
-	int	    suboptoff = optoff;
-	guint8	    subopt, idx, vs_opt, vs_len;
-	int	    subopt_len, subopt_end, datalen;
-	guint32	    enterprise;
+	int         suboptoff = optoff;
+	guint8      subopt, idx, vs_opt, vs_len;
+	int         subopt_len, subopt_end, datalen;
+	guint32     enterprise;
 	proto_item *vti, *ti;
 	proto_tree *o82_v_tree, *o82_sub_tree;
-	guint8	    tag, tag_len;
+	guint8      tag, tag_len;
 
 	struct basic_types_hfs default_hfs = {
 		&hf_bootp_option82_value,
@@ -2901,9 +2907,9 @@ static int
 dissect_vendor_pxeclient_suboption(packet_info *pinfo, proto_item *v_ti, proto_tree *v_tree,
 				   tvbuff_t *tvb, int optoff, int optend)
 {
-	int	    suboptoff = optoff;
-	guint8	    subopt;
-	guint8	    subopt_len;
+	int         suboptoff = optoff;
+	guint8      subopt;
+	guint8      subopt_len;
 	proto_tree *o43pxeclient_v_tree;
 	proto_item *vti, *ti;
 
@@ -3162,9 +3168,9 @@ static int
 dissect_vendor_cablelabs_suboption(packet_info *pinfo, proto_item *v_ti, proto_tree *v_tree,
 				   tvbuff_t *tvb, int optoff, int optend)
 {
-	int	    suboptoff = optoff;
-	guint8	    subopt;
-	guint8	    subopt_len;
+	int         suboptoff = optoff;
+	guint8      subopt;
+	guint8      subopt_len;
 	proto_tree *o43cl_v_tree;
 	proto_item *vti;
 
@@ -3328,8 +3334,8 @@ static int
 dissect_vendor_generic_suboption(packet_info *pinfo _U_, proto_item *v_ti _U_, proto_tree *v_tree,
 				 tvbuff_t *tvb, int optoff, int optend _U_)
 {
-	int	    suboptoff = optoff;
-	guint8	    subopt_len;
+	int         suboptoff = optoff;
+	guint8      subopt_len;
 	proto_item *item;
 	proto_tree *sub_tree;
 
@@ -3367,9 +3373,9 @@ static int
 dissect_vendor_alcatel_suboption(packet_info *pinfo, proto_item *v_ti, proto_tree *v_tree,
 				 tvbuff_t *tvb, int optoff, int optend)
 {
-	int	    suboptoff = optoff;
-	guint8	    subopt;
-	guint8	    subopt_len;
+	int         suboptoff = optoff;
+	guint8      subopt;
+	guint8      subopt_len;
 	proto_item *vti;
 	proto_tree *o43alcatel_v_tree;
 
@@ -3470,8 +3476,8 @@ static int
 dissect_netware_ip_suboption(packet_info *pinfo, proto_item *v_ti, proto_tree *v_tree,
 			     tvbuff_t *tvb, int optoff, int optend)
 {
-	int	    suboptoff = optoff;
-	guint8	    subopt, subopt_len;
+	int         suboptoff = optoff;
+	guint8      subopt, subopt_len;
 	proto_tree *o63_v_tree;
 	proto_item *vti, *ti;
 
@@ -3560,10 +3566,10 @@ static int
 dissect_vendor_tr111_suboption(packet_info *pinfo, proto_item *v_ti, proto_tree *v_tree,
 			       tvbuff_t *tvb, int optoff, int optend)
 {
-	int	    suboptoff = optoff;
+	int         suboptoff = optoff;
 	proto_tree *o125_v_tree;
 	proto_item *vti, *ti;
-	guint8	    subopt, subopt_len;
+	guint8      subopt, subopt_len;
 
 	struct basic_types_hfs default_hfs = {
 		NULL,
@@ -3658,8 +3664,8 @@ static int
 dissect_vendor_cl_suboption(packet_info *pinfo, proto_item *v_ti, proto_tree *v_tree,
 			    tvbuff_t *tvb, int optoff, int optend)
 {
-	int	    suboptoff = optoff;
-	guint8	    subopt, subopt_len;
+	int         suboptoff = optoff;
+	guint8      subopt, subopt_len;
 	proto_tree *o125_v_tree;
 	proto_item *vti;
 
@@ -3720,11 +3726,8 @@ dissect_vendor_cl_suboption(packet_info *pinfo, proto_item *v_ti, proto_tree *v_
 				   proto_tree_add_item(o125_v_tree, *o125_cl_opt[subopt].phf, tvb, suboptoff, subopt_len, ENC_BIG_ENDIAN);
 				else
 				   proto_tree_add_item(o125_v_tree, hf_bootp_option125_value, tvb, suboptoff, subopt_len, ENC_NA);
-				switch(subopt){
-					case 5: /* Modem Capabilities */
-						dissect_docsis_cm_cap(o125_v_tree, tvb, optoff, subopt_len+2, TRUE);
-					break;
-				}
+
+					dissect_docsis_cm_cap(o125_v_tree, tvb, optoff, subopt_len+2, TRUE);
 				break;
 			default:
 				if (o125_cl_opt[subopt].phf == NULL)
@@ -3932,13 +3935,13 @@ static const value_string pkt_mdc_euro_mib_vals[] = {
 static void
 dissect_packetcable_mta_cap(proto_tree *v_tree, tvbuff_t *tvb, int voff, int len)
 {
-	guint16	       raw_val;
-	unsigned long  flow_val	  = 0;
-	int	       off	  = PKT_MDC_TLV_OFF + voff;
-	int	       subopt_off, max_len;
-	guint	       tlv_len, i, mib_val;
-	guint8	       asc_val[3] = "  ", flow_val_str[5];
-	char	       bit_fld[64];
+	guint16        raw_val;
+	unsigned long  flow_val   = 0;
+	int            off        = PKT_MDC_TLV_OFF + voff;
+	int            subopt_off, max_len;
+	guint          tlv_len, i, mib_val;
+	guint8         asc_val[3] = "  ", flow_val_str[5];
+	char           bit_fld[64];
 	proto_item    *ti, *mib_ti;
 	proto_tree    *subtree, *subtree2;
 
@@ -4091,8 +4094,7 @@ dissect_packetcable_mta_cap(proto_tree *v_tree, tvbuff_t *tvb, int voff, int len
 					raw_val = tvb_get_ntohs(tvb, subopt_off);
 					tvb_memcpy(tvb, asc_val, subopt_off, 2);
 
-					subtree2 = proto_tree_add_subtree_format(subtree, tvb, subopt_off, 2,
-						ett_bootp_option, &mib_ti, "%s (%s)",
+					mib_ti = proto_tree_add_text(subtree, tvb, subopt_off, 2, "%s (%s)",
 						val_to_str_const(raw_val, pkt_mdc_mib_orgs, "Unknown"), asc_val);
 					if (subopt_off > off + 4 + 2) {
 						proto_item_append_text(ti, ", ");
@@ -4109,6 +4111,7 @@ dissect_packetcable_mta_cap(proto_tree *v_tree, tvbuff_t *tvb, int voff, int len
 					switch (raw_val) {
 
 					case PKT_MDC_MIB_CL:
+						subtree2 = proto_item_add_subtree(mib_ti, ett_bootp_option);
 
 						for (i = 0; i < 8; i++) {
 							if (mib_val & pkt_mdc_cl_mib_vals[i].value) {
@@ -4120,6 +4123,8 @@ dissect_packetcable_mta_cap(proto_tree *v_tree, tvbuff_t *tvb, int voff, int len
 						break;
 
 					case PKT_MDC_MIB_IETF:
+						subtree2 = proto_item_add_subtree(mib_ti, ett_bootp_option);
+
 						for (i = 0; i < 8; i++) {
 							if (mib_val & pkt_mdc_ietf_mib_vals[i].value) {
 								decode_bitfield_value(bit_fld, mib_val, pkt_mdc_ietf_mib_vals[i].value, 8);
@@ -4130,6 +4135,8 @@ dissect_packetcable_mta_cap(proto_tree *v_tree, tvbuff_t *tvb, int voff, int len
 						break;
 
 					case PKT_MDC_MIB_EURO:
+						subtree2 = proto_item_add_subtree(mib_ti, ett_bootp_option);
+
 						for (i = 0; i < 8; i++) {
 							if (mib_val & pkt_mdc_euro_mib_vals[i].value) {
 								decode_bitfield_value(bit_fld, mib_val, pkt_mdc_euro_mib_vals[i].value, 8);
@@ -4240,8 +4247,8 @@ static const value_string docsis_cm_cap_type_vals[] = {
 	{ DOCSIS_CM_CAP_IPV6_SUP,		"IPv6 Support" },
 	{ DOCSIS_CM_CAP_ExUsTrPow,		"Extended Upstream Transmit Power Capability (1/4 dB)" },
 	{ DOCSIS_CM_CAP_Opt802MPLSSup,		"Optional 802.1ad, 802.1ah, MPLS Classification Support" },
-	{ DOCSIS_CM_CAP_DounEnc,		"D-ONU Capabilities Encoding" },
-	{ DOCSIS_CM_CAP_EnrgMang,		"Energy Management Capabilities" },
+	{ DOCSIS_CM_CAP_DounEnc, 		"D-ONU Capabilities Encoding" },
+	{ DOCSIS_CM_CAP_EnrgMang, 		"Energy Management Capabilities" },
 	{ 0, NULL }
 };
 
@@ -4360,9 +4367,9 @@ static const value_string docsis_cm_cap_map_l2vpn_esafe_index_support_vals[] = {
 };
 
 static const value_string docsis_cm_cap_ussymrate_vals[] = {
-	{ 1 << 0, "160	ksps symbol rate supported" },
-	{ 1 << 1, "320	ksps symbol rate supported" },
-	{ 1 << 2, "640	ksps symbol rate supported" },
+	{ 1 << 0, "160  ksps symbol rate supported" },
+	{ 1 << 1, "320  ksps symbol rate supported" },
+	{ 1 << 2, "640  ksps symbol rate supported" },
 	{ 1 << 3, "1280 ksps symbol rate supported" },
 	{ 1 << 4, "2560 ksps symbol rate supported" },
 	{ 1 << 5, "5120 ksps symbol rate supported" },
@@ -4402,7 +4409,7 @@ static void get_opt125_tlv(tvbuff_t *tvb, guint off, guint8 *tlvtype, guint8 *tl
 
 static void get_opt60_tlv(tvbuff_t *tvb, guint off, guint8 *tlvtype, guint8 *tlvlen, guint8 **value)
 {
-	guint	i;
+	guint   i;
 	guint8 *val_asc;
 
 	val_asc = (guint8 *)wmem_alloc0(wmem_packet_scope(), 4);
@@ -4425,17 +4432,17 @@ static void get_opt60_tlv(tvbuff_t *tvb, guint off, guint8 *tlvtype, guint8 *tlv
 static void
 dissect_docsis_cm_cap(proto_tree *v_tree, tvbuff_t *tvb, int voff, int len, gboolean opt125)
 {
-	guint8	   *asc_val;
-	guint	    i;
+	guint8     *asc_val;
+	guint       i;
 	proto_item *ti;
 	proto_tree *subtree;
-	char	    bit_fld[64];
-	guint8	    tlv_type;
-	guint8	    tlv_len;
-	guint8	    val_byte   = 0;
-	guint16	    val_uint16 = 0;
-	guint8	   *val_other  = NULL;
-	guint	    off	       = voff;
+	char        bit_fld[64];
+	guint8      tlv_type;
+	guint8      tlv_len;
+	guint8      val_byte   = 0;
+	guint16     val_uint16 = 0;
+	guint8     *val_other  = NULL;
+	guint       off        = voff;
 
 	asc_val = (guint8*)wmem_alloc0(wmem_packet_scope(), 4);
 
@@ -4788,8 +4795,8 @@ static int
 dissect_packetcable_i05_ccc(packet_info *pinfo, proto_item *v_ti, proto_tree *v_tree,
 			    tvbuff_t *tvb, int optoff, int optend)
 {
-	int	    suboptoff = optoff;
-	guint8	    subopt, subopt_len, fetch_tgt, timer_val, ticket_ctl;
+	int         suboptoff = optoff;
+	guint8      subopt, subopt_len, fetch_tgt, timer_val, ticket_ctl;
 	proto_tree *pkt_s_tree;
 	proto_item *vti;
 
@@ -4933,15 +4940,16 @@ static int
 dissect_packetcable_ietf_ccc(packet_info *pinfo, proto_item *v_ti, proto_tree *v_tree,
 			     tvbuff_t *tvb, int optoff, int optend, int revision)
 {
-	int	      suboptoff	    = optoff;
-	guint8	      subopt, subopt_len;
-	guint8	      prov_type, fetch_tgt, timer_val;
-	guint16	      sec_tcm;
+	int           suboptoff     = optoff;
+	guint8        subopt, subopt_len;
+	guint32       ipv4addr;
+	guint8        prov_type, fetch_tgt, timer_val;
+	guint16       sec_tcm;
 	proto_tree   *pkt_s_tree;
 	proto_item   *vti;
-	int	      max_timer_val = 255, i;
+	int           max_timer_val = 255, i;
 	const guchar *dns_name;
-	char	      bit_fld[24];
+	char          bit_fld[24];
 
 	subopt = tvb_get_guint8(tvb, suboptoff);
 	suboptoff++;
@@ -4966,8 +4974,9 @@ dissect_packetcable_ietf_ccc(packet_info *pinfo, proto_item *v_ti, proto_tree *v
 			expert_add_info(pinfo, vti, &ei_bootp_missing_subopt_value);
 			return (optend);
 		}
+		ipv4addr = tvb_get_ipv4(tvb, suboptoff);
 		proto_item_append_text(vti, "%s (%u byte%s%s)",
-				       tvb_ip_to_str(tvb, suboptoff),
+				       ip_to_str((guint8 *)&ipv4addr),
 				       subopt_len,
 				       plurality(subopt_len, "", "s"),
 				       subopt_len != 4 ? " [Invalid]" : "");
@@ -4994,8 +5003,9 @@ dissect_packetcable_ietf_ccc(packet_info *pinfo, proto_item *v_ti, proto_tree *v
 				expert_add_info(pinfo, vti, &ei_bootp_missing_subopt_value);
 				return (optend);
 			}
+			ipv4addr = tvb_get_ipv4(tvb, suboptoff);
 			proto_item_append_text(vti, "%s (%u byte%s%s)",
-					       tvb_ip_to_str(tvb, suboptoff),
+					       ip_to_str((guint8 *)&ipv4addr),
 					       subopt_len,
 					       plurality(subopt_len, "", "s"),
 					       subopt_len != 5 ? " [Invalid]" : "");
@@ -5133,27 +5143,22 @@ dissect_bootp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	proto_tree   *bp_tree;
 	proto_item   *bp_ti, *ti;
+	proto_tree   *flag_tree;
 	proto_item   *fi, *hidden_item;
 	guint8	      op;
 	guint8	      htype, hlen;
 	int	      voff, eoff, tmpvoff; /* vendor offset, end offset */
 	guint32	      ip_addr;
 	gboolean      at_end;
-	const char   *dhcp_type				     = NULL;
-	const guint8 *vendor_class_id			     = NULL;
+	const char   *dhcp_type                              = NULL;
+	const guint8 *vendor_class_id                        = NULL;
 	guint16	      flags, secs;
 	int	      offset_delta;
-	guint8	      overload				     = 0; /* DHCP option overload */
-	static const int * bootp_flags[] = {
-		&hf_bootp_flags_broadcast,
-		&hf_bootp_flags_reserved,
-		NULL
-	};
-
+	guint8	      overload                               = 0; /* DHCP option overload */
 	rfc3396_dns_domain_search_list.total_number_of_block = 0;
-	rfc3396_dns_domain_search_list.tvb_composite	     = NULL;
-	rfc3396_sip_server.total_number_of_block	     = 0;
-	rfc3396_sip_server.tvb_composite		     = NULL;
+	rfc3396_dns_domain_search_list.tvb_composite         = NULL;
+	rfc3396_sip_server.total_number_of_block             = 0;
+	rfc3396_sip_server.tvb_composite                     = NULL;
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "BOOTP");
 	/*
@@ -5265,11 +5270,15 @@ dissect_bootp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			    8, 2, ENC_BIG_ENDIAN);
 	}
 	flags = tvb_get_ntohs(tvb, 10);
-	fi = proto_tree_add_bitmask(bp_tree, tvb, 10, hf_bootp_flags,
-			       ett_bootp_flags, bootp_flags, ENC_NA);
+	fi = proto_tree_add_uint(bp_tree, hf_bootp_flags, tvb,
+			    10, 2, flags);
 	proto_item_append_text(fi, " (%s)",
 	    (flags & BOOTP_BC) ? "Broadcast" : "Unicast");
-
+	flag_tree = proto_item_add_subtree(fi, ett_bootp_flags);
+	proto_tree_add_boolean(flag_tree, hf_bootp_flags_broadcast, tvb,
+			    10, 2, flags);
+	proto_tree_add_uint(flag_tree, hf_bootp_flags_reserved, tvb,
+			    10, 2, flags);
 	proto_tree_add_item(bp_tree, hf_bootp_ip_client, tvb,
 			    12, 4, ENC_BIG_ENDIAN);
 	proto_tree_add_item(bp_tree, hf_bootp_ip_your, tvb,
@@ -5368,7 +5377,7 @@ dissect_bootp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/*
 		 * Padding after the end option.
 		 */
-		proto_tree_add_item(bp_tree, hf_bootp_option_padding, tvb, voff, eoff - voff, ENC_NA);
+		proto_tree_add_text(bp_tree, tvb, voff, eoff - voff, "Padding");
 	}
 }
 
@@ -5378,7 +5387,12 @@ bootp_init_protocol(void)
 	guint i;
 
 	/* first copy default_bootp_opt[] to bootp_opt[].  This resets all values to default */
-	memcpy(bootp_opt, default_bootp_opt, sizeof(bootp_opt));
+	for(i=0; i<BOOTP_OPT_NUM; i++)
+	{
+		bootp_opt[i].text = default_bootp_opt[i].text;
+		bootp_opt[i].ftype = default_bootp_opt[i].ftype;
+		bootp_opt[i].phf = default_bootp_opt[i].phf;
+	}
 
 	/* Now apply the custom options */
 	for (i = 0; i < num_bootp_records_uat; i++)
@@ -5393,15 +5407,15 @@ void
 proto_register_bootp(void)
 {
 	static const value_string bootp_custom_type_vals[] = {
-		{ ipv4,		    "IP Address"},
-		{ ipv4_list,	    "IP Address List" },
-		{ string,	    "string" },
-		{ bytes,	    "bytes" },
-		{ val_boolean,	    "boolean" },
-		{ val_u_byte,	    "byte" },
-		{ val_u_short,	    "unsigned short" },
+		{ ipv4,             "IP Address"},
+		{ ipv4_list,        "IP Address List" },
+		{ string,           "string" },
+		{ bytes,            "bytes" },
+		{ val_boolean,      "boolean" },
+		{ val_u_byte,       "byte" },
+		{ val_u_short,      "unsigned short" },
 		{ val_u_short_list, "unsigned short list" },
-		{ val_u_long,	    "unsigned long" },
+		{ val_u_long,       "unsigned long" },
 		{ time_in_s_secs,   "integer time in seconds" },
 		{ time_in_u_secs,   "unsigned integer time in seconds" },
 		{ 0x00, NULL }
@@ -6867,7 +6881,7 @@ proto_register_bootp(void)
 
 		{ &hf_bootp_option125_cl_option_request,
 		  { "Option Request", "bootp.option.vi.cl.option_request",
-		    FT_BYTES, SEP_SPACE, NULL, 0x0,
+		    FT_BYTES, BASE_NONE, NULL, 0x0,
 		    "Option 125:CL 1 Option Request", HFILL }},
 
 		{ &hf_bootp_option125_cl_tftp_server_addresses,
@@ -7040,24 +7054,24 @@ proto_register_bootp(void)
 	prefs_register_obsolete_preference(bootp_module, "displayasstring");
 
 	bootp_uat = uat_new("Custom BootP/DHCP Options (Excl. suboptions)",
-			sizeof(uat_bootp_record_t), /* record size	     */
-			"custom_bootp",		    /* filename		     */
-			TRUE,			    /* from_profile	     */
-			&uat_bootp_records,	    /* data_ptr		     */
-			&num_bootp_records_uat,	    /* numitems_ptr	     */
-			UAT_AFFECTS_DISSECTION,	    /* affects dissection of packets, but not set of named fields */
-			NULL,			    /* help		     */
-			uat_bootp_record_copy_cb,   /* copy callback	     */
-			uat_bootp_record_update_cb, /* update callback	     */
-			uat_bootp_record_free_cb,   /* free callback	     */
+			sizeof(uat_bootp_record_t), /* record size           */
+			"custom_bootp",		    /* filename              */
+			TRUE,			    /* from_profile          */
+			&uat_bootp_records,	    /* data_ptr              */
+			&num_bootp_records_uat,	    /* numitems_ptr          */
+			UAT_AFFECTS_DISSECTION,     /* affects dissection of packets, but not set of named fields */
+			NULL,			    /* help                  */
+			uat_bootp_record_copy_cb,   /* copy callback         */
+			uat_bootp_record_update_cb, /* update callback       */
+			uat_bootp_record_free_cb,   /* free callback         */
 			NULL,			    /* post update callback  */
 			bootp_uat_flds);	    /* UAT field definitions */
 
 	prefs_register_uat_preference(bootp_module,
-				      "custom_bootp_table",
-				      "Custom BootP/DHCP Options (Excl. suboptions)",
-				      "Custom BootP/DHCP Options (Excl. suboptions)",
-				      bootp_uat);
+                                      "custom_bootp_table",
+                                      "Custom BootP/DHCP Options (Excl. suboptions)",
+                                      "Custom BootP/DHCP Options (Excl. suboptions)",
+                                      bootp_uat);
 }
 
 void
@@ -7068,7 +7082,7 @@ proto_reg_handoff_bootp(void)
 }
 
 /*
- * Editor modelines  -	http://www.wireshark.org/tools/modelines.html
+ * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
  *
  * Local variables:
  * c-basic-offset: 8

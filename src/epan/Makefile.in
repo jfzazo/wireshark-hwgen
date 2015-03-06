@@ -196,42 +196,42 @@ am__uninstall_files_from_dir = { \
 am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
 @HAVE_LIBLUA_TRUE@am__DEPENDENCIES_1 = wslua/libwslua.la
+@HAVE_LIBPY_TRUE@am__DEPENDENCIES_2 = wspython/libwspython.la
 am__objects_1 = libwireshark_la-addr_and_mask.lo \
 	libwireshark_la-addr_resolv.lo \
 	libwireshark_la-address_to_str.lo libwireshark_la-afn.lo \
 	libwireshark_la-aftypes.lo libwireshark_la-app_mem_usage.lo \
-	libwireshark_la-asn1.lo libwireshark_la-charsets.lo \
-	libwireshark_la-circuit.lo \
-	libwireshark_la-color_dissector_filters.lo \
+	libwireshark_la-asn1.lo libwireshark_la-atalk-utils.lo \
+	libwireshark_la-charsets.lo libwireshark_la-circuit.lo \
 	libwireshark_la-column.lo libwireshark_la-column-utils.lo \
-	libwireshark_la-conversation.lo \
-	libwireshark_la-conversation_table.lo \
-	libwireshark_la-crc10-tvb.lo libwireshark_la-crc16-tvb.lo \
-	libwireshark_la-crc32-tvb.lo libwireshark_la-crc6-tvb.lo \
-	libwireshark_la-crc8-tvb.lo libwireshark_la-decode_as.lo \
+	libwireshark_la-conversation.lo libwireshark_la-crc16-tvb.lo \
+	libwireshark_la-crc32-tvb.lo libwireshark_la-crc8-tvb.lo \
+	libwireshark_la-decode_as.lo \
 	libwireshark_la-disabled_protos.lo \
 	libwireshark_la-dissector_filters.lo \
 	libwireshark_la-dvb_chartbl.lo libwireshark_la-dwarf.lo \
-	libwireshark_la-epan.lo libwireshark_la-ex-opt.lo \
-	libwireshark_la-except.lo libwireshark_la-expert.lo \
-	libwireshark_la-exported_pdu.lo \
+	libwireshark_la-emem.lo libwireshark_la-epan.lo \
+	libwireshark_la-ex-opt.lo libwireshark_la-except.lo \
+	libwireshark_la-expert.lo libwireshark_la-exported_pdu.lo \
 	libwireshark_la-filter_expressions.lo \
 	libwireshark_la-follow.lo libwireshark_la-frame_data.lo \
 	libwireshark_la-frame_data_sequence.lo \
 	libwireshark_la-frequency-utils.lo libwireshark_la-funnel.lo \
 	libwireshark_la-gcp.lo libwireshark_la-geoip_db.lo \
 	libwireshark_la-golay.lo libwireshark_la-guid-utils.lo \
+	libwireshark_la-h225-persistentdata.lo \
 	libwireshark_la-in_cksum.lo libwireshark_la-ipproto.lo \
 	libwireshark_la-ipv4.lo libwireshark_la-next_tvb.lo \
 	libwireshark_la-oids.lo libwireshark_la-osi-utils.lo \
-	libwireshark_la-oui.lo libwireshark_la-packet-range.lo \
-	libwireshark_la-packet.lo libwireshark_la-prefs.lo \
-	libwireshark_la-print.lo libwireshark_la-print_stream.lo \
+	libwireshark_la-packet-range.lo libwireshark_la-packet.lo \
+	libwireshark_la-prefs.lo libwireshark_la-print.lo \
 	libwireshark_la-proto.lo libwireshark_la-range.lo \
 	libwireshark_la-reassemble.lo libwireshark_la-reedsolomon.lo \
 	libwireshark_la-req_resp_hdrs.lo \
-	libwireshark_la-show_exception.lo libwireshark_la-sminmpec.lo \
-	libwireshark_la-sna-utils.lo libwireshark_la-stat_tap_ui.lo \
+	libwireshark_la-show_exception.lo \
+	libwireshark_la-sigcomp_state_hdlr.lo \
+	libwireshark_la-sigcomp-udvm.lo libwireshark_la-sminmpec.lo \
+	libwireshark_la-sna-utils.lo libwireshark_la-stat_cmd_args.lo \
 	libwireshark_la-stats_tree.lo libwireshark_la-strutil.lo \
 	libwireshark_la-stream.lo libwireshark_la-t35.lo \
 	libwireshark_la-tap.lo libwireshark_la-timestamp.lo \
@@ -271,14 +271,14 @@ libwireshark_generated_la_OBJECTS =  \
 	$(nodist_libwireshark_generated_la_OBJECTS)
 oids_test_SOURCES = oids_test.c
 oids_test_OBJECTS = oids_test.$(OBJEXT)
-am__DEPENDENCIES_2 =
-oids_test_DEPENDENCIES = libwireshark.la $(am__DEPENDENCIES_2)
+am__DEPENDENCIES_3 =
+oids_test_DEPENDENCIES = libwireshark.la $(am__DEPENDENCIES_3)
 reassemble_test_SOURCES = reassemble_test.c
 reassemble_test_OBJECTS = reassemble_test.$(OBJEXT)
-reassemble_test_DEPENDENCIES = libwireshark.la $(am__DEPENDENCIES_2)
+reassemble_test_DEPENDENCIES = libwireshark.la $(am__DEPENDENCIES_3)
 tvbtest_SOURCES = tvbtest.c
 tvbtest_OBJECTS = tvbtest.$(OBJEXT)
-tvbtest_DEPENDENCIES = libwireshark.la $(am__DEPENDENCIES_2)
+tvbtest_DEPENDENCIES = libwireshark.la $(am__DEPENDENCIES_3)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -404,8 +404,8 @@ CCDEPMODE = @CCDEPMODE@
 CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
-CFLAGS_SSE42 = @CFLAGS_SSE42@
 CONFIG_ARGS = @CONFIG_ARGS@
+CONFIG_WITH_ARGS = @CONFIG_WITH_ARGS@
 COREFOUNDATION_FRAMEWORKS = @COREFOUNDATION_FRAMEWORKS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -431,7 +431,6 @@ ELINKS = @ELINKS@
 ENABLE_STATIC = @ENABLE_STATIC@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FLOORL_LO = @FLOORL_LO@
 FOP = @FOP@
 GEOIP_LIBS = @GEOIP_LIBS@
 GETOPT_LO = @GETOPT_LO@
@@ -504,7 +503,7 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
-LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDES = @LUA_INCLUDES@
 LUA_LIBS = @LUA_LIBS@
 LYNX = @LYNX@
 MAKEINFO = @MAKEINFO@
@@ -540,14 +539,14 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_LIBS = @PLUGIN_LIBS@
 POD2HTML = @POD2HTML@
 POD2MAN = @POD2MAN@
-POPCOUNT_LO = @POPCOUNT_LO@
 PORTAUDIO_INCLUDES = @PORTAUDIO_INCLUDES@
 PORTAUDIO_LIBS = @PORTAUDIO_LIBS@
 PYTHON = @PYTHON@
+PY_CFLAGS = @PY_CFLAGS@
+PY_LIBS = @PY_LIBS@
 QT_MIN_VERSION = @QT_MIN_VERSION@
 Qt_LIBS = @Qt_LIBS@
 RANLIB = @RANLIB@
-RCC = @RCC@
 RPMBUILD_WITH_ARGS = @RPMBUILD_WITH_ARGS@
 SBC_CFLAGS = @SBC_CFLAGS@
 SBC_LIBS = @SBC_LIBS@
@@ -558,6 +557,8 @@ SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+STRNCASECMP_LO = @STRNCASECMP_LO@
+STRPTIME_C = @STRPTIME_C@
 STRPTIME_LO = @STRPTIME_LO@
 SYSTEMCONFIGURATION_FRAMEWORKS = @SYSTEMCONFIGURATION_FRAMEWORKS@
 UIC = @UIC@
@@ -577,6 +578,7 @@ ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 ac_cv_wireshark_have_rpm = @ac_cv_wireshark_have_rpm@
+ac_ws_python_config = @ac_ws_python_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -606,8 +608,6 @@ echld_test_bin = @echld_test_bin@
 editcap_bin = @editcap_bin@
 editcap_man = @editcap_man@
 exec_prefix = @exec_prefix@
-extcapdir = @extcapdir@
-have_sw_vers = @have_sw_vers@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -628,10 +628,10 @@ mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 plugindir = @plugindir@
-plugins_dir = @plugins_dir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pythondir = @pythondir@
 randpkt_bin = @randpkt_bin@
 randpkt_man = @randpkt_man@
 rawshark_bin = @rawshark_bin@
@@ -682,13 +682,21 @@ INCLUDE_DIRS = $(subst -I,NEWLINE,$(filter -I%, $(CFLAGS) -I$(abs_top_srcdir) -I
 @HAVE_LIBLUA_TRUE@wslua_dir = wslua
 @HAVE_LIBLUA_FALSE@wslua_dist_dir = wslua
 @HAVE_LIBLUA_TRUE@wslua_dist_dir = 
-SUBDIRS = compress crypt ftypes dfilter dissectors jsmn nghttp2 wmem $(wslua_dir)
-DIST_SUBDIRS = $(SUBDIRS) $(wslua_dist_dir)
+@HAVE_LIBPY_FALSE@wspython_lib = 
+@HAVE_LIBPY_TRUE@wspython_lib = wspython/libwspython.la
+@HAVE_LIBPY_FALSE@wspython_dir = 
+@HAVE_LIBPY_TRUE@wspython_dir = wspython
+@HAVE_LIBPY_FALSE@wspython_dist_dir = wspython
+@HAVE_LIBPY_TRUE@wspython_dist_dir = 
+@HAVE_LIBPY_FALSE@py_dissectors_dir = -DPYTHONDIR=
+@HAVE_LIBPY_TRUE@py_dissectors_dir = -DPYTHON_DIR=\"@pythondir@\"
+SUBDIRS = crypt ftypes dfilter dissectors nghttp2 wmem $(wslua_dir) $(wspython_dir)
+DIST_SUBDIRS = $(SUBDIRS) $(wslua_dist_dir) $(wspython_dist_dir)
 ACLOCAL_AMFLAGS = `../aclocal-flags`
 noinst_LTLIBRARIES = libwireshark_generated.la libwireshark_asmopt.la
 lib_LTLIBRARIES = libwireshark.la
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-libwireshark_la_LDFLAGS = -version-info 0:0:0 @LDFLAGS_SHAREDLIB@
+libwireshark_la_LDFLAGS = -version-info 5:4:0 @LDFLAGS_SHAREDLIB@
 LIBWIRESHARK_SRC = \
 	addr_and_mask.c		\
 	addr_resolv.c		\
@@ -697,23 +705,21 @@ LIBWIRESHARK_SRC = \
 	aftypes.c		\
 	app_mem_usage.c		\
 	asn1.c			\
+	atalk-utils.c		\
 	charsets.c		\
 	circuit.c		\
-	color_dissector_filters.c	\
 	column.c		\
 	column-utils.c		\
 	conversation.c		\
-	conversation_table.c	\
-	crc10-tvb.c		\
 	crc16-tvb.c		\
 	crc32-tvb.c		\
-	crc6-tvb.c		\
 	crc8-tvb.c		\
 	decode_as.c		\
 	disabled_protos.c	\
 	dissector_filters.c	\
 	dvb_chartbl.c		\
 	dwarf.c			\
+	emem.c			\
 	epan.c			\
 	ex-opt.c		\
 	except.c		\
@@ -729,27 +735,28 @@ LIBWIRESHARK_SRC = \
 	geoip_db.c		\
 	golay.c			\
 	guid-utils.c		\
+	h225-persistentdata.c	\
 	in_cksum.c		\
 	ipproto.c		\
 	ipv4.c			\
 	next_tvb.c		\
 	oids.c			\
 	osi-utils.c		\
-	oui.c			\
 	packet-range.c		\
 	packet.c		\
 	prefs.c			\
 	print.c			\
-	print_stream.c		\
 	proto.c			\
 	range.c			\
 	reassemble.c		\
 	reedsolomon.c		\
 	req_resp_hdrs.c		\
 	show_exception.c	\
+	sigcomp_state_hdlr.c	\
+	sigcomp-udvm.c		\
 	sminmpec.c		\
 	sna-utils.c		\
-	stat_tap_ui.c		\
+	stat_cmd_args.c		\
 	stats_tree.c		\
 	strutil.c		\
 	stream.c		\
@@ -822,23 +829,20 @@ LIBWIRESHARK_INCLUDES = \
 	arcnet_pids.h		\
 	arptypes.h		\
 	asn1.h			\
+	atalk-utils.h		\
 	ax25_pids.h		\
 	bridged_pids.h		\
 	charsets.h		\
 	chdlctypes.h		\
 	circuit.h		\
-	color_dissector_filters.h	\
 	column.h		\
 	column-info.h		\
 	column-utils.h		\
 	conversation.h		\
 	conversation_debug.h		\
-	conversation_table.h		\
 	conv_id.h		\
-	crc10-tvb.h		\
 	crc16-tvb.h		\
 	crc32-tvb.h		\
-	crc6-tvb.h		\
 	crc8-tvb.h		\
 	decode_as.h		\
 	diam_dict.h		\
@@ -850,6 +854,7 @@ LIBWIRESHARK_INCLUDES = \
 	dwarf.h			\
 	eap.h			\
 	eapol_keydes_types.h	\
+	emem.h			\
 	epan-int.h		\
 	epan.h			\
 	epan_dissect.h		\
@@ -869,7 +874,9 @@ LIBWIRESHARK_INCLUDES = \
 	gcp.h			\
 	geoip_db.h		\
 	golay.h			\
+	greproto.h		\
 	guid-utils.h		\
+	h225-persistentdata.h	\
 	iana_snap_pid.h		\
 	iax2_codec_type.h	\
 	in_cksum.h		\
@@ -890,7 +897,6 @@ LIBWIRESHARK_INCLUDES = \
 	params.h		\
 	ppptypes.h		\
 	print.h			\
-	print_stream.h		\
 	prefs.h			\
 	prefs-int.h		\
 	proto.h			\
@@ -903,11 +909,11 @@ LIBWIRESHARK_INCLUDES = \
 	rtp_pt.h		\
 	sctpppids.h		\
 	show_exception.h	\
-	slow_protocol_subtypes.h \
+	sigcomp_state_hdlr.h	\
+	sigcomp-udvm.h		\
 	sminmpec.h		\
 	sna-utils.h		\
-	stat_tap_ui.h		\
-	stat_groups.h		\
+	stat_cmd_args.h		\
 	stats_tree.h		\
 	stats_tree_priv.h	\
 	stream.h		\
@@ -931,7 +937,7 @@ LIBWIRESHARK_INCLUDES = \
 	xdlc.h
 
 AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/$(LEMON) -I$(builddir)/wslua \
-	@LUA_CFLAGS@ $(LIBGNUTLS_CFLAGS) $(LIBGCRYPT_CFLAGS) \
+	@LUA_INCLUDES@ $(LIBGNUTLS_CFLAGS) $(LIBGCRYPT_CFLAGS) \
 	$(LIBSMI_CFLAGS) $(LIBGEOIP_CFLAGS) $(PY_CFLAGS)
 
 AM_NON_GENERATED_CFLAGS = -DWS_BUILD_DLL $(am__append_1)
@@ -977,8 +983,7 @@ EXTRA_DIST = \
 	exntest.c		\
 	oids_test.c		\
 	doxygen.cfg.in		\
-	CMakeLists.txt	\
-	CMakeListsCustom.txt.example
+	CMakeLists.txt
 
 CLEANFILES = \
 	doxygen-epan.tag		\
@@ -1009,19 +1014,17 @@ libwireshark_la_LIBADD = \
 	libwireshark_asmopt.la crypt/libairpdcap.la \
 	ftypes/libftypes.la dfilter/libdfilter.la dissectors/libdissectors.la \
 	dissectors/libdirtydissectors.la dissectors/libfiledissectors.la \
-	jsmn/libjsmn.la nghttp2/libnghttp2.la wmem/libwmem.la $(wslua_lib) \
-	@SOCKET_LIBS@ @NSL_LIBS@ \
+	nghttp2/libnghttp2.la wmem/libwmem.la $(wslua_lib) $(wspython_lib) @SOCKET_LIBS@ @NSL_LIBS@ \
 	@C_ARES_LIBS@ @ADNS_LIBS@ @LIBGCRYPT_LIBS@ @LIBGNUTLS_LIBS@ \
 	@KRB5_LIBS@ @SSL_LIBS@ @LIBSMI_LDFLAGS@ @GEOIP_LIBS@ \
 	${top_builddir}/wiretap/libwiretap.la @GLIB_LIBS@ \
 	${top_builddir}/wsutil/libwsutil.la -lm
 
 libwireshark_la_DEPENDENCIES = \
-	libwireshark_generated.la compress/liblzxpress.la\
+	libwireshark_generated.la \
 	libwireshark_asmopt.la crypt/libairpdcap.la \
 	ftypes/libftypes.la dfilter/libdfilter.la dissectors/libdissectors.la \
-	dissectors/libdirtydissectors.la jsmn/libjsmn.la nghttp2/libnghttp2.la \
-	wmem/libwmem.la $(wslua_lib) \
+	dissectors/libdirtydissectors.la nghttp2/libnghttp2.la wmem/libwmem.la $(wslua_lib) $(wspython_lib) \
 	${top_builddir}/wsutil/libwsutil.la \
 	${top_builddir}/wiretap/libwiretap.la
 
@@ -1242,23 +1245,21 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-aftypes.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-app_mem_usage.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-asn1.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-atalk-utils.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-charsets.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-circuit.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-color_dissector_filters.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-column-utils.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-column.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-conversation.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-conversation_table.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-crc10-tvb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-crc16-tvb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-crc32-tvb.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-crc6-tvb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-crc8-tvb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-decode_as.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-disabled_protos.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-dissector_filters.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-dvb_chartbl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-dwarf.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-emem.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-epan.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-ex-opt.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-except.Plo@am__quote@
@@ -1274,27 +1275,28 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-geoip_db.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-golay.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-guid-utils.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-h225-persistentdata.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-in_cksum.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-ipproto.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-ipv4.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-next_tvb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-oids.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-osi-utils.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-oui.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-packet-range.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-packet.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-prefs.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-print.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-print_stream.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-proto.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-range.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-reassemble.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-reedsolomon.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-req_resp_hdrs.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-show_exception.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-sigcomp-udvm.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-sigcomp_state_hdlr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-sminmpec.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-sna-utils.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-stat_tap_ui.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-stat_cmd_args.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-stats_tree.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-stream.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwireshark_la-strutil.Plo@am__quote@
@@ -1322,25 +1324,22 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uat_load.Plo@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
-@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
@@ -1394,6 +1393,13 @@ libwireshark_la-asn1.lo: asn1.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-asn1.lo `test -f 'asn1.c' || echo '$(srcdir)/'`asn1.c
 
+libwireshark_la-atalk-utils.lo: atalk-utils.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-atalk-utils.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-atalk-utils.Tpo -c -o libwireshark_la-atalk-utils.lo `test -f 'atalk-utils.c' || echo '$(srcdir)/'`atalk-utils.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-atalk-utils.Tpo $(DEPDIR)/libwireshark_la-atalk-utils.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='atalk-utils.c' object='libwireshark_la-atalk-utils.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-atalk-utils.lo `test -f 'atalk-utils.c' || echo '$(srcdir)/'`atalk-utils.c
+
 libwireshark_la-charsets.lo: charsets.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-charsets.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-charsets.Tpo -c -o libwireshark_la-charsets.lo `test -f 'charsets.c' || echo '$(srcdir)/'`charsets.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-charsets.Tpo $(DEPDIR)/libwireshark_la-charsets.Plo
@@ -1407,13 +1413,6 @@ libwireshark_la-circuit.lo: circuit.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='circuit.c' object='libwireshark_la-circuit.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-circuit.lo `test -f 'circuit.c' || echo '$(srcdir)/'`circuit.c
-
-libwireshark_la-color_dissector_filters.lo: color_dissector_filters.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-color_dissector_filters.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-color_dissector_filters.Tpo -c -o libwireshark_la-color_dissector_filters.lo `test -f 'color_dissector_filters.c' || echo '$(srcdir)/'`color_dissector_filters.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-color_dissector_filters.Tpo $(DEPDIR)/libwireshark_la-color_dissector_filters.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='color_dissector_filters.c' object='libwireshark_la-color_dissector_filters.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-color_dissector_filters.lo `test -f 'color_dissector_filters.c' || echo '$(srcdir)/'`color_dissector_filters.c
 
 libwireshark_la-column.lo: column.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-column.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-column.Tpo -c -o libwireshark_la-column.lo `test -f 'column.c' || echo '$(srcdir)/'`column.c
@@ -1436,20 +1435,6 @@ libwireshark_la-conversation.lo: conversation.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-conversation.lo `test -f 'conversation.c' || echo '$(srcdir)/'`conversation.c
 
-libwireshark_la-conversation_table.lo: conversation_table.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-conversation_table.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-conversation_table.Tpo -c -o libwireshark_la-conversation_table.lo `test -f 'conversation_table.c' || echo '$(srcdir)/'`conversation_table.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-conversation_table.Tpo $(DEPDIR)/libwireshark_la-conversation_table.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conversation_table.c' object='libwireshark_la-conversation_table.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-conversation_table.lo `test -f 'conversation_table.c' || echo '$(srcdir)/'`conversation_table.c
-
-libwireshark_la-crc10-tvb.lo: crc10-tvb.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-crc10-tvb.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-crc10-tvb.Tpo -c -o libwireshark_la-crc10-tvb.lo `test -f 'crc10-tvb.c' || echo '$(srcdir)/'`crc10-tvb.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-crc10-tvb.Tpo $(DEPDIR)/libwireshark_la-crc10-tvb.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='crc10-tvb.c' object='libwireshark_la-crc10-tvb.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-crc10-tvb.lo `test -f 'crc10-tvb.c' || echo '$(srcdir)/'`crc10-tvb.c
-
 libwireshark_la-crc16-tvb.lo: crc16-tvb.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-crc16-tvb.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-crc16-tvb.Tpo -c -o libwireshark_la-crc16-tvb.lo `test -f 'crc16-tvb.c' || echo '$(srcdir)/'`crc16-tvb.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-crc16-tvb.Tpo $(DEPDIR)/libwireshark_la-crc16-tvb.Plo
@@ -1463,13 +1448,6 @@ libwireshark_la-crc32-tvb.lo: crc32-tvb.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='crc32-tvb.c' object='libwireshark_la-crc32-tvb.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-crc32-tvb.lo `test -f 'crc32-tvb.c' || echo '$(srcdir)/'`crc32-tvb.c
-
-libwireshark_la-crc6-tvb.lo: crc6-tvb.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-crc6-tvb.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-crc6-tvb.Tpo -c -o libwireshark_la-crc6-tvb.lo `test -f 'crc6-tvb.c' || echo '$(srcdir)/'`crc6-tvb.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-crc6-tvb.Tpo $(DEPDIR)/libwireshark_la-crc6-tvb.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='crc6-tvb.c' object='libwireshark_la-crc6-tvb.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-crc6-tvb.lo `test -f 'crc6-tvb.c' || echo '$(srcdir)/'`crc6-tvb.c
 
 libwireshark_la-crc8-tvb.lo: crc8-tvb.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-crc8-tvb.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-crc8-tvb.Tpo -c -o libwireshark_la-crc8-tvb.lo `test -f 'crc8-tvb.c' || echo '$(srcdir)/'`crc8-tvb.c
@@ -1512,6 +1490,13 @@ libwireshark_la-dwarf.lo: dwarf.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dwarf.c' object='libwireshark_la-dwarf.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-dwarf.lo `test -f 'dwarf.c' || echo '$(srcdir)/'`dwarf.c
+
+libwireshark_la-emem.lo: emem.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-emem.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-emem.Tpo -c -o libwireshark_la-emem.lo `test -f 'emem.c' || echo '$(srcdir)/'`emem.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-emem.Tpo $(DEPDIR)/libwireshark_la-emem.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='emem.c' object='libwireshark_la-emem.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-emem.lo `test -f 'emem.c' || echo '$(srcdir)/'`emem.c
 
 libwireshark_la-epan.lo: epan.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-epan.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-epan.Tpo -c -o libwireshark_la-epan.lo `test -f 'epan.c' || echo '$(srcdir)/'`epan.c
@@ -1618,6 +1603,13 @@ libwireshark_la-guid-utils.lo: guid-utils.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-guid-utils.lo `test -f 'guid-utils.c' || echo '$(srcdir)/'`guid-utils.c
 
+libwireshark_la-h225-persistentdata.lo: h225-persistentdata.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-h225-persistentdata.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-h225-persistentdata.Tpo -c -o libwireshark_la-h225-persistentdata.lo `test -f 'h225-persistentdata.c' || echo '$(srcdir)/'`h225-persistentdata.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-h225-persistentdata.Tpo $(DEPDIR)/libwireshark_la-h225-persistentdata.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='h225-persistentdata.c' object='libwireshark_la-h225-persistentdata.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-h225-persistentdata.lo `test -f 'h225-persistentdata.c' || echo '$(srcdir)/'`h225-persistentdata.c
+
 libwireshark_la-in_cksum.lo: in_cksum.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-in_cksum.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-in_cksum.Tpo -c -o libwireshark_la-in_cksum.lo `test -f 'in_cksum.c' || echo '$(srcdir)/'`in_cksum.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-in_cksum.Tpo $(DEPDIR)/libwireshark_la-in_cksum.Plo
@@ -1660,13 +1652,6 @@ libwireshark_la-osi-utils.lo: osi-utils.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-osi-utils.lo `test -f 'osi-utils.c' || echo '$(srcdir)/'`osi-utils.c
 
-libwireshark_la-oui.lo: oui.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-oui.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-oui.Tpo -c -o libwireshark_la-oui.lo `test -f 'oui.c' || echo '$(srcdir)/'`oui.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-oui.Tpo $(DEPDIR)/libwireshark_la-oui.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='oui.c' object='libwireshark_la-oui.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-oui.lo `test -f 'oui.c' || echo '$(srcdir)/'`oui.c
-
 libwireshark_la-packet-range.lo: packet-range.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-packet-range.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-packet-range.Tpo -c -o libwireshark_la-packet-range.lo `test -f 'packet-range.c' || echo '$(srcdir)/'`packet-range.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-packet-range.Tpo $(DEPDIR)/libwireshark_la-packet-range.Plo
@@ -1694,13 +1679,6 @@ libwireshark_la-print.lo: print.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='print.c' object='libwireshark_la-print.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-print.lo `test -f 'print.c' || echo '$(srcdir)/'`print.c
-
-libwireshark_la-print_stream.lo: print_stream.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-print_stream.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-print_stream.Tpo -c -o libwireshark_la-print_stream.lo `test -f 'print_stream.c' || echo '$(srcdir)/'`print_stream.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-print_stream.Tpo $(DEPDIR)/libwireshark_la-print_stream.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='print_stream.c' object='libwireshark_la-print_stream.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-print_stream.lo `test -f 'print_stream.c' || echo '$(srcdir)/'`print_stream.c
 
 libwireshark_la-proto.lo: proto.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-proto.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-proto.Tpo -c -o libwireshark_la-proto.lo `test -f 'proto.c' || echo '$(srcdir)/'`proto.c
@@ -1744,6 +1722,20 @@ libwireshark_la-show_exception.lo: show_exception.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-show_exception.lo `test -f 'show_exception.c' || echo '$(srcdir)/'`show_exception.c
 
+libwireshark_la-sigcomp_state_hdlr.lo: sigcomp_state_hdlr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-sigcomp_state_hdlr.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-sigcomp_state_hdlr.Tpo -c -o libwireshark_la-sigcomp_state_hdlr.lo `test -f 'sigcomp_state_hdlr.c' || echo '$(srcdir)/'`sigcomp_state_hdlr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-sigcomp_state_hdlr.Tpo $(DEPDIR)/libwireshark_la-sigcomp_state_hdlr.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sigcomp_state_hdlr.c' object='libwireshark_la-sigcomp_state_hdlr.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-sigcomp_state_hdlr.lo `test -f 'sigcomp_state_hdlr.c' || echo '$(srcdir)/'`sigcomp_state_hdlr.c
+
+libwireshark_la-sigcomp-udvm.lo: sigcomp-udvm.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-sigcomp-udvm.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-sigcomp-udvm.Tpo -c -o libwireshark_la-sigcomp-udvm.lo `test -f 'sigcomp-udvm.c' || echo '$(srcdir)/'`sigcomp-udvm.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-sigcomp-udvm.Tpo $(DEPDIR)/libwireshark_la-sigcomp-udvm.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sigcomp-udvm.c' object='libwireshark_la-sigcomp-udvm.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-sigcomp-udvm.lo `test -f 'sigcomp-udvm.c' || echo '$(srcdir)/'`sigcomp-udvm.c
+
 libwireshark_la-sminmpec.lo: sminmpec.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-sminmpec.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-sminmpec.Tpo -c -o libwireshark_la-sminmpec.lo `test -f 'sminmpec.c' || echo '$(srcdir)/'`sminmpec.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-sminmpec.Tpo $(DEPDIR)/libwireshark_la-sminmpec.Plo
@@ -1758,12 +1750,12 @@ libwireshark_la-sna-utils.lo: sna-utils.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-sna-utils.lo `test -f 'sna-utils.c' || echo '$(srcdir)/'`sna-utils.c
 
-libwireshark_la-stat_tap_ui.lo: stat_tap_ui.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-stat_tap_ui.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-stat_tap_ui.Tpo -c -o libwireshark_la-stat_tap_ui.lo `test -f 'stat_tap_ui.c' || echo '$(srcdir)/'`stat_tap_ui.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-stat_tap_ui.Tpo $(DEPDIR)/libwireshark_la-stat_tap_ui.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='stat_tap_ui.c' object='libwireshark_la-stat_tap_ui.lo' libtool=yes @AMDEPBACKSLASH@
+libwireshark_la-stat_cmd_args.lo: stat_cmd_args.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-stat_cmd_args.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-stat_cmd_args.Tpo -c -o libwireshark_la-stat_cmd_args.lo `test -f 'stat_cmd_args.c' || echo '$(srcdir)/'`stat_cmd_args.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwireshark_la-stat_cmd_args.Tpo $(DEPDIR)/libwireshark_la-stat_cmd_args.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='stat_cmd_args.c' object='libwireshark_la-stat_cmd_args.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-stat_tap_ui.lo `test -f 'stat_tap_ui.c' || echo '$(srcdir)/'`stat_tap_ui.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -c -o libwireshark_la-stat_cmd_args.lo `test -f 'stat_cmd_args.c' || echo '$(srcdir)/'`stat_cmd_args.c
 
 libwireshark_la-stats_tree.lo: stats_tree.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwireshark_la_CFLAGS) $(CFLAGS) -MT libwireshark_la-stats_tree.lo -MD -MP -MF $(DEPDIR)/libwireshark_la-stats_tree.Tpo -c -o libwireshark_la-stats_tree.lo `test -f 'stats_tree.c' || echo '$(srcdir)/'`stats_tree.c
@@ -2243,8 +2235,6 @@ dumpabi-libwireshark: all abi-descriptor.xml
 	cp *.h abi-check-headers/epan
 	mkdir abi-check-headers/crypt
 	cp crypt/*.h abi-check-headers/crypt
-	mkdir abi-check-headers/compress
-	cp compress/*.h abi-check-headers/compress
 	mkdir abi-check-headers/dfilter
 	cp dfilter/*.h ../tools/lemon/cppmagic.h abi-check-headers/dfilter
 	mkdir abi-check-headers/dissectors

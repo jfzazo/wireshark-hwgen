@@ -27,6 +27,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/ipproto.h>
 #include <wiretap/nettl.h>

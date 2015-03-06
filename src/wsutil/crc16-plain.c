@@ -40,6 +40,7 @@
  * Modified 2009-03-16 not to include <stdint.h> as our Win32 environment
  * appears not to have it; we're using GLib types, instead.
  *****************************************************************************/
+#include <glib.h>
 #include "wsutil/crc16-plain.h"
 #include <stdlib.h>
 
@@ -192,15 +193,3 @@ guint16 crc16_8005_noreflect_noxor(const guint8 *data, guint64 data_len)
     return crc & 0xffff;
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

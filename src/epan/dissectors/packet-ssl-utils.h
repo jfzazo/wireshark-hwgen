@@ -30,6 +30,8 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/wmem/wmem.h>
+#include <epan/tvbuff.h>
+#include <epan/proto.h>
 #include <epan/expert.h>
 #include <wsutil/wsgcrypt.h>
 
@@ -70,34 +72,30 @@
 #define SSL_VER_TLSv1DOT2                 7
 
 /* other defines */
-typedef enum {
-    SSL_ID_CHG_CIPHER_SPEC         = 0x14,
-    SSL_ID_ALERT                   = 0x15,
-    SSL_ID_HANDSHAKE               = 0x16,
-    SSL_ID_APP_DATA                = 0x17,
-    SSL_ID_HEARTBEAT               = 0x18
-} ContentType;
+#define SSL_ID_CHG_CIPHER_SPEC         0x14
+#define SSL_ID_ALERT                   0x15
+#define SSL_ID_HANDSHAKE               0x16
+#define SSL_ID_APP_DATA                0x17
+#define SSL_ID_HEARTBEAT               0x18
 
-typedef enum {
-    SSL_HND_HELLO_REQUEST          = 0,
-    SSL_HND_CLIENT_HELLO           = 1,
-    SSL_HND_SERVER_HELLO           = 2,
-    SSL_HND_HELLO_VERIFY_REQUEST   = 3,
-    SSL_HND_NEWSESSION_TICKET      = 4,
-    SSL_HND_CERTIFICATE            = 11,
-    SSL_HND_SERVER_KEY_EXCHG       = 12,
-    SSL_HND_CERT_REQUEST           = 13,
-    SSL_HND_SVR_HELLO_DONE         = 14,
-    SSL_HND_CERT_VERIFY            = 15,
-    SSL_HND_CLIENT_KEY_EXCHG       = 16,
-    SSL_HND_FINISHED               = 20,
-    SSL_HND_CERT_URL               = 21,
-    SSL_HND_CERT_STATUS            = 22,
-    SSL_HND_SUPPLEMENTAL_DATA      = 23,
-    /* Encrypted Extensions was NextProtocol in draft-agl-tls-nextprotoneg-03
-     * and changed in draft 04 */
-    SSL_HND_ENCRYPTED_EXTS         = 67
-} HandshakeType;
+#define SSL_HND_HELLO_REQUEST          0
+#define SSL_HND_CLIENT_HELLO           1
+#define SSL_HND_SERVER_HELLO           2
+#define SSL_HND_HELLO_VERIFY_REQUEST   3
+#define SSL_HND_NEWSESSION_TICKET      4
+#define SSL_HND_CERTIFICATE            11
+#define SSL_HND_SERVER_KEY_EXCHG       12
+#define SSL_HND_CERT_REQUEST           13
+#define SSL_HND_SVR_HELLO_DONE         14
+#define SSL_HND_CERT_VERIFY            15
+#define SSL_HND_CLIENT_KEY_EXCHG       16
+#define SSL_HND_FINISHED               20
+#define SSL_HND_CERT_URL               21
+#define SSL_HND_CERT_STATUS            22
+#define SSL_HND_SUPPLEMENTAL_DATA      23
+/* Encrypted Extensions was NextProtocol in draft-agl-tls-nextprotoneg-03 and
+ * changed in draft 04 */
+#define SSL_HND_ENCRYPTED_EXTS         67
 
 #define SSL2_HND_ERROR                 0x00
 #define SSL2_HND_CLIENT_HELLO          0x01
@@ -170,12 +168,10 @@ typedef enum {
 #define SSL_HND_HELLO_EXT_CLIENT_CERT_TYPE   0x0013
 #define SSL_HND_HELLO_EXT_SERVER_CERT_TYPE   0x0014
 #define SSL_HND_HELLO_EXT_PADDING            0x0015
-#define SSL_HND_HELLO_EXT_EXTENDED_MASTER_SECRET_TYPE 0x0017
 #define SSL_HND_HELLO_EXT_SESSION_TICKET     0x0023
 #define SSL_HND_HELLO_EXT_RENEG_INFO         0xff01
 #define SSL_HND_HELLO_EXT_NPN                0x3374
-#define SSL_HND_HELLO_EXT_CHANNEL_ID_OLD     0x754f
-#define SSL_HND_HELLO_EXT_CHANNEL_ID         0x7550
+#define SSL_HND_HELLO_EXT_CHANNEL_ID         0x754f
 #define SSL_HND_CERT_URL_TYPE_INDIVIDUAL_CERT       1
 #define SSL_HND_CERT_URL_TYPE_PKIPATH               2
 #define SSL_HND_CERT_STATUS_TYPE_OCSP        1
@@ -223,8 +219,8 @@ extern const value_string tls_hello_ext_server_name_type_vs[];
 
 /* XXX Should we use GByteArray instead? */
 typedef struct _StringInfo {
-    guchar  *data;      /* Backing storage which may be larger than data_len */
-    guint    data_len;  /* Length of the meaningful part of data */
+    guchar* data;
+    guint data_len;
 } StringInfo;
 
 #define SSL_WRITE_KEY           1
@@ -244,10 +240,6 @@ typedef struct _StringInfo {
 #define SSL_VERSION             (1<<4)
 #define SSL_MASTER_SECRET       (1<<5)
 #define SSL_PRE_MASTER_SECRET   (1<<6)
-#define SSL_CLIENT_EXTENDED_MASTER_SECRET (1<<7)
-#define SSL_SERVER_EXTENDED_MASTER_SECRET (1<<8)
-
-#define SSL_EXTENDED_MASTER_SECRET_MASK (SSL_CLIENT_EXTENDED_MASTER_SECRET|SSL_SERVER_EXTENDED_MASTER_SECRET)
 
 /* SSL Cipher Suite modes */
 typedef enum {
@@ -355,12 +347,8 @@ typedef struct _SslSession {
     gint8 server_cert_type;
 } SslSession;
 
-/* RFC 5246, section 8.1 says that the master secret is always 48 bytes */
-#define SSL_MASTER_SECRET_LENGTH        48
-
-/* This holds state information for a SSL conversation */
 typedef struct _SslDecryptSession {
-    guchar _master_secret[SSL_MASTER_SECRET_LENGTH];
+    guchar _master_secret[48];
     guchar _session_id[256];
     guchar _client_random[32];
     guchar _server_random[32];
@@ -369,7 +357,6 @@ typedef struct _SslDecryptSession {
     StringInfo server_random;
     StringInfo client_random;
     StringInfo master_secret;
-    StringInfo handshake_data;
     /* the data store for this StringInfo must be allocated explicitly with a capture lifetime scope */
     StringInfo pre_master_secret;
     guchar _server_data_for_iv[24];
@@ -425,28 +412,13 @@ typedef struct _ssldecrypt_assoc_t {
     char* password;
 } ssldecrypt_assoc_t;
 
-typedef struct ssl_common_options {
-    const gchar        *psk;
-    const gchar        *keylog_filename;
-} ssl_common_options_t;
-
-/** Map from something to a (pre-)master secret */
-typedef struct {
-    GHashTable *session;    /* Session ID/Ticket to master secret. It uses the
-                               observation that Session IDs are 1-32 bytes and
-                               tickets are much longer */
-    GHashTable *crandom;    /* Client Random to master secret */
-    GHashTable *pre_master; /* First 8 bytes of encrypted pre-master secret to
-                               pre-master secret */
-} ssl_master_key_map_t;
-
 gint ssl_get_keyex_alg(gint cipher);
 
-gboolean ssldecrypt_uat_fld_ip_chk_cb(void*, const char*, unsigned, const void*, const void*, char** err);
-gboolean ssldecrypt_uat_fld_port_chk_cb(void*, const char*, unsigned, const void*, const void*, char** err);
-gboolean ssldecrypt_uat_fld_protocol_chk_cb(void*, const char*, unsigned, const void*, const void*, char** err);
-gboolean ssldecrypt_uat_fld_fileopen_chk_cb(void*, const char*, unsigned, const void*, const void*, char** err);
-gboolean ssldecrypt_uat_fld_password_chk_cb(void*, const char*, unsigned, const void*, const void*, char** err);
+gboolean ssldecrypt_uat_fld_ip_chk_cb(void*, const char*, unsigned, const void*, const void*, const char** err);
+gboolean ssldecrypt_uat_fld_port_chk_cb(void*, const char*, unsigned, const void*, const void*, const char** err);
+gboolean ssldecrypt_uat_fld_protocol_chk_cb(void*, const char*, unsigned, const void*, const void*, const char** err);
+gboolean ssldecrypt_uat_fld_fileopen_chk_cb(void*, const char*, unsigned, const void*, const void*, const char** err);
+gboolean ssldecrypt_uat_fld_password_chk_cb(void*, const char*, unsigned, const void*, const void*, const char** err);
 
 /** Initialize decryption engine/ssl layer. To be called once per execution */
 extern void
@@ -494,11 +466,10 @@ ssl_find_private_key(SslDecryptSession *ssl_session, GHashTable *key_hash, GTree
 extern gint
 ssl_find_cipher(int num,SslCipherSuite* cs);
 
-gboolean
+int
 ssl_generate_pre_master_secret(SslDecryptSession *ssl_session,
                                guint32 length, tvbuff_t *tvb, guint32 offset,
-                               const gchar *ssl_psk,
-                               const ssl_master_key_map_t *mk_map);
+                               const gchar *ssl_psk, const gchar *keylog_filename);
 
 /** Expand the pre_master_secret to generate all the session information
  * (master secret, session keys, ivs)
@@ -509,6 +480,26 @@ ssl_generate_keyring_material(SslDecryptSession*ssl_session);
 
 extern void
 ssl_change_cipher(SslDecryptSession *ssl_session, gboolean server);
+
+/** Try to find the pre-master secret for the given encrypted pre-master secret
+    from a log of secrets.
+ @param ssl_session the store for the decrypted pre_master_secret
+ @param ssl_keylog_filename a file that contains a log of secrets (may be NULL)
+ @param encrypted_pre_master the rsa encrypted pre_master_secret (may be NULL)
+ @return 0 on success */
+int
+ssl_keylog_lookup(SslDecryptSession* ssl_session,
+                  const gchar* ssl_keylog_filename,
+                  StringInfo* encrypted_pre_master);
+
+/** Try to decrypt in place the encrypted pre_master_secret
+ @param ssl_session the store for the decrypted pre_master_secret
+ @param encrypted_pre_master the rsa encrypted pre_master_secret
+ @param pk the private key to be used for decryption
+ @return 0 on success */
+extern gint
+ssl_decrypt_pre_master_secret(SslDecryptSession*ssl_session,
+    StringInfo* encrypted_pre_master, SSL_PRIVATE_KEY *pk);
 
 /** Try to decrypt an ssl record
  @param ssl ssl_session the store all the session data
@@ -540,7 +531,7 @@ extern guint
 ssl_private_key_hash  (gconstpointer v);
 
 /* private key table entries have a scope 'larger' then packet capture,
- * so we can't rely on wmem_file_scope function */
+ * so we can't relay on se_alloc** function */
 extern void
 ssl_private_key_free(gpointer id, gpointer key, gpointer dummy _U_);
 
@@ -579,13 +570,7 @@ ssl_get_data_info(int proto, packet_info *pinfo, gint key);
 
 /* initialize/reset per capture state data (ssl sessions cache) */
 extern void
-ssl_common_init(ssl_master_key_map_t *master_key_map, FILE **ssl_keylog_file,
-                StringInfo *decrypted_data, StringInfo *compressed_data);
-
-/* tries to update the secrets cache from the given filename */
-extern void
-ssl_load_keyfile(const gchar *ssl_keylog_filename, FILE **keylog_file,
-                 const ssl_master_key_map_t *mk_map);
+ssl_common_init(GHashTable **session_hash, StringInfo *decrypted_data, StringInfo *compressed_data);
 
 /* parse ssl related preferences (private keys and ports association strings) */
 extern void
@@ -595,17 +580,17 @@ ssl_parse_key_list(const ssldecrypt_assoc_t * uats, GHashTable *key_hash, GTree*
 extern void
 ssl_save_session(SslDecryptSession* ssl, GHashTable *session_hash);
 
+extern gboolean
+ssl_restore_session(SslDecryptSession* ssl, GHashTable *session_hash);
+
 extern void
-ssl_finalize_decryption(SslDecryptSession *ssl, ssl_master_key_map_t *mk_map);
+ssl_save_session_ticket(SslDecryptSession* ssl, GHashTable *session_hash);
 
 extern gboolean
+ssl_restore_session_ticket(SslDecryptSession* ssl, GHashTable *session_hash);
+
+extern gint
 ssl_is_valid_content_type(guint8 type);
-
-extern gboolean
-ssl_is_valid_handshake_type(guint8 hs_type, gboolean is_dtls);
-
-extern void
-ssl_calculate_handshake_hash(SslDecryptSession *ssl_session, tvbuff_t *tvb, guint32 offset, guint32 length);
 
 /* common header fields, subtrees and expert info for SSL and DTLS dissectors */
 typedef struct ssl_common_dissect {
@@ -683,29 +668,6 @@ typedef struct ssl_common_dissect {
         gint hs_certificates;
         gint hs_certificate_len;
         gint hs_certificate;
-        gint hs_cert_types_count;
-        gint hs_cert_types;
-        gint hs_cert_type;
-        gint hs_dnames_len;
-        gint hs_dnames;
-        gint hs_dname_len;
-        gint hs_dname;
-        gint hs_random_time;
-        gint hs_random_bytes;
-        gint hs_session_id;
-        gint hs_session_id_len;
-        gint hs_client_version;
-        gint hs_server_version;
-        gint hs_cipher_suites_len;
-        gint hs_cipher_suites;
-        gint hs_cipher_suite;
-        gint hs_comp_methods_len;
-        gint hs_comp_methods;
-        gint hs_comp_method;
-        gint hs_session_ticket_lifetime_hint;
-        gint hs_session_ticket_len;
-        gint hs_session_ticket;
-        gint hs_finished;
 
         /* do not forget to update SSL_COMMON_LIST_T and SSL_COMMON_HF_LIST! */
     } hf;
@@ -724,72 +686,29 @@ typedef struct ssl_common_dissect {
         gint urlhash;
         gint keyex_params;
         gint certificates;
-        gint cert_types;
-        gint dnames;
-        gint hs_random;
-        gint cipher_suites;
-        gint comp_methods;
-        gint session_ticket;
 
         /* do not forget to update SSL_COMMON_LIST_T and SSL_COMMON_ETT_LIST! */
     } ett;
     struct {
         expert_field hs_ext_cert_status_undecoded;
-        expert_field hs_sig_hash_alg_len_bad;
-        expert_field hs_cipher_suites_len_bad;
 
         /* do not forget to update SSL_COMMON_LIST_T and SSL_COMMON_EI_LIST! */
     } ei;
 } ssl_common_dissect_t;
 
-/* Header fields specific to DTLS. See packet-dtls.c */
-typedef struct {
-    gint hf_dtls_handshake_cookie_len;
-    gint hf_dtls_handshake_cookie;
-
-    /* Do not forget to initialize dtls_hfs to -1 in packet-dtls.c! */
-} dtls_hfs_t;
-
-/* Header fields specific to SSL. See packet-ssl.c */
-typedef struct {
-    gint hs_md5_hash;
-    gint hs_sha_hash;
-
-    /* Do not forget to initialize ssl_hfs to -1 in packet-ssl.c! */
-} ssl_hfs_t;
-
-extern void
-ssl_dissect_hnd_cli_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
-                          packet_info *pinfo, proto_tree *tree, guint32 offset,
-                          guint32 length, SslSession *session,
-                          SslDecryptSession *ssl,
-                          dtls_hfs_t *dtls_hfs);
-
-extern void
-ssl_dissect_hnd_srv_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
-                          proto_tree *tree, guint32 offset, guint32 length,
+extern gint
+ssl_dissect_hnd_hello_ext(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tree,
+                          guint32 offset, guint32 left, gboolean is_client,
                           SslSession *session, SslDecryptSession *ssl);
 
-extern void
-ssl_dissect_hnd_new_ses_ticket(ssl_common_dissect_t *hf, tvbuff_t *tvb,
-                               proto_tree *tree, guint32 offset,
-                               SslDecryptSession *ssl,
-                               GHashTable *session_hash);
+extern gint
+ssl_dissect_hash_alg_list(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tree,
+                          guint32 offset, guint16 len);
 
 extern void
 ssl_dissect_hnd_cert(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tree,
                      guint32 offset, packet_info *pinfo,
                      const SslSession *session, gint is_from_server);
-
-extern void
-ssl_dissect_hnd_cert_req(ssl_common_dissect_t *hf, tvbuff_t *tvb,
-                          proto_tree *tree, guint32 offset, packet_info *pinfo,
-                          const SslSession *session);
-
-extern void
-ssl_dissect_hnd_finished(ssl_common_dissect_t *hf, tvbuff_t *tvb,
-                         proto_tree *tree, guint32 offset,
-                         const SslSession *session, ssl_hfs_t *ssl_hfs);
 
 extern void
 ssl_dissect_hnd_cert_url(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tree, guint32 offset);
@@ -812,15 +731,13 @@ ssl_common_dissect_t name = {   \
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, \
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, \
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, \
-        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, \
-        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, \
+        -1, -1, -1, -1, -1, -1, -1, -1, -1,                             \
     },                                                                  \
     /* ett */ {                                                         \
-        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, \
-        -1, -1, -1, -1,                                                 \
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,         \
     },                                                                  \
     /* ei */ {                                                          \
-        EI_INIT, EI_INIT, EI_INIT,                                      \
+        EI_INIT,                                                        \
     },                                                                  \
 }
 /* }}} */
@@ -1184,129 +1101,13 @@ ssl_common_dissect_t name = {   \
     },                                                                  \
     { & name .hf.hs_certificate,                                        \
       { "Certificate", prefix ".handshake.certificate",                 \
-        FT_BYTES, BASE_NONE, NULL, 0x0,                                  \
+        FT_NONE, BASE_NONE, NULL, 0x0,                                  \
         NULL, HFILL }                                                   \
     },                                                                  \
     { & name .hf.hs_certificate_len,                                    \
       { "Certificate Length", prefix ".handshake.certificate_length",   \
         FT_UINT24, BASE_DEC, NULL, 0x0,                                 \
         "Length of certificate", HFILL }                                \
-    },                                                                  \
-    { & name .hf.hs_cert_types_count,                                   \
-      { "Certificate types count", prefix ".handshake.cert_types_count",\
-        FT_UINT8, BASE_DEC, NULL, 0x0,                                  \
-        "Count of certificate types", HFILL }                           \
-    },                                                                  \
-    { & name .hf.hs_cert_types,                                         \
-      { "Certificate types", prefix ".handshake.cert_types",            \
-        FT_NONE, BASE_NONE, NULL, 0x0,                                  \
-        "List of certificate types", HFILL }                            \
-    },                                                                  \
-    { & name .hf.hs_cert_type,                                          \
-      { "Certificate type", prefix ".handshake.cert_type",              \
-        FT_UINT8, BASE_DEC, VALS(ssl_31_client_certificate_type), 0x0,  \
-        NULL, HFILL }                                                   \
-    },                                                                  \
-    { & name .hf.hs_dnames_len,                                         \
-      { "Distinguished Names Length", prefix ".handshake.dnames_len",   \
-        FT_UINT16, BASE_DEC, NULL, 0x0,                                 \
-        "Length of list of CAs that server trusts", HFILL }             \
-    },                                                                  \
-    { & name .hf.hs_dnames,                                             \
-      { "Distinguished Names", prefix ".handshake.dnames",              \
-        FT_NONE, BASE_NONE, NULL, 0x0,                                  \
-        "List of CAs that server trusts", HFILL }                       \
-    },                                                                  \
-    { & name .hf.hs_dname_len,                                          \
-      { "Distinguished Name Length", prefix ".handshake.dname_len",     \
-        FT_UINT16, BASE_DEC, NULL, 0x0,                                 \
-        "Length of distinguished name", HFILL }                         \
-    },                                                                  \
-    { & name .hf.hs_dname,                                              \
-      { "Distinguished Name", prefix ".handshake.dname",                \
-        FT_NONE, BASE_NONE, NULL, 0x0,                                  \
-        "Distinguished name of a CA that server trusts", HFILL }        \
-    },                                                                  \
-    { & name .hf.hs_random_time,                                        \
-      { "GMT Unix Time", prefix ".handshake.random_time",               \
-        FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0x0,               \
-        "Unix time field of random structure", HFILL }                  \
-    },                                                                  \
-    { & name .hf.hs_random_bytes,                                       \
-      { "Random Bytes", prefix ".handshake.random",                     \
-        FT_BYTES, BASE_NONE, NULL, 0x0,                                 \
-        "Random values used for deriving keys", HFILL }                 \
-    },                                                                  \
-    { & name .hf.hs_session_id,                                         \
-      { "Session ID", prefix ".handshake.session_id",                   \
-        FT_BYTES, BASE_NONE, NULL, 0x0,                                 \
-        "Identifies the SSL session, allowing later resumption", HFILL }\
-    },                                                                  \
-    { & name .hf.hs_session_id_len,                                     \
-      { "Session ID Length", prefix ".handshake.session_id_length",     \
-        FT_UINT8, BASE_DEC, NULL, 0x0,                                  \
-        "Length of Session ID field", HFILL }                           \
-    },                                                                  \
-    { & name .hf.hs_client_version,                                     \
-      { "Version", prefix ".handshake.version",                         \
-        FT_UINT16, BASE_HEX, VALS(ssl_versions), 0x0,                   \
-        "Maximum version supported by client", HFILL }                  \
-    },                                                                  \
-    { & name .hf.hs_server_version,                                     \
-      { "Version", prefix ".handshake.version",                         \
-        FT_UINT16, BASE_HEX, VALS(ssl_versions), 0x0,                   \
-        "Version selected by server", HFILL }                           \
-    },                                                                  \
-    { & name .hf.hs_cipher_suites_len,                                  \
-      { "Cipher Suites Length", prefix ".handshake.cipher_suites_length", \
-        FT_UINT16, BASE_DEC, NULL, 0x0,                                 \
-        "Length of cipher suites field", HFILL }                        \
-    },                                                                  \
-    { & name .hf.hs_cipher_suites,                                      \
-      { "Cipher Suites", prefix ".handshake.ciphersuites",              \
-        FT_NONE, BASE_NONE, NULL, 0x0,                                  \
-        "List of cipher suites supported by client", HFILL }            \
-    },                                                                  \
-    { & name .hf.hs_cipher_suite,                                       \
-      { "Cipher Suite", prefix ".handshake.ciphersuite",                \
-        FT_UINT16, BASE_HEX|BASE_EXT_STRING, &ssl_31_ciphersuite_ext, 0x0, \
-        NULL, HFILL }                                                   \
-    },                                                                  \
-    { & name .hf.hs_comp_methods_len,                                   \
-      { "Compression Methods Length", prefix ".handshake.comp_methods_length", \
-        FT_UINT8, BASE_DEC, NULL, 0x0,                                  \
-        "Length of compression methods field", HFILL }                  \
-    },                                                                  \
-    { & name .hf.hs_comp_methods,                                       \
-      { "Compression Methods", prefix ".handshake.comp_methods",        \
-        FT_NONE, BASE_NONE, NULL, 0x0,                                  \
-        "List of compression methods supported by client", HFILL }      \
-    },                                                                  \
-    { & name .hf.hs_comp_method,                                        \
-      { "Compression Method", prefix ".handshake.comp_method",          \
-        FT_UINT8, BASE_DEC, VALS(ssl_31_compression_method), 0x0,       \
-        NULL, HFILL }                                                   \
-    },                                                                  \
-    { & name .hf.hs_session_ticket_lifetime_hint,                       \
-      { "Session Ticket Lifetime Hint",                                 \
-        prefix ".handshake.session_ticket_lifetime_hint",               \
-        FT_UINT32, BASE_DEC, NULL, 0x0,                                 \
-        "New Session Ticket Lifetime Hint", HFILL }                     \
-    },                                                                  \
-    { & name .hf.hs_session_ticket_len,                                 \
-      { "Session Ticket Length", prefix ".handshake.session_ticket_length", \
-        FT_UINT16, BASE_DEC, NULL, 0x0,                                 \
-        "New Session Ticket Length", HFILL }                            \
-    },                                                                  \
-    { & name .hf.hs_session_ticket,                                     \
-      { "Session Ticket", prefix ".handshake.session_ticket",           \
-        FT_BYTES, BASE_NONE, NULL, 0x0,                                 \
-        "New Session Ticket", HFILL }                                   \
-    },                                                                  \
-    { & name .hf.hs_finished,                                           \
-      { "Verify Data", prefix ".handshake.verify_data",                 \
-        FT_NONE, BASE_NONE, NULL, 0x0,                                  \
-        "Opaque verification data", HFILL }                             \
     }
 /* }}} */
 
@@ -1326,29 +1127,18 @@ ssl_common_dissect_t name = {   \
         & name .ett.urlhash,                        \
         & name .ett.keyex_params,                   \
         & name .ett.certificates,                   \
-        & name .ett.cert_types,                     \
-        & name .ett.dnames,                         \
-        & name .ett.hs_random,                      \
-        & name .ett.cipher_suites,                  \
-        & name .ett.comp_methods,                   \
-        & name .ett.session_ticket,                 \
 /* }}} */
 
 /* {{{ */
 #define SSL_COMMON_EI_LIST(name, prefix)                       \
-    { & name .ei.hs_ext_cert_status_undecoded, \
-        { prefix ".handshake.status_request.undecoded", PI_UNDECODED, PI_NOTE, \
-        "Responder ID list or Request Extensions are not implemented, contact Wireshark developers if you want this to be supported", EXPFILL } \
-    }, \
-    { & name .ei.hs_sig_hash_alg_len_bad, \
-        { prefix ".handshake.sig_hash_alg_len.mult2", PI_MALFORMED, PI_ERROR, \
-        "Signature Hash Algorithm length must be a multiple of 2", EXPFILL } \
-    }, \
-    { & name .ei.hs_cipher_suites_len_bad, \
-        { prefix ".handshake.cipher_suites_length.mult2", PI_MALFORMED, PI_ERROR, \
-        "Cipher suite length must be a multiple of 2", EXPFILL } \
-    }
+        { & name .ei.hs_ext_cert_status_undecoded, { prefix ".handshake.status_request.undecoded", PI_UNDECODED, PI_NOTE,   \
+          "Responder ID list or Request Extensions are not implemented, contact Wireshark developers if you want this to be supported", EXPFILL }}
 /* }}} */
+
+typedef struct ssl_common_options {
+    const gchar        *psk;
+    const gchar        *keylog_filename;
+} ssl_common_options_t;
 
 extern void
 ssl_common_register_options(module_t *module, ssl_common_options_t *options);

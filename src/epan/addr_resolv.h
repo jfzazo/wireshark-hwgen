@@ -26,7 +26,7 @@
  * However, take into account that when the packet dissection
  * completes, these buffers will be automatically reclaimed/freed.
  * If you need the buffer to remain for a longer scope than packet lifetime
- * you must copy the content to an wmem_file_scope() buffer.
+ * you must copy the content to an se_alloc() buffer.
  */
 
 #ifndef __RESOLV_H__
@@ -109,40 +109,47 @@ extern gchar *g_pipxnets_path;
 /* Functions in addr_resolv.c */
 
 /*
- * udp_port_to_display() returns the port name corresponding to that UDP port,
+ * ep_udp_port_to_display() returns the port name corresponding to that UDP port,
  * or the port number as a string if not found.
  */
-WS_DLL_PUBLIC gchar *udp_port_to_display(wmem_allocator_t *allocator, guint port);
+WS_DLL_PUBLIC gchar *ep_udp_port_to_display(guint port);
 
 /*
- * tcp_port_to_display() returns the port name corresponding to that TCP port,
+ * ep_tcp_port_to_display() returns the port name corresponding to that TCP port,
  * or the port number as a string if not found.
  */
-WS_DLL_PUBLIC gchar *tcp_port_to_display(wmem_allocator_t *allocator, guint port);
+WS_DLL_PUBLIC gchar *ep_tcp_port_to_display(guint port);
 
 /*
- * dccp_port_to_display() returns the port name corresponding to that DCCP port,
+ * ep_dccp_port_to_display() returns the port name corresponding to that DCCP port,
  * or the port number as a string if not found.
  */
-extern gchar *dccp_port_to_display(wmem_allocator_t *allocator, guint port);
+extern gchar *ep_dccp_port_to_display(guint port);
 
 /*
- * sctp_port_to_display() returns the port name corresponding to that SCTP port,
+ * ep_sctp_port_to_display() returns the port name corresponding to that SCTP port,
  * or the port number as a string if not found.
  */
-WS_DLL_PUBLIC gchar *sctp_port_to_display(wmem_allocator_t *allocator, guint port);
+WS_DLL_PUBLIC gchar *ep_sctp_port_to_display(guint port);
 
-/*
- * address_to_display takes as input an "address", as defined in address.h */
+/* ep_address_to_display takes as input an "address", as defined in address.h */
 /* it returns a string that contains: */
 /*  - if the address is of a type that can be translated into a name, and the user */
 /*    has activated name resolution, the translated name */
 /*  - if the address is of type AT_NONE, a pointer to the string "NONE" */
-/*  - if the address is of any other type, the result of address_to_str on the argument, */
+/*  - if the address is of any other type, the result of ep_address_to_str on the argument, */
 /*    which should be a string representation for the answer -e.g. "10.10.10.10" for IPv4 */
 /*    address 10.10.10.10 */
+
 WS_DLL_PUBLIC
-const gchar *address_to_display(wmem_allocator_t *allocator, const address *addr);
+const gchar *ep_address_to_display(const address *addr);
+
+/* get_addr_name_buf solves an address in the same way as ep_address_to_display above */
+/* The difference is that get_addr_name_buf takes as input a buffer, into which it puts */
+/* the result which is always NUL ('\0') terminated. The buffer should be large enough to */
+/* contain size characters including the terminator */
+
+void get_addr_name_buf(const address *addr, gchar *buf, gsize size);
 
 const gchar *get_addr_name(const address *addr);
 
@@ -182,7 +189,7 @@ gchar *get_ether_name_if_known(const guint8 *addr);
  * Given a sequence of 3 octets containing an OID, get_manuf_name()
  * returns the vendor name, or "%02x:%02x:%02x" if not known.
  */
-extern gchar *get_manuf_name(wmem_allocator_t *allocator, const guint8 *addr);
+extern const gchar *get_manuf_name(const guint8 *addr);
 
 /*
  * Given a sequence of 3 octets containing an OID, get_manuf_name_if_known()
@@ -216,13 +223,17 @@ WS_DLL_PUBLIC const gchar *tvb_get_manuf_name(tvbuff_t *tvb, gint offset);
  */
 WS_DLL_PUBLIC const gchar *tvb_get_manuf_name_if_known(tvbuff_t *tvb, gint offset);
 
-/* eui64_to_display returns "<vendor>_%02x:%02x:%02x:%02x:%02x:%02x" if the vendor code is known
+/* ep_eui64_to_display returns "<vendor>_%02x:%02x:%02x:%02x:%02x:%02x" if the vendor code is known
    "%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x" */
-extern const gchar *eui64_to_display(wmem_allocator_t *allocator, const guint64 addr);
+extern const gchar *ep_eui64_to_display(const guint64 addr);
+
+/* ep_eui64_to_display_if_known returns "<vendor>_%02x:%02x:%02x:%02x:%02x:%02x" if the vendor code is known else NULL */
+extern const gchar *ep_eui64_to_display_if_known(const guint64 addr);
+
 
 /* get_ipxnet_name returns the logical name if found in an ipxnets file,
  * or a string formatted with "%X" if not */
-extern const gchar *get_ipxnet_name(wmem_allocator_t *allocator, const guint32 addr);
+extern const gchar *get_ipxnet_name(const guint32 addr);
 
 /* returns the ethernet address corresponding to name or NULL if not known */
 extern guint8 *get_ether_addr(const gchar *name);

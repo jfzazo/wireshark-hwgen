@@ -22,7 +22,7 @@
  *
  * See
  *
- *    http://h71000.www7.hp.com/wizard/decnet/
+ *	http://h71000.www7.hp.com/wizard/decnet/
  *
  * for some DECnet specifications.
  *
@@ -47,7 +47,9 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include <epan/etypes.h>
 #include <epan/ppptypes.h>
 
@@ -702,19 +704,11 @@ do_hello_msg(
     guint msg)
 {
     guint   my_offset = offset;
-    guint8  priority;
+    guint8  iinfo, priority;
     guint16 version, eco_nr, user_eco;
     proto_item *ti;
+    proto_tree *iinfo_tree;
     char *addr;
-    static const int * info_flags[] = {
-        &hf_dec_rt_iinfo_node_type,
-        &hf_dec_rt_iinfo_vrf,
-        &hf_dec_rt_iinfo_rej,
-        &hf_dec_rt_iinfo_verf,
-        &hf_dec_rt_iinfo_mta,
-        &hf_dec_rt_iinfo_blkreq,
-        NULL
-    };
 
     version = tvb_get_guint8(tvb, my_offset);
     eco_nr = tvb_get_guint8(tvb, my_offset + 1);
@@ -730,9 +724,23 @@ do_hello_msg(
         proto_item_append_text(ti, " (%s)", addr);
     }
     my_offset += 6;
-    proto_tree_add_bitmask(tree, tvb, my_offset, hf_dec_rt_iinfo, ett_dec_rt_info_flags, info_flags, ENC_NA);
+    iinfo = tvb_get_guint8(tvb, my_offset);
+    ti = proto_tree_add_uint(
+        tree, hf_dec_rt_iinfo, tvb, my_offset, 1, iinfo);
+    iinfo_tree = proto_item_add_subtree(ti, ett_dec_rt_info_flags);
+    proto_tree_add_uint(
+        iinfo_tree, hf_dec_rt_iinfo_node_type, tvb, my_offset, 1, iinfo);
+    proto_tree_add_boolean(iinfo_tree, hf_dec_rt_iinfo_vrf,
+        tvb, my_offset, 1, iinfo);
+    proto_tree_add_boolean(iinfo_tree, hf_dec_rt_iinfo_rej,
+        tvb, my_offset, 1, iinfo);
+    proto_tree_add_boolean(iinfo_tree, hf_dec_rt_iinfo_verf,
+        tvb, my_offset, 1, iinfo);
+    proto_tree_add_boolean(iinfo_tree, hf_dec_rt_iinfo_mta,
+        tvb, my_offset, 1, iinfo);
+    proto_tree_add_boolean(iinfo_tree, hf_dec_rt_iinfo_blkreq,
+        tvb, my_offset, 1, iinfo);
     my_offset++;
-
     proto_tree_add_item(tree, hf_dec_rt_blk_size, tvb,
         my_offset, 2, ENC_LITTLE_ENDIAN);
     my_offset += 2;
@@ -1486,16 +1494,3 @@ proto_reg_handoff_dec_rt(void)
     dissector_add_uint("ppp.protocol", PPP_DEC4, dec_rt_handle);
 /*  dissector_add_uint("ppp.protocol", PPP_DECNETCP, dec_rt_handle);*/
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

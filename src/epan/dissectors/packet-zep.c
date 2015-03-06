@@ -43,6 +43,14 @@
 
 #include "config.h"
 
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#include <sys/stat.h>
+
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
@@ -65,8 +73,6 @@ static int hf_zep_lqi = -1;
 static int hf_zep_timestamp = -1;
 static int hf_zep_seqno = -1;
 static int hf_zep_ieee_length = -1;
-static int hf_zep_protocol_id = -1;
-static int hf_zep_reserved_field = -1;
 
 /* Initialize protocol subtrees. */
 static gint ett_zep = -1;
@@ -107,7 +113,7 @@ static void dissect_zep(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     dissector_handle_t  next_dissector;
 
     /*  Determine whether this is a Q51/IEEE 802.15.4 sniffer packet or not */
-    if(strcmp(tvb_get_string_enc(wmem_packet_scope(), tvb, 0, 2, ENC_ASCII), ZEP_PREAMBLE)){
+    if(strcmp(tvb_get_string(wmem_packet_scope(), tvb, 0, 2), ZEP_PREAMBLE)){
         /*  This is not a Q51/ZigBee sniffer packet */
         call_dissector(data_handle, tvb, pinfo, tree);
         return;
@@ -159,7 +165,7 @@ static void dissect_zep(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     }
 #endif
 
-    if(ieee_packet_len < tvb_reported_length(tvb)-zep_header_len){
+    if(ieee_packet_len < tvb_length(tvb)-zep_header_len){
         /* Packet's length is mis-reported, abort dissection */
         call_dissector(data_handle, tvb, pinfo, tree);
         return;
@@ -185,7 +191,7 @@ static void dissect_zep(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         zep_tree = proto_item_add_subtree(proto_root, ett_zep);
 
         /*  Display the information in the subtree */
-        proto_tree_add_item(zep_tree, hf_zep_protocol_id, tvb, 0, 2, ENC_NA|ENC_ASCII);
+        proto_tree_add_text(zep_tree, tvb, 0, 2, "Protocol ID String: EX");
         if (zep_data.version==1) {
             proto_tree_add_uint(zep_tree, hf_zep_version, tvb, 2, 1, zep_data.version);
             proto_tree_add_uint(zep_tree, hf_zep_channel_id, tvb, 3, 1, zep_data.channel_id);
@@ -194,7 +200,7 @@ static void dissect_zep(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             if(!(zep_data.lqi_mode)){
                 proto_tree_add_uint(zep_tree, hf_zep_lqi, tvb, 7, 1, zep_data.lqi);
             }
-            proto_tree_add_item(zep_tree, hf_zep_reserved_field, tvb, 7+((zep_data.lqi_mode)?0:1), 7+((zep_data.lqi_mode)?1:0), ENC_NA);
+            proto_tree_add_text(zep_tree, tvb, 7+((zep_data.lqi_mode)?0:1), 7+((zep_data.lqi_mode)?1:0), "Reserved Fields");
         }
         else {
             proto_tree_add_uint(zep_tree, hf_zep_version, tvb, 2, 1, zep_data.version);
@@ -234,7 +240,7 @@ static void dissect_zep(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     /*  Call the IEEE 802.15.4 dissector */
     if (!((zep_data.version>=2) && (zep_data.type==ZEP_V2_TYPE_ACK))) {
-        next_tvb = tvb_new_subset_length(tvb, zep_header_len, ieee_packet_len);
+        next_tvb = tvb_new_subset(tvb, zep_header_len, ieee_packet_len, ieee_packet_len);
         call_dissector(next_dissector, next_tvb, pinfo, tree);
     }
 } /* dissect_ieee802_15_4 */
@@ -290,14 +296,6 @@ void proto_register_zep(void)
         { &hf_zep_ieee_length,
         { "Length",              "zep.length", FT_UINT8, BASE_DEC, NULL, 0x0,
             "The length (in bytes) of the encapsulated IEEE 802.15.4 MAC frame.", HFILL }},
-
-        { &hf_zep_protocol_id,
-        { "Protocol ID String",            "zep.seqno", FT_STRING, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_zep_reserved_field,
-        { "Reserved Fields",            "zep.reserved_field", FT_BYTES, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -365,15 +363,3 @@ void proto_reg_handoff_zep(void)
     lastPort = gPREF_zep_udp_port;
 } /* proto_reg_handoff_zep */
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

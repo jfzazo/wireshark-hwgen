@@ -26,7 +26,9 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <glib.h>
 #include <errno.h>
 
 #ifdef HAVE_UNISTD_H
@@ -48,8 +50,7 @@ merge_open_in_files(int in_file_count, char *const *in_file_names,
                     merge_in_file_t **in_files, int *err, gchar **err_info,
                     int *err_fileno)
 {
-  gint i;
-  gint j;
+  int i, j;
   size_t files_size = in_file_count * sizeof(merge_in_file_t);
   merge_in_file_t *files;
   gint64 size;
@@ -72,7 +73,7 @@ merge_open_in_files(int in_file_count, char *const *in_file_names,
     }
     size = wtap_file_size(files[i].wth, err);
     if (size == -1) {
-      for (j = 0; j + 1 > j && j <= i; j++)
+      for (j = 0; j <= i; j++)
         wtap_close(files[j].wth);
       *err_fileno = i;
       return FALSE;
@@ -282,16 +283,3 @@ merge_append_read_packet(int in_file_count, merge_in_file_t in_files[],
   *err = 0;
   return &in_files[i];
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

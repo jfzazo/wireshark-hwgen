@@ -90,10 +90,12 @@ fi
 ##############################################################################
 ### Set up environment variables for fuzz testing			   ###
 ##############################################################################
-# Initialize ep_ allocated memory to 0xBADDCAFE and freed memory
+# Initialize (ep_ and se_) allocated memory to 0xBADDCAFE and freed memory
 # to 0xDEADBEEF
 export WIRESHARK_DEBUG_SCRUB_MEMORY=
-# Verify that ep_ allocated memory is not passed to certain routines
+# Use canaries in se_ allocations (off by default due to the memory usage)
+export WIRESHARK_DEBUG_SE_USE_CANARY=
+# Verify that ep_ and se_ allocated memory is not passed to certain routines
 # which need the memory to be persistent.
 export WIRESHARK_EP_VERIFY_POINTERS=
 export WIRESHARK_SE_VERIFY_POINTERS=

@@ -27,11 +27,12 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <epan/conversation.h>
 #include <epan/expert.h>
 #include <epan/tap.h>
 #include <epan/exported_pdu.h>
-#include "packet-tcp.h"
+#include <epan/wmem/wmem.h>
+#include <packet-tcp.h>
 
 void proto_register_reload_framing(void);
 void proto_reg_handoff_reload_framing(void);
@@ -96,8 +97,7 @@ static const value_string types[] = {
 };
 
 static guint
-get_reload_framing_message_length(packet_info *pinfo _U_, tvbuff_t *tvb,
-                                  int offset, void *data _U_)
+get_reload_framing_message_length(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   /* Get the type */
   guint32 length = 9;

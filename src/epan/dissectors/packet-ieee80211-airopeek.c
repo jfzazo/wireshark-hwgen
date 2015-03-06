@@ -25,6 +25,7 @@
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 
+#include "packet-ieee80211.h"
 
 void proto_register_ieee80211_airopeek(void);
 void proto_reg_handoff_ieee80211_airopeek(void);
@@ -71,7 +72,7 @@ dissect_airopeek(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   }
 
   if (tree)
-    proto_tree_add_item(airopeek_tree, hf_channel, tvb, 1, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(airopeek_tree, hf_channel, tvb, 1, 1, ENC_NA);
 
   signal_level = tvb_get_guint8(tvb, 2);
   /*

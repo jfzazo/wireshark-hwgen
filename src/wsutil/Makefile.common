@@ -33,10 +33,6 @@ LIBWSUTIL_SRC = 	\
 	base64.c	\
 	bitswap.c	\
 	buffer.c	\
-	cfutils.c	\
-	clopts_common.c	\
-	cmdarg_err.c	\
-	copyright_info.c \
 	crash_info.c	\
 	crc6.c		\
 	crc7.c		\
@@ -46,6 +42,7 @@ LIBWSUTIL_SRC = 	\
 	crc16.c		\
 	crc16-plain.c	\
 	crc32.c		\
+	crcdrm.c	\
 	des.c		\
 	eax.c		\
 	filesystem.c	\
@@ -54,11 +51,9 @@ LIBWSUTIL_SRC = 	\
 	md5.c		\
 	mpeg-audio.c	\
 	nstime.c	\
-	os_version_info.c \
 	plugins.c	\
 	privileges.c	\
 	sha1.c		\
-	sober128.c	\
 	strnatcmp.c	\
 	str_util.c	\
 	rc4.c		\
@@ -66,25 +61,18 @@ LIBWSUTIL_SRC = 	\
 	tempfile.c	\
 	time_util.c	\
 	type_util.c	\
-	ws_mempbrk.c	\
 	u3.c		\
-	unicode-utils.c	\
-	ws_version_info.c
+	unicode-utils.c
 
-# Header files that don't declare replacement functions for functions
-# present in the APIs/ABIs of some, but not all, targets.
-libwsutil_nonrepl_INCLUDES = \
+# Header files that are not generated from other files
+LIBWSUTIL_INCLUDES = 	\
 	adler32.h	\
 	aes.h		\
 	base64.h	\
 	bits_ctz.h	\
 	bits_count_ones.h	\
-	bitswap.h	\
+	bitswap.h		\
 	buffer.h	\
-	cfutils.h	\
-	clopts_common.h	\
-	cmdarg_err.h	\
-	copyright_info.h \
 	crash_info.h	\
 	crc6.h		\
 	crc7.h		\
@@ -94,6 +82,7 @@ libwsutil_nonrepl_INCLUDES = \
 	crc16.h		\
 	crc16-plain.h	\
 	crc32.h		\
+	crcdrm.h	\
 	des.h		\
 	eax.h		\
 	filesystem.h	\
@@ -102,12 +91,10 @@ libwsutil_nonrepl_INCLUDES = \
 	md5.h		\
 	mpeg-audio.h	\
 	nstime.h	\
-	os_version_info.h \
 	plugins.h	\
 	privileges.h	\
 	sha1.h		\
 	sign_ext.h	\
-	sober128.h	\
 	strnatcmp.h	\
 	str_util.h	\
 	pint.h		\
@@ -117,15 +104,7 @@ libwsutil_nonrepl_INCLUDES = \
 	time_util.h	\
 	type_util.h	\
 	u3.h		\
-	unicode-utils.h \
-	ws_cpuid.h	\
-	ws_diag_control.h \
-	ws_mempbrk.h	\
-	ws_version_info.h
-
-# Header files that are not generated from other files
-LIBWSUTIL_INCLUDES = 	\
-	$(libwsutil_nonrepl_INCLUDES)
+	unicode-utils.h
 
 #
 # Editor modelines  -  https://www.wireshark.org/tools/modelines.html

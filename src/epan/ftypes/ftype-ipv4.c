@@ -25,6 +25,7 @@
 #include <ftypes-int.h>
 #include <epan/ipv4.h>
 #include <epan/addr_resolv.h>
+#include <epan/emem.h>
 
 
 static void
@@ -41,40 +42,32 @@ value_get(fvalue_t *fv)
 }
 
 static gboolean
-val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, gchar **err_msg)
+val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, LogFunc logfunc)
 {
 	guint32	addr;
 	unsigned int nmask_bits;
 
-	const char *has_slash, *net_str;
-	char *addr_str;
+	const char *has_slash;
+	const char *net_str, *addr_str;
 	fvalue_t *nmask_fvalue;
-	gboolean free_addr_str = FALSE;
 
 	/* Look for CIDR: Is there a single slash in the string? */
 	has_slash = strchr(s, '/');
 	if (has_slash) {
 		/* Make a copy of the string up to but not including the
 		 * slash; that's the address portion. */
-		addr_str = wmem_strndup(NULL, s, has_slash - s);
-		free_addr_str = TRUE;
+		addr_str = ep_strndup(s, has_slash - s);
 	}
 	else {
-		addr_str = (char*)s;
+		addr_str = s;
 	}
 
 	if (!get_host_ipaddr(addr_str, &addr)) {
-		if (err_msg != NULL) {
-			*err_msg = g_strdup_printf("\"%s\" is not a valid hostname or IPv4 address.",
-			    addr_str);
-		}
-		if (free_addr_str)
-			wmem_free(NULL, addr_str);
+		logfunc("\"%s\" is not a valid hostname or IPv4 address.",
+		    addr_str);
 		return FALSE;
 	}
 
-	if (free_addr_str)
-		wmem_free(NULL, addr_str);
 	ipv4_addr_set_net_order_addr(&(fv->value.ipv4), addr);
 
 	/* If CIDR, get netmask bits. */
@@ -83,7 +76,7 @@ val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_,
 		net_str = has_slash + 1;
 
 		/* XXX - this is inefficient */
-		nmask_fvalue = fvalue_from_unparsed(FT_UINT32, net_str, FALSE, err_msg);
+		nmask_fvalue = fvalue_from_unparsed(FT_UINT32, net_str, FALSE, logfunc);
 		if (!nmask_fvalue) {
 			return FALSE;
 		}
@@ -91,10 +84,8 @@ val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_,
 		FVALUE_FREE(nmask_fvalue);
 
 		if (nmask_bits > 32) {
-			if (err_msg != NULL) {
-				*err_msg = g_strdup_printf("Netmask bits in a CIDR IPv4 address should be <= 32, not %u",
-						nmask_bits);
-			}
+			logfunc("Netmask bits in a CIDR IPv4 address should be <= 32, not %u",
+					nmask_bits);
 			return FALSE;
 		}
 		ipv4_addr_set_netmask_bits(&fv->value.ipv4, nmask_bits);
@@ -108,7 +99,7 @@ val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_,
 }
 
 static int
-val_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_, int field_display _U_)
+val_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_)
 {
 	/*
 	 * 15 characters for "XXX.XXX.XXX.XXX".
@@ -117,7 +108,7 @@ val_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_, int field_display _U_)
 }
 
 static void
-val_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, int field_display _U_, char *buf)
+val_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, char *buf)
 {
 	ipv4_addr_str_buf(&fv->value.ipv4, buf);
 }

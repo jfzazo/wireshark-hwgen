@@ -22,17 +22,19 @@
  *
  * References:
  * RFC 3267  http://www.ietf.org/rfc/rfc3267.txt?number=3267
- * RFC 4867  http://www.rfc-editor.org/rfc/rfc4867.txt
  * 3GPP TS 26.101 for AMR-NB, 3GPP TS 26.201 for AMR-WB
  */
 
 #include "config.h"
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
 
+#include <epan/prefs.h>
 
 void proto_register_amr(void);
 void proto_reg_handoff_amr(void);
@@ -51,15 +53,12 @@ static dissector_handle_t amr_wb_handle;
 static int proto_amr = -1;
 static int hf_amr_nb_cmr = -1;
 static int hf_amr_wb_cmr = -1;
-static int hf_amr_payload_decoded_as = -1;
 static int hf_amr_reserved = -1;
 static int hf_amr_toc_f = -1;
 static int hf_amr_nb_toc_ft = -1;
 static int hf_amr_wb_toc_ft = -1;
 static int hf_amr_toc_q = -1;
 
-static int hf_amr_speech_data = -1;
-static int hf_amr_frame_data = -1;
 static int hf_amr_nb_if1_ft = -1;
 static int hf_amr_wb_if1_ft = -1;
 static int hf_amr_if1_fqi = -1;
@@ -86,8 +85,6 @@ static expert_field ei_amr_spare_bit_not0 = EI_INIT;
 static expert_field ei_amr_not_enough_data_for_frames = EI_INIT;
 static expert_field ei_amr_superfluous_data = EI_INIT;
 static expert_field ei_amr_padding_bits_not0 = EI_INIT;
-static expert_field ei_amr_padding_bits_correct = EI_INIT;
-static expert_field ei_amr_reserved = EI_INIT;
 
 /* The dynamic payload type which will be dissected as AMR */
 
@@ -235,7 +232,7 @@ dissect_amr_nb_if1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         ti = proto_tree_add_item(tree, hf_amr_nb_if1_mode_req, tvb, offset+1, 1, ENC_BIG_ENDIAN);
         if (tvb_get_guint8(tvb,offset+1) & 0x1f)
             expert_add_info(pinfo, ti, &ei_amr_spare_bit_not0);
-        proto_tree_add_item(tree, hf_amr_speech_data, tvb, offset+2, 5, ENC_NA);
+        proto_tree_add_text(tree, tvb, offset+2, 5, "Speech data");
         proto_tree_add_item(tree, hf_amr_if1_sti, tvb, offset+7, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(tree, hf_amr_nb_if1_sti_mode_ind, tvb, offset+7, 1, ENC_BIG_ENDIAN);
         return;
@@ -247,7 +244,7 @@ dissect_amr_nb_if1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     if (tvb_get_guint8(tvb,offset) & 0x1f)
         expert_add_info(pinfo, ti, &ei_amr_spare_bit_not0);
     offset += 1;
-    proto_tree_add_item(tree, hf_amr_speech_data, tvb, offset, -1, ENC_NA);
+    proto_tree_add_text(tree, tvb, offset, -1, "Speech data");
 }
 
 /* See 3GPP TS 26.201 for AMR-WB */
@@ -264,7 +261,7 @@ dissect_amr_wb_if1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     octet = (tvb_get_guint8(tvb,offset) & 0xf0) >> 4;
     if (octet == AMR_WB_SID) {
         proto_tree_add_item(tree, hf_amr_wb_if1_mode_req, tvb, offset+1, 1, ENC_BIG_ENDIAN);
-        proto_tree_add_item(tree, hf_amr_speech_data, tvb, offset+2, 4, ENC_NA);
+        proto_tree_add_text(tree, tvb, offset+2, 4, "Speech data");
         proto_tree_add_item(tree, hf_amr_if1_sti, tvb, offset+7, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(tree, hf_amr_wb_if1_sti_mode_ind, tvb, offset+7, 1, ENC_BIG_ENDIAN);
         return;
@@ -274,7 +271,7 @@ dissect_amr_wb_if1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     proto_tree_add_item(tree, hf_amr_wb_if1_mode_ind, tvb, offset, 1, ENC_BIG_ENDIAN);
     proto_tree_add_item(tree, hf_amr_wb_if1_mode_req, tvb, offset, 1, ENC_BIG_ENDIAN);
     offset += 1;
-    proto_tree_add_item(tree, hf_amr_speech_data, tvb, offset, -1, ENC_NA);
+    proto_tree_add_text(tree, tvb, offset, -1, "Speech data");
 }
 
 static void
@@ -286,14 +283,14 @@ dissect_amr_nb_if2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     octet = tvb_get_guint8(tvb,offset) & 0x0f;
 
     if (octet == AMR_NB_SID) {
-        proto_tree_add_item(tree, hf_amr_speech_data, tvb, offset+1, 3, ENC_NA);
+        proto_tree_add_text(tree, tvb, offset+1, 3, "Speech data");
         proto_tree_add_item(tree, hf_amr_if2_sti, tvb, offset+4, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(tree, hf_amr_nb_if2_sti_mode_ind, tvb, offset+5, 1, ENC_BIG_ENDIAN);
         return;
     }
     if (octet == AMR_NO_TRANS)
         return;
-    proto_tree_add_item(tree, hf_amr_speech_data, tvb, offset+1, -1, ENC_NA);
+    proto_tree_add_text(tree, tvb, offset+1, -1, "Speech data");
 
     col_append_fstr(pinfo->cinfo, COL_INFO, "%s ",
             val_to_str_ext(octet, &amr_nb_codec_mode_request_vals_ext, "Unknown (%d)" ));
@@ -308,14 +305,14 @@ dissect_amr_wb_if2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     octet = (tvb_get_guint8(tvb,offset) & 0xf0) >> 4;
 
     if (octet == AMR_WB_SID) {
-        proto_tree_add_item(tree, hf_amr_speech_data, tvb, offset+1, 4, ENC_NA);
+        proto_tree_add_text(tree, tvb, offset+1, 4, "Speech data");
         proto_tree_add_item(tree, hf_amr_if2_sti, tvb, offset+5, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(tree, hf_amr_wb_if2_sti_mode_ind, tvb, offset+5, 1, ENC_BIG_ENDIAN);
         return;
     }
     if (octet == AMR_NO_TRANS)
         return;
-    proto_tree_add_item(tree, hf_amr_speech_data, tvb, offset+1, -1, ENC_NA);
+    proto_tree_add_text(tree, tvb, offset+1, -1, "Speech data");
 
     col_append_fstr(pinfo->cinfo, COL_INFO, "%s ",
             val_to_str_ext(octet, &amr_wb_codec_mode_request_vals_ext, "Unknown (%d)" ));
@@ -402,26 +399,28 @@ dissect_amr_be(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, gint amr
 
     /* Check if we have enough data available for our frames */
     if (tvb_reported_length_remaining(tvb, bitcount/8) < bytes_needed_for_frames) {
-        proto_tree_add_expert_format(tree, pinfo, &ei_amr_not_enough_data_for_frames,
-                tvb, bitcount/8, bytes_needed_for_frames,
+        item = proto_tree_add_text(tree, tvb, bitcount/8, bytes_needed_for_frames,
                 "Error: %d Bytes available, %d would be needed!",
                        tvb_reported_length_remaining(tvb, bitcount/8),
                        bytes_needed_for_frames);
+        expert_add_info(pinfo, item, &ei_amr_not_enough_data_for_frames);
     }
     else {
-        proto_tree_add_item(tree, hf_amr_frame_data, tvb, bitcount/8, bytes_needed_for_frames, ENC_NA);
+        item = proto_tree_add_text(tree, tvb, bitcount/8, bytes_needed_for_frames, "Frame Data");
+        proto_item_append_text(item, " (%d Bytes)",bytes_needed_for_frames);
     }
 
     bitcount += bits_used_for_frames;
 
     if (tvb_reported_length_remaining(tvb, (bitcount+8)/8) > 0) {
-        proto_tree_add_expert_format(tree, pinfo, &ei_amr_superfluous_data, tvb, bitcount/8, tvb_reported_length_remaining(tvb, bitcount/8),
+        item = proto_tree_add_text(tree, tvb, bitcount/8, tvb_reported_length_remaining(tvb, bitcount/8),
             "Error: %d Bytes remaining - should be 0!",tvb_reported_length_remaining(tvb, (bitcount+8)/8));
+        expert_add_info(pinfo, item, &ei_amr_superfluous_data);
 
         /* Now check the paddings */
         if (bitcount%8 != 0) {
             if ( (1 << (8 -(bitcount%8)-1)) & tvb_get_guint8(tvb,bitcount/8) )
-                proto_tree_add_expert(tree, pinfo, &ei_amr_padding_bits_correct, tvb, bitcount/8, 1);
+                proto_tree_add_text(tree, tvb, bitcount/8, 1, "Padding bits correct");
             else {
                 proto_tree_add_expert(tree, pinfo, &ei_amr_padding_bits_not0, tvb,
                                         bitcount/8, 1);
@@ -441,15 +440,14 @@ dissect_amr_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gint amr
     gboolean    first_time;
 
 /* Set up structures needed to add the protocol subtree and manage it */
-    proto_item *ti;
+    proto_item *ti,*toc_item;
     proto_tree *amr_tree, *toc_tree;
 
     ti = proto_tree_add_item(tree, proto_amr, tvb, 0, -1, ENC_NA);
     amr_tree = proto_item_add_subtree(ti, ett_amr);
 
-    item = proto_tree_add_uint(amr_tree, hf_amr_payload_decoded_as, tvb, offset, 4, amr_encoding_type);
-    proto_item_set_len(item, tvb_reported_length(tvb));
-    PROTO_ITEM_SET_GENERATED(item);
+    proto_tree_add_text(amr_tree, tvb, offset, -1, "Payload decoded as %s",
+                val_to_str_const(amr_encoding_type, amr_encoding_type_value, "Unknown value - Error"));
 
     switch (amr_encoding_type) {
     case 0: /* RFC 3267 Byte aligned */
@@ -480,13 +478,16 @@ dissect_amr_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gint amr
 
     bit_offset += 4;
     octet = tvb_get_guint8(tvb,offset) & 0x0f;
-    item = proto_tree_add_item(amr_tree, hf_amr_reserved, tvb, offset, 1, ENC_BIG_ENDIAN);
     if ( octet != 0  ) {
-        expert_add_info(pinfo, item, &ei_amr_reserved);
+        item = proto_tree_add_text(amr_tree, tvb, offset, -1,
+                       "Reserved != 0, wrongly encoded or not octet aligned."
+                       " Decoding as bandwidth-efficient mode");
         PROTO_ITEM_SET_GENERATED(item);
         return;
 
     }
+
+    proto_tree_add_item(amr_tree, hf_amr_reserved, tvb, offset, 1, ENC_BIG_ENDIAN);
     offset     += 1;
     bit_offset += 4;
     /*
@@ -506,7 +507,8 @@ dissect_amr_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gint amr
      *   P bits: padding bits, MUST be set to zero.
      */
     octet = tvb_get_guint8(tvb,offset);
-    toc_tree = proto_tree_add_subtree(amr_tree, tvb, offset, -1, ett_amr_toc, NULL, "Payload Table of Contents");
+    toc_item = proto_tree_add_text(amr_tree, tvb, offset, -1, "Payload Table of Contents");
+    toc_tree = proto_item_add_subtree(toc_item, ett_amr_toc);
 
     first_time = TRUE;
     while ((( octet& 0x80 ) == 0x80) || (first_time == TRUE)) {
@@ -613,7 +615,7 @@ dissect_amr_name(tvbuff_t *tvb _U_, packet_info *pinfo, proto_tree *tree, void* 
         }
     }
 
-    return tvb_reported_length(tvb);
+    return tvb_length(tvb);
 }
 
 void
@@ -638,11 +640,6 @@ proto_register_amr(void)
             FT_UINT8, BASE_DEC, NULL, 0x0f,
             "Reserved bits", HFILL }
         },
-        { &hf_amr_payload_decoded_as,
-            { "Payload decoded as",           "amr.payload_decoded_as",
-            FT_UINT32, BASE_DEC, VALS(amr_encoding_type_value), 0x0,
-            "Value of decoding preference", HFILL }
-        },
         { &hf_amr_toc_f,
             { "F bit",           "amr.toc.f",
             FT_BOOLEAN, BASE_NONE, TFS(&toc_f_bit_vals), 0x0,
@@ -662,16 +659,6 @@ proto_register_amr(void)
             { "Q bit",           "amr.toc.q",
             FT_BOOLEAN, BASE_NONE, TFS(&toc_q_bit_vals), 0x0,
             "Frame quality indicator bit", HFILL }
-        },
-        { &hf_amr_speech_data,
-            { "Speech data",           "amr.speech_data",
-            FT_BYTES, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }
-        },
-        { &hf_amr_frame_data,
-            { "Frame Data",           "amr.frame_data",
-            FT_BYTES, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }
         },
         { &hf_amr_nb_if1_ft,
             { "Frame Type",           "amr.nb.if1.ft",
@@ -761,8 +748,6 @@ proto_register_amr(void)
         { &ei_amr_not_enough_data_for_frames, { "amr.not_enough_data_for_frames", PI_MALFORMED, PI_ERROR, "Not enough data for the frames according to TOC", EXPFILL }},
         { &ei_amr_superfluous_data, { "amr.superfluous_data", PI_MALFORMED, PI_ERROR, "Superfluous data remaining", EXPFILL }},
         { &ei_amr_padding_bits_not0, { "amr.padding_bits_not0", PI_MALFORMED, PI_ERROR, "Padding bits error - MUST be 0", EXPFILL }},
-        { &ei_amr_padding_bits_correct, { "amr.padding_bits_correct", PI_PROTOCOL, PI_NOTE, "Padding bits correct", EXPFILL }},
-        { &ei_amr_reserved, { "amr.reserved.not_zero", PI_PROTOCOL, PI_WARN, "Reserved != 0, wrongly encoded or not octet aligned. Decoding as bandwidth-efficient mode", EXPFILL }},
     };
 
     static const enum_val_t encoding_types[] = {

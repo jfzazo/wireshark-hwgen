@@ -23,6 +23,7 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include <gtk/gtk.h>
@@ -32,6 +33,7 @@
 #include "../globals.h"
 
 #include "ui/gtk/supported_protos_dlg.h"
+#include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/font_utils.h"

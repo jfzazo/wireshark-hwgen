@@ -19,7 +19,7 @@
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  *  Changed to use guint instead of uint 2004 by Anders Broman
- *  Original code found at http://www.cr0.net:8040/code/crypto/sha1/
+ *	Original code found at http://www.cr0.net:8040/code/crypto/sha1/
  *  References: http://www.ietf.org/rfc/rfc3174.txt?number=3174
  *
  *  2012-08-21 - C Elston - Split sha1_hmac function to allow incremental usage.
@@ -29,6 +29,7 @@
 #include <glib.h>
 
 #include "sha1.h"
+#include "file_util.h"
 
 #define GET_UINT32(n,b,i)                       \
 {                                               \
@@ -255,10 +256,10 @@ void sha1_update( sha1_context *ctx, const guint8 *input, guint32 length )
 
 static guint8 sha1_padding[64] =
 {
-    0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+ 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
 void sha1_finish( sha1_context *ctx, guint8 digest[20] )
@@ -338,6 +339,7 @@ void sha1_hmac( const guint8 *key, guint32 keylen, const guint8 *buf, guint32 bu
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <glib.h>
 #include <errno.h>
 
 /*
@@ -440,16 +442,3 @@ int main( int argc, char *argv[] )
 
 #endif
 
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

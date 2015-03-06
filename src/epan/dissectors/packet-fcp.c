@@ -23,8 +23,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
+#include <epan/wmem/wmem.h>
 #include <epan/packet.h>
 #include <epan/conversation.h>
+#include <epan/etypes.h>
 #include "packet-scsi.h"
 #include "packet-fc.h"
 #include "packet-fcp.h"
@@ -50,7 +54,6 @@ static int hf_fcp_wrdata = -1;
 static int hf_fcp_dl = -1;
 static int hf_fcp_bidir_dl = -1;
 static int hf_fcp_data_ro = -1;
-static int hf_fcp_r_ctl = -1;
 static int hf_fcp_burstlen = -1;
 static int hf_fcp_rspflags = -1;
 static int hf_fcp_retry_delay_timer = -1;
@@ -78,9 +81,10 @@ static int hf_fcp_rsp_flags_res_vld = -1;
 static int hf_fcp_request_in = -1;
 static int hf_fcp_response_in = -1;
 static int hf_fcp_time = -1;
-static int hf_fcp_els_op = -1;
+/* static int hf_fcp_srr_op = -1; */
 static int hf_fcp_srr_ox_id = -1;
 static int hf_fcp_srr_rx_id = -1;
+/* static int hf_fcp_srr_r_ctl = -1; */
 
 /* Initialize the subtree pointers */
 static gint ett_fcp = -1;
@@ -176,13 +180,15 @@ static const true_false_string fcp_mgmt_flags_abort_task_set_tfs = {
 static void
 dissect_task_mgmt_flags(packet_info *pinfo, proto_tree *parent_tree, tvbuff_t *tvb, int offset)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item = NULL;
+    proto_tree *tree = NULL;
 
     guint8 flags;
 
-    item = proto_tree_add_item(parent_tree, hf_fcp_taskmgmt, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    tree = proto_item_add_subtree(item, ett_fcp_taskmgmt);
+    if (parent_tree) {
+        item = proto_tree_add_item(parent_tree, hf_fcp_taskmgmt, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        tree = proto_item_add_subtree(item, ett_fcp_taskmgmt);
+    }
 
     flags = tvb_get_guint8(tvb, offset);
 
@@ -279,13 +285,15 @@ static const true_false_string fcp_rsp_flags_res_vld_tfs = {
 static void
 dissect_rsp_flags(proto_tree *parent_tree, tvbuff_t *tvb, int offset)
 {
-    proto_item *item;
-    proto_tree *tree;
+    proto_item *item               = NULL;
+    proto_tree *tree               = NULL;
     gboolean    bidi_resid_present = FALSE;
     guint8      flags;
 
-    item = proto_tree_add_item(parent_tree, hf_fcp_rspflags, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    tree = proto_item_add_subtree(item, ett_fcp_rsp_flags);
+    if (parent_tree) {
+        item = proto_tree_add_item(parent_tree, hf_fcp_rspflags, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        tree = proto_item_add_subtree(item, ett_fcp_rsp_flags);
+    }
 
     flags = tvb_get_guint8(tvb, offset);
 
@@ -381,7 +389,7 @@ dissect_fcp_cmnd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, pro
     guint8       flags, rwflags, lun0;
     guint16      lun     = 0xffff;
     tvbuff_t    *cdb_tvb;
-    int          tvb_len;
+    int          tvb_len, tvb_rlen;
     fcp_request_data_t *request_data = NULL;
     itl_nexus_t itl;
     fcp_proto_data_t *proto_data;
@@ -475,11 +483,14 @@ dissect_fcp_cmnd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, pro
     tvb_len = tvb_length_remaining(tvb, offset+12);
     if (tvb_len > (16 + add_len))
       tvb_len = 16 + add_len;
+    tvb_rlen = tvb_reported_length_remaining(tvb, offset+12);
+    if (tvb_rlen > (16 + add_len))
+      tvb_rlen = 16 + add_len;
 
     itl.cmdset = 0xff;
     itl.conversation = conversation;
 
-    cdb_tvb = tvb_new_subset_length(tvb, offset+12, tvb_len);
+    cdb_tvb = tvb_new_subset(tvb, offset+12, tvb_len, tvb_rlen);
     dissect_scsi_cdb(cdb_tvb, pinfo, parent_tree, SCSI_DEV_UNKNOWN, request_data->itlq, &itl);
 
     proto_tree_add_item(tree, hf_fcp_dl, tvb, offset+12+16+add_len,
@@ -667,7 +678,9 @@ dissect_fcp_srr(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, fc_hdr 
         proto_tree_add_item(tree, hf_fcp_srr_ox_id, tvb, 4, 2, ENC_BIG_ENDIAN);
         proto_tree_add_item(tree, hf_fcp_srr_rx_id, tvb, 6, 2, ENC_BIG_ENDIAN);
         proto_tree_add_item(tree, hf_fcp_data_ro, tvb, 8, 4, ENC_BIG_ENDIAN);
-        proto_tree_add_item(tree, hf_fcp_r_ctl, tvb, 12, 1, ENC_NA);
+        r_ctl = tvb_get_guint8(tvb, 12);
+        proto_tree_add_text(tree, tvb, 12, 1, "R_CTL: %s",
+                            val_to_str(r_ctl, fcp_iu_val, "0x%02x"));
     }
 }
 
@@ -687,7 +700,9 @@ dissect_fcp_els(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, fc_hdr *fch
 
     op = tvb_get_guint8(tvb, 0);
     col_add_str(pinfo->cinfo, COL_INFO, val_to_str_ext(op, &fc_els_proto_val_ext, "0x%x"));
-    proto_tree_add_item(tree, hf_fcp_els_op, tvb, 0, 1, ENC_NA);
+    proto_tree_add_text(tree, tvb, 0, 1, "Opcode: %s",
+                                   val_to_str_ext(op, &fc_els_proto_val_ext,
+                                              "ELS 0x%02x"));
 
     switch (op) {   /* XXX should switch based on conv for LS_ACC */
     case FC_ELS_SRR:
@@ -877,12 +892,7 @@ proto_register_fcp(void)
 
         { &hf_fcp_data_ro,
           {"FCP_DATA_RO", "fcp.data_ro",
-           FT_UINT32, BASE_DEC, VALS(fcp_iu_val), 0x0,
-           NULL, HFILL}},
-
-        { &hf_fcp_r_ctl,
-          {"R_CTL", "fcp.r_ctl",
-           FT_UINT8, BASE_HEX, NULL, 0x0,
+           FT_UINT32, BASE_DEC, NULL, 0x0,
            NULL, HFILL}},
 
         { &hf_fcp_burstlen,
@@ -1020,10 +1030,12 @@ proto_register_fcp(void)
             FT_RELATIVE_TIME, BASE_NONE, NULL, 0,
             "Time since the FCP_CMND frame", HFILL }},
 
-        { &hf_fcp_els_op,
+#if 0
+        { &hf_fcp_srr_op,
           {"Opcode", "fcp.els.op",
-           FT_UINT8, BASE_HEX|BASE_EXT_STRING, &fc_els_proto_val_ext, 0x0,
+           FT_UINT8, BASE_HEX, NULL, 0x0,
            NULL, HFILL}},
+#endif
 
         { &hf_fcp_srr_ox_id,
           {"OX_ID", "fcp.els.srr.ox_id",
@@ -1034,6 +1046,13 @@ proto_register_fcp(void)
           {"RX_ID", "fcp.els.srr.rx_id",
            FT_UINT16, BASE_HEX, NULL, 0x0,
            NULL, HFILL}},
+
+#if 0
+        { &hf_fcp_srr_r_ctl,
+          {"R_CTL", "fcp.els.srr.r_ctl",
+           FT_UINT8, BASE_HEX, NULL, 0x0,
+           NULL, HFILL}},
+#endif
     };
 
     /* Setup protocol subtree array */
@@ -1062,16 +1081,3 @@ proto_reg_handoff_fcp(void)
 
     data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -52,16 +52,18 @@
 
 #include "wtap-int.h"
 #include "file_wrappers.h"
+#include <wsutil/buffer.h>
 #include "pcap-encap.h"
+#include "atm.h"
 #include "erf.h"
 
-static gboolean erf_read_header(FILE_T fh,
-                                struct wtap_pkthdr *phdr,
-                                erf_header_t *erf_header,
-                                int *err,
-                                gchar **err_info,
-                                guint32 *bytes_read,
-                                guint32 *packet_size);
+static int erf_read_header(FILE_T fh,
+                           struct wtap_pkthdr *phdr,
+                           erf_header_t *erf_header,
+                           int *err,
+                           gchar **err_info,
+                           guint32 *bytes_read,
+                           guint32 *packet_size);
 static gboolean erf_read(wtap *wth, int *err, gchar **err_info,
                          gint64 *data_offset);
 static gboolean erf_seek_read(wtap *wth, gint64 seek_off,
@@ -84,7 +86,7 @@ static const struct {
 
 #define NUM_ERF_ENCAPS (sizeof erf_to_wtap_map / sizeof erf_to_wtap_map[0])
 
-extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
+extern int erf_open(wtap *wth, int *err, gchar **err_info)
 {
   int              i, n, records_for_erf_check = RECORDS_FOR_ERF_CHECK;
   int              valid_prev                  = 0;
@@ -97,7 +99,7 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
   guint16          rlen;
   guint64          erf_ext_header;
   guint8           type;
-  gboolean         r;
+  size_t           r;
   gchar *          buffer;
 
   memset(&prevts, 0, sizeof(prevts));
@@ -117,22 +119,22 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
 
   for (i = 0; i < records_for_erf_check; i++) {  /* records_for_erf_check */
 
-    if (!wtap_read_bytes_or_eof(wth->fh,&header,sizeof(header),err,err_info)) {
-      if (*err == 0) {
-        /* EOF - all records have been successfully checked, accept the file */
-        break;
-      }
-      if (*err == WTAP_ERR_SHORT_READ) {
+    r = file_read(&header,sizeof(header),wth->fh);
+
+    if (r == 0 ) break;
+    if (r != sizeof(header)) {
+      *err = file_error(wth->fh, err_info);
+      if (*err != 0 && *err != WTAP_ERR_SHORT_READ) {
+        return -1;
+      } else {
         /* ERF header too short accept the file,
            only if the very first records have been successfully checked */
         if (i < MIN_RECORDS_FOR_ERF_CHECK) {
-          return WTAP_OPEN_NOT_MINE;
+          return 0;
         } else {
           /* BREAK, the last record is too short, and will be ignored */
           break;
         }
-      } else {
-        return WTAP_OPEN_ERROR;
       }
     }
 
@@ -142,7 +144,7 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
 
     /* Test valid rlen >= 16 */
     if (rlen < 16) {
-      return WTAP_OPEN_NOT_MINE;
+      return 0;
     }
 
     packet_size = rlen - (guint32)sizeof(header);
@@ -151,13 +153,13 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
        * Probably a corrupt capture file or a file that's not an ERF file
        * but that passed earlier tests.
        */
-      return WTAP_OPEN_NOT_MINE;
+      return 0;
     }
 
     /* Skip PAD records, timestamps may not be set */
     if ((header.type & 0x7F) == ERF_TYPE_PAD) {
       if (file_seek(wth->fh, packet_size, SEEK_CUR, err) == -1) {
-        return WTAP_OPEN_ERROR;
+        return -1;
       }
       continue;
     }
@@ -165,24 +167,24 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
     /* fail on invalid record type, decreasing timestamps or non-zero pad-bits */
     /* Not all types within this range are decoded, but it is a first filter */
     if ((header.type & 0x7F) == 0 || (header.type & 0x7F) > ERF_TYPE_MAX ) {
-      return WTAP_OPEN_NOT_MINE;
+      return 0;
     }
 
     /* The ERF_TYPE_MAX is the PAD record, but the last used type is ERF_TYPE_INFINIBAND_LINK */
     if ((header.type & 0x7F) > ERF_TYPE_INFINIBAND_LINK) {
-      return WTAP_OPEN_NOT_MINE;
+      return 0;
     }
 
     if ((ts = pletoh64(&header.ts)) < prevts) {
       /* reassembled AALx records may not be in time order, also records are not in strict time order between physical interfaces, so allow 1 sec fudge */
       if ( ((prevts-ts)>>32) > 1 ) {
-        return WTAP_OPEN_NOT_MINE;
+        return 0;
       }
     }
 
     /* Check to see if timestamp increment is > 1 week */
     if ( (valid_prev) && (ts > prevts) && (((ts-prevts)>>32) > 3600*24*7) ) {
-      return WTAP_OPEN_NOT_MINE;
+      return 0;
     }
 
     memcpy(&prevts, &ts, sizeof(prevts));
@@ -190,12 +192,11 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
     /* Read over the extension headers */
     type = header.type;
     while (type & 0x80){
-      if (!wtap_read_bytes(wth->fh,&erf_ext_header,sizeof(erf_ext_header),err,err_info)) {
-        if (*err == WTAP_ERR_SHORT_READ) {
-          /* Extension header missing, not an ERF file */
-          return WTAP_OPEN_NOT_MINE;
-        }
-        return WTAP_OPEN_ERROR;
+      if (file_read(&erf_ext_header, sizeof(erf_ext_header),wth->fh) != sizeof(erf_ext_header)) {
+        *err = file_error(wth->fh, err_info);
+        if (*err == 0)
+          *err = WTAP_ERR_SHORT_READ;
+        return -1;
       }
       packet_size -= (guint32)sizeof(erf_ext_header);
       memcpy(&type, &erf_ext_header, sizeof(type));
@@ -212,24 +213,18 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
       case ERF_TYPE_MC_AAL2:
       case ERF_TYPE_COLOR_MC_HDLC_POS:
       case ERF_TYPE_AAL2: /* not an MC type but has a similar 'AAL2 ext' header */
-        if (!wtap_read_bytes(wth->fh,&mc_hdr,sizeof(mc_hdr),err,err_info)) {
-          if (*err == WTAP_ERR_SHORT_READ) {
-            /* Subheader missing, not an ERF file */
-            return WTAP_OPEN_NOT_MINE;
-          }
-          return WTAP_OPEN_ERROR;
+        if (file_read(&mc_hdr,sizeof(mc_hdr),wth->fh) != sizeof(mc_hdr)) {
+          *err = file_error(wth->fh, err_info);
+          return -1;
         }
         packet_size -= (guint32)sizeof(mc_hdr);
         break;
       case ERF_TYPE_ETH:
       case ERF_TYPE_COLOR_ETH:
       case ERF_TYPE_DSM_COLOR_ETH:
-        if (!wtap_read_bytes(wth->fh,&eth_hdr,sizeof(eth_hdr),err,err_info)) {
-          if (*err == WTAP_ERR_SHORT_READ) {
-            /* Subheader missing, not an ERF file */
-            return WTAP_OPEN_NOT_MINE;
-          }
-          return WTAP_OPEN_ERROR;
+        if (file_read(&eth_hdr,sizeof(eth_hdr),wth->fh) != sizeof(eth_hdr)) {
+          *err = file_error(wth->fh, err_info);
+          return -1;
         }
         packet_size -= (guint32)sizeof(eth_hdr);
         break;
@@ -244,21 +239,17 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
        * Probably a corrupt capture file or a file that's not an ERF file
        * but that passed earlier tests.
        */
-      return WTAP_OPEN_NOT_MINE;
+      return 0;
     }
     buffer=(gchar *)g_malloc(packet_size);
-    r = wtap_read_bytes(wth->fh, buffer, packet_size, err, err_info);
+    r = file_read(buffer, packet_size, wth->fh);
     g_free(buffer);
 
-    if (!r) {
-      if (*err != WTAP_ERR_SHORT_READ) {
-        /* A real error */
-        return WTAP_OPEN_ERROR;
-      }
+    if (r != packet_size) {
       /* ERF record too short, accept the file,
          only if the very first records have been successfully checked */
       if (i < MIN_RECORDS_FOR_ERF_CHECK) {
-        return WTAP_OPEN_NOT_MINE;
+        return 0;
       }
     }
 
@@ -267,7 +258,7 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
   } /* records_for_erf_check */
 
   if (file_seek(wth->fh, 0L, SEEK_SET, err) == -1) {   /* rewind */
-    return WTAP_OPEN_ERROR;
+    return -1;
   }
 
   /* This is an ERF file */
@@ -281,11 +272,11 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
 
   wth->subtype_read = erf_read;
   wth->subtype_seek_read = erf_seek_read;
-  wth->file_tsprec = WTAP_TSPREC_NSEC;
+  wth->tsprecision = WTAP_FILE_TSPREC_NSEC;
 
   erf_populate_interfaces(wth);
 
-  return WTAP_OPEN_MINE;
+  return 1;
 }
 
 /* Read the next packet */
@@ -333,13 +324,13 @@ static gboolean erf_seek_read(wtap *wth, gint64 seek_off,
                                 err, err_info);
 }
 
-static gboolean erf_read_header(FILE_T fh,
-                                struct wtap_pkthdr *phdr,
-                                erf_header_t *erf_header,
-                                int *err,
-                                gchar **err_info,
-                                guint32 *bytes_read,
-                                guint32 *packet_size)
+static int erf_read_header(FILE_T fh,
+                           struct wtap_pkthdr *phdr,
+                           erf_header_t *erf_header,
+                           int *err,
+                           gchar **err_info,
+                           guint32 *bytes_read,
+                           guint32 *packet_size)
 {
   union wtap_pseudo_header *pseudo_header = &phdr->pseudo_header;
   guint32 mc_hdr;
@@ -351,9 +342,8 @@ static gboolean erf_read_header(FILE_T fh,
   int     i       = 0;
   int     max     = sizeof(pseudo_header->erf.ehdr_list)/sizeof(struct erf_ehdr);
 
-  if (!wtap_read_bytes_or_eof(fh, erf_header, sizeof(*erf_header), err, err_info)) {
-    return FALSE;
-  }
+  wtap_file_read_expected_bytes(erf_header, sizeof(*erf_header), fh, err,
+                                err_info);
   if (bytes_read != NULL) {
     *bytes_read = sizeof(*erf_header);
   }
@@ -409,9 +399,8 @@ static gboolean erf_read_header(FILE_T fh,
   /* Copy the ERF extension header into the pseudo header */
   type = erf_header->type;
   while (type & 0x80){
-    if (!wtap_read_bytes(fh, &erf_exhdr, sizeof(erf_exhdr),
-                         err, err_info))
-      return FALSE;
+    wtap_file_read_expected_bytes(&erf_exhdr, sizeof(erf_exhdr), fh, err,
+                                  err_info);
     if (bytes_read != NULL)
       *bytes_read += (guint32)sizeof(erf_exhdr);
     *packet_size -=  (guint32)sizeof(erf_exhdr);
@@ -448,8 +437,8 @@ static gboolean erf_read_header(FILE_T fh,
     case ERF_TYPE_ETH:
     case ERF_TYPE_COLOR_ETH:
     case ERF_TYPE_DSM_COLOR_ETH:
-      if (!wtap_read_bytes(fh, &eth_hdr, sizeof(eth_hdr), err, err_info))
-        return FALSE;
+      wtap_file_read_expected_bytes(&eth_hdr, sizeof(eth_hdr), fh, err,
+                                    err_info);
       if (bytes_read != NULL)
         *bytes_read += (guint32)sizeof(eth_hdr);
       *packet_size -=  (guint32)sizeof(eth_hdr);
@@ -465,8 +454,8 @@ static gboolean erf_read_header(FILE_T fh,
     case ERF_TYPE_MC_AAL2:
     case ERF_TYPE_COLOR_MC_HDLC_POS:
     case ERF_TYPE_AAL2: /* not an MC type but has a similar 'AAL2 ext' header */
-      if (!wtap_read_bytes(fh, &mc_hdr, sizeof(mc_hdr), err, err_info))
-        return FALSE;
+      wtap_file_read_expected_bytes(&mc_hdr, sizeof(mc_hdr), fh, err,
+                                    err_info);
       if (bytes_read != NULL)
         *bytes_read += (guint32)sizeof(mc_hdr);
       *packet_size -=  (guint32)sizeof(mc_hdr);
@@ -590,8 +579,7 @@ static gboolean erf_dump(
     wtap_dumper                    *wdh,
     const struct wtap_pkthdr       *phdr,
     const guint8                   *pd,
-    int                            *err,
-    gchar                          **err_info _U_)
+    int                            *err)
 {
   const union wtap_pseudo_header *pseudo_header = &phdr->pseudo_header;
   union wtap_pseudo_header other_phdr;
@@ -604,7 +592,7 @@ static gboolean erf_dump(
 
   /* We can only write packet records. */
   if (phdr->rec_type != REC_TYPE_PACKET) {
-    *err = WTAP_ERR_UNWRITABLE_REC_TYPE;
+    *err = WTAP_ERR_REC_TYPE_UNSUPPORTED;
     return FALSE;
   }
 
@@ -714,7 +702,7 @@ int erf_dump_can_write_encap(int encap)
     return 0;
 
   if (wtap_wtap_encap_to_erf_encap(encap) == -1)
-    return WTAP_ERR_UNWRITABLE_ENCAP;
+    return WTAP_ERR_UNSUPPORTED_ENCAP;
 
   return 0;
 }
@@ -726,10 +714,10 @@ int erf_dump_open(wtap_dumper *wdh, int *err)
 
   switch(wdh->file_type_subtype){
     case WTAP_FILE_TYPE_SUBTYPE_ERF:
-      wdh->tsprecision = WTAP_TSPREC_NSEC;
+      wdh->tsprecision = WTAP_FILE_TSPREC_NSEC;
       break;
     default:
-      *err = WTAP_ERR_UNWRITABLE_FILE_TYPE;
+      *err = WTAP_ERR_UNSUPPORTED_FILE_TYPE;
       return FALSE;
       break;
   }
@@ -781,16 +769,3 @@ int erf_populate_interfaces(wtap *wth)
 
   return 0;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

@@ -29,15 +29,19 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/addr_resolv.h>
 #include <epan/prefs.h>
+#include <epan/strutil.h>
 
 void proto_register_pcli(void);
 void proto_reg_handoff_pcli(void);
 
 /* Define udp_port for lawful intercept */
 
-#define UDP_PORT_PCLI 0
+#define UDP_PORT_PCLI 9000
 
 /* Define the pcli proto */
 

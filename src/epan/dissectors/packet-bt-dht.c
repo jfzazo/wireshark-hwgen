@@ -31,6 +31,7 @@
 #include <epan/packet.h>
 #include <epan/conversation.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
 #include <epan/to_str.h>
 
 void proto_register_bt_dht(void);
@@ -107,7 +108,7 @@ bencoded_string_length(tvbuff_t *tvb, guint *offset_ptr)
   while(tvb_get_guint8(tvb, offset) != ':')
     ++offset;
 
-  len = atoi(tvb_get_string_enc(wmem_packet_scope(), tvb, start, offset-start, ENC_ASCII));
+  len = atoi(tvb_get_string(wmem_packet_scope(), tvb, start, offset-start));
   ++offset; /* skip the ':' */
 
   *offset_ptr = offset;
@@ -128,9 +129,9 @@ dissect_bencoded_string(tvbuff_t *tvb, packet_info _U_*pinfo, proto_tree *tree, 
 
   /* fill the return data */
   if( tohex )
-    *result = tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, string_len );
+    *result = tvb_bytes_to_ep_str(tvb, offset, string_len );
   else
-    *result = tvb_get_string_enc( wmem_packet_scope(), tvb, offset, string_len , ENC_ASCII);
+    *result = tvb_get_string( wmem_packet_scope(), tvb, offset, string_len );
 
   proto_tree_add_string_format( tree, hf_bencoded_string, tvb, offset, string_len, *result, "%s: %s", label, *result );
   offset += string_len;
@@ -153,7 +154,7 @@ dissect_bencoded_int(tvbuff_t *tvb, packet_info _U_*pinfo, proto_tree *tree, gui
   while( tvb_get_guint8(tvb,offset)!='e' )
     offset += 1;
 
-  *result = tvb_get_string_enc( wmem_packet_scope(), tvb, start_offset, offset-start_offset, ENC_ASCII);
+  *result = tvb_get_string( wmem_packet_scope(), tvb, start_offset, offset-start_offset);
   proto_tree_add_string_format( tree, hf_bencoded_int, tvb, start_offset, offset-start_offset, *result,
     "%s: %s", label, *result );
 
@@ -318,7 +319,7 @@ dissect_bt_dht_nodes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
     node_tree = proto_item_add_subtree( node_ti, ett_bt_dht_peers);
 
     proto_tree_add_item( node_tree, hf_bt_dht_id, tvb, offset, 20, ENC_NA);
-    proto_item_append_text(node_ti, " (id: %s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, 20));
+    proto_item_append_text(node_ti, " (id: %s", tvb_bytes_to_ep_str(tvb, offset, 20));
     proto_tree_add_item( node_tree, hf_ip, tvb, offset+20, 4, ENC_BIG_ENDIAN);
     proto_item_append_text(node_ti, ", IP/Port: %s", tvb_ip_to_str(tvb, offset+20));
     proto_tree_add_item( node_tree, hf_port, tvb, offset+24, 2, ENC_BIG_ENDIAN);
@@ -597,7 +598,7 @@ proto_reg_handoff_bt_dht(void)
     heur_dissector_add("udp", dissect_bt_dht_heur, proto_bt_dht);
 
     bt_dht_handle = new_create_dissector_handle(dissect_bt_dht, proto_bt_dht);
-    dissector_add_for_decode_as("udp.port", bt_dht_handle);
+    dissector_add_handle("udp.port", bt_dht_handle);   /* for "decode_as" */
 
     prefs_initialized = TRUE;
   }

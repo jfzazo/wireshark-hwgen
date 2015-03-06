@@ -915,7 +915,9 @@ char* echld_new_child_params_str(enc_msg_t* em, const char* prefix, const char* 
 	}
 	g_string_truncate(str, str->len - trunc_n);
 	g_string_append(str,postfix);
-	return g_string_free(str,FALSE);
+	p = str->str;
+	g_string_free(str,FALSE);
+	return p;
 }
 
 void echld_new_child_params_add_params(enc_msg_t* em, ...) {

@@ -23,10 +23,6 @@
 #ifndef __FRAME_DATA_H__
 #define __FRAME_DATA_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 #include <epan/tvbuff.h>
 #include <wsutil/nstime.h>
 #include "ws_symbol_export.h"
@@ -81,7 +77,6 @@ typedef struct _frame_data {
     unsigned int has_phdr_comment : 1; /** 1 = there's comment for this packet */
     unsigned int has_user_comment : 1; /** 1 = user set (also deleted) comment for this packet */
   } flags;
-  gint16       tsprec;       /**< Time stamp precision */
 
   const void *color_filter;  /**< Per-packet matching color_filter_t object */
 
@@ -122,10 +117,6 @@ WS_DLL_PUBLIC void frame_data_set_after_dissect(frame_data *fdata,
                 guint32 *cum_bytes);
 
 /** @} */
-
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif  /* __FRAME_DATA__ */
 

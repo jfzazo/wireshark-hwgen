@@ -29,9 +29,12 @@
 #include "config.h"
 
 #include <stdio.h>
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/addr_resolv.h>
 #include <epan/prefs.h>
 #include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
 
 #define TCP_PORT_BEEP 10288
@@ -65,7 +68,6 @@ static int hf_beep_ackno = -1;
 static int hf_beep_window = -1;
 static int hf_beep_payload = -1;
 static int hf_beep_payload_undissected = -1;
-static int hf_beep_crlf_terminator = -1;
 
 #if 0
 static const value_string beep_status_vals[] = {
@@ -218,7 +220,7 @@ dissect_beep_more(tvbuff_t *tvb, packet_info *pinfo, int offset,
   int ret = 0;
   guint8 more = tvb_get_guint8(tvb, offset);
 
-  hidden_item = proto_tree_add_item(tree, hf_beep_more, tvb, offset, 1, ENC_BIG_ENDIAN);
+  hidden_item = proto_tree_add_item(tree, hf_beep_more, tvb, offset, 1, ENC_NA);
   PROTO_ITEM_SET_HIDDEN(hidden_item);
 
   switch(more) {
@@ -244,7 +246,7 @@ static void dissect_beep_status(tvbuff_t *tvb, int offset,
 
   /* FIXME: We should return a value to indicate all OK. */
 
-  proto_tree_add_item(item_tree, hf_beep_status, tvb, offset, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(item_tree, hf_beep_status, tvb, offset, 1, ENC_NA);
 }
 #endif
 
@@ -279,7 +281,7 @@ check_term(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree)
   if ((tvb_get_guint8(tvb, offset) == 0x0d &&
        tvb_get_guint8(tvb, offset + 1) == 0x0a)){ /* Correct terminator */
 
-    proto_tree_add_item(tree, hf_beep_crlf_terminator, tvb, offset, 2, ENC_NA);
+    proto_tree_add_text(tree, tvb, offset, 2, "Terminator: CRLF");
     return 2;
 
   }
@@ -348,7 +350,7 @@ dissect_beep_mime_header(tvbuff_t *tvb, packet_info *pinfo, int offset,
   if (mime_length == 0) { /* Default header */
 
     if (tree) {
-      proto_tree_add_string_format(mime_tree, hf_beep_header, tvb, offset, 0, "", "Default values");
+      proto_tree_add_text(mime_tree, tvb, offset, 0, "Default values");
     }
 
     if ((cc = check_term(tvb, pinfo, offset, mime_tree)) <= 0) {
@@ -496,8 +498,9 @@ dissect_beep_tree(tvbuff_t *tvb, int offset, packet_info *pinfo,
   if (cmd_temp != NULL) {
 
     if (tree) {
-      hdr = proto_tree_add_subtree(tree, tvb, offset, header_len(tvb, offset) + 2,
-            ett_header, NULL, "Header");
+      ti = proto_tree_add_text(tree, tvb, offset, header_len(tvb, offset) + 2, "Header");
+
+      hdr = proto_item_add_subtree(ti, ett_header);
 
       ti = proto_tree_add_item(hdr, hf_beep_cmd, tvb, offset, 3, ENC_NA|ENC_ASCII);
       /* Include space */
@@ -655,8 +658,9 @@ dissect_beep_tree(tvbuff_t *tvb, int offset, packet_info *pinfo,
     proto_tree *tr = NULL;
 
     if (tree) {
-      tr = proto_tree_add_subtree(tree, tvb, offset, MIN(5, MAX(0, tvb_length_remaining(tvb, offset))),
-                                    ett_trailer, NULL, "Trailer");
+      ti = proto_tree_add_text(tree, tvb, offset, MIN(5, MAX(0, tvb_length_remaining(tvb, offset))), "Trailer");
+
+      tr = proto_item_add_subtree(ti, ett_trailer);
 
       proto_tree_add_item(hdr, hf_beep_cmd, tvb, offset, 3, ENC_NA|ENC_ASCII);
     }
@@ -961,9 +965,6 @@ proto_register_beep(void)
 
     { &hf_beep_payload_undissected,
       { "Undissected Payload", "beep.payload_undissected", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-
-    { &hf_beep_crlf_terminator,
-      { "Terminator: CRLF", "beep.crlf_terminator", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL }},
   };
   static gint *ett[] = {
     &ett_beep,
@@ -1034,16 +1035,3 @@ proto_reg_handoff_beep(void)
   dissector_add_uint("tcp.port", global_beep_tcp_port, beep_handle);
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

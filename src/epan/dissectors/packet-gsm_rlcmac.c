@@ -48,8 +48,11 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-csn1.h"
 #include "packet-gsm_a_rr.h"
 
@@ -3848,6 +3851,7 @@ static CSN_CallBackStatus_t callback_UTRAN_FDD_map_NrOfFrequencies(proto_tree *t
 
 static CSN_CallBackStatus_t callback_UTRAN_FDD_compute_FDD_CELL_INFORMATION(proto_tree *tree, tvbuff_t *tvb, void* param1, void* param2 _U_, int bit_offset, int ett_csn1)
 {
+  proto_item   *ti;
   proto_tree   *subtree;
   UTRAN_FDD_NeighbourCells_t * pUtranFddNcell = (UTRAN_FDD_NeighbourCells_t*)param1;
   gint xdd_cell_info, wsize, nwi, jwi, w[64], i, iused;
@@ -3858,7 +3862,8 @@ static CSN_CallBackStatus_t callback_UTRAN_FDD_compute_FDD_CELL_INFORMATION(prot
 
   if ( idx > 0 )
   {
-    subtree = proto_tree_add_subtree(tree, tvb, curr_bit_offset>>3, 1, ett_csn1, NULL, "FDD_CELL_INFORMATION: ");
+    ti = proto_tree_add_text(tree, tvb, curr_bit_offset>>3, 1,  "FDD_CELL_INFORMATION: ");
+    subtree = proto_item_add_subtree(ti, ett_csn1);
 
     if (pUtranFddNcell->Indic0)
     {
@@ -3948,6 +3953,7 @@ static CSN_CallBackStatus_t callback_UTRAN_TDD_map_NrOfFrequencies(proto_tree *t
 
 static CSN_CallBackStatus_t callback_UTRAN_TDD_compute_TDD_CELL_INFORMATION(proto_tree *tree, tvbuff_t *tvb, void* param1, void* param2 _U_, int bit_offset, int ett_csn1)
 {
+  proto_item   *ti;
   proto_tree   *subtree;
   UTRAN_TDD_NeighbourCells_t *pUtranTddNcell = (UTRAN_TDD_NeighbourCells_t *)param1;
   gint xdd_cell_info, wsize, nwi, jwi, w[64], i, iused;
@@ -3958,7 +3964,8 @@ static CSN_CallBackStatus_t callback_UTRAN_TDD_compute_TDD_CELL_INFORMATION(prot
 
   if ( idx > 0 )
   {
-    subtree = proto_tree_add_subtree(tree, tvb, curr_bit_offset>>3, 1, ett_csn1, NULL, "TDD_CELL_INFORMATION: ");
+    ti = proto_tree_add_text(tree, tvb, curr_bit_offset>>3, 1,  "TDD_CELL_INFORMATION: ");
+    subtree = proto_item_add_subtree(ti, ett_csn1);
 
     if (pUtranTddNcell->Indic0)
     {
@@ -6992,7 +6999,7 @@ static guint8 dissect_gprs_data_segments(tvbuff_t *tvb, packet_info *pinfo, prot
                                    i, li);
         }
         subtree = proto_item_add_subtree(ti, ett_data_segments);
-        data_tvb = tvb_new_subset_length(tvb, octet_offset, octet_length - octet_offset);
+        data_tvb = tvb_new_subset(tvb, octet_offset, octet_length - octet_offset, octet_length - octet_offset);
         call_dissector(data_handle, data_tvb, pinfo, subtree);
         octet_offset = octet_length;
         break;
@@ -7002,7 +7009,7 @@ static guint8 dissect_gprs_data_segments(tvbuff_t *tvb, packet_info *pinfo, prot
                                  "data segment: LI[%d]=%d indicates: (Last segment of) LLC frame (%d octets)",
                                  i, li, li);
         subtree = proto_item_add_subtree(ti, ett_data_segments);
-        data_tvb = tvb_new_subset_length(tvb, octet_offset, li);
+        data_tvb = tvb_new_subset(tvb, octet_offset, li, li);
         call_dissector(data_handle, data_tvb, pinfo, subtree);
         octet_offset += li;
         break;
@@ -7022,7 +7029,7 @@ static guint8 dissect_gprs_data_segments(tvbuff_t *tvb, packet_info *pinfo, prot
       ti = proto_tree_add_text(tree, tvb, octet_offset, octet_length - octet_offset, "Padding Octets");
     }
     subtree = proto_item_add_subtree(ti, ett_data_segments);
-    data_tvb = tvb_new_subset_length(tvb, octet_offset, octet_length - octet_offset);
+    data_tvb = tvb_new_subset(tvb, octet_offset, octet_length - octet_offset, octet_length - octet_offset);
     call_dissector(data_handle, data_tvb, pinfo, subtree);
     octet_offset = octet_length;
   }
@@ -7108,7 +7115,7 @@ static guint16 dissect_egprs_data_segments(tvbuff_t *tvb, packet_info *pinfo, pr
                                    i, li);
         }
         subtree = proto_item_add_subtree(ti, ett_data_segments);
-        data_tvb = tvb_new_subset_length(tvb, octet_offset, octet_length - octet_offset);
+        data_tvb = tvb_new_subset(tvb, octet_offset, octet_length - octet_offset, octet_length - octet_offset);
         call_dissector(data_handle, data_tvb, pinfo, subtree);
         octet_offset = octet_length;
         break;
@@ -7118,7 +7125,7 @@ static guint16 dissect_egprs_data_segments(tvbuff_t *tvb, packet_info *pinfo, pr
                                  "data segment: LI[%d]=%d indicates: (Last segment of) LLC frame (%d octets)",
                                  i, li, li);
         subtree = proto_item_add_subtree(ti, ett_data_segments);
-        data_tvb = tvb_new_subset_length(tvb, octet_offset, li);
+        data_tvb = tvb_new_subset(tvb, octet_offset, li, li);
         call_dissector(data_handle, data_tvb, pinfo, subtree);
         octet_offset += li;
         break;
@@ -7131,7 +7138,7 @@ static guint16 dissect_egprs_data_segments(tvbuff_t *tvb, packet_info *pinfo, pr
     ti = proto_tree_add_text(tree, tvb, octet_offset, octet_length - octet_offset,
                              "data segment: LI not present: \n The Upper Layer PDU in the current RLC data block either fills the current RLC data block precisely \nor continues in the following in-sequence RLC data block");
     subtree = proto_item_add_subtree(ti, ett_data_segments);
-    data_tvb = tvb_new_subset_length(tvb, octet_offset, octet_length - octet_offset);
+    data_tvb = tvb_new_subset(tvb, octet_offset, octet_length - octet_offset, octet_length - octet_offset);
     call_dissector(data_handle, data_tvb, pinfo, subtree);
     octet_offset = octet_length;
   }
@@ -7398,7 +7405,7 @@ dissect_dl_gprs_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, RlcMa
   proto_tree  *rlcmac_tree = NULL;
   csnStream_t  ar;
   gint         bit_offset  = 0;
-  guint16      bit_length  = tvb_reported_length(tvb) * 8;
+  guint16      bit_length  = tvb_length(tvb) * 8;
 
   guint8 payload_type = tvb_get_bits8(tvb, 0, 2);
   guint8 rbsn = tvb_get_bits8(tvb, 8, 1);
@@ -7539,7 +7546,7 @@ dissect_egprs_dl_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     proto_tree  *rlcmac_tree;
     csnStream_t  ar;
 
-    guint16      bit_length = tvb_reported_length(tvb) * 8;
+    guint16      bit_length = tvb_length(tvb) * 8;
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "GSM RLC/MAC");
     col_append_sep_str(pinfo->cinfo, COL_INFO, ":", "EGPRS DL:HEADER");
@@ -7584,7 +7591,7 @@ dissect_ul_pacch_access_burst(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
   proto_item  *ti;
   proto_tree  *rlcmac_tree;
   csnStream_t  ar;
-  guint16      bit_length = tvb_reported_length(tvb) * 8;
+  guint16      bit_length = tvb_length(tvb) * 8;
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "GSM RLC/MAC");
   col_append_sep_str(pinfo->cinfo, COL_INFO, ":", "PACCH ACCESS BURST");
@@ -7625,7 +7632,7 @@ dissect_ul_gprs_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, RlcMa
 {
   csnStream_t ar;
   guint8      payload_type = tvb_get_bits8(tvb, 0, 2);
-  guint16     bit_length   = tvb_reported_length(tvb) * 8;
+  guint16     bit_length   = tvb_length(tvb) * 8;
   guint16     bit_offset   = 0;
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "GSM RLC/MAC");
@@ -7713,7 +7720,7 @@ dissect_egprs_ul_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     proto_tree  *rlcmac_tree;
     csnStream_t  ar;
     guint16      bit_offset = 0;
-    guint16      bit_length = tvb_reported_length(tvb) * 8;
+    guint16      bit_length = tvb_length(tvb) * 8;
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL,  "GSM RLC/MAC");
     col_append_sep_str(pinfo->cinfo, COL_INFO, ":",  "EGPRS UL:HEADER");
@@ -7802,7 +7809,7 @@ dissect_egprs_ul_data_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   {
     /* dissect the data segments */
     dissect_egprs_data_segments(tvb, pinfo, data_tree, offset,
-                                tvb_reported_length(tvb), li_count, li_array);
+                                tvb_length(tvb), li_count, li_array);
   }
   else
   {
@@ -7849,7 +7856,7 @@ dissect_egprs_dl_data_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   {
     /* dissect the data segments */
     dissect_egprs_data_segments(tvb, pinfo, data_tree, offset,
-                                tvb_reported_length(tvb), li_count, li_array);
+                                tvb_length(tvb), li_count, li_array);
   }
   else
   {
@@ -7905,7 +7912,7 @@ dissect_gsm_rlcmac_downlink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       break;
   }
 
-  return tvb_reported_length(tvb);
+  return tvb_length(tvb);
 }
 
 
@@ -7925,7 +7932,7 @@ dissect_gsm_rlcmac_uplink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
     rlc_ul->block_format = rlc_mac->block_format;
     rlc_ul->flags = rlc_mac->flags;
   }
-  else if (tvb_reported_length(tvb) < 3)
+  else if (tvb_length(tvb) < 3)
   {
     /* assume that little packets are PACCH */
     rlc_ul->block_format = RLCMAC_PRACH;
@@ -7968,7 +7975,7 @@ dissect_gsm_rlcmac_uplink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
       break;
   }
 
-  return tvb_reported_length(tvb);
+  return tvb_length(tvb);
 }
 
 void

@@ -278,23 +278,26 @@
 
 #include "config.h"
 
+#include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <glib.h>
 #include <math.h>
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include <epan/strutil.h>
-#include <wsutil/file_util.h>
-#include <wsutil/str_util.h>
-#include <wsutil/pint.h>
-#include <wsutil/report_err.h>
 
 #include "packet-giop.h"
 #include "packet-ziop.h"
 #include "packet-tcp.h"
+#include <wsutil/file_util.h>
+#include <wsutil/str_util.h>
+#include <wsutil/pint.h>
 
 void proto_register_giop(void);
 void proto_reg_handoff_giop(void);
@@ -355,7 +358,6 @@ static int hf_giop_string_length = -1;
 static int hf_giop_sequence_length = -1;
 static int hf_giop_profile_id = -1;
 static int hf_giop_type_id = -1;
-static int hf_giop_type_id_match = -1;
 static int hf_giop_iiop_v_maj = -1;
 static int hf_giop_iiop_v_min = -1;
 static int hf_giop_endianness = -1; /* esp encapsulations */
@@ -836,7 +838,6 @@ static const value_string reply_status_types[] = {
   { 0, NULL }
 };
 
-const true_false_string tfs_matched_not_matched = { "Matched", "Not matched" };
 
 
 typedef enum LocateStatusType
@@ -1038,7 +1039,7 @@ static GList *insert_in_comp_req_list(GList *list, guint32 fn, guint32 reqid, co
   entry->reqid     = reqid;
   entry->subh      = sh;
   entry->operation = wmem_strdup(wmem_file_scope(), op); /* duplicate operation for storage */
-  entry->repoid    = NULL;      /* don't have yet */
+  entry->repoid    = NULL;      /* dont have yet */
 
   return g_list_append (list, entry); /* append */
 }
@@ -1428,12 +1429,12 @@ static guint32 string_to_IOR(guchar *in, guint32 in_len, guint8 **out) {
     if ( g_ascii_isxdigit(in[i]) && g_ascii_isxdigit(in[i+1]) ) { /* hex ? */
 
       if ( (tmpval_msb = ws_xton(in[i])) < 0 ) {
-        report_failure("giop: Invalid value in IOR %i", tmpval_msb);
+        g_warning("giop: Invalid value in IOR %i \n", tmpval_msb);
 
       }
 
       if ( (tmpval_lsb = ws_xton(in[i+1])) < 0 ) {
-        report_failure("giop: Invalid value in IOR %i", tmpval_lsb);
+        g_warning("giop: Invalid value in IOR %i \n", tmpval_lsb);
       }
 
       tmpval = tmpval_msb << 4;
@@ -1489,7 +1490,7 @@ static void read_IOR_strings_from_file(const gchar *name, int max_iorlen) {
 
   if (fp == NULL) {
     if (errno == EACCES)
-      report_open_failure(name, errno, FALSE);
+      fprintf(stderr, "Error opening file %s for reading: %s\n", name, g_strerror(errno));
     return;
   }
 
@@ -1540,7 +1541,7 @@ static void giop_init(void) {
 
   /*
    * Create objkey/repoid  hash, use my "equal" and "hash" functions.
-   *  Note: keys and values are wmem_file_scoped so they don't need to be freed.
+   *  Note: keys and values are se_alloc'd so they don't need to be freed.
    *
    */
 
@@ -1557,7 +1558,7 @@ static void giop_init(void) {
 
   /*
    * Create complete_reply_hash, use my "equal" and "hash" functions.
-   *  Note: keys and values are wmem_file_scoped so they don't need to be freed.
+   *  Note: keys and values are se_alloc'd so they don't need to be freed.
    *
    */
 
@@ -1574,7 +1575,7 @@ static void giop_init(void) {
 
   /*
    * Free giop_complete_request_list (if necessary)
-   * Note: The data elements are wmem_file_scoped so only the
+   * Note: The data elements are se_alloc'd so only the
    *       actual list elements need to be freed.
    */
 
@@ -2033,7 +2034,7 @@ static gboolean try_explicit_giop_dissector(tvbuff_t *tvb, packet_info *pinfo, p
 /* Take in an array of char and create a new ephemeral string.
  * Replace non-printable characters with periods.
  *
- * The array may contain \0's so don't use strdup
+ * The array may contain \0's so dont use strdup
  * The string is \0 terminated, and thus longer than
  * the initial sequence.
  */
@@ -3611,7 +3612,7 @@ guint32 get_CDR_wstring(tvbuff_t *tvb, const gchar **seq, int *offset, gboolean 
   *seq = NULL; /* set in case GIOP 1.2 length is 0 */
 
   /* get length, same for all GIOP versions,
-   * although for 1.2 CORBA doesn't say, so assume.
+   * although for 1.2 CORBA doesnt say, so assume.
    */
   slength = get_CDR_ulong(tvb, offset, stream_is_big_endian, boundary);
 
@@ -3783,7 +3784,7 @@ static void decode_UnknownServiceContext(tvbuff_t *tvb, proto_tree *tree,
     return;
 
   /*
-   * Decode sequence according to vendor ServiceId, but I don't
+   * Decode sequence according to vendor ServiceId, but I dont
    * have that yet, so just dump it as data.
    */
 
@@ -3842,7 +3843,8 @@ static void decode_ServiceContextList(tvbuff_t *tvb, packet_info *pinfo _U_, pro
   /* set length to -1 (to the end) now and correct with proto_item_set_len()
    * later
    */
-  tree = proto_tree_add_subtree(ptree, tvb, *offset, -1, ett_giop_scl, &tf, "ServiceContextList");
+  tf = proto_tree_add_text (ptree, tvb, *offset, -1, "ServiceContextList");
+  tree = proto_item_add_subtree (tf, ett_giop_scl);
 
   /* Get sequence length (number of elements) */
   seqlen = get_CDR_ulong(tvb, offset, stream_is_be, boundary);
@@ -3991,7 +3993,7 @@ dissect_reply_body (tvbuff_t *tvb, guint offset, packet_info *pinfo,
 
     if (sequence_length != 0 && sequence_length < ITEM_LABEL_LENGTH)
     {
-      header->exception_id = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &sequence_length, ENC_ASCII);
+      header->exception_id = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &sequence_length);
 
       proto_tree_add_string(tree, hf_giop_exception_id, tvb, offset,
                             sequence_length, header->exception_id);
@@ -4053,9 +4055,9 @@ dissect_reply_body (tvbuff_t *tvb, guint offset, packet_info *pinfo,
       exres = try_heuristic_giop_dissector(tvb, pinfo, clnp_tree, &offset, header, entry->operation);
     }
 
-    if (!exres && !strcmp(giop_op_is_a, entry->operation)) {
-      proto_tree_add_boolean(tree, hf_giop_type_id_match, tvb, offset - 1, 1,
-                          get_CDR_boolean(tvb, &offset));
+    if (!exres && !strcmp(giop_op_is_a, entry->operation) && tree) {
+      proto_tree_add_text(tree, tvb, offset - 1, 1, "Type Id%s matched",
+                          get_CDR_boolean(tvb, &offset) ? "" : " not");
     }
 
     if (! exres) {
@@ -4116,9 +4118,11 @@ static void dissect_giop_reply (tvbuff_t * tvb, packet_info * pinfo, proto_tree 
   guint32     request_id;
   guint32     reply_status;
   proto_tree *reply_tree;
+  proto_item *tf;
   guint32     mfn;              /* matching frame number */
 
-  reply_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_giop_reply, NULL, "General Inter-ORB Protocol Reply");
+  tf = proto_tree_add_text (tree, tvb, offset, -1, "General Inter-ORB Protocol Reply");
+  reply_tree = proto_item_add_subtree (tf, ett_giop_reply);
 
   /*
    * Decode IOP::ServiceContextList
@@ -4178,9 +4182,11 @@ static void dissect_giop_reply_1_2 (tvbuff_t * tvb, packet_info * pinfo,
   guint32     request_id;
   guint32     reply_status;
   proto_tree *reply_tree;
+  proto_item *tf;
   guint32     mfn;              /* matching frame number */
 
-  reply_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_giop_reply, NULL, "General Inter-ORB Protocol Reply");
+  tf = proto_tree_add_text (tree, tvb, offset, -1, "General Inter-ORB Protocol Reply");
+  reply_tree = proto_item_add_subtree (tf, ett_giop_reply);
 
   request_id = get_CDR_ulong(tvb, &offset, stream_is_big_endian, GIOP_HEADER_SIZE);
   col_append_fstr(pinfo->cinfo, COL_INFO, " id=%u", request_id);
@@ -4233,9 +4239,10 @@ static void dissect_giop_cancel_request (tvbuff_t * tvb, packet_info * pinfo,
   guint       offset = 0;
   guint32     request_id;
   proto_tree *cancel_request_tree;
+  proto_item *tf;
 
-  cancel_request_tree = proto_tree_add_subtree(tree, tvb, offset, -1,
-        ett_giop_cancel_request, NULL, "General Inter-ORB Protocol CancelRequest");
+  tf = proto_tree_add_text (tree, tvb, offset, -1, "General Inter-ORB Protocol CancelRequest");
+  cancel_request_tree = proto_item_add_subtree (tf, ett_giop_cancel_request);
 
   request_id = get_CDR_ulong(tvb, &offset, stream_is_big_endian, GIOP_HEADER_SIZE);
   col_append_fstr(pinfo->cinfo, COL_INFO, " id=%u", request_id);
@@ -4278,7 +4285,8 @@ dissect_giop_request_1_1 (tvbuff_t * tvb, packet_info * pinfo,
 
   gchar       *repoid;        /* from object key lookup in objkey hash */
 
-  request_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_giop_request, &tf, "General Inter-ORB Protocol Request");
+  tf = proto_tree_add_text (tree, tvb, offset, -1, "General Inter-ORB Protocol Request");
+  request_tree = proto_item_add_subtree (tf, ett_giop_request);
 
   /*
    * Decode IOP::ServiceContextList
@@ -4294,7 +4302,7 @@ dissect_giop_request_1_1 (tvbuff_t * tvb, packet_info * pinfo,
   response_expected = tvb_get_guint8( tvb, offset );
   col_append_fstr(pinfo->cinfo, COL_INFO, " (%s)",
                     response_expected ? "two-way" : "one-way");
-  proto_tree_add_item(request_tree, hf_giop_rsp_expected, tvb, offset, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(request_tree, hf_giop_rsp_expected, tvb, offset, 1, ENC_NA);
   offset += 1;
 
   if ( header->GIOP_version.minor > 0)
@@ -4312,7 +4320,7 @@ dissect_giop_request_1_1 (tvbuff_t * tvb, packet_info * pinfo,
 
   if (miop[0] == 'M' && miop[1] == 'I' && miop[2] == 'O' && miop[3] == 'P')
   {
-    proto_tree_add_string(request_tree, hf_giop_message_magic, tvb, offset - 4, 4, "MIOP");
+    proto_tree_add_text (request_tree, tvb, offset - 4, 4, "Magic number: MIOP");
     decode_TaggedProfile (tvb, pinfo, request_tree, &offset, GIOP_HEADER_SIZE,
                           stream_is_big_endian, NULL);
   }
@@ -4437,13 +4445,15 @@ dissect_giop_request_1_2 (tvbuff_t * tvb, packet_info * pinfo,
   const gchar *reserved;
   const gchar *operation  = NULL;
   proto_tree  *request_tree;
+  proto_item  *tf;
   gboolean     exres      = FALSE; /* result of trying explicit dissectors */
 
   guint32      objkey_len = 0;  /* object key length */
   const gchar *objkey     = NULL; /* object key sequence */
   gchar       *repoid     = NULL; /* from object key lookup in objkey hash */
 
-  request_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_giop_request, NULL, "General Inter-ORB Protocol Request");
+  tf = proto_tree_add_text (tree, tvb, offset, -1, "General Inter-ORB Protocol Request");
+  request_tree = proto_item_add_subtree (tf, ett_giop_request);
 
   request_id = get_CDR_ulong(tvb, &offset, stream_is_big_endian, GIOP_HEADER_SIZE);
   header->req_id = request_id;
@@ -4451,7 +4461,7 @@ dissect_giop_request_1_2 (tvbuff_t * tvb, packet_info * pinfo,
   proto_tree_add_uint (request_tree, hf_giop_req_id, tvb, offset-4, 4, request_id);
 
   proto_tree_add_item(request_tree, hf_giop_response_flag, tvb,
-                             offset, 1, ENC_BIG_ENDIAN);
+                             offset, 1, ENC_NA);
   offset += 1;
 
   get_CDR_octet_seq( tvb, &reserved, &offset, 3);
@@ -4541,8 +4551,8 @@ dissect_giop_locate_request( tvbuff_t * tvb, packet_info * pinfo,
   proto_tree *locate_request_tree;
   proto_item *tf;
 
-  locate_request_tree = proto_tree_add_subtree(tree, tvb, offset, -1,
-      ett_giop_locate_request, &tf, "General Inter-ORB Locate Request");
+  tf = proto_tree_add_text (tree, tvb, offset, -1, "General Inter-ORB Locate Request");
+  locate_request_tree = proto_item_add_subtree (tf, ett_giop_locate_request);
 
   request_id = get_CDR_ulong(tvb, &offset, stream_is_big_endian, GIOP_HEADER_SIZE);
   col_append_fstr(pinfo->cinfo, COL_INFO, " id=%u op=LocateRequest", request_id);
@@ -4580,8 +4590,10 @@ dissect_giop_locate_reply( tvbuff_t * tvb, packet_info * pinfo,
   guint16 addr_disp;
 
   proto_tree *locate_reply_tree;
+  proto_item *tf;
 
-  locate_reply_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_giop_locate_reply, NULL, "General Inter-ORB Locate Reply");
+  tf = proto_tree_add_text (tree, tvb, offset, -1, "General Inter-ORB Locate Reply");
+  locate_reply_tree = proto_item_add_subtree (tf, ett_giop_locate_reply);
 
   request_id = get_CDR_ulong(tvb, &offset, stream_is_big_endian, GIOP_HEADER_SIZE);
   col_append_fstr(pinfo->cinfo, COL_INFO, " id=%u", request_id);
@@ -4627,8 +4639,10 @@ dissect_giop_fragment( tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree,
   guint32     offset = 0;
   guint32     request_id;
   proto_tree *fragment_tree;
+  proto_item *tf;
 
-  fragment_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_giop_fragment, NULL, "General Inter-ORB Fragment");
+  tf = proto_tree_add_text (tree, tvb, offset, -1, "General Inter-ORB Fragment");
+  fragment_tree = proto_item_add_subtree (tf, ett_giop_fragment);
 
   request_id = get_CDR_ulong(tvb, &offset, stream_is_big_endian, GIOP_HEADER_SIZE);
   col_append_fstr(pinfo->cinfo, COL_INFO, " id=%u", request_id);
@@ -4671,13 +4685,15 @@ static int dissect_giop_common (tvbuff_t * tvb, packet_info * pinfo, proto_tree 
   stream_is_big_endian = is_big_endian (&header);
 
   /* Dissect GIOP header */
-  header_tree = proto_tree_add_subtree(giop_tree, tvb, offset, GIOP_HEADER_SIZE, ett_giop_header, NULL, "GIOP Header");
+  ti = proto_tree_add_text (giop_tree, tvb, offset, GIOP_HEADER_SIZE, "GIOP Header");
+  header_tree = proto_item_add_subtree (ti, ett_giop_header);
   proto_tree_add_item(header_tree, hf_giop_message_magic, tvb, 0, 4, ENC_NA|ENC_ASCII);
 
-  header_version_tree = proto_tree_add_subtree_format(header_tree, tvb, 4, 2, ett_giop_header_version, &version_item,
+  version_item = proto_tree_add_text (header_tree, tvb, 4, 2,
                      "Version: %u.%u", header.GIOP_version.major, header.GIOP_version.minor);
-  proto_tree_add_item(header_version_tree, hf_giop_message_major_version, tvb, 4, 1, ENC_BIG_ENDIAN);
-  proto_tree_add_item(header_version_tree, hf_giop_message_minor_version, tvb, 5, 1, ENC_BIG_ENDIAN);
+  header_version_tree = proto_item_add_subtree (version_item, ett_giop_header_version);
+  proto_tree_add_item(header_version_tree, hf_giop_message_major_version, tvb, 4, 1, ENC_NA);
+  proto_tree_add_item(header_version_tree, hf_giop_message_minor_version, tvb, 5, 1, ENC_NA);
 
   if ((header.GIOP_version.major != GIOP_MAJOR) ||
       (header.GIOP_version.minor > GIOP_MINOR))
@@ -4713,11 +4729,15 @@ static int dissect_giop_common (tvbuff_t * tvb, packet_info * pinfo, proto_tree 
         proto_item_append_text(ti, ", (Big Endian)");  /* hack to show "Big Endian" when endianness flag == 0 */
         break;
     case 0:
-      proto_tree_add_boolean(header_tree, hf_giop_message_flags_little_endian, tvb, 6, 1, stream_is_big_endian ? 0 : 1);
+      proto_tree_add_text (header_version_tree, tvb, 6, 1,
+                       "Byte ordering: %s-endian",
+                       (stream_is_big_endian) ? "big" : "little");
+      ti = proto_tree_add_boolean(header_tree, hf_giop_message_flags_little_endian, tvb, 6, 1, stream_is_big_endian ? 0 : 1);
+      PROTO_ITEM_SET_HIDDEN(ti);
       break;
   }
 
-  proto_tree_add_item(header_tree, hf_giop_message_type, tvb, 7, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(header_tree, hf_giop_message_type, tvb, 7, 1, ENC_NA);
 
   if (stream_is_big_endian)
   {
@@ -4815,26 +4835,23 @@ static int dissect_giop_common (tvbuff_t * tvb, packet_info * pinfo, proto_tree 
 }
 
 static guint
-get_giop_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_giop_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset _U_)
 {
 
   MessageHeader header;
   guint message_size;
 
-  if (tvb_reported_length_remaining(tvb, offset) < GIOP_HEADER_SIZE)
-    return 0;
-
-  if (tvb_get_ntohl(tvb, 0 + offset) != GIOP_MAGIC_NUMBER)
+  if (tvb_get_ntohl(tvb, 0) != GIOP_MAGIC_NUMBER)
     return 0;
 
   /* Get minimal header information to determine endianness, size */
-  header.GIOP_version.minor = tvb_get_guint8(tvb, 5 + offset);
-  header.flags = tvb_get_guint8(tvb, 6 + offset);
+  header.GIOP_version.minor = tvb_get_guint8(tvb, 5);
+  header.flags = tvb_get_guint8(tvb, 6);
 
   if (is_big_endian (&header))
-    message_size = tvb_get_ntohl(tvb, 8 + offset);
+    message_size = tvb_get_ntohl(tvb, 8);
   else
-    message_size = tvb_get_letohl(tvb, 8 + offset);
+    message_size = tvb_get_letohl(tvb, 8);
 
   /* Make sure the size is reasonable, otherwise just take the header */
   if (message_size > GIOP_MAX_MESSAGE_SIZE)
@@ -4961,7 +4978,7 @@ proto_register_giop (void)
 
     { &hf_giop_message_type,
       { "Message type", "giop.type",
-        FT_UINT8, BASE_DEC, VALS(giop_message_types), 0x0, NULL, HFILL }
+        FT_UINT8, BASE_DEC, giop_message_types, 0x0, NULL, HFILL }
     },
 
     { &hf_giop_message_size,
@@ -4989,14 +5006,10 @@ proto_register_giop (void)
         FT_UINT32, BASE_DEC, VALS(profile_id_vals), 0x0, NULL, HFILL }
     },
 
+
     { &hf_giop_type_id,
       { "IOR::type_id", "giop.typeid",
         FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
-    },
-
-    { &hf_giop_type_id_match,
-      { "Type Id", "giop.typeid.match",
-        FT_BOOLEAN, BASE_NONE, TFS(&tfs_matched_not_matched), 0x0, NULL, HFILL }
     },
 
     { &hf_giop_type_id_len,
@@ -5417,7 +5430,7 @@ void proto_reg_handoff_giop (void) {
   heur_dissector_add("tcp", dissect_giop_heur, proto_giop);
   /* Support DIOP (GIOP/UDP) */
   heur_dissector_add("udp", dissect_giop_heur, proto_giop);
-  dissector_add_for_decode_as("tcp.port", giop_tcp_handle);
+  dissector_add_handle("tcp.port", giop_tcp_handle);  /* for "decode-as" */
 }
 
 
@@ -5470,13 +5483,15 @@ static void decode_IOR(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ptree, int
   guint32 u_octet4;
 
   proto_tree *tree;     /* IOR tree */
+  proto_item *tf;
 
   const gchar *repobuf; /* for repository ID */
 
   guint32 i;
 
   /* create a subtree */
-  tree = proto_tree_add_subtree(ptree, tvb, *offset, -1, ett_giop_ior, NULL, "IOR");
+  tf = proto_tree_add_text (ptree, tvb, *offset, -1, "IOR");
+  tree = proto_item_add_subtree (tf, ett_giop_ior);
 
   /* Get type_id  == Repository ID */
 

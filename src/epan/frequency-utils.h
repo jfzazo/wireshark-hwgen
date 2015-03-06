@@ -60,8 +60,6 @@ ieee80211_mhz_to_str(guint freq);
 /* Should this be "(freq < 4920)", or something else? */
 #define FREQ_IS_BG(freq) (freq <= 2484)
 
-#endif /* __FREQUENCY_UTILS_H__ */
-
 /*
  * Editor modelines
  *
@@ -71,6 +69,9 @@ ieee80211_mhz_to_str(guint freq);
  * indent-tabs-mode: nil
  * End:
  *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
+ * ex: set shiftwidth=4 tabstop=8 expandtab:
  * :indentSize=4:tabSize=8:noTabs=true:
  */
+
+#endif /* __FREQUENCY_UTILS_H__ */
+

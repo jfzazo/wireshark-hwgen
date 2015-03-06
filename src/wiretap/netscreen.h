@@ -37,7 +37,7 @@
 #define NETSCREEN_REC_MAGIC_STR1	NETSCREEN_HDR_MAGIC_STR1
 #define NETSCREEN_REC_MAGIC_STR2	NETSCREEN_HDR_MAGIC_STR2
 
-#define NETSCREEN_LINE_LENGTH		128
+#define NETSCREEN_LINE_LENGTH        	128
 #define NETSCREEN_HEADER_LINES_TO_CHECK	32
 #define NETSCREEN_MAX_INFOLINES		8
 #define NETSCREEN_SPACES_ON_INFO_LINE	14
@@ -49,6 +49,6 @@
 
 #define NETSCREEN_MAX_PACKET_LEN	65536
 
-wtap_open_return_val netscreen_open(wtap *wth, int *err, gchar **err_info);
+int netscreen_open(wtap *wth, int *err, gchar **err_info);
 
 #endif

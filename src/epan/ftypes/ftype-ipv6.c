@@ -25,6 +25,7 @@
 #include <ftypes-int.h>
 #include <epan/ipv6-utils.h>
 #include <epan/addr_resolv.h>
+#include <epan/emem.h>
 
 static void
 ipv6_fvalue_set(fvalue_t *fv, const guint8 *value)
@@ -34,37 +35,27 @@ ipv6_fvalue_set(fvalue_t *fv, const guint8 *value)
 }
 
 static gboolean
-ipv6_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, gchar **err_msg)
+ipv6_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, LogFunc logfunc)
 {
-	const char *has_slash;
-	char *addr_str;
+	const char *has_slash, *addr_str;
 	unsigned int nmask_bits;
 	fvalue_t *nmask_fvalue;
-	gboolean free_addr_str = FALSE;
 
 	/* Look for prefix: Is there a single slash in the string? */
-	if ((has_slash = strchr(s, '/'))) {
-		addr_str = wmem_strndup(NULL, s, has_slash-s);
-		free_addr_str = TRUE;
-	}
+	if ((has_slash = strchr(s, '/')))
+		addr_str = ep_strndup(s, has_slash-s);
 	else
-		addr_str = (char*)s;
+		addr_str = s;
 
 	if (!get_host_ipaddr6(addr_str, &(fv->value.ipv6.addr))) {
-		if (err_msg != NULL)
-			*err_msg = g_strdup_printf("\"%s\" is not a valid hostname or IPv6 address.", s);
-		if (free_addr_str)
-			wmem_free(NULL, addr_str);
+		logfunc("\"%s\" is not a valid hostname or IPv6 address.", s);
 		return FALSE;
 	}
-
-	if (free_addr_str)
-		wmem_free(NULL, addr_str);
 
 	/* If prefix */
 	if (has_slash) {
 		/* XXX - this is inefficient */
-		nmask_fvalue = fvalue_from_unparsed(FT_UINT32, has_slash+1, FALSE, err_msg);
+		nmask_fvalue = fvalue_from_unparsed(FT_UINT32, has_slash+1, FALSE, logfunc);
 		if (!nmask_fvalue) {
 			return FALSE;
 		}
@@ -72,10 +63,8 @@ ipv6_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_
 		FVALUE_FREE(nmask_fvalue);
 
 		if (nmask_bits > 128) {
-			if (err_msg != NULL) {
-				*err_msg = g_strdup_printf("Prefix in a IPv6 address should be <= 128, not %u",
-						nmask_bits);
-			}
+			logfunc("Prefix in a IPv6 address should be <= 128, not %u",
+					nmask_bits);
 			return FALSE;
 		}
 		fv->value.ipv6.prefix = nmask_bits;
@@ -88,7 +77,7 @@ ipv6_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_
 }
 
 static int
-ipv6_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_, int field_display _U_)
+ipv6_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_)
 {
 	/*
 	 * 39 characters for "XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX".
@@ -97,7 +86,7 @@ ipv6_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_, int field_display _U_)
 }
 
 static void
-ipv6_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, int field_display _U_, char *buf)
+ipv6_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, char *buf)
 {
 	ip6_to_str_buf(&(fv->value.ipv6.addr), buf);
 }

@@ -22,11 +22,12 @@
  */
 
 /*
- * See: RFC6325
+ * See: http://tools.ietf.org/html/draft-ietf-trill-rbridge-protocol-16
  */
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/etypes.h>
 
@@ -70,7 +71,7 @@ static const true_false_string multi_dst_strings = {
 } ;
 
 static const range_string version_strings[] = {
-  { 0, 0, "RFC6325 Version" },
+  { 0, 0, "draft-ietf-trill-rbridge-protocol-16 Version" },
   { 1, 3, "Unallocated Version" },
   { 0, 0, NULL }
 } ;
@@ -84,9 +85,7 @@ static const range_string reserved_strings[] = {
 static const range_string nickname_strings[] = {
   { 0x0000, 0x0000, "Nickname Not Specified" },
   { 0x0001, 0xFFBF, "Valid Nickname" },
-  { 0xFFC0, 0xFFC0, "Any RBridge" },
-  { 0xFFC1, 0xFFC1, "OOMF" },
-  { 0xFFC2, 0xFFFE, "Reserved for Future Specification" },
+  { 0xFFC0, 0xFFFE, "Reserved for Future Specification" },
   { 0xFFFF, 0xFFFF, "Permanently Reserved" },
   { 0, 0, NULL }
 } ;
@@ -205,15 +204,3 @@ proto_reg_handoff_trill(void)
   eth_dissector = find_dissector( "eth" ) ;
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

@@ -16,7 +16,7 @@ PDV-list/presentation-data-values/single-ASN1-type	pdv-list_presentation-data-va
 PDV-list/presentation-data-values/arbitrary pdv-list_presentation-data-values_arbitrary
 #.END
 
-#.PDU_NEW
+#.PDU
 	Fully-encoded-data
 	ACSE-apdu
 #.END
@@ -46,6 +46,7 @@ PDV-list/presentation-data-values/arbitrary pdv-list_presentation-data-values_ar
 
 		packet_info * pinfo = actx->pinfo;
 		tvbuff_t *tvb_usr = NULL;
+		proto_item *ti = NULL;
 		proto_tree *atn_ulcs_tree = NULL;
 		atn_conversation_t *atn_cv = NULL;
 		heur_dtbl_entry_t *hdtbl_entry;
@@ -67,14 +68,18 @@ PDV-list/presentation-data-values/arbitrary pdv-list_presentation-data-values_ar
 			/* call appropiate dissector for bitstring data */
 			switch(ulcs_context_value){
 					case  1: /* ACSE PDU*/
-							atn_ulcs_tree = proto_tree_add_subtree(
-									root_tree, tvb, offset, 0,
-									ett_atn_acse, NULL, ATN_ACSE_PROTO );
+							ti = proto_tree_add_text(
+									root_tree,
+									tvb,
+									offset,
+									0,
+									ATN_ACSE_PROTO );
+							atn_ulcs_tree = proto_item_add_subtree(ti, ett_atn_acse);
 
 							dissect_ACSE_apdu_PDU(
 									tvb_new_subset_remaining(tvb_usr, 0),
 									pinfo,
-									atn_ulcs_tree, NULL);
+									atn_ulcs_tree);
 							break;
 						case  3: /* USER data; call subdissector for CM, CPDLC ...  */
 

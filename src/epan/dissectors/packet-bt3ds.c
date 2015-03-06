@@ -78,7 +78,8 @@ dissect_bt3ds(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
             col_set_str(pinfo->cinfo, COL_INFO, "Rcvd ");
             break;
         default:
-            col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection ");
+            col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction %d ",
+                pinfo->p2p_dir);
             break;
     }
 
@@ -185,7 +186,7 @@ proto_reg_handoff_bt3ds(void)
     dissector_add_uint("btl2cap.service", BTSDP_3D_GLASSES_UUID, b3ds_handle);
 
     dissector_add_uint("btl2cap.psm", BTL2CAP_PSM_3DS, b3ds_handle);
-    dissector_add_for_decode_as("btl2cap.cid", b3ds_handle);
+    dissector_add_handle("btl2cap.cid", b3ds_handle);
 }
 
 /*

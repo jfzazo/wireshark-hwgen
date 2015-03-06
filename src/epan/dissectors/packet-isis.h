@@ -43,28 +43,15 @@
 #define ISIS_TYPE_L1_PSNP   26
 #define ISIS_TYPE_L2_PSNP   27
 
-#define ISIS_TYPE_MASK             0x1f
+#define ISIS_TYPE_MASK 	        0x1f
 #define ISIS_TYPE_RESERVED_MASK 0xe0
 
 /*
  * Data given to subdissectors
  */
 typedef struct isis_data {
-    guint8 header_length;
-    guint8 system_id_len;
+	guint8 header_length;
+	guint8 system_id_len;
 } isis_data_t;
 
 #endif /* _PACKET_ISIS_H */
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

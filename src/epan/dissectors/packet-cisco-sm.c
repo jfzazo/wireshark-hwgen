@@ -37,6 +37,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 #define MESSAGE_TYPE_START              0
@@ -320,7 +322,7 @@ dissect_sm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             proto_item_set_len(ti, 16);
 
             if (length > 0) {
-                next_tvb = tvb_new_subset_length(tvb, offset, length);
+                next_tvb = tvb_new_subset(tvb, offset, length, length);
 
                 if ((msg_type == PDU_MTP3_TO_SLT || msg_type == PDU_MTP3_FROM_SLT)) {
                     call_dissector(q931_handle, next_tvb, pinfo, tree);
@@ -342,9 +344,9 @@ dissect_sm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             offset = offset + 2;
             proto_item_set_len(ti, 8);
 
-            /* This should be the EISUP dissector but we haven't got one
+            /* This should be the EISUP dissector but we havent got one
              * right now - so decode it as data for now ... */
-            next_tvb = tvb_new_subset_length(tvb, offset, length);
+            next_tvb = tvb_new_subset(tvb, offset, length, length);
             call_dissector(data_handle, next_tvb, pinfo, sm_tree);
 
             break;
@@ -379,7 +381,7 @@ dissect_sm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                 proto_tree_add_item(sm_tree, hf_sm_len, tvb, offset, 2, ENC_BIG_ENDIAN);
                 length = tvb_get_ntohs(tvb,offset);
                 offset = offset +2;
-                next_tvb = tvb_new_subset_length(tvb, offset, length);
+                next_tvb = tvb_new_subset(tvb, offset, length, length);
                 call_dissector(sdp_handle, next_tvb, pinfo, sm_tree);
                 /*offset = offset+length;*/
 
@@ -411,7 +413,7 @@ dissect_sm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                 proto_tree_add_item(sm_tree, hf_sm_len, tvb, offset, 2, ENC_BIG_ENDIAN);
                 length = tvb_get_ntohs(tvb,offset);
                 offset = offset +2;
-                next_tvb = tvb_new_subset_length(tvb, offset, length);
+                next_tvb = tvb_new_subset(tvb, offset, length, length);
                 call_dissector(sdp_handle, next_tvb, pinfo, sm_tree);
                 /*offset = offset+length;*/
 
@@ -436,7 +438,7 @@ dissect_sm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
             proto_item_set_len(ti, 16);
 
             if (length > 0) {
-                next_tvb = tvb_new_subset_length(tvb, offset, length);
+                next_tvb = tvb_new_subset(tvb, offset, length, length);
 
                 switch (msg_type) {
                 case PDU_MTP3_TO_SLT:

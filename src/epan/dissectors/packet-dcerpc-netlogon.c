@@ -25,18 +25,23 @@
 #include "config.h"
 
 
-#include <epan/packet.h>
+#include <glib.h>
+#include <string.h>
+
 #include <wsutil/rc4.h>
 #include <wsutil/md4.h>
 #include <wsutil/md5.h>
 #include <wsutil/des.h>
 
+#include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 /* for dissect_mscldap_string */
 #include "packet-ldap.h"
 #include "packet-dcerpc.h"
 #include "packet-dcerpc-nt.h"
 #include "packet-dcerpc-netlogon.h"
 #include "packet-windows-common.h"
+#include "packet-ntlmssp.h"
 #include "packet-dcerpc-lsa.h"
 /* for keytab format */
 #include <epan/asn1.h>
@@ -683,13 +688,16 @@ dissect_ndr_lm_nt_hash_helper(tvbuff_t *tvb, int offset,
                               dcerpc_info *di, guint8 *drep, int hf_index, int levels _U_,
                               gboolean add_subtree)
 {
+    proto_item *item;
     proto_tree *subtree = tree;
 
     if (add_subtree) {
 
-        subtree = proto_tree_add_subtree(
-            tree, tvb, offset, 0, ett_LM_OWF_PASSWORD, NULL,
+        item = proto_tree_add_text(
+            tree, tvb, offset, 0, "%s",
             proto_registrar_get_name(hf_index));
+
+        subtree = proto_item_add_subtree(item,ett_LM_OWF_PASSWORD);
     }
 
     return dissect_ndr_lm_nt_hash_cb(
@@ -991,8 +999,9 @@ netlogon_dissect_LOGON_IDENTITY_INFO(tvbuff_t *tvb, int offset,
     int old_offset=offset;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_IDENTITY_INFO, &item, "IDENTITY_INFO:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "IDENTITY_INFO:");
+        tree = proto_item_add_subtree(item, ett_IDENTITY_INFO);
     }
 
     /* XXX: It would be nice to get the domain and account name
@@ -1014,7 +1023,7 @@ netlogon_dissect_LOGON_IDENTITY_INFO(tvbuff_t *tvb, int offset,
                                         hf_netlogon_workstation, 0);
 
 #ifdef REMOVED
-    /* NetMon does not recognize these bytes. I'll comment them out until someone complains */
+    /* NetMon does not recognize these bytes. Ill comment them out until someone complains */
     /* XXX 8 extra bytes here */
     /* there were 8 extra bytes, either here or in NETWORK_INFO that does not match
        the idl file. Could be a bug in either the NETLOGON implementation or in the
@@ -1047,8 +1056,9 @@ netlogon_dissect_LM_OWF_PASSWORD(tvbuff_t *tvb, int offset,
     }
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 16,
-                                   ett_LM_OWF_PASSWORD, &item, "LM_OWF_PASSWORD:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 16,
+                                   "LM_OWF_PASSWORD:");
+        tree = proto_item_add_subtree(item, ett_LM_OWF_PASSWORD);
     }
 
     proto_tree_add_item(tree, hf_netlogon_lm_owf_password, tvb, offset, 16,
@@ -1077,8 +1087,9 @@ netlogon_dissect_NT_OWF_PASSWORD(tvbuff_t *tvb, int offset,
     }
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 16,
-                                   ett_NT_OWF_PASSWORD, &item, "NT_OWF_PASSWORD:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 16,
+                                   "NT_OWF_PASSWORD:");
+        tree = proto_item_add_subtree(item, ett_NT_OWF_PASSWORD);
     }
 
     proto_tree_add_item(tree, hf_netlogon_nt_owf_password, tvb, offset, 16,
@@ -1163,7 +1174,7 @@ static void dissect_nt_chal_resp_cb(packet_info *pinfo _U_, proto_tree *tree,
     start_offset += 12;
     len = end_offset - start_offset;
 
-    s = tvb_bytes_to_str(wmem_packet_scope(), tvb, start_offset, len);
+    s = tvb_bytes_to_ep_str(tvb, start_offset, len);
 
     /* Append string to upper-level proto_items */
 
@@ -1450,8 +1461,9 @@ netlogon_dissect_GROUP_MEMBERSHIP(tvbuff_t *tvb, int offset,
     proto_tree *tree=NULL;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_GROUP_MEMBERSHIP, &item, "GROUP_MEMBERSHIP:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "GROUP_MEMBERSHIP:");
+        tree = proto_item_add_subtree(item, ett_GROUP_MEMBERSHIP);
     }
 
     offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep,
@@ -3392,8 +3404,9 @@ netlogon_dissect_QUOTA_LIMITS(tvbuff_t *tvb, int offset,
     int old_offset=offset;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_QUOTA_LIMITS, &item, "QUOTA_LIMTS:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "QUOTA_LIMTS:");
+        tree = proto_item_add_subtree(item, ett_QUOTA_LIMITS);
     }
 
     offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep,
@@ -3765,8 +3778,9 @@ netlogon_dissect_CIPHER_VALUE(tvbuff_t *tvb, int offset,
     int old_offset=offset;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_CYPHER_VALUE, &item, name);
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "%s", name);
+        tree = proto_item_add_subtree(item, ett_CYPHER_VALUE);
     }
 
     offset = dissect_ndr_uint32 (tvb, offset, pinfo, tree, di, drep,
@@ -3957,8 +3971,9 @@ netlogon_dissect_DELTA_UNION(tvbuff_t *tvb, int offset,
     guint16 level = 0;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_DELTA_UNION, &item, "DELTA_UNION:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "DELTA_UNION:");
+        tree = proto_item_add_subtree(item, ett_DELTA_UNION);
     }
 
     offset = dissect_ndr_uint16(tvb, offset, pinfo, tree, di, drep,
@@ -4090,8 +4105,9 @@ netlogon_dissect_DELTA_ID_UNION(tvbuff_t *tvb, int offset,
     guint16 level = 0;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_DELTA_ID_UNION, &item, "DELTA_ID_UNION:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "DELTA_ID_UNION:");
+        tree = proto_item_add_subtree(item, ett_DELTA_ID_UNION);
     }
 
     offset = dissect_ndr_uint16(tvb, offset, pinfo, tree, di, drep,
@@ -4204,8 +4220,9 @@ netlogon_dissect_DELTA_ENUM(tvbuff_t *tvb, int offset,
     guint16 type;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_DELTA_ENUM, &item, "DELTA_ENUM:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "DELTA_ENUM:");
+        tree = proto_item_add_subtree(item, ett_DELTA_ENUM);
     }
 
     offset = dissect_ndr_uint16(tvb, offset, pinfo, tree, di, drep,
@@ -4820,7 +4837,7 @@ netlogon_dissect_netrgetanydcname_reply(tvbuff_t *tvb, int offset,
  * According to muddle this is what CONTROL_DATA_INFORMATION is supposed
  * to look like. However NetMon does not recognize any such informationlevels.
  *
- * I'll leave it as CONTROL_DATA_INFORMATION with no informationlevels
+ * Ill leave it as CONTROL_DATA_INFORMATION with no informationlevels
  * until someone has any source of better authority to call upon.
  */
 static int
@@ -5571,8 +5588,9 @@ netlogon_dissect_UNICODE_MULTI(tvbuff_t *tvb, int offset,
     int old_offset=offset;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_UNICODE_MULTI, &item, "UNICODE_MULTI:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "UNICODE_MULTI:");
+        tree = proto_item_add_subtree(item, ett_UNICODE_MULTI);
     }
 
     offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep,
@@ -5596,8 +5614,9 @@ netlogon_dissect_DOMAIN_CONTROLLER_INFO(tvbuff_t *tvb, int offset,
     int old_offset=offset;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_DOMAIN_CONTROLLER_INFO, &item, "DOMAIN_CONTROLLER_INFO:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "DOMAIN_CONTROLLER_INFO:");
+        tree = proto_item_add_subtree(item, ett_DOMAIN_CONTROLLER_INFO);
     }
 
     offset = dissect_ndr_str_pointer_item(tvb, offset, pinfo, tree, di, drep,
@@ -5701,9 +5720,11 @@ dissect_ndr_ulongs_as_counted_string(tvbuff_t *tvb, int offset,
 
     if (add_subtree) {
 
-        subtree = proto_tree_add_subtree(
-            tree, tvb, offset, 0, ett_nt_counted_longs_as_string, &item,
+        item = proto_tree_add_text(
+            tree, tvb, offset, 0, "%s",
             proto_registrar_get_name(hf_index));
+
+        subtree = proto_item_add_subtree(item, ett_nt_counted_longs_as_string);
     }
     /* Structure starts with short, but is aligned for longs */
     ALIGN_TO_4_BYTES;
@@ -5781,8 +5802,9 @@ netlogon_dissect_ONE_DOMAIN_INFO(tvbuff_t *tvb, int offset,
     int old_offset=offset;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_DOMAIN_TRUST_INFO, &item, "ONE_DOMAIN_INFO");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "ONE_DOMAIN_INFO");
+        tree = proto_item_add_subtree(item, ett_DOMAIN_TRUST_INFO);
     }
 /*hf_netlogon_dnsdomaininfo*/
     offset = dissect_part_DnsDomainInfo(tvb, offset, pinfo, tree, di, drep, 0, 0);
@@ -5843,8 +5865,9 @@ netlogon_dissect_LSA_POLICY_INFO(tvbuff_t *tvb _U_, int offset,
     }
 
     if(tree){
-        subtree = proto_tree_add_subtree(tree, tvb, offset, 0,
-                                   ett_LSA_POLICY_INFO, &item, "LSA Policy");
+        item = proto_tree_add_text(tree, tvb, offset, 0,
+                                   "LSA Policy");
+        subtree = proto_item_add_subtree(item, ett_LSA_POLICY_INFO);
     }
     offset = dissect_ndr_uint32(tvb, offset, pinfo, subtree, di, drep,
                                 hf_netlogon_lsapolicy_len, &len);
@@ -6013,8 +6036,9 @@ netlogon_dissect_UNICODE_STRING_512(tvbuff_t *tvb, int offset,
     int i;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_UNICODE_STRING_512, &item, "UNICODE_STRING_512:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "UNICODE_STRING_512:");
+        tree = proto_item_add_subtree(item, ett_UNICODE_STRING_512);
     }
 
     for(i=0;i<512;i++){
@@ -6061,8 +6085,9 @@ netlogon_dissect_TYPE_50(tvbuff_t *tvb, int offset,
     int old_offset=offset;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_TYPE_50, &item, "TYPE_50:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "TYPE_50:");
+        tree = proto_item_add_subtree(item, ett_TYPE_50);
     }
 
     offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep,
@@ -6098,8 +6123,9 @@ netlogon_dissect_DS_DOMAIN_TRUSTS(tvbuff_t *tvb, int offset,
     int old_offset=offset;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_DS_DOMAIN_TRUSTS, NULL, "DS_DOMAIN_TRUSTS");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "DS_DOMAIN_TRUSTS");
+        tree = proto_item_add_subtree(item, ett_DS_DOMAIN_TRUSTS);
     }
 
     /* name */
@@ -6197,8 +6223,9 @@ netlogon_dissect_TYPE_52(tvbuff_t *tvb, int offset,
     int old_offset=offset;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_TYPE_52, &item, "TYPE_52:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "TYPE_52:");
+        tree = proto_item_add_subtree(item, ett_TYPE_52);
     }
 
     offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep,
@@ -6239,8 +6266,9 @@ netlogon_dissect_TYPE_44(tvbuff_t *tvb, int offset,
     guint32 level = 0;
 
     if(parent_tree){
-        tree = proto_tree_add_subtree(parent_tree, tvb, offset, 0,
-                                   ett_TYPE_44, &item, "TYPE_44:");
+        item = proto_tree_add_text(parent_tree, tvb, offset, 0,
+                                   "TYPE_44:");
+        tree = proto_item_add_subtree(item, ett_TYPE_44);
     }
 
     offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep,
@@ -7561,9 +7589,11 @@ static int dissect_secchan_nl_auth_message(tvbuff_t *tvb, int offset,
     int len;
 
     if (tree) {
-        subtree = proto_tree_add_subtree(
-            tree, tvb, offset, -1, ett_secchan_nl_auth_message, &item,
+        item = proto_tree_add_text(
+            tree, tvb, offset, -1,
             "Secure Channel NL_AUTH_MESSAGE");
+        subtree = proto_item_add_subtree(
+            item, ett_secchan_nl_auth_message);
     }
 
     /* We can't use the NDR routines as the DCERPC call data hasn't
@@ -9456,16 +9486,3 @@ proto_reg_handoff_dcerpc_netlogon(void)
                                       DCE_C_RPC_AUTHN_PROTOCOL_SEC_CHAN,
                                       &secchan_auth_fns);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

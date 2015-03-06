@@ -73,7 +73,7 @@ const double pkt_point_size_ = 3.0;
 // in zoom mode.
 const int min_zoom_pixels_ = 20;
 
-const QString average_throughput_label_ = QObject::tr("Average Througput (bits/s)");
+const QString average_throughput_label_ = QObject::tr("Avgerage Througput (bits/s)");
 const QString round_trip_time_ms_label_ = QObject::tr("Round Trip Time (ms)");
 const QString segment_length_label_ = QObject::tr("Segment Length (B)");
 const QString sequence_number_label_ = QObject::tr("Sequence Number (B)");
@@ -725,13 +725,12 @@ void TCPStreamDialog::fillWindowScale()
 
 QString TCPStreamDialog::streamDescription()
 {
-    QString description(tr(" for %1:%2 %3 %4:%5")
-            .arg(address_to_qstring(&graph_.src_address))
+    return QString(tr(" for %1:%2 %3 %4:%5"))
+            .arg(ep_address_to_str(&graph_.src_address))
             .arg(graph_.src_port)
             .arg(UTF8_RIGHTWARDS_ARROW)
-            .arg(address_to_qstring(&graph_.dst_address))
-            .arg(graph_.dst_port));
-    return description;
+            .arg(ep_address_to_str(&graph_.dst_address))
+            .arg(graph_.dst_port);
 }
 
 bool TCPStreamDialog::compareHeaders(segment *seg)
@@ -988,7 +987,7 @@ void TCPStreamDialog::on_buttonBox_accepted()
             .arg(bmp_filter)
             .arg(jpeg_filter);
 
-    file_name = QFileDialog::getSaveFileName(this, wsApp->windowTitleString(tr("Save Graph As" UTF8_HORIZONTAL_ELLIPSIS)),
+    file_name = QFileDialog::getSaveFileName(this, tr("Wireshark: Save Graph As..."),
                                              path.canonicalPath(), filter, &extension);
 
     if (file_name.length() > 0) {

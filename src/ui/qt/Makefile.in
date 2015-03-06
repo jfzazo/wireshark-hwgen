@@ -178,21 +178,18 @@ libqtui_a_AR = $(AR) $(ARFLAGS)
 libqtui_a_LIBADD =
 am__objects_1 = about_dialog.$(OBJEXT) accordion_frame.$(OBJEXT) \
 	byte_view_tab.$(OBJEXT) byte_view_text.$(OBJEXT) \
-	capture_file.$(OBJEXT) capture_file_dialog.$(OBJEXT) \
-	capture_file_properties_dialog.$(OBJEXT) \
-	capture_filter_combo.$(OBJEXT) capture_filter_edit.$(OBJEXT) \
+	capture_file_dialog.$(OBJEXT) capture_filter_combo.$(OBJEXT) \
+	capture_filter_edit.$(OBJEXT) \
 	capture_filter_syntax_worker.$(OBJEXT) \
 	capture_info_dialog.$(OBJEXT) \
-	capture_interfaces_dialog.$(OBJEXT) \
-	capture_preferences_frame.$(OBJEXT) color_dialog.$(OBJEXT) \
-	color_utils.$(OBJEXT) column_preferences_frame.$(OBJEXT) \
-	column_editor_frame.$(OBJEXT) compiled_filter_output.$(OBJEXT) \
-	conversation_dialog.$(OBJEXT) decode_as_dialog.$(OBJEXT) \
+	capture_interface_dialog.$(OBJEXT) \
+	capture_interfaces_dialog.$(OBJEXT) color_dialog.$(OBJEXT) \
+	color_utils.$(OBJEXT) capture_preferences_frame.$(OBJEXT) \
+	column_preferences_frame.$(OBJEXT) decode_as_dialog.$(OBJEXT) \
 	display_filter_combo.$(OBJEXT) display_filter_edit.$(OBJEXT) \
-	elided_label.$(OBJEXT) endpoint_dialog.$(OBJEXT) \
-	export_dissection_dialog.$(OBJEXT) \
+	elided_label.$(OBJEXT) export_dissection_dialog.$(OBJEXT) \
 	export_object_dialog.$(OBJEXT) export_pdu_dialog.$(OBJEXT) \
-	file_set_dialog.$(OBJEXT) filter_action.$(OBJEXT) \
+	file_set_dialog.$(OBJEXT) \
 	filter_expressions_preferences_frame.$(OBJEXT) \
 	follow_stream_dialog.$(OBJEXT) follow_stream_text.$(OBJEXT) \
 	font_color_preferences_frame.$(OBJEXT) \
@@ -202,9 +199,10 @@ am__objects_1 = about_dialog.$(OBJEXT) accordion_frame.$(OBJEXT) \
 	lbm_lbtrm_transport_dialog.$(OBJEXT) \
 	lbm_lbtru_transport_dialog.$(OBJEXT) \
 	lbm_stream_dialog.$(OBJEXT) lbm_uimflow_dialog.$(OBJEXT) \
-	main_status_bar.$(OBJEXT) main_welcome.$(OBJEXT) \
-	main_window.$(OBJEXT) main_window_preferences_frame.$(OBJEXT) \
-	main_window_slots.$(OBJEXT) manage_interfaces_dialog.$(OBJEXT) \
+	main.$(OBJEXT) main_status_bar.$(OBJEXT) \
+	main_welcome.$(OBJEXT) main_window.$(OBJEXT) \
+	main_window_preferences_frame.$(OBJEXT) \
+	main_window_slots.$(OBJEXT) \
 	module_preferences_scroll_area.$(OBJEXT) \
 	packet_comment_dialog.$(OBJEXT) \
 	packet_format_group_box.$(OBJEXT) packet_list.$(OBJEXT) \
@@ -212,24 +210,19 @@ am__objects_1 = about_dialog.$(OBJEXT) accordion_frame.$(OBJEXT) \
 	packet_range_group_box.$(OBJEXT) preferences_dialog.$(OBJEXT) \
 	print_dialog.$(OBJEXT) profile_dialog.$(OBJEXT) \
 	progress_bar.$(OBJEXT) proto_tree.$(OBJEXT) \
-	protocol_hierarchy_dialog.$(OBJEXT) qcustomplot.$(OBJEXT) \
-	qt_ui_utils.$(OBJEXT) recent_file_status.$(OBJEXT) \
-	related_packet_delegate.$(OBJEXT) \
-	remote_capture_dialog.$(OBJEXT) \
-	remote_settings_dialog.$(OBJEXT) rtp_stream_dialog.$(OBJEXT) \
+	qcustomplot.$(OBJEXT) qt_ui_utils.$(OBJEXT) \
+	recent_file_status.$(OBJEXT) related_packet_delegate.$(OBJEXT) \
 	sctp_all_assocs_dialog.$(OBJEXT) \
 	sctp_assoc_analyse_dialog.$(OBJEXT) \
 	sctp_chunk_statistics_dialog.$(OBJEXT) \
 	sctp_graph_dialog.$(OBJEXT) sctp_graph_arwnd_dialog.$(OBJEXT) \
 	sctp_graph_byte_dialog.$(OBJEXT) search_frame.$(OBJEXT) \
 	sequence_diagram.$(OBJEXT) sequence_dialog.$(OBJEXT) \
-	simple_dialog.$(OBJEXT) sparkline_delegate.$(OBJEXT) \
-	splash_overlay.$(OBJEXT) stats_tree_dialog.$(OBJEXT) \
-	stock_icon.$(OBJEXT) syntax_line_edit.$(OBJEXT) \
+	simple_dialog_qt.$(OBJEXT) sparkline_delegate.$(OBJEXT) \
+	stats_tree_dialog.$(OBJEXT) summary_dialog.$(OBJEXT) \
+	splash_overlay.$(OBJEXT) syntax_line_edit.$(OBJEXT) \
 	tcp_stream_dialog.$(OBJEXT) time_shift_dialog.$(OBJEXT) \
-	traffic_table_dialog.$(OBJEXT) uat_dialog.$(OBJEXT) \
-	voip_calls_dialog.$(OBJEXT) wireshark_application.$(OBJEXT) \
-	wireshark_dialog.$(OBJEXT)
+	uat_dialog.$(OBJEXT) wireshark_application.$(OBJEXT)
 am__objects_2 = libqtui_a-wireshark-tap-register.$(OBJEXT)
 am__objects_3 =
 am__objects_4 = $(am__objects_3)
@@ -237,28 +230,22 @@ am_libqtui_a_OBJECTS = $(am__objects_1) $(am__objects_2) \
 	$(am__objects_3) $(am__objects_4) $(am__objects_3)
 am__objects_5 = about_dialog.moc.$(OBJEXT) \
 	accordion_frame.moc.$(OBJEXT) byte_view_tab.moc.$(OBJEXT) \
-	byte_view_text.moc.$(OBJEXT) capture_file.moc.$(OBJEXT) \
-	capture_file_dialog.moc.$(OBJEXT) \
-	capture_file_properties_dialog.moc.$(OBJEXT) \
+	byte_view_text.moc.$(OBJEXT) capture_file_dialog.moc.$(OBJEXT) \
 	capture_filter_combo.moc.$(OBJEXT) \
 	capture_filter_edit.moc.$(OBJEXT) \
 	capture_filter_syntax_worker.moc.$(OBJEXT) \
 	capture_info_dialog.moc.$(OBJEXT) \
+	capture_interface_dialog.moc.$(OBJEXT) \
 	capture_interfaces_dialog.moc.$(OBJEXT) \
-	capture_preferences_frame.moc.$(OBJEXT) \
 	color_dialog.moc.$(OBJEXT) color_utils.moc.$(OBJEXT) \
+	capture_preferences_frame.moc.$(OBJEXT) \
 	column_preferences_frame.moc.$(OBJEXT) \
-	column_editor_frame.moc.$(OBJEXT) \
-	compiled_filter_output.moc.$(OBJEXT) \
-	conversation_dialog.moc.$(OBJEXT) \
 	decode_as_dialog.moc.$(OBJEXT) \
 	display_filter_combo.moc.$(OBJEXT) \
 	display_filter_edit.moc.$(OBJEXT) elided_label.moc.$(OBJEXT) \
-	endpoint_dialog.moc.$(OBJEXT) \
 	export_dissection_dialog.moc.$(OBJEXT) \
 	export_object_dialog.moc.$(OBJEXT) \
 	export_pdu_dialog.moc.$(OBJEXT) file_set_dialog.moc.$(OBJEXT) \
-	filter_action.moc.$(OBJEXT) \
 	filter_expressions_preferences_frame.moc.$(OBJEXT) \
 	follow_stream_dialog.moc.$(OBJEXT) \
 	follow_stream_text.moc.$(OBJEXT) \
@@ -272,7 +259,6 @@ am__objects_5 = about_dialog.moc.$(OBJEXT) \
 	lbm_uimflow_dialog.moc.$(OBJEXT) main_status_bar.moc.$(OBJEXT) \
 	main_welcome.moc.$(OBJEXT) main_window.moc.$(OBJEXT) \
 	main_window_preferences_frame.moc.$(OBJEXT) \
-	manage_interfaces_dialog.moc.$(OBJEXT) \
 	module_preferences_scroll_area.moc.$(OBJEXT) \
 	packet_comment_dialog.moc.$(OBJEXT) \
 	packet_format_group_box.moc.$(OBJEXT) \
@@ -280,13 +266,10 @@ am__objects_5 = about_dialog.moc.$(OBJEXT) \
 	packet_range_group_box.moc.$(OBJEXT) \
 	preferences_dialog.moc.$(OBJEXT) print_dialog.moc.$(OBJEXT) \
 	profile_dialog.moc.$(OBJEXT) progress_bar.moc.$(OBJEXT) \
-	proto_tree.moc.$(OBJEXT) \
-	protocol_hierarchy_dialog.moc.$(OBJEXT) \
-	qcustomplot.moc.$(OBJEXT) recent_file_status.moc.$(OBJEXT) \
+	proto_tree.moc.$(OBJEXT) qcustomplot.moc.$(OBJEXT) \
+	recent_file_status.moc.$(OBJEXT) \
 	related_packet_delegate.moc.$(OBJEXT) \
-	remote_capture_dialog.moc.$(OBJEXT) \
-	remote_settings_dialog.moc.$(OBJEXT) \
-	search_frame.moc.$(OBJEXT) rtp_stream_dialog.moc.$(OBJEXT) \
+	search_frame.moc.$(OBJEXT) \
 	sctp_all_assocs_dialog.moc.$(OBJEXT) \
 	sctp_assoc_analyse_dialog.moc.$(OBJEXT) \
 	sctp_chunk_statistics_dialog.moc.$(OBJEXT) \
@@ -294,23 +277,16 @@ am__objects_5 = about_dialog.moc.$(OBJEXT) \
 	sctp_graph_arwnd_dialog.moc.$(OBJEXT) \
 	sctp_graph_byte_dialog.moc.$(OBJEXT) \
 	sequence_diagram.moc.$(OBJEXT) sequence_dialog.moc.$(OBJEXT) \
-	simple_dialog.moc.$(OBJEXT) sparkline_delegate.moc.$(OBJEXT) \
-	splash_overlay.moc.$(OBJEXT) stats_tree_dialog.moc.$(OBJEXT) \
+	simple_dialog_qt.moc.$(OBJEXT) \
+	sparkline_delegate.moc.$(OBJEXT) splash_overlay.moc.$(OBJEXT) \
+	stats_tree_dialog.moc.$(OBJEXT) summary_dialog.moc.$(OBJEXT) \
 	syntax_line_edit.moc.$(OBJEXT) tcp_stream_dialog.moc.$(OBJEXT) \
-	time_shift_dialog.moc.$(OBJEXT) \
-	traffic_table_dialog.moc.$(OBJEXT) uat_dialog.moc.$(OBJEXT) \
-	voip_calls_dialog.moc.$(OBJEXT) \
-	wireshark_application.moc.$(OBJEXT) \
-	wireshark_dialog.moc.$(OBJEXT)
+	time_shift_dialog.moc.$(OBJEXT) uat_dialog.moc.$(OBJEXT) \
+	wireshark_application.moc.$(OBJEXT)
 am__objects_6 = $(am__objects_5)
-am__dirstamp = $(am__leading_dot)dirstamp
-am__objects_7 = ../../image/about.rcc.$(OBJEXT) \
-	../../image/display_filter.rcc.$(OBJEXT) \
-	../../image/languages/languages.rcc.$(OBJEXT) \
-	../../image/layout.rcc.$(OBJEXT) \
-	../../image/status.rcc.$(OBJEXT) \
-	../../image/toolbar.rcc.$(OBJEXT) \
-	../../image/wsicon.rcc.$(OBJEXT) i18n.rcc.$(OBJEXT)
+am__objects_7 = about.rcc.$(OBJEXT) display_filter.rcc.$(OBJEXT) \
+	layout.rcc.$(OBJEXT) status.rcc.$(OBJEXT) \
+	toolbar.rcc.$(OBJEXT) i18n.rcc.$(OBJEXT) welcome.rcc.$(OBJEXT)
 am__objects_8 = $(am__objects_7)
 am__objects_9 = $(am__objects_6) $(am__objects_8)
 nodist_libqtui_a_OBJECTS = $(am__objects_3) $(am__objects_9) \
@@ -418,8 +394,8 @@ CCDEPMODE = @CCDEPMODE@
 CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
-CFLAGS_SSE42 = @CFLAGS_SSE42@
 CONFIG_ARGS = @CONFIG_ARGS@
+CONFIG_WITH_ARGS = @CONFIG_WITH_ARGS@
 COREFOUNDATION_FRAMEWORKS = @COREFOUNDATION_FRAMEWORKS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -445,7 +421,6 @@ ELINKS = @ELINKS@
 ENABLE_STATIC = @ENABLE_STATIC@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FLOORL_LO = @FLOORL_LO@
 FOP = @FOP@
 GEOIP_LIBS = @GEOIP_LIBS@
 GETOPT_LO = @GETOPT_LO@
@@ -518,7 +493,7 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
-LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDES = @LUA_INCLUDES@
 LUA_LIBS = @LUA_LIBS@
 LYNX = @LYNX@
 MAKEINFO = @MAKEINFO@
@@ -554,14 +529,14 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_LIBS = @PLUGIN_LIBS@
 POD2HTML = @POD2HTML@
 POD2MAN = @POD2MAN@
-POPCOUNT_LO = @POPCOUNT_LO@
 PORTAUDIO_INCLUDES = @PORTAUDIO_INCLUDES@
 PORTAUDIO_LIBS = @PORTAUDIO_LIBS@
 PYTHON = @PYTHON@
+PY_CFLAGS = @PY_CFLAGS@
+PY_LIBS = @PY_LIBS@
 QT_MIN_VERSION = @QT_MIN_VERSION@
 Qt_LIBS = @Qt_LIBS@
 RANLIB = @RANLIB@
-RCC = @RCC@
 RPMBUILD_WITH_ARGS = @RPMBUILD_WITH_ARGS@
 SBC_CFLAGS = @SBC_CFLAGS@
 SBC_LIBS = @SBC_LIBS@
@@ -572,6 +547,8 @@ SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+STRNCASECMP_LO = @STRNCASECMP_LO@
+STRPTIME_C = @STRPTIME_C@
 STRPTIME_LO = @STRPTIME_LO@
 SYSTEMCONFIGURATION_FRAMEWORKS = @SYSTEMCONFIGURATION_FRAMEWORKS@
 UIC = @UIC@
@@ -591,6 +568,7 @@ ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 ac_cv_wireshark_have_rpm = @ac_cv_wireshark_have_rpm@
+ac_ws_python_config = @ac_ws_python_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -620,8 +598,6 @@ echld_test_bin = @echld_test_bin@
 editcap_bin = @editcap_bin@
 editcap_man = @editcap_man@
 exec_prefix = @exec_prefix@
-extcapdir = @extcapdir@
-have_sw_vers = @have_sw_vers@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -642,10 +618,10 @@ mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 plugindir = @plugindir@
-plugins_dir = @plugins_dir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pythondir = @pythondir@
 randpkt_bin = @randpkt_bin@
 randpkt_man = @randpkt_man@
 rawshark_bin = @rawshark_bin@
@@ -692,12 +668,9 @@ GENERATED_HEADER_FILES =
 # Generated header files that we don't want in the distribution.
 NODIST_GENERATED_HEADER_FILES = \
 	ui_about_dialog.h	\
-	ui_capture_file_properties_dialog.h	\
 	ui_capture_interfaces_dialog.h	\
 	ui_capture_preferences_frame.h	\
 	ui_column_preferences_frame.h	\
-	ui_column_editor_frame.h	\
-	ui_compiled_filter_output.h		\
 	ui_decode_as_dialog.h	\
 	ui_export_object_dialog.h	\
 	ui_export_pdu_dialog.h	\
@@ -715,7 +688,6 @@ NODIST_GENERATED_HEADER_FILES = \
 	ui_main_welcome.h	\
 	ui_main_window.h	\
 	ui_main_window_preferences_frame.h	\
-	ui_manage_interfaces_dialog.h	\
 	ui_module_preferences_scroll_area.h	\
 	ui_packet_comment_dialog.h	\
 	ui_packet_format_group_box.h	\
@@ -723,10 +695,6 @@ NODIST_GENERATED_HEADER_FILES = \
 	ui_preferences_dialog.h	\
 	ui_print_dialog.h	\
 	ui_profile_dialog.h	\
-	ui_protocol_hierarchy_dialog.h	\
-	ui_remote_capture_dialog.h	\
-	ui_remote_settings_dialog.h	\
-	ui_rtp_stream_dialog.h	\
 	ui_sctp_all_assocs_dialog.h	\
 	ui_sctp_assoc_analyse_dialog.h	\
 	ui_sctp_chunk_statistics_dialog.h	\
@@ -737,11 +705,10 @@ NODIST_GENERATED_HEADER_FILES = \
 	ui_search_frame.h	\
 	ui_sequence_dialog.h	\
 	ui_splash_overlay.h	\
+	ui_summary_dialog.h	\
 	ui_tcp_stream_dialog.h	\
 	ui_time_shift_dialog.h	\
-	ui_traffic_table_dialog.h	\
-	ui_uat_dialog.h		\
-	ui_voip_calls_dialog.h
+	ui_uat_dialog.h
 
 
 # Generated C source files that we want in the distribution.
@@ -786,31 +753,25 @@ MOC_HDRS = \
 	accordion_frame.h	\
 	byte_view_tab.h	\
 	byte_view_text.h	\
-	capture_file.h	\
 	capture_file_dialog.h	\
-	capture_file_properties_dialog.h	\
 	capture_filter_combo.h	\
 	capture_filter_edit.h	\
 	capture_filter_syntax_worker.h	\
 	capture_info_dialog.h	\
+	capture_interface_dialog.h	\
 	capture_interfaces_dialog.h	\
-	capture_preferences_frame.h	\
 	color_dialog.h	\
 	color_utils.h	\
+	capture_preferences_frame.h	\
 	column_preferences_frame.h	\
-	column_editor_frame.h	\
-	compiled_filter_output.h	\
-	conversation_dialog.h	\
 	decode_as_dialog.h	\
 	display_filter_combo.h	\
 	display_filter_edit.h	\
 	elided_label.h	\
-	endpoint_dialog.h	\
 	export_dissection_dialog.h	\
 	export_object_dialog.h	\
 	export_pdu_dialog.h	\
 	file_set_dialog.h	\
-	filter_action.h	\
 	filter_expressions_preferences_frame.h	\
 	follow_stream_dialog.h	\
 	follow_stream_text.h	\
@@ -828,7 +789,6 @@ MOC_HDRS = \
 	main_welcome.h	\
 	main_window.h	\
 	main_window_preferences_frame.h	\
-	manage_interfaces_dialog.h	\
 	module_preferences_scroll_area.h	\
 	packet_comment_dialog.h	\
 	packet_format_group_box.h	\
@@ -840,14 +800,10 @@ MOC_HDRS = \
 	profile_dialog.h	\
 	progress_bar.h	\
 	proto_tree.h	\
-	protocol_hierarchy_dialog.h	\
 	qcustomplot.h	\
 	recent_file_status.h	\
 	related_packet_delegate.h	\
-	remote_capture_dialog.h	\
-	remote_settings_dialog.h	\
 	search_frame.h	\
-	rtp_stream_dialog.h	\
 	sctp_all_assocs_dialog.h	\
 	sctp_assoc_analyse_dialog.h	\
 	sctp_chunk_statistics_dialog.h	\
@@ -856,18 +812,16 @@ MOC_HDRS = \
 	sctp_graph_byte_dialog.h	\
 	sequence_diagram.h	\
 	sequence_dialog.h	\
-	simple_dialog.h	\
+	simple_dialog_qt.h	\
 	sparkline_delegate.h	\
 	splash_overlay.h	\
 	stats_tree_dialog.h	\
+	summary_dialog.h	\
 	syntax_line_edit.h	\
 	tcp_stream_dialog.h	\
 	time_shift_dialog.h	\
-	traffic_table_dialog.h	\
 	uat_dialog.h	\
-	voip_calls_dialog.h	\
-	wireshark_application.h	\
-	wireshark_dialog.h
+	wireshark_application.h
 
 
 #
@@ -875,12 +829,9 @@ MOC_HDRS = \
 #
 UI_FILES = \
 	about_dialog.ui	\
-	capture_file_properties_dialog.ui 	\
 	capture_interfaces_dialog.ui 	\
 	capture_preferences_frame.ui	\
 	column_preferences_frame.ui	\
-	column_editor_frame.ui	\
-	compiled_filter_output.ui \
 	decode_as_dialog.ui	\
 	export_object_dialog.ui	\
 	export_pdu_dialog.ui	\
@@ -898,7 +849,6 @@ UI_FILES = \
 	main_welcome.ui	\
 	main_window.ui	\
 	main_window_preferences_frame.ui	\
-	manage_interfaces_dialog.ui		\
 	module_preferences_scroll_area.ui	\
 	packet_format_group_box.ui	\
 	packet_range_group_box.ui	\
@@ -906,10 +856,6 @@ UI_FILES = \
 	preferences_dialog.ui	\
 	print_dialog.ui	\
 	profile_dialog.ui	\
-	protocol_hierarchy_dialog.ui	\
-	remote_capture_dialog.ui	\
-	remote_settings_dialog.ui	\
-	rtp_stream_dialog.ui	\
 	sctp_all_assocs_dialog.ui	\
 	sctp_assoc_analyse_dialog.ui	\
 	sctp_chunk_statistics_dialog.ui	\
@@ -920,11 +866,10 @@ UI_FILES = \
 	sequence_dialog.ui	\
 	splash_overlay.ui	\
 	stats_tree_dialog.ui	\
+	summary_dialog.ui 	\
 	tcp_stream_dialog.ui	\
 	time_shift_dialog.ui	\
-	traffic_table_dialog.ui	\
-	uat_dialog.ui		\
-	voip_calls_dialog.ui
+	uat_dialog.ui
 
 
 #
@@ -942,26 +887,22 @@ MOC_SRC = $(MOC_HDRS:.h=.moc.cpp)
 QRC_FILES = \
 	../../image/about.qrc	\
 	../../image/display_filter.qrc	\
-	../../image/languages/languages.qrc	\
 	../../image/layout.qrc	\
 	../../image/status.qrc	\
 	../../image/toolbar.qrc	\
-	../../image/wsicon.qrc	\
-	i18n.qrc
+	i18n.qrc	\
+	welcome.qrc
 
 
 #
 # .ts files.
-# wireshark_en should be pluralonly.
+# qtshark_en should be pluralonly.
 #
 TS_FILES = \
-	wireshark_de.ts	\
-	wireshark_en.ts	\
-	wireshark_fr.ts	\
-	wireshark_it.ts \
-	wireshark_ja_JP.ts	\
-	wireshark_pl.ts	\
-	wireshark_zh_CN.ts
+	qtshark_de.ts	\
+	qtshark_en.ts	\
+	qtshark_fr.ts	\
+	qtshark_zh_CN.ts
 
 
 #
@@ -969,13 +910,10 @@ TS_FILES = \
 #
 # Should be auto-generated ?
 QM_FILES = \
-	wireshark_de.qm		\
-	wireshark_en.qm		\
-	wireshark_fr.qm		\
-	wireshark_it.qm		\
-	wireshark_ja_JP.qm	\
-	wireshark_pl.qm		\
-	wireshark_zh_CN.qm
+	qtshark_de.qm	\
+	qtshark_en.qm	\
+	qtshark_fr.qm	\
+	qtshark_zh_CN.qm
 
 
 #
@@ -990,31 +928,25 @@ WIRESHARK_QT_SRC = \
 	accordion_frame.cpp	\
 	byte_view_tab.cpp	\
 	byte_view_text.cpp	\
-	capture_file.cpp	\
 	capture_file_dialog.cpp	\
-	capture_file_properties_dialog.cpp	\
 	capture_filter_combo.cpp	\
 	capture_filter_edit.cpp	\
 	capture_filter_syntax_worker.cpp	\
 	capture_info_dialog.cpp	\
+	capture_interface_dialog.cpp	\
 	capture_interfaces_dialog.cpp	\
-	capture_preferences_frame.cpp	\
 	color_dialog.cpp	\
 	color_utils.cpp	\
+	capture_preferences_frame.cpp	\
 	column_preferences_frame.cpp	\
-	column_editor_frame.cpp	\
-	compiled_filter_output.cpp \
-	conversation_dialog.cpp	\
 	decode_as_dialog.cpp	\
 	display_filter_combo.cpp	\
 	display_filter_edit.cpp	\
 	elided_label.cpp	\
-	endpoint_dialog.cpp	\
 	export_dissection_dialog.cpp	\
 	export_object_dialog.cpp	\
 	export_pdu_dialog.cpp	\
 	file_set_dialog.cpp	\
-	filter_action.cpp	\
 	filter_expressions_preferences_frame.cpp	\
 	follow_stream_dialog.cpp	\
 	follow_stream_text.cpp	\
@@ -1028,12 +960,12 @@ WIRESHARK_QT_SRC = \
 	lbm_lbtru_transport_dialog.cpp	\
 	lbm_stream_dialog.cpp	\
 	lbm_uimflow_dialog.cpp	\
+	main.cpp	\
 	main_status_bar.cpp	\
 	main_welcome.cpp	\
 	main_window.cpp	\
 	main_window_preferences_frame.cpp	\
 	main_window_slots.cpp	\
-	manage_interfaces_dialog.cpp	\
 	module_preferences_scroll_area.cpp	\
 	packet_comment_dialog.cpp	\
 	packet_format_group_box.cpp	\
@@ -1046,14 +978,10 @@ WIRESHARK_QT_SRC = \
 	profile_dialog.cpp	\
 	progress_bar.cpp	\
 	proto_tree.cpp	\
-	protocol_hierarchy_dialog.cpp	\
 	qcustomplot.cpp	\
 	qt_ui_utils.cpp	\
 	recent_file_status.cpp	\
 	related_packet_delegate.cpp	\
-	remote_capture_dialog.cpp	\
-	remote_settings_dialog.cpp	\
-	rtp_stream_dialog.cpp	\
 	sctp_all_assocs_dialog.cpp	\
 	sctp_assoc_analyse_dialog.cpp	\
 	sctp_chunk_statistics_dialog.cpp	\
@@ -1063,19 +991,16 @@ WIRESHARK_QT_SRC = \
 	search_frame.cpp	\
 	sequence_diagram.cpp	\
 	sequence_dialog.cpp	\
-	simple_dialog.cpp	\
+	simple_dialog_qt.cpp	\
 	sparkline_delegate.cpp	\
-	splash_overlay.cpp	\
 	stats_tree_dialog.cpp	\
-	stock_icon.cpp		\
+	summary_dialog.cpp	\
+	splash_overlay.cpp	\
 	syntax_line_edit.cpp	\
 	tcp_stream_dialog.cpp	\
 	time_shift_dialog.cpp	\
-	traffic_table_dialog.cpp	\
 	uat_dialog.cpp	\
-	voip_calls_dialog.cpp	\
-	wireshark_application.cpp	\
-	wireshark_dialog.cpp
+	wireshark_application.cpp
 
 WIRESHARK_QT_TAP_SRC = \
 	stats_tree_dialog.cpp
@@ -1085,7 +1010,6 @@ noinst_HEADERS = \
 	packet_list_record.h	\
 	qcustomplot.h	\
 	qt_ui_utils.h	\
-	stock_icon.h	\
 	tango_colors.h
 
 AUTOMAKE_OPTIONS = -Wno-portability
@@ -1170,9 +1094,10 @@ EXTRA_DIST = \
 	$(QM_FILES)			\
 	CMakeLists.txt			\
 	doxygen.cfg.in			\
+	main.cpp			\
 	Makefile.common			\
 	Makefile_custom.common		\
-	Wireshark.pro			\
+	QtShark.pro			\
 	display_filter_16.svg		\
 	gpl-template.txt
 
@@ -1216,33 +1141,6 @@ doxygen.cfg: $(top_builddir)/config.status $(srcdir)/doxygen.cfg.in
 
 clean-noinstLIBRARIES:
 	-test -z "$(noinst_LIBRARIES)" || rm -f $(noinst_LIBRARIES)
-../../image/$(am__dirstamp):
-	@$(MKDIR_P) ../../image
-	@: > ../../image/$(am__dirstamp)
-../../image/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) ../../image/$(DEPDIR)
-	@: > ../../image/$(DEPDIR)/$(am__dirstamp)
-../../image/about.rcc.$(OBJEXT): ../../image/$(am__dirstamp) \
-	../../image/$(DEPDIR)/$(am__dirstamp)
-../../image/display_filter.rcc.$(OBJEXT): ../../image/$(am__dirstamp) \
-	../../image/$(DEPDIR)/$(am__dirstamp)
-../../image/languages/$(am__dirstamp):
-	@$(MKDIR_P) ../../image/languages
-	@: > ../../image/languages/$(am__dirstamp)
-../../image/languages/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) ../../image/languages/$(DEPDIR)
-	@: > ../../image/languages/$(DEPDIR)/$(am__dirstamp)
-../../image/languages/languages.rcc.$(OBJEXT):  \
-	../../image/languages/$(am__dirstamp) \
-	../../image/languages/$(DEPDIR)/$(am__dirstamp)
-../../image/layout.rcc.$(OBJEXT): ../../image/$(am__dirstamp) \
-	../../image/$(DEPDIR)/$(am__dirstamp)
-../../image/status.rcc.$(OBJEXT): ../../image/$(am__dirstamp) \
-	../../image/$(DEPDIR)/$(am__dirstamp)
-../../image/toolbar.rcc.$(OBJEXT): ../../image/$(am__dirstamp) \
-	../../image/$(DEPDIR)/$(am__dirstamp)
-../../image/wsicon.rcc.$(OBJEXT): ../../image/$(am__dirstamp) \
-	../../image/$(DEPDIR)/$(am__dirstamp)
 
 libqtui.a: $(libqtui_a_OBJECTS) $(libqtui_a_DEPENDENCIES) $(EXTRA_libqtui_a_DEPENDENCIES) 
 	$(AM_V_at)-rm -f libqtui.a
@@ -1251,19 +1149,11 @@ libqtui.a: $(libqtui_a_OBJECTS) $(libqtui_a_DEPENDENCIES) $(EXTRA_libqtui_a_DEPE
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
-	-rm -f ../../image/*.$(OBJEXT)
-	-rm -f ../../image/languages/*.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@../../image/$(DEPDIR)/about.rcc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@../../image/$(DEPDIR)/display_filter.rcc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@../../image/$(DEPDIR)/layout.rcc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@../../image/$(DEPDIR)/status.rcc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@../../image/$(DEPDIR)/toolbar.rcc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@../../image/$(DEPDIR)/wsicon.rcc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@../../image/languages/$(DEPDIR)/languages.rcc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/about.rcc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/about_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/about_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/accordion_frame.Po@am__quote@
@@ -1272,12 +1162,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/byte_view_tab.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/byte_view_text.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/byte_view_text.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_file.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_file.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_file_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_file_dialog.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_file_properties_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_file_properties_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_filter_combo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_filter_combo.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_filter_edit.Po@am__quote@
@@ -1286,6 +1172,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_filter_syntax_worker.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_info_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_info_dialog.moc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_interface_dialog.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_interface_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_interfaces_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_interfaces_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/capture_preferences_frame.Po@am__quote@
@@ -1294,24 +1182,17 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/color_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/color_utils.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/color_utils.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/column_editor_frame.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/column_editor_frame.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/column_preferences_frame.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/column_preferences_frame.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compiled_filter_output.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compiled_filter_output.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/conversation_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/conversation_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/decode_as_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/decode_as_dialog.moc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/display_filter.rcc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/display_filter_combo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/display_filter_combo.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/display_filter_edit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/display_filter_edit.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elided_label.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elided_label.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/endpoint_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/endpoint_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/export_dissection_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/export_dissection_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/export_object_dialog.Po@am__quote@
@@ -1320,8 +1201,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/export_pdu_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/file_set_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/file_set_dialog.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/filter_action.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/filter_action.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/filter_expressions_preferences_frame.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/filter_expressions_preferences_frame.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/follow_stream_dialog.Po@am__quote@
@@ -1339,6 +1218,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/io_graph_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/label_stack.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/label_stack.moc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/layout.rcc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/layout_preferences_frame.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/layout_preferences_frame.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lbm_lbtrm_transport_dialog.Po@am__quote@
@@ -1350,6 +1230,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lbm_uimflow_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lbm_uimflow_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libqtui_a-wireshark-tap-register.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main_status_bar.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main_status_bar.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main_welcome.Po@am__quote@
@@ -1359,8 +1240,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main_window_preferences_frame.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main_window_preferences_frame.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main_window_slots.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/manage_interfaces_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/manage_interfaces_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/module_preferences_scroll_area.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/module_preferences_scroll_area.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/packet_comment_dialog.Po@am__quote@
@@ -1384,8 +1263,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/progress_bar.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proto_tree.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proto_tree.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/protocol_hierarchy_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/protocol_hierarchy_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/qcustomplot.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/qcustomplot.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/qt_ui_utils.Po@am__quote@
@@ -1393,12 +1270,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/recent_file_status.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/related_packet_delegate.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/related_packet_delegate.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/remote_capture_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/remote_capture_dialog.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/remote_settings_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/remote_settings_dialog.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rtp_stream_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rtp_stream_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sctp_all_assocs_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sctp_all_assocs_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sctp_assoc_analyse_dialog.Po@am__quote@
@@ -1417,52 +1288,47 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sequence_diagram.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sequence_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sequence_dialog.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simple_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simple_dialog.moc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simple_dialog_qt.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simple_dialog_qt.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sparkline_delegate.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sparkline_delegate.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/splash_overlay.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/splash_overlay.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stats_tree_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stats_tree_dialog.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stock_icon.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/status.rcc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/summary_dialog.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/summary_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/syntax_line_edit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/syntax_line_edit.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcp_stream_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcp_stream_dialog.moc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/time_shift_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/time_shift_dialog.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/traffic_table_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/traffic_table_dialog.moc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/toolbar.rcc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uat_dialog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uat_dialog.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/voip_calls_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/voip_calls_dialog.moc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/welcome.rcc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wireshark_application.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wireshark_application.moc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wireshark_dialog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wireshark_dialog.moc.Po@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
-@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
@@ -1482,28 +1348,95 @@ libqtui_a-wireshark-tap-register.obj: wireshark-tap-register.c
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libqtui_a_CFLAGS) $(CFLAGS) -c -o libqtui_a-wireshark-tap-register.obj `if test -f 'wireshark-tap-register.c'; then $(CYGPATH_W) 'wireshark-tap-register.c'; else $(CYGPATH_W) '$(srcdir)/wireshark-tap-register.c'; fi`
 
 .cpp.o:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
 
 .cpp.obj:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .cpp.lo:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
-@am__fastdepCXX_TRUE@	$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
+
+about.rcc.o: ../../image/about.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT about.rcc.o -MD -MP -MF $(DEPDIR)/about.rcc.Tpo -c -o about.rcc.o `test -f '../../image/about.rcc.cpp' || echo '$(srcdir)/'`../../image/about.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/about.rcc.Tpo $(DEPDIR)/about.rcc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../../image/about.rcc.cpp' object='about.rcc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o about.rcc.o `test -f '../../image/about.rcc.cpp' || echo '$(srcdir)/'`../../image/about.rcc.cpp
+
+about.rcc.obj: ../../image/about.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT about.rcc.obj -MD -MP -MF $(DEPDIR)/about.rcc.Tpo -c -o about.rcc.obj `if test -f '../../image/about.rcc.cpp'; then $(CYGPATH_W) '../../image/about.rcc.cpp'; else $(CYGPATH_W) '$(srcdir)/../../image/about.rcc.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/about.rcc.Tpo $(DEPDIR)/about.rcc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../../image/about.rcc.cpp' object='about.rcc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o about.rcc.obj `if test -f '../../image/about.rcc.cpp'; then $(CYGPATH_W) '../../image/about.rcc.cpp'; else $(CYGPATH_W) '$(srcdir)/../../image/about.rcc.cpp'; fi`
+
+display_filter.rcc.o: ../../image/display_filter.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT display_filter.rcc.o -MD -MP -MF $(DEPDIR)/display_filter.rcc.Tpo -c -o display_filter.rcc.o `test -f '../../image/display_filter.rcc.cpp' || echo '$(srcdir)/'`../../image/display_filter.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/display_filter.rcc.Tpo $(DEPDIR)/display_filter.rcc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../../image/display_filter.rcc.cpp' object='display_filter.rcc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o display_filter.rcc.o `test -f '../../image/display_filter.rcc.cpp' || echo '$(srcdir)/'`../../image/display_filter.rcc.cpp
+
+display_filter.rcc.obj: ../../image/display_filter.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT display_filter.rcc.obj -MD -MP -MF $(DEPDIR)/display_filter.rcc.Tpo -c -o display_filter.rcc.obj `if test -f '../../image/display_filter.rcc.cpp'; then $(CYGPATH_W) '../../image/display_filter.rcc.cpp'; else $(CYGPATH_W) '$(srcdir)/../../image/display_filter.rcc.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/display_filter.rcc.Tpo $(DEPDIR)/display_filter.rcc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../../image/display_filter.rcc.cpp' object='display_filter.rcc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o display_filter.rcc.obj `if test -f '../../image/display_filter.rcc.cpp'; then $(CYGPATH_W) '../../image/display_filter.rcc.cpp'; else $(CYGPATH_W) '$(srcdir)/../../image/display_filter.rcc.cpp'; fi`
+
+layout.rcc.o: ../../image/layout.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT layout.rcc.o -MD -MP -MF $(DEPDIR)/layout.rcc.Tpo -c -o layout.rcc.o `test -f '../../image/layout.rcc.cpp' || echo '$(srcdir)/'`../../image/layout.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/layout.rcc.Tpo $(DEPDIR)/layout.rcc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../../image/layout.rcc.cpp' object='layout.rcc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o layout.rcc.o `test -f '../../image/layout.rcc.cpp' || echo '$(srcdir)/'`../../image/layout.rcc.cpp
+
+layout.rcc.obj: ../../image/layout.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT layout.rcc.obj -MD -MP -MF $(DEPDIR)/layout.rcc.Tpo -c -o layout.rcc.obj `if test -f '../../image/layout.rcc.cpp'; then $(CYGPATH_W) '../../image/layout.rcc.cpp'; else $(CYGPATH_W) '$(srcdir)/../../image/layout.rcc.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/layout.rcc.Tpo $(DEPDIR)/layout.rcc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../../image/layout.rcc.cpp' object='layout.rcc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o layout.rcc.obj `if test -f '../../image/layout.rcc.cpp'; then $(CYGPATH_W) '../../image/layout.rcc.cpp'; else $(CYGPATH_W) '$(srcdir)/../../image/layout.rcc.cpp'; fi`
+
+status.rcc.o: ../../image/status.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT status.rcc.o -MD -MP -MF $(DEPDIR)/status.rcc.Tpo -c -o status.rcc.o `test -f '../../image/status.rcc.cpp' || echo '$(srcdir)/'`../../image/status.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/status.rcc.Tpo $(DEPDIR)/status.rcc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../../image/status.rcc.cpp' object='status.rcc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o status.rcc.o `test -f '../../image/status.rcc.cpp' || echo '$(srcdir)/'`../../image/status.rcc.cpp
+
+status.rcc.obj: ../../image/status.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT status.rcc.obj -MD -MP -MF $(DEPDIR)/status.rcc.Tpo -c -o status.rcc.obj `if test -f '../../image/status.rcc.cpp'; then $(CYGPATH_W) '../../image/status.rcc.cpp'; else $(CYGPATH_W) '$(srcdir)/../../image/status.rcc.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/status.rcc.Tpo $(DEPDIR)/status.rcc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../../image/status.rcc.cpp' object='status.rcc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o status.rcc.obj `if test -f '../../image/status.rcc.cpp'; then $(CYGPATH_W) '../../image/status.rcc.cpp'; else $(CYGPATH_W) '$(srcdir)/../../image/status.rcc.cpp'; fi`
+
+toolbar.rcc.o: ../../image/toolbar.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT toolbar.rcc.o -MD -MP -MF $(DEPDIR)/toolbar.rcc.Tpo -c -o toolbar.rcc.o `test -f '../../image/toolbar.rcc.cpp' || echo '$(srcdir)/'`../../image/toolbar.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/toolbar.rcc.Tpo $(DEPDIR)/toolbar.rcc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../../image/toolbar.rcc.cpp' object='toolbar.rcc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o toolbar.rcc.o `test -f '../../image/toolbar.rcc.cpp' || echo '$(srcdir)/'`../../image/toolbar.rcc.cpp
+
+toolbar.rcc.obj: ../../image/toolbar.rcc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT toolbar.rcc.obj -MD -MP -MF $(DEPDIR)/toolbar.rcc.Tpo -c -o toolbar.rcc.obj `if test -f '../../image/toolbar.rcc.cpp'; then $(CYGPATH_W) '../../image/toolbar.rcc.cpp'; else $(CYGPATH_W) '$(srcdir)/../../image/toolbar.rcc.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/toolbar.rcc.Tpo $(DEPDIR)/toolbar.rcc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../../image/toolbar.rcc.cpp' object='toolbar.rcc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o toolbar.rcc.obj `if test -f '../../image/toolbar.rcc.cpp'; then $(CYGPATH_W) '../../image/toolbar.rcc.cpp'; else $(CYGPATH_W) '$(srcdir)/../../image/toolbar.rcc.cpp'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -1624,10 +1557,6 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
-	-rm -f ../../image/$(DEPDIR)/$(am__dirstamp)
-	-rm -f ../../image/$(am__dirstamp)
-	-rm -f ../../image/languages/$(DEPDIR)/$(am__dirstamp)
-	-rm -f ../../image/languages/$(am__dirstamp)
 	-test -z "$(DISTCLEANFILES)" || rm -f $(DISTCLEANFILES)
 
 maintainer-clean-generic:
@@ -1640,7 +1569,7 @@ clean-am: clean-generic clean-libtool clean-noinstLIBRARIES \
 	mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ../../image/$(DEPDIR) ../../image/languages/$(DEPDIR) ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -1686,7 +1615,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ../../image/$(DEPDIR) ../../image/languages/$(DEPDIR) ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -1745,16 +1674,21 @@ abi-descriptor.xml: ../abi-descriptor.template
 # The first argument is the directory in which the source files live.
 # All subsequent arguments are the files to scan.
 #
-wireshark-tap-register.c: $(WIRESHARK_QT_TAP_SRC) $(top_srcdir)/tools/make-tap-reg.py
-	@echo Making wireshark-tap-register.c
-	@$(PYTHON) $(top_srcdir)/tools/make-tap-reg.py $(srcdir) taps $(WIRESHARK_QT_TAP_SRC)
+wireshark-tap-register.c: $(WIRESHARK_QT_TAP_SRC) $(top_srcdir)/tools/make-tapreg-dotc $(top_srcdir)/tools/make-tap-reg.py
+	@if test -n "$(PYTHON)"; then \
+		echo Making wireshark-tap-register.c with python ; \
+		$(PYTHON) $(top_srcdir)/tools/make-tap-reg.py $(srcdir) taps $(WIRESHARK_QT_TAP_SRC); \
+	else \
+		echo Making wireshark-tap-register.c; \
+		$(top_srcdir)/tools/make-tapreg-dotc wireshark-tap-register.c $(srcdir) $(WIRESHARK_QT_TAP_SRC); \
+	fi
 
 .h.moc.cpp:
 	$(AM_V_MOC)$(MOC) -I.. -I../.. -o $@ $<
 
 .qrc.rcc.cpp:
 	$(MKDIR_P) $(@D)
-	$(AM_V_RCC)$(RCC) -name `basename $< .qrc` -o $@ $<
+	$(AM_V_RCC)rcc -name `basename $< .qrc` -o $@ $<
 
 ui_%.h: %.ui
 	$(AM_V_UIC)$(UIC) $< -o $@
@@ -1765,17 +1699,11 @@ ui_%.h: %.ui
 
 about_dialog.cpp about_dialog.h: ui_about_dialog.h
 
-capture_file_properties_dialog.cpp capture_file_properties_dialog.h: ui_capture_file_properties_dialog.h
-
 capture_interfaces_dialog.cpp capture_interfaces_dialog.h: ui_capture_interfaces_dialog.h
 
 capture_preferences_frame.cpp capture_preferences_frame.h: ui_capture_preferences_frame.h
 
-column_editor_frame.cpp column_editor_frame.h: ui_column_editor_frame.h
-
 column_preferences_frame.cpp column_preferences_frame.h: ui_column_preferences_frame.h
-
-compiled_filter_output.cpp compiled_filter_output.h: ui_compiled_filter_output.h
 
 decode_as_dialog.cpp decode_as_dialog.h: ui_decode_as_dialog.h
 
@@ -1811,8 +1739,6 @@ main_window.cpp main_window_slots.cpp main_window.h: ui_main_window.h
 
 main_window_preferences_frame.cpp main_window_preferences_frame.h: ui_main_window_preferences_frame.h
 
-manage_interfaces_dialog.cpp manage_interfaces_dialog.h: ui_manage_interfaces_dialog.h
-
 module_preferences_scroll_area.cpp module_preferences_scroll_area.h: ui_module_preferences_scroll_area.h
 
 packet_comment_dialog.cpp packet_comment_dialog.h: ui_packet_comment_dialog.h
@@ -1826,14 +1752,6 @@ preferences_dialog.cpp preferences_dialog.h: ui_preferences_dialog.h
 print_dialog.cpp print_dialog.h: ui_print_dialog.h
 
 profile_dialog.cpp profile_dialog.h: ui_profile_dialog.h
-
-protocol_hierarchy_dialog.cpp protocol_hierarchy_dialog.h: ui_protocol_hierarchy_dialog.h
-
-remote_capture_dialog.cpp remote_capture_dialog.h: ui_remote_capture_dialog.h
-
-remote_settings_dialog.cpp remote_settings_dialog.h: ui_remote_settings_dialog.h
-
-rtp_stream_dialog.cpp rtp_stream_dialog.h: ui_rtp_stream_dialog.h
 
 search_frame.cpp search_frame.h: ui_search_frame.h
 
@@ -1855,15 +1773,13 @@ splash_overlay.cpp splash_overlay.h: ui_splash_overlay.h
 
 stats_tree_dialog.cpp stats_tree_dialog.h: ui_stats_tree_dialog.h
 
+summary_dialog.cpp summary_dialog.h: ui_summary_dialog.h
+
 tcp_stream_dialog.cpp: ui_tcp_stream_dialog.h
 
 time_shift_dialog.cpp time_shift_dialog.h: ui_time_shift_dialog.h
 
-traffic_table_dialog.cpp traffic_table_dialog.h: ui_traffic_table_dialog.h
-
 uat_dialog.cpp uat_dialog.h: ui_uat_dialog.h
-
-voip_calls_dialog.cpp voip_calls_dialog.h: ui_voip_calls_dialog.h
 
 doxygen:
 @HAVE_DOXYGEN_TRUE@	$(DOXYGEN) doxygen.cfg

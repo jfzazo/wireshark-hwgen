@@ -32,18 +32,23 @@
 
 #include "config.h"
 
+#include <stdlib.h>
+
+#include <glib.h>
+#include <time.h>
 
 #include <epan/packet.h>
+#include <epan/ipproto.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include <epan/in_cksum.h>
 #include <epan/to_str.h>
-#include <epan/conversation.h>
-#include <epan/tap.h>
-#include <epan/ipproto.h>
 
 #include "packet-ip.h"
 #include "packet-icmp.h"
+#include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
+#include <epan/tap.h>
 
 void proto_register_icmp(void);
 void proto_reg_handoff_icmp(void);
@@ -171,16 +176,16 @@ static expert_field ei_icmp_resp_not_found = EI_INIT;
 #define ICMP_PHOTURIS     40
 
 /* ICMP UNREACHABLE */
-#define ICMP_NET_UNREACH         0	/* Network Unreachable */
-#define ICMP_HOST_UNREACH        1	/* Host Unreachable */
-#define ICMP_PROT_UNREACH        2	/* Protocol Unreachable */
-#define ICMP_PORT_UNREACH        3	/* Port Unreachable */
-#define ICMP_FRAG_NEEDED         4	/* Fragmentation Needed/DF set */
-#define ICMP_SR_FAILED           5	/* Source Route failed */
-#define ICMP_NET_UNKNOWN         6
-#define ICMP_HOST_UNKNOWN        7
-#define ICMP_HOST_ISOLATED       8
-#define ICMP_NET_ANO             9
+#define ICMP_NET_UNREACH        0	/* Network Unreachable */
+#define ICMP_HOST_UNREACH       1	/* Host Unreachable */
+#define ICMP_PROT_UNREACH       2	/* Protocol Unreachable */
+#define ICMP_PORT_UNREACH       3	/* Port Unreachable */
+#define ICMP_FRAG_NEEDED        4	/* Fragmentation Needed/DF set */
+#define ICMP_SR_FAILED          5	/* Source Route failed */
+#define ICMP_NET_UNKNOWN        6
+#define ICMP_HOST_UNKNOWN       7
+#define ICMP_HOST_ISOLATED      8
+#define ICMP_NET_ANO            9
 #define ICMP_HOST_ANO           10
 #define ICMP_NET_UNR_TOS        11
 #define ICMP_HOST_UNR_TOS       12
@@ -188,7 +193,7 @@ static expert_field ei_icmp_resp_not_found = EI_INIT;
 #define ICMP_PREC_VIOLATION     14	/* Precedence violation */
 #define ICMP_PREC_CUTOFF        15	/* Precedence cut off */
 
-#define ICMP_MIP_EXTENSION_PAD	 0
+#define ICMP_MIP_EXTENSION_PAD	0
 #define ICMP_MIP_MOB_AGENT_ADV	16
 #define ICMP_MIP_PREFIX_LENGTHS	19
 #define ICMP_MIP_CHALLENGE	24
@@ -197,57 +202,57 @@ static dissector_handle_t ip_handle;
 static dissector_handle_t data_handle;
 
 static const value_string icmp_type_str[] = {
-	{ICMP_ECHOREPLY,    "Echo (ping) reply"},
-	{1,		    "Reserved"},
-	{2,		    "Reserved"},
-	{ICMP_UNREACH,	    "Destination unreachable"},
+	{ICMP_ECHOREPLY, "Echo (ping) reply"},
+	{1, "Reserved"},
+	{2, "Reserved"},
+	{ICMP_UNREACH, "Destination unreachable"},
 	{ICMP_SOURCEQUENCH, "Source quench (flow control)"},
-	{ICMP_REDIRECT,	    "Redirect"},
-	{ICMP_ALTHOST,	    "Alternate host address"},
-	{ICMP_ECHO,	    "Echo (ping) request"},
-	{ICMP_RTRADVERT,    "Router advertisement"},
-	{ICMP_RTRSOLICIT,   "Router solicitation"},
-	{ICMP_TIMXCEED,	    "Time-to-live exceeded"},
-	{ICMP_PARAMPROB,    "Parameter problem"},
-	{ICMP_TSTAMP,	    "Timestamp request"},
-	{ICMP_TSTAMPREPLY,  "Timestamp reply"},
-	{ICMP_IREQ,	    "Information request"},
-	{ICMP_IREQREPLY,    "Information reply"},
-	{ICMP_MASKREQ,	    "Address mask request"},
-	{ICMP_MASKREPLY,    "Address mask reply"},
-	{19,		    "Reserved (for security)"},
-	{30,		    "Traceroute"},
-	{31,		    "Datagram Conversion Error"},
-	{32,		    "Mobile Host Redirect"},
-	{33,		    "IPv6 Where-Are-You"},
-	{34,		    "IPv6 I-Am-Here"},
-	{35,		    "Mobile Registration Request"},
-	{36,		    "Mobile Registration Reply"},
-	{37,		    "Domain Name Request"},
-	{38,		    "Domain Name Reply"},
-	{39,		    "SKIP"},
-	{ICMP_PHOTURIS,	    "Photuris"},
-	{41,		    "Experimental mobility protocols"},
+	{ICMP_REDIRECT, "Redirect"},
+	{ICMP_ALTHOST, "Alternate host address"},
+	{ICMP_ECHO, "Echo (ping) request"},
+	{ICMP_RTRADVERT, "Router advertisement"},
+	{ICMP_RTRSOLICIT, "Router solicitation"},
+	{ICMP_TIMXCEED, "Time-to-live exceeded"},
+	{ICMP_PARAMPROB, "Parameter problem"},
+	{ICMP_TSTAMP, "Timestamp request"},
+	{ICMP_TSTAMPREPLY, "Timestamp reply"},
+	{ICMP_IREQ, "Information request"},
+	{ICMP_IREQREPLY, "Information reply"},
+	{ICMP_MASKREQ, "Address mask request"},
+	{ICMP_MASKREPLY, "Address mask reply"},
+	{19, "Reserved (for security)"},
+	{30, "Traceroute"},
+	{31, "Datagram Conversion Error"},
+	{32, "Mobile Host Redirect"},
+	{33, "IPv6 Where-Are-You"},
+	{34, "IPv6 I-Am-Here"},
+	{35, "Mobile Registration Request"},
+	{36, "Mobile Registration Reply"},
+	{37, "Domain Name Request"},
+	{38, "Domain Name Reply"},
+	{39, "SKIP"},
+	{ICMP_PHOTURIS, "Photuris"},
+	{41, "Experimental mobility protocols"},
 	{0, NULL}
 };
 
 static const value_string unreach_code_str[] = {
-	{ICMP_NET_UNREACH,    "Network unreachable"},
-	{ICMP_HOST_UNREACH,   "Host unreachable"},
-	{ICMP_PROT_UNREACH,   "Protocol unreachable"},
-	{ICMP_PORT_UNREACH,   "Port unreachable"},
-	{ICMP_FRAG_NEEDED,    "Fragmentation needed"},
-	{ICMP_SR_FAILED,      "Source route failed"},
-	{ICMP_NET_UNKNOWN,    "Destination network unknown"},
-	{ICMP_HOST_UNKNOWN,   "Destination host unknown"},
-	{ICMP_HOST_ISOLATED,  "Source host isolated"},
-	{ICMP_NET_ANO,	      "Network administratively prohibited"},
-	{ICMP_HOST_ANO,	      "Host administratively prohibited"},
-	{ICMP_NET_UNR_TOS,    "Network unreachable for TOS"},
-	{ICMP_HOST_UNR_TOS,   "Host unreachable for TOS"},
-	{ICMP_PKT_FILTERED,   "Communication administratively filtered"},
+	{ICMP_NET_UNREACH, "Network unreachable"},
+	{ICMP_HOST_UNREACH, "Host unreachable"},
+	{ICMP_PROT_UNREACH, "Protocol unreachable"},
+	{ICMP_PORT_UNREACH, "Port unreachable"},
+	{ICMP_FRAG_NEEDED, "Fragmentation needed"},
+	{ICMP_SR_FAILED, "Source route failed"},
+	{ICMP_NET_UNKNOWN, "Destination network unknown"},
+	{ICMP_HOST_UNKNOWN, "Destination host unknown"},
+	{ICMP_HOST_ISOLATED, "Source host isolated"},
+	{ICMP_NET_ANO, "Network administratively prohibited"},
+	{ICMP_HOST_ANO, "Host administratively prohibited"},
+	{ICMP_NET_UNR_TOS, "Network unreachable for TOS"},
+	{ICMP_HOST_UNR_TOS, "Host unreachable for TOS"},
+	{ICMP_PKT_FILTERED, "Communication administratively filtered"},
 	{ICMP_PREC_VIOLATION, "Host precedence violation"},
-	{ICMP_PREC_CUTOFF,    "Precedence cutoff in effect"},
+	{ICMP_PREC_CUTOFF, "Precedence cutoff in effect"},
 	{0, NULL}
 };
 
@@ -265,7 +270,7 @@ static const value_string alt_host_code_str[] = {
 };
 
 static const value_string rtradvert_code_str[] = {
-	{ 0, "Normal router advertisement"},
+	{0, "Normal router advertisement"},
 	{16, "Does not route common traffic"},
 	{0, NULL}
 };
@@ -294,11 +299,11 @@ static const value_string photuris_code_str[] = {
 };
 
 static const value_string mip_extensions[] = {
-	{ICMP_MIP_EXTENSION_PAD,  "One byte padding extension"}, /* RFC 2002 */
-	{ICMP_MIP_MOB_AGENT_ADV,  "Mobility Agent Advertisement Extension"},
+	{ICMP_MIP_EXTENSION_PAD, "One byte padding extension"},	/* RFC 2002 */
+	{ICMP_MIP_MOB_AGENT_ADV, "Mobility Agent Advertisement Extension"},
 	/* RFC 2002 */
-	{ICMP_MIP_PREFIX_LENGTHS, "Prefix Lengths Extension"},	 /* RFC 2002 */
-	{ICMP_MIP_CHALLENGE,	  "Challenge Extension"},	 /* RFC 3012 */
+	{ICMP_MIP_PREFIX_LENGTHS, "Prefix Lengths Extension"},	/* RFC 2002 */
+	{ICMP_MIP_CHALLENGE, "Challenge Extension"},	/* RFC 3012 */
 	{0, NULL}
 };
 
@@ -307,7 +312,8 @@ static const value_string mip_extensions[] = {
  */
 static const value_string interface_role_str[] = {
 	{0, "IP interface upon which datagram arrived"},
-	{1, "sub-IP component of an IP interface upon which datagram arrived"},
+	{1,
+	 "sub-IP component of an IP interface upon which datagram arrived"},
 	{2, "IP interface through which datagram would be forwarded"},
 	{3, "IP next-hop to which datagram would be forwarded"},
 	{0, NULL}
@@ -320,13 +326,13 @@ static const value_string interface_role_str[] = {
 #define INT_INFO_NAME                           0x02
 #define INT_INFO_MTU                            0x01
 
-#define INTERFACE_INFORMATION_OBJECT_CLASS       2
+#define INTERFACE_INFORMATION_OBJECT_CLASS      2
 
-#define MPLS_STACK_ENTRY_OBJECT_CLASS            1
-#define MPLS_EXTENDED_PAYLOAD_OBJECT_CLASS       0
+#define MPLS_STACK_ENTRY_OBJECT_CLASS           1
+#define MPLS_EXTENDED_PAYLOAD_OBJECT_CLASS      0
 
-#define MPLS_STACK_ENTRY_C_TYPE                  1
-#define MPLS_EXTENDED_PAYLOAD_C_TYPE             1
+#define MPLS_STACK_ENTRY_C_TYPE                 1
+#define MPLS_EXTENDED_PAYLOAD_C_TYPE            1
 
 #define INET6_ADDRLEN                           16
 
@@ -355,24 +361,12 @@ dissect_mip_extensions(tvbuff_t * tvb, int offset, proto_tree * tree)
 {
 	guint8 type;
 	guint8 length;
+	guint16 flags;
 	proto_item *ti;
 	proto_tree *mip_tree = NULL;
+	proto_tree *flags_tree = NULL;
 	gint numCOAs;
 	gint i;
-	static const int * flags[] = {
-		&hf_icmp_mip_r,
-		&hf_icmp_mip_b,
-		&hf_icmp_mip_h,
-		&hf_icmp_mip_f,
-		&hf_icmp_mip_m,
-		&hf_icmp_mip_g,
-		&hf_icmp_mip_v,
-		&hf_icmp_mip_rt,
-		&hf_icmp_mip_u,
-		&hf_icmp_mip_x,
-		&hf_icmp_mip_reserved,
-		NULL
-	};
 
 	/* Not much to do if we're not parsing everything */
 	if (!tree)
@@ -386,33 +380,36 @@ dissect_mip_extensions(tvbuff_t * tvb, int offset, proto_tree * tree)
 			length = 0;
 		}
 
-		mip_tree = proto_tree_add_subtree_format(tree, tvb, offset,
-								1, ett_icmp_mip, &ti,
-								"Ext: %s", val_to_str(type,
-								mip_extensions,
-								"Unknown ext %u"));
-		proto_tree_add_item(mip_tree, hf_icmp_mip_type,
-					tvb, offset, 1,
-					ENC_BIG_ENDIAN);
-		offset++;
-		if (type != ICMP_MIP_EXTENSION_PAD)
-		{
-			proto_item_set_len(ti, length + 2);
-
-			/* length */
-			proto_tree_add_item(mip_tree, hf_icmp_mip_length,
-						tvb, offset, 1,
-						ENC_BIG_ENDIAN);
-			offset++;
-		}
+		ti = proto_tree_add_text(tree, tvb, offset,
+					 type ? (length + 2) : 1,
+					 "Ext: %s", val_to_str(type,
+							       mip_extensions,
+							       "Unknown ext %u"));
+		mip_tree = proto_item_add_subtree(ti, ett_icmp_mip);
 
 		switch (type) {
 		case ICMP_MIP_EXTENSION_PAD:
 			/* One byte padding extension */
+			/* Add our fields */
+			/* type */
+			proto_tree_add_item(mip_tree, hf_icmp_mip_type,
+					    tvb, offset, 1,
+					    ENC_BIG_ENDIAN);
+			offset++;
 			break;
 		case ICMP_MIP_MOB_AGENT_ADV:
 			/* Mobility Agent Advertisement Extension (RFC 2002) */
 			/* Add our fields */
+			/* type */
+			proto_tree_add_item(mip_tree, hf_icmp_mip_type,
+					    tvb, offset, 1,
+					    ENC_BIG_ENDIAN);
+			offset++;
+			/* length */
+			proto_tree_add_item(mip_tree, hf_icmp_mip_length,
+					    tvb, offset, 1,
+					    ENC_BIG_ENDIAN);
+			offset++;
 			/* sequence number */
 			proto_tree_add_item(mip_tree, hf_icmp_mip_seq, tvb,
 					    offset, 2, ENC_BIG_ENDIAN);
@@ -423,7 +420,37 @@ dissect_mip_extensions(tvbuff_t * tvb, int offset, proto_tree * tree)
 					    ENC_BIG_ENDIAN);
 			offset += 2;
 			/* flags */
-			proto_tree_add_bitmask(mip_tree, tvb, offset, hf_icmp_mip_flags, ett_icmp_mip_flags, flags, ENC_BIG_ENDIAN);
+			flags = tvb_get_ntohs(tvb, offset);
+			ti = proto_tree_add_uint(mip_tree,
+						 hf_icmp_mip_flags, tvb,
+						 offset, 2, flags);
+			flags_tree =
+			    proto_item_add_subtree(ti, ett_icmp_mip_flags);
+			proto_tree_add_boolean(flags_tree, hf_icmp_mip_r,
+					       tvb, offset, 2, flags);
+			proto_tree_add_boolean(flags_tree, hf_icmp_mip_b,
+					       tvb, offset, 2, flags);
+			proto_tree_add_boolean(flags_tree, hf_icmp_mip_h,
+					       tvb, offset, 2, flags);
+			proto_tree_add_boolean(flags_tree, hf_icmp_mip_f,
+					       tvb, offset, 2, flags);
+			proto_tree_add_boolean(flags_tree, hf_icmp_mip_m,
+					       tvb, offset, 2, flags);
+			proto_tree_add_boolean(flags_tree, hf_icmp_mip_g,
+					       tvb, offset, 2, flags);
+			proto_tree_add_boolean(flags_tree, hf_icmp_mip_v,
+					       tvb, offset, 2, flags);
+			proto_tree_add_boolean(flags_tree, hf_icmp_mip_rt,
+					       tvb, offset, 2, flags);
+			proto_tree_add_boolean(flags_tree, hf_icmp_mip_u,
+					       tvb, offset, 2, flags);
+			proto_tree_add_boolean(flags_tree, hf_icmp_mip_x,
+					       tvb, offset, 2, flags);
+
+			/* Reserved */
+			proto_tree_add_uint(flags_tree,
+					    hf_icmp_mip_reserved, tvb,
+					    offset, 2, flags);
 			offset += 2;
 
 			/* COAs */
@@ -439,6 +466,16 @@ dissect_mip_extensions(tvbuff_t * tvb, int offset, proto_tree * tree)
 		case ICMP_MIP_PREFIX_LENGTHS:
 			/* Prefix-Lengths Extension  (RFC 2002) */
 			/* Add our fields */
+			/* type */
+			proto_tree_add_item(mip_tree, hf_icmp_mip_type,
+					    tvb, offset, 1,
+					    ENC_BIG_ENDIAN);
+			offset++;
+			/* length */
+			proto_tree_add_item(mip_tree, hf_icmp_mip_length,
+					    tvb, offset, 1,
+					    ENC_BIG_ENDIAN);
+			offset++;
 
 			/* prefix lengths */
 			for (i = 0; i < length; i++) {
@@ -451,6 +488,16 @@ dissect_mip_extensions(tvbuff_t * tvb, int offset, proto_tree * tree)
 			break;
 		case ICMP_MIP_CHALLENGE:
 			/* Challenge Extension  (RFC 3012) */
+			/* type */
+			proto_tree_add_item(mip_tree, hf_icmp_mip_type,
+					    tvb, offset, 1,
+					    ENC_BIG_ENDIAN);
+			offset++;
+			/* length */
+			proto_tree_add_item(mip_tree, hf_icmp_mip_length,
+					    tvb, offset, 1,
+					    ENC_BIG_ENDIAN);
+			offset++;
 			/* challenge */
 			proto_tree_add_item(mip_tree,
 					    hf_icmp_mip_challenge, tvb,
@@ -459,6 +506,16 @@ dissect_mip_extensions(tvbuff_t * tvb, int offset, proto_tree * tree)
 
 			break;
 		default:
+			/* type */
+			proto_tree_add_item(mip_tree, hf_icmp_mip_type,
+					    tvb, offset, 1,
+					    ENC_BIG_ENDIAN);
+			offset++;
+			/* length */
+			proto_tree_add_item(mip_tree, hf_icmp_mip_length,
+					    tvb, offset, 1,
+					    ENC_BIG_ENDIAN);
+			offset++;
 			/* data, if any */
 			if (length != 0) {
 				proto_tree_add_text(mip_tree, tvb, offset,
@@ -555,9 +612,12 @@ dissect_mpls_stack_entry_object(tvbuff_t * tvb, gint offset,
 				break;
 			}
 			/* Create a subtree for each entry (the text will be set later) */
-			mpls_stack_object_tree = proto_tree_add_subtree(ext_object_tree,
-								tvb, offset, 4,
-								ett_icmp_mpls_stack_object, &tf_entry, " ");
+			tf_entry = proto_tree_add_text(ext_object_tree,
+						       tvb, offset, 4,
+						       " ");
+			mpls_stack_object_tree =
+			    proto_item_add_subtree(tf_entry,
+						   ett_icmp_mpls_stack_object);
 
 			/* Label */
 			label = (guint) tvb_get_ntohs(tvb, offset);
@@ -623,6 +683,7 @@ dissect_interface_information_object(tvbuff_t * tvb, gint offset,
 				     proto_tree * ext_object_tree,
 				     proto_item * tf_object)
 {
+	proto_item *ti;
 	proto_tree *int_name_object_tree = NULL;
 	proto_tree *int_ipaddr_object_tree;
 	guint16 obj_length, obj_trunc_length;
@@ -703,9 +764,12 @@ dissect_interface_information_object(tvbuff_t * tvb, gint offset,
 		 * if afi = 1, IPv4 address, 2 bytes afi, 2 bytes rsvd, 4 bytes IP addr
 		 * if afi = 2, IPv6 address, 2 bytes afi, 2 bytes rsvd, 6 bytes IP addr
 		 */
-		int_ipaddr_object_tree = proto_tree_add_subtree(ext_object_tree, tvb, offset,
-					 afi == 1 ? 8 : 10, ett_icmp_interface_ipaddr, NULL,
+		ti = proto_tree_add_text(ext_object_tree, tvb, offset,
+					 afi == 1 ? 8 : 10,
 					 "IP Address Sub-Object");
+
+		int_ipaddr_object_tree =
+		    proto_item_add_subtree(ti, ett_icmp_interface_ipaddr);
 
 		proto_tree_add_uint(int_ipaddr_object_tree,
 				    hf_icmp_int_info_afi, tvb, offset, 2,
@@ -740,10 +804,13 @@ dissect_interface_information_object(tvbuff_t * tvb, gint offset,
 	if (name_flag) {
 		if (obj_end_offset >= offset + 1) {
 			int_name_length = tvb_get_guint8(tvb, offset);
-			int_name_object_tree = proto_tree_add_subtree(ext_object_tree, tvb,
-						 offset, int_name_length, ett_icmp_interface_name, NULL,
+			ti = proto_tree_add_text(ext_object_tree, tvb,
+						 offset, int_name_length,
 						 "Interface Name Sub-Object");
 
+			int_name_object_tree =
+			    proto_item_add_subtree(ti,
+						   ett_icmp_interface_name);
 			proto_tree_add_text(int_name_object_tree, tvb,
 					    offset, 1, "Length: %u",
 					    int_name_length);
@@ -811,7 +878,9 @@ dissect_extensions(tvbuff_t * tvb, gint offset, proto_tree * tree)
 	/* Checksum */
 	cksum = tvb_get_ntohs(tvb, offset + 2);
 
-	computed_cksum = ip_checksum_tvb(tvb, offset, reported_length);
+	computed_cksum =
+	    ip_checksum(tvb_get_ptr(tvb, offset, reported_length),
+			reported_length);
 
 	if (computed_cksum == 0) {
 		proto_tree_add_uint_format_value(ext_tree, hf_icmp_ext_checksum,
@@ -857,9 +926,12 @@ dissect_extensions(tvbuff_t * tvb, gint offset, proto_tree * tree)
 		obj_end_offset = offset + obj_trunc_length;
 
 		/* Add a subtree for this object (the text will be reset later) */
-		ext_object_tree = proto_tree_add_subtree(ext_tree, tvb, offset,
+		tf_object = proto_tree_add_text(ext_tree, tvb, offset,
 						MAX(obj_trunc_length, 4),
-						ett_icmp_ext_object, &tf_object, "Unknown object");
+						"Unknown object");
+
+		ext_object_tree =
+		    proto_item_add_subtree(tf_object, ett_icmp_ext_object);
 
 		proto_tree_add_uint(ext_object_tree, hf_icmp_ext_length,
 				    tvb, offset, 2, obj_length);
@@ -1008,7 +1080,8 @@ static icmp_transaction_t *transaction_start(packet_info * pinfo,
 			/* Expert info.  TODO: add to _icmp_transaction_t type and sequence number
 			   so can report here (and in taps) */
 			expert_add_info_format(pinfo, it, &ei_icmp_resp_not_found,
-					       "No response seen to ICMP request");
+					       "No response seen to ICMP request in frame %u",
+					       pinfo->fd->num);
 		}
 
 		return NULL;
@@ -1301,7 +1374,9 @@ dissect_icmp(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* data)
 		   truncated, and isn't the payload of an error packet, so we can checksum
 		   it. */
 
-		computed_cksum = ip_checksum_tvb(tvb, 0, reported_length);
+		computed_cksum =
+		    ip_checksum(tvb_get_ptr(tvb, 0, reported_length),
+				reported_length);
 		if (computed_cksum == 0) {
 			proto_tree_add_uint_format_value(icmp_tree,
 						   hf_icmp_checksum, tvb,
@@ -1390,7 +1465,7 @@ dissect_icmp(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* data)
 				    "Address entry size: %u",
 				    addr_entry_size);
 		proto_tree_add_text(icmp_tree, tvb, 6, 2, "Lifetime: %s",
-				    time_secs_to_str(wmem_packet_scope(), tvb_get_ntohs
+				    time_secs_to_ep_str(tvb_get_ntohs
 						     (tvb, 6)));
 		break;
 
@@ -1617,17 +1692,17 @@ dissect_icmp(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* data)
 			    get_best_guess_mstimeofday(tvb, 8, frame_ts);
 			proto_tree_add_text(icmp_tree, tvb, 8, 4,
 					    "Originate timestamp: %s after midnight UTC",
-					    time_msecs_to_str(wmem_packet_scope(), orig_ts));
+					    time_msecs_to_ep_str(orig_ts));
 
 			proto_tree_add_text(icmp_tree, tvb, 12, 4,
 					    "Receive timestamp: %s after midnight UTC",
-					    time_msecs_to_str
-					    (wmem_packet_scope(), get_best_guess_mstimeofday
+					    time_msecs_to_ep_str
+					    (get_best_guess_mstimeofday
 					     (tvb, 12, orig_ts)));
 			proto_tree_add_text(icmp_tree, tvb, 16, 4,
 					    "Transmit timestamp: %s after midnight UTC",
-					    time_msecs_to_str
-					    (wmem_packet_scope(), get_best_guess_mstimeofday
+					    time_msecs_to_ep_str
+					    (get_best_guess_mstimeofday
 					     (tvb, 16, orig_ts)));
 		}
 		break;
@@ -1992,16 +2067,3 @@ void proto_reg_handoff_icmp(void)
 
 	dissector_add_uint("ip.proto", IP_PROTO_ICMP, icmp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

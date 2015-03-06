@@ -92,42 +92,12 @@ http://www.oracle.com/technetwork/java/javasebusiness/downloads/java-archive-dow
 then extract the archive, then copy JimiProClasses.zip to FOP's lib dir and
 rename it to jimi-1.0.jar.
 
-AsciiDoc
+AsciiDoc 
 --------
-Text documentation format and conversion suite: http://asciidoc.org/. AsciiDoc
-can use either w3m (default) or Lynx for plain text output. We use AsciiDoc for
-the Developer's Guide, User's Guide, and for the release notes. Lynx is used to
-render the official plaintext release announcments.
-
-The AsciiDoc files have been converted from DocBook. In a lot of cases the
-markup is wrong, inconsistent, or both. Use the following markup conventions
-for any new or revised text:
-
-- Window and dialog box names should be in ``curly quotes''.
-
-- Use Asciidoctor compatibility macros for buttons, keys, and menus:
-
-  The button:[Start] button
-  Press kbd:[Shift+Ctrl+P] to open the preferences dialog.
-  Select menu:File[Open] from the main menu.
-
-  This ensures that UI elemnents are shown consistently and lets us apply styles
-  to each type of element.
-
-- Command line examples should reflect the OS:
-
-----
-$ echo Linux and UNIX
-----
-
-----
-C:\> echo Windows
-----
-
-Admonitions ([NOTE], [TIP], and [WARNING]) can be used to highlight important
-information. Keep in mind that they interrupt the flow of text by design. Too
-many (especially in a row) are distracting and annoying.
-
+Text documentation format and conversion suite: http://asciidoc.org/.
+AsciiDoc can use either w3m (default) or Lynx for plain text output.
+We use AsciiDoc for the release notes and Lynx to for the official
+plaintext release announcments.
 
 Lynx
 ----
@@ -145,25 +115,21 @@ http://www.microsoft.com/en-us/download/details.aspx?id=21138
 
 Packages for Win32
 ------------------
-See ..\config.nmake for Win32 settings.
-Installing the asciidoc package will pull in almost all the other required Cygwin packages.
-You may need to run "build-docbook-catalog" from a Cygwin bash prompt in order to register your catalog properly.
+See ..\config.nmake for Win32 settings. You may need to run
+"build-docbook-catalog" in order to register your catalog properly.
 
 Tool/File           Cygwin Package          Opt./Mand.  Comments
 ---------           --------------          ----------  --------
-asciidoc            Doc/asciidoc            M           cygwin python is a dependency and will also be installed (if not installed)
-xsltproc:           Libs/libxslt            M
-xmllint:            Libs/libxml2            M
-xsl stylesheets:    Text/docbook-xsl        M           docbook.xsl, chunk.xsl and htmlhelp.xsl
-docbookx.dtd:       Text/docbook-xml42      M           a later version may be required (e.g. Doc/docbook-xml45), depending on your asciidoc installation
-docbookx.dtd:       Text/docbook-xml45      M           current asciidoc installations require this
+xsltproc:           Doc/libxslt             M
+xmllint:            Doc/libxml2             M
+xsl stylesheets:    Doc/docbook-xsl         M           docbook.xsl, chunk.xsl and htmlhelp.xsl
+docbookx.dtd:       Doc/docbook-xml42       M
 lynx:               Web/lynx                M
-dblatex             Text/dblatex            O           A number of dependencies will also be installed
-fop:                -                       O           URL: http://xml.apache.org/fop/ - install it into docbok\fop-1.x or wireshark_lib_dir\fop-1.x to use defaults from config.nmake
+fop:                -                       O           URL: http://xml.apache.org/fop/ - install it into docbook\fop-1.0 to keep defaults from config.nmake
 jimi:               -                       O           URL: http://java.sun.com/products/jimi/ - see above
 hhc:                -                       O           URL: http://msdn.microsoft.com/library/default.asp?url=/library/en-us/htmlhelp/html/hwMicrosoftHTMLHelpDownloads.asp
 zip:                Archive/zip             O
-getopt:             Base/util-linux         O           Required to run "build-docbook-catalog"
+getopt:             Utils/util-linux        O           Required to run "build-docbook-catalog"
 
 
 Packages for Suse 9.3
@@ -211,7 +177,6 @@ xsltproc:           libxslt                 M
 xmllint:            libxml2                 M
 xsl stylesheets:    docbook-style-xsl       M           docbook.xsl and chunk.xsl
 docbookx.dtd:       docbook-dtds            M           provides v4.1, v4.2, v4.3, v4.4 DTDs
-asciidoc:           ascidoc                 M
 
 fop:                fop                     O           See above
 jimi:               -                       O           get it from http://java.sun.com/products/jimi/ - see above
@@ -334,3 +299,4 @@ http://www.codeproject.com/KB/winhelp/docbook_howto.aspx
 FO Parameter Reference
 by Norman Walsh
 http://docbook.sourceforge.net/release/xsl/current/doc/fo/
+

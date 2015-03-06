@@ -75,14 +75,4 @@ const true_false_string tfs_valid_not_valid = { "Valid", "Not Valid" };
 const true_false_string tfs_do_not_clear_clear = { "Do not clear", "Clear" };
 const true_false_string tfs_confirmed_unconfirmed = { "Confirmed", "Unconfirmed" };
 const true_false_string tfs_enforced_not_enforced = { "Enforced", "Not enforced" };
-const true_false_string tfs_possible_not_possible = { "Possible", "Not possible" };
-const true_false_string tfs_required_not_required = { "Required", "Not required" };
-const true_false_string tfs_registered_not_registered = { "Registered", "Not registered" };
-const true_false_string tfs_provisioned_not_provisioned = { "Provisioned", "Not provisioned" };
-const true_false_string tfs_included_not_included = { "Included", "Not included" };
-const true_false_string tfs_allocated_by_receiver_sender = {"allocated by receiver", "allocated by sender"};
-const true_false_string tfs_asynchronous_synchronous = { "Asynchronous", "Synchronous" };
-const true_false_string tfs_protocol_sensative_bit_transparent = { "Protocol sensitive", "Bit transparent" };
-const true_false_string tfs_full_half = { "Full", "Half" };
-const true_false_string tfs_acknowledged_not_acknowledged = { "Acknowledged", "Not Acknowledged" };
 

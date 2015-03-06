@@ -2,20 +2,18 @@ MAINTAINERCLEANFILES = \
 	Makefile.in
 
 EXTRA_DIST = \
-	AdditionalTasksPage.ini \
+	wireshark.nsi	\
+	uninstall.nsi	\
 	common.nsh	\
-	config.nsh.in	\
+	GetWindowsVersion.nsh \
+	servicelib.nsh \
+	VersionCompare.nsh \
+	AdditionalTasksPage.ini \
+	WinPcapPage.ini \
+	Makefile.nmake \
 	Custom.nmake \
 	custom_diameter_xmls.txt \
-	custom_mibs.txt	\
 	custom_plugins.txt	\
+	custom_mibs.txt	\
 	custom_radius_dict.txt	\
-	GetWindowsVersion.nsh \
-	Makefile.nmake \
-	servicelib.nsh \
-	uninstall.nsi	\
-	VersionCompare.nsh \
-	windeployqt-to-nsis.ps1 \
-	WinPcapPage.ini \
-	wireshark.nsi	\
 	x64.nsh

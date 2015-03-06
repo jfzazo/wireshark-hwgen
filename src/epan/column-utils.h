@@ -34,7 +34,7 @@ extern "C" {
 
 struct epan_dissect;
 
-/**
+/** @file
  *  Helper routines for column utility structures and routines.
  */
 
@@ -268,12 +268,6 @@ gboolean col_based_on_frame_data(column_info *cinfo, const gint col);
  * @param str the string to append
  */
 WS_DLL_PUBLIC void	col_append_str(column_info *cinfo, const gint col, const gchar *str);
-
-/* Append the given strings (terminated by COL_ADD_LSTR_TERMINATOR) to a column element,
- *
- * Same result as col_append_str() called for every string element.
- */
-WS_DLL_PUBLIC void	col_append_lstr(column_info *cinfo, const gint el, const gchar *str, ...);
 
 /** Append the given text to a column element, the text will be formatted and copied.
  *

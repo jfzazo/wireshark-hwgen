@@ -20,27 +20,32 @@
 
 ACLOCAL_AMFLAGS = `../aclocal-flags`
 
-# Optional headers for ABI checking
-wsutil_optional_abi_includes =
-
-# Header files for functions in libwsutil's ABI on this platform.
-libwsutil_abi_INCLUDES = 	\
-	$(libwsutil_nonrepl_INCLUDES)	\
-	$(wsutil_optional_abi_includes)
-
 # Optional objects that I know how to build. These will be
-# linked into libwsutil if necessary.
-wsutil_optional_objects = \
-	@FLOORL_LO@		\
-	@GETOPT_LO@		\
-	@INET_ATON_LO@		\
-	@INET_NTOP_LO@		\
-	@INET_PTON_LO@		\
-	@POPCOUNT_LO@		\
-	@STRPTIME_LO@
+# linked into libwsutil.
+wsutil_optional_objects =
 
-if SSE42_SUPPORTED
-wsutil_optional_objects += libwsutil_sse42.la
+if NEED_GETOPT_LO
+wsutil_optional_objects += @GETOPT_LO@
+endif
+
+if NEED_INET_ATON_LO
+wsutil_optional_objects += @INET_ATON_LO@
+endif
+
+if NEED_INET_NTOP_LO
+wsutil_optional_objects += @INET_NTOP_LO@
+endif
+
+if NEED_INET_PTON_LO
+wsutil_optional_objects += @INET_PTON_LO@
+endif
+
+if NEED_STRNCASECMP_LO
+wsutil_optional_objects += @STRNCASECMP_LO@
+endif
+
+if NEED_STRPTIME_LO
+wsutil_optional_objects += @STRPTIME_LO@
 endif
 
 include ../Makefile.am.inc
@@ -53,11 +58,9 @@ if HAVE_WARNINGS_AS_ERRORS
 AM_CFLAGS += -Werror
 endif
 
-noinst_LTLIBRARIES = libwsutil_sse42.la
-
 lib_LTLIBRARIES = libwsutil.la
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-libwsutil_la_LDFLAGS = -version-info 0:0:0 @LDFLAGS_SHAREDLIB@
+libwsutil_la_LDFLAGS = -version-info 5:0:1 @LDFLAGS_SHAREDLIB@
 
 AM_CPPFLAGS = -I$(srcdir)/.. \
 	$(LIBGCRYPT_CFLAGS) \
@@ -67,21 +70,13 @@ libwsutil_la_SOURCES =		\
 	$(LIBWSUTIL_SRC)	\
 	$(LIBWSUTIL_INCLUDES)
 
-libwsutil_sse42_la_SOURCES = \
-	ws_mempbrk_sse42.c
-
-libwsutil_sse42_la_CFLAGS = $(AM_CFLAGS) @CFLAGS_SSE42@
-
 EXTRA_libwsutil_la_SOURCES=	\
-	floorl.c		\
-	floorl.h		\
 	inet_aton.c		\
 	inet_aton.h		\
 	inet_ntop.c		\
 	inet_pton.c		\
 	inet_v6defs.h		\
-	popcount.c		\
-	popcount.h		\
+	strncasecmp.c		\
 	strptime.c		\
 	strptime.h		\
 	wsgetopt.c		\
@@ -92,7 +87,6 @@ libwsutil_la_DEPENDENCIES=	\
 	$(wsutil_optional_objects)
 
 libwsutil_la_LIBADD =		\
-	@COREFOUNDATION_FRAMEWORKS@	\
 	@GLIB_LIBS@		\
 	@LIBGCRYPT_LIBS@	\
 	$(wsutil_optional_objects)
@@ -102,7 +96,7 @@ EXTRA_DIST =		\
 	Makefile.common	\
 	Makefile.nmake	\
 	file_util.c	\
-	file_util.h	\
+	file_util.h 	\
 	wsgcrypt.h
 
 CLEANFILES = \
@@ -119,7 +113,7 @@ MAINTAINERCLEANFILES = \
 dumpabi-libwsutil: all abi-descriptor.xml
 	rm -rf abi-check-headers abi_dumps .libs/*.abi.tar.gz
 	mkdir abi-check-headers
-	cp ../config.h ../ws_symbol_export.h $(libwsutil_abi_INCLUDES) abi-check-headers/
+	cp ../config.h ../ws_symbol_export.h *.h abi-check-headers/
 	abi-compliance-checker -l libwsutil -v1 `readlink .libs/libwsutil.so | sed 's/.*\.so\.//'` \
 		-relpath $(abs_srcdir) -dump-abi abi-descriptor.xml || \
 		cat logs/libwsutil/[0-9]*/log.txt

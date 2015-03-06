@@ -151,6 +151,7 @@ extern value_string_ext gmr1_ie_rr_strings_ext;
 extern elem_fcn gmr1_ie_rr_func[];
 extern gint ett_gmr1_ie_rr[];
 
+extern sccp_msg_info_t* sccp_msg;
 extern sccp_assoc_info_t* sccp_assoc;
 
 extern int gsm_a_tap;
@@ -211,17 +212,44 @@ extern const char* get_gsm_a_msg_string(int pdu_type, int idx);
 /* FUNCTIONS */
 
 /* ELEMENT FUNCTIONS */
-#define EXTRANEOUS_DATA_CHECK(edc_len, edc_max_len, pinfo, ei) \
+
+#define EXTRANEOUS_DATA_CHECK(edc_len, edc_max_len) \
+    if ((edc_len) > (edc_max_len)) \
+    { \
+        proto_tree_add_text(tree, tvb, \
+            curr_offset, (edc_len) - (edc_max_len), "Extraneous Data"); \
+        curr_offset += ((edc_len) - (edc_max_len)); \
+    }
+
+#define EXTRANEOUS_DATA_CHECK_EXPERT(edc_len, edc_max_len, pinfo, ei) \
     if ((edc_len) > (edc_max_len)) \
     { \
         proto_tree_add_expert(tree, pinfo, ei, tvb, curr_offset, (edc_len) - (edc_max_len)); \
         curr_offset += ((edc_len) - (edc_max_len)); \
     }
 
+#define SHORT_DATA_CHECK(sdc_len, sdc_min_len) \
+    if ((sdc_len) < (sdc_min_len)) \
+    { \
+        proto_tree_add_text(tree, tvb, \
+            curr_offset, (sdc_len), "Short Data (?)"); \
+        curr_offset += (sdc_len); \
+        return(curr_offset - offset); \
+    }
+
+#define EXACT_DATA_CHECK(edc_len, edc_eq_len) \
+    if ((edc_len) != (edc_eq_len)) \
+    { \
+        proto_tree_add_text(tree, tvb, \
+            curr_offset, (edc_len), "Unexpected Data Length"); \
+        curr_offset += (edc_len); \
+        return(curr_offset - offset); \
+    }
+
 #define NO_MORE_DATA_CHECK(nmdc_len) \
     if ((nmdc_len) <= (curr_offset - offset)) return(nmdc_len);
 
-#define SET_ELEM_VARS(SEV_pdu_type, SEV_elem_names_ext, SEV_elem_ett, SEV_elem_funcs, ei_unknown) \
+#define SET_ELEM_VARS(SEV_pdu_type, SEV_elem_names_ext, SEV_elem_ett, SEV_elem_funcs) \
     switch (SEV_pdu_type) \
     { \
     case GSM_A_PDU_TYPE_BSSMAP: \
@@ -300,7 +328,7 @@ extern const char* get_gsm_a_msg_string(int pdu_type, int idx);
         SEV_elem_funcs = gmr1_ie_rr_func; \
         break; \
     default: \
-        proto_tree_add_expert_format(tree, pinfo, ei_unknown, \
+        proto_tree_add_text(tree, \
             tvb, curr_offset, -1, \
             "Unknown PDU type (%u) gsm_a_common", SEV_pdu_type); \
         return(consumed); \
@@ -378,7 +406,7 @@ WS_DLL_PUBLIC guint16 elem_v_short(tvbuff_t *tvb, proto_tree *tree, packet_info 
  *      Is there a better approach ?
  */
 
-#define ELEM_MAND_TLV(EMT_iei, EMT_pdu_type, EMT_elem_idx, EMT_elem_name_addition, ei_mandatory) \
+#define ELEM_MAND_TLV(EMT_iei, EMT_pdu_type, EMT_elem_idx, EMT_elem_name_addition) \
 {\
     if ((consumed = elem_tlv(tvb, tree, pinfo, (guint8) EMT_iei, EMT_pdu_type, EMT_elem_idx, curr_offset, curr_len, EMT_elem_name_addition)) > 0) \
     { \
@@ -387,7 +415,7 @@ WS_DLL_PUBLIC guint16 elem_v_short(tvbuff_t *tvb, proto_tree *tree, packet_info 
     } \
     else \
     { \
-        proto_tree_add_expert_format(tree, pinfo, &ei_mandatory, \
+        proto_tree_add_text(tree, \
             tvb, curr_offset, 0, \
             "Missing Mandatory element (0x%02x) %s%s, rest of dissection is suspect", \
             EMT_iei, \
@@ -403,7 +431,7 @@ WS_DLL_PUBLIC guint16 elem_v_short(tvbuff_t *tvb, proto_tree *tree, packet_info 
  * octet 2 0/1 ext  length
  * octet 2a length
  */
-#define ELEM_MAND_TELV(EMT_iei, EMT_pdu_type, EMT_elem_idx, EMT_elem_name_addition, ei_mandatory) \
+#define ELEM_MAND_TELV(EMT_iei, EMT_pdu_type, EMT_elem_idx, EMT_elem_name_addition) \
 {\
     if ((consumed = elem_telv(tvb, tree, pinfo, (guint8) EMT_iei, EMT_pdu_type, EMT_elem_idx, curr_offset, curr_len, EMT_elem_name_addition)) > 0) \
     { \
@@ -412,7 +440,7 @@ WS_DLL_PUBLIC guint16 elem_v_short(tvbuff_t *tvb, proto_tree *tree, packet_info 
     } \
     else \
     { \
-        proto_tree_add_expert_format(tree, pinfo, &ei_mandatory, \
+        proto_tree_add_text(tree, \
             tvb, curr_offset, 0, \
             "Missing Mandatory element (0x%02x) %s%s, rest of dissection is suspect", \
             EMT_iei, \
@@ -423,7 +451,7 @@ WS_DLL_PUBLIC guint16 elem_v_short(tvbuff_t *tvb, proto_tree *tree, packet_info 
     if ((signed)curr_len <= 0) return;      \
 }
 
-#define ELEM_MAND_TLV_E(EMT_iei, EMT_pdu_type, EMT_elem_idx, EMT_elem_name_addition, ei_mandatory) \
+#define ELEM_MAND_TLV_E(EMT_iei, EMT_pdu_type, EMT_elem_idx, EMT_elem_name_addition) \
 {\
     if ((consumed = elem_tlv_e(tvb, tree, pinfo, (guint8) EMT_iei, EMT_pdu_type, EMT_elem_idx, curr_offset, curr_len, EMT_elem_name_addition)) > 0) \
     { \
@@ -432,7 +460,7 @@ WS_DLL_PUBLIC guint16 elem_v_short(tvbuff_t *tvb, proto_tree *tree, packet_info 
     } \
     else \
     { \
-        proto_tree_add_expert_format(tree, pinfo, &ei_mandatory, \
+        proto_tree_add_text(tree, \
             tvb, curr_offset, 0, \
             "Missing Mandatory element (0x%02x) %s%s, rest of dissection is suspect", \
             EMT_iei, \
@@ -472,7 +500,7 @@ WS_DLL_PUBLIC guint16 elem_v_short(tvbuff_t *tvb, proto_tree *tree, packet_info 
     if ((signed)curr_len <= 0) return;      \
 }
 
-#define ELEM_MAND_TV(EMT_iei, EMT_pdu_type, EMT_elem_idx, EMT_elem_name_addition, ei_mandatory) \
+#define ELEM_MAND_TV(EMT_iei, EMT_pdu_type, EMT_elem_idx, EMT_elem_name_addition) \
 {\
     if ((consumed = elem_tv(tvb, tree, pinfo, (guint8) EMT_iei, EMT_pdu_type, EMT_elem_idx, curr_offset, EMT_elem_name_addition)) > 0) \
     { \
@@ -481,7 +509,7 @@ WS_DLL_PUBLIC guint16 elem_v_short(tvbuff_t *tvb, proto_tree *tree, packet_info 
     } \
     else \
     { \
-        proto_tree_add_expert_format(tree, pinfo, &ei_mandatory,\
+        proto_tree_add_text(tree, \
             tvb, curr_offset, 0, \
             "Missing Mandatory element (0x%02x) %s%s, rest of dissection is suspect", \
             EMT_iei, \
@@ -606,6 +634,10 @@ typedef struct _gsm_a_tap_rec_t {
     guint8      message_type;
     gsm_a_pd_str_e  protocol_disc;
 } gsm_a_tap_rec_t;
+
+void dissect_bssmap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
+
+void dissect_bssmap_le(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 
 void bssmap_old_bss_to_new_bss_info(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo);
 void bssmap_new_bss_to_old_bss_info(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo);
@@ -899,24 +931,24 @@ typedef enum
     BE_UDEF_130,                        /* Undefined */
     BE_KC128,                           /* Kc128 */
     BE_CSG_ID,                          /* CSG Identifier */
-    BE_REDIR_ATT_FLG,                   /* Redirect Attempt Flag               3.2.2.111    */
-    BE_REROUTE_REJ_CAUSE,               /* Reroute Reject Cause                3.2.2.112    */
-    BE_SEND_SEQN,                       /* Send Sequence Number                3.2.2.113    */
-    BE_REROUTE_OUTCOME,                 /* Reroute complete outcome            3.2.2.114    */
-    BE_GLOBAL_CALL_REF,                 /* Global Call Reference               3.2.2.115    */
-    BE_LCLS_CONF,                       /* LCLS-Configuration                  3.2.2.116    */
-    BE_LCLS_CON_STATUS_CONTROL,         /* LCLS-Connection-Status-Control      3.2.2.117    */
-    BE_LCLS_CORR_NOT_NEEDED,            /* LCLS-Correlation-Not-Needed         3.2.2.118    */
-    BE_LCLS_BSS_STATUS,                 /* LCLS-BSS-Status                     3.2.2.119    */
-    BE_LCLS_BREAK_REQ,                  /* LCLS-Break-Request                  3.2.2.120    */
-    BE_CSFB_IND,                        /* CSFB Indication                     3.2.2.121    */
+	BE_REDIR_ATT_FLG,                   /* Redirect Attempt Flag               3.2.2.111    */
+	BE_REROUTE_REJ_CAUSE,               /* Reroute Reject Cause                3.2.2.112    */
+	BE_SEND_SEQN,                       /* Send Sequence Number                3.2.2.113    */
+	BE_REROUTE_OUTCOME,                 /* Reroute complete outcome            3.2.2.114    */
+	BE_GLOBAL_CALL_REF,                 /* Global Call Reference               3.2.2.115    */
+	BE_LCLS_CONF,                       /* LCLS-Configuration                  3.2.2.116    */
+	BE_LCLS_CON_STATUS_CONTROL,         /* LCLS-Connection-Status-Control      3.2.2.117    */
+	BE_LCLS_CORR_NOT_NEEDED,            /* LCLS-Correlation-Not-Needed         3.2.2.118    */
+	BE_LCLS_BSS_STATUS,                 /* LCLS-BSS-Status                     3.2.2.119    */
+	BE_LCLS_BREAK_REQ,                  /* LCLS-Break-Request                  3.2.2.120    */
+	BE_CSFB_IND,                        /* CSFB Indication                     3.2.2.121    */
 #if 0
-    BE_CS_TO_PS_SRVCC,                  /* CS to PS SRVCC                      3.2.2.122    */
-    BE_SRC_ENB_2_TGT_ENB_TRANSP_INF,    /* Source eNB to target eNB transparent information (E-UTRAN)" 3.2.2.123    */
-    BE_CS_TO_PS_SRVCC_IND,              /* CS to PS SRVCC Indication           3.2.2.124    */
-    BE_CN_TO_MS_TRANSP,                 /* CN to MS transparent information    3.2.2.125    */
+	BE_CS_TO_PS_SRVCC,                  /* CS to PS SRVCC                      3.2.2.122    */
+	BE_SRC_ENB_2_TGT_ENB_TRANSP_INF,    /* Source eNB to target eNB transparent information (E-UTRAN)" 3.2.2.123    */
+	BE_CS_TO_PS_SRVCC_IND,              /* CS to PS SRVCC Indication           3.2.2.124    */
+	BE_CN_TO_MS_TRANSP,                 /* CN to MS transparent information    3.2.2.125    */
 #endif
-    BE_SELECTED_PLMN_ID,                /* Selected PLMN ID                    3.2.2.126    */
+	BE_SELECTED_PLMN_ID,                /* Selected PLMN ID                    3.2.2.126    */
     BE_NONE                             /* NONE */
 }
 bssmap_elem_idx_t;
@@ -1146,7 +1178,6 @@ typedef enum
     DE_REQ_TYPE,                    /* Request type */
     DE_SM_NOTIF_IND,                /* Notification indicator */
     DE_SM_CONNECTIVITY_TYPE,        /* Connectivity type */
-    DE_SM_WLAN_OFFLOAD_ACCEPT,      /* WLAN offload acceptability */
     /* GPRS Common Information Elements [8] 10.5.7 */
     DE_PDP_CONTEXT_STAT,            /* [8] 10.5.7.1     PDP Context Status */
     DE_RAD_PRIO,                    /* [8] 10.5.7.2     Radio Priority */
@@ -1337,7 +1368,6 @@ typedef enum
     DE_EMM_NONCE,               /* 9.9.3.25 Nonce */
     DE_EMM_PAGING_ID,           /* 9.9.3.25A Paging identity */
     DE_EMM_P_TMSI_SIGN,         /* 9.9.3.26 P-TMSI signature, See subclause 10.5.5.8 in 3GPP TS 24.008 [6]. */
-    DE_EMM_EXT_CAUSE,           /* 9.9.3.26A Extended EMM cause */
     DE_EMM_SERV_TYPE,           /* 9.9.3.27 Service type */
     DE_EMM_SHORT_MAC,           /* 9.9.3.28 Short MAC */
     DE_EMM_TZ,                  /* 9.9.3.29 Time zone, See subclause 10.5.3.8 in 3GPP TS 24.008 [6]. */
@@ -1404,24 +1434,9 @@ typedef enum
     DE_SGSAP_TAID,                                  /* 9.4.21a Tracking Area Identity */
     DE_SGSAP_ECGI,                                  /* 9.4.3a E-UTRAN Cell Global Identity */
     DE_SGSAP_UE_EMM_MODE,                           /* 9.4.21c UE EMM mode*/
-    DE_SGSAP_ADD_PAGING_IND,                        /* 9.4.25 Additional paging indicators */
-    DE_SGSAP_TMSI_BASED_NRI_CONT,                   /* 9.4.26 TMSI based NRI container */
 
     DE_SGAP_NONE                            /* NONE */
 }
 sgsap_elem_idx_t;
 
 #endif /* __PACKET_GSM_A_COMMON_H__ */
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

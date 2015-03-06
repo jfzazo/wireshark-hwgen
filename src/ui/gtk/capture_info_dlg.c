@@ -30,10 +30,10 @@
 
 #include <epan/packet.h>
 
-#include "ui/capture.h"
+#include "../capture.h"
 #include "../capture_info.h"
-
-#include "ui/capture_ui_utils.h"
+#include "../capture_ui_utils.h"
+#include "../capture-pcap-util.h"
 
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/gui_utils.h"
@@ -42,8 +42,8 @@
 #include "ui/gtk/stock_icons.h"
 
 #ifdef HAVE_AIRPCAP
-#include <caputils/airpcap.h>
-#include <caputils/airpcap_loader.h>
+#include <airpcap.h>
+#include "airpcap_loader.h"
 #include "airpcap_gui_utils.h"
 #include "airpcap_dlg.h"
 #endif

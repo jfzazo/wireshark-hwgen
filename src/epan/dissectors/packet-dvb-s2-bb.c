@@ -30,6 +30,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/etypes.h>
@@ -628,7 +629,7 @@ static int dissect_dvb_s2_gse(tvbuff_t *tvb, int cur_off, proto_tree *tree, pack
                 if (BIT_IS_SET(gse_hdr, DVB_S2_GSE_HDR_STOP_POS))
                     col_append_str(pinfo->cinfo, COL_INFO, "3 ");
 
-                proto_tree_add_item(dvb_s2_gse_tree, hf_dvb_s2_gse_label3, tvb, cur_off + new_off, 3, ENC_BIG_ENDIAN);
+                proto_tree_add_item(dvb_s2_gse_tree, hf_dvb_s2_gse_label3, tvb, cur_off + new_off, 3, ENC_NA);
 
                 new_off += 3;
             } else {
@@ -687,7 +688,7 @@ static int dissect_dvb_s2_gse(tvbuff_t *tvb, int cur_off, proto_tree *tree, pack
 
         /* add crc32 if last fragment */
         if (BIT_IS_CLEAR(gse_hdr, DVB_S2_GSE_HDR_START_POS) && BIT_IS_SET(gse_hdr, DVB_S2_GSE_HDR_STOP_POS)) {
-            proto_tree_add_item(dvb_s2_gse_tree, hf_dvb_s2_gse_crc32, tvb, cur_off + new_off, DVB_S2_GSE_CRC32_LEN, ENC_BIG_ENDIAN);
+            proto_tree_add_item(dvb_s2_gse_tree, hf_dvb_s2_gse_crc32, tvb, cur_off + new_off, DVB_S2_GSE_CRC32_LEN, ENC_NA);
             new_off += DVB_S2_GSE_CRC32_LEN;
         }
     }

@@ -22,6 +22,7 @@
 
 #include "config.h"
 #include <string.h>
+#include <stdarg.h>
 
 #include <gtk/gtk.h>
 
@@ -29,6 +30,7 @@
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/stock_icons.h"
+#include "ui/gtk/old-gtk-compat.h"
 
 #include "wsutil/filesystem.h"
 
@@ -459,42 +461,6 @@ dlg_window_new(const gchar *title)
      *      window using dlg_window_new() and then calls
      *      gtk_widget_destroy_with_parent() will *not* get the desired effect
      *      since the dialog window actually has has no parent.
-     */
-#ifndef _WIN32
-    if (top_level) {
-        gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(top_level));
-    }
-#endif /*_WIN32*/
-
-    return win;
-}
-
-/* Create a dialog box window that belongs to Wireshark's main window. */
-GtkWidget *
-dlg_window_new_with_geom(const gchar *title, const gchar *geom_name, GtkWindowPosition pos)
-{
-    GtkWidget *win;
-
-    win = window_new_with_geom(GTK_WINDOW_TOPLEVEL, title, geom_name ? geom_name : title, pos);
-
-    /*
-     * XXX - if we're running in the capture child process, we can't easily
-     * make this window transient for the main process's window.  We just
-     * punt here.
-     *
-     * Perhaps the child process should only capture packets, write them to
-     * a file, and somehow notify the parent process and let *it* do all
-     * the GUI work.  If we can do that efficiently (so that we don't drop
-     * more packets), perhaps we can also do so even when we're *not* doing
-     * an "Update list of packets in real time" capture.  That'd let the
-     * child process run set-UID on platforms where you need that in order
-     * to capture, and might also simplify the job of having the GUI main
-     * loop wait both for user input and packet arrival.
-     */
-    /*
-     * On Windows, making the dialogs transient to top_level behaves strangely.
-     * It is not possible any more to bring the top level window to front easily.
-     * So we don't do this on Windows.
      */
 #ifndef _WIN32
     if (top_level) {

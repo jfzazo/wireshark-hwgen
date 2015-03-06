@@ -23,7 +23,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/strutil.h>
 
 #include "packet-aim.h"
 
@@ -89,16 +92,3 @@ proto_reg_handoff_aim_popup(void)
 {
 	aim_init_family(proto_aim_popup, ett_aim_popup, FAMILY_POPUP, aim_fnac_family_popup);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

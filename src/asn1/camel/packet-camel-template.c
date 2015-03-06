@@ -33,14 +33,16 @@
  */
 #include "config.h"
 
-#include <stdlib.h>
-
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/oids.h>
 #include <epan/tap.h>
 #include <epan/asn1.h>
 #include <epan/expert.h>
+
+#include <stdlib.h>
+#include <string.h>
 
 #include "packet-ber.h"
 #include "packet-camel.h"
@@ -137,7 +139,6 @@ static gint ett_camel_stat = -1;
 static gint ett_camel_calledpartybcdnumber = -1;
 static gint ett_camel_callingpartynumber = -1;
 static gint ett_camel_locationnumber = -1;
-static gint ett_camel_additionalcallingpartynumber = -1;
 
 #include "packet-camel-ett.c"
 
@@ -439,9 +440,9 @@ new_camelsrt_call(struct camelsrt_call_info_key_t *p_camelsrt_call_key)
      with the tcap transaction Id as main Key
      Once created, this entry will be updated later */
 
-  p_new_camelsrt_call_key = wmem_new(wmem_file_scope(), struct camelsrt_call_info_key_t);
+  p_new_camelsrt_call_key = se_new(struct camelsrt_call_info_key_t);
   p_new_camelsrt_call_key->SessionIdKey = p_camelsrt_call_key->SessionIdKey;
-  p_new_camelsrt_call = wmem_new(wmem_file_scope(), struct camelsrt_call_t);
+  p_new_camelsrt_call = se_new(struct camelsrt_call_t);
   raz_camelsrt_call(p_new_camelsrt_call);
   p_new_camelsrt_call->session_id = camelsrt_global_SessionId++;
 #ifdef DEBUG_CAMELSRT
@@ -695,7 +696,7 @@ camelsrt_request_call_matching(tvbuff_t *tvb, packet_info *pinfo,
       if (p_camelsrt_call->category[srt_type].req_num != pinfo->fd->num) {
 
 	if (srt_type!=CAMELSRT_VOICE_DISC) {
-	  /* No, so it's a duplicate request. Mark it as such. */
+	  /* No, so it's a duplicate resquest. Mark it as such. */
 #ifdef DEBUG_CAMELSRT
 	  dbg(21,"Display_duplicate with req %d ", p_camelsrt_call->category[srt_type].req_num);
 #endif
@@ -1071,7 +1072,7 @@ dissect_camel_camelPDU(gboolean implicit_tag _U_, tvbuff_t *tvb, int offset, asn
 static int
 dissect_camel_v1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* data)
 {
-  proto_item  *item;
+  proto_item  *item, *stat_item;
   proto_tree  *tree = NULL, *stat_tree = NULL;
   struct tcap_private_t * p_private_tcap = (struct tcap_private_t*)data;
   asn1_ctx_t asn1_ctx;
@@ -1096,19 +1097,20 @@ dissect_camel_v1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, voi
   if (gcamel_HandleSRT &&
       gp_camelsrt_info->tcap_context ) {
     if (gcamel_DisplaySRT && tree) {
-      stat_tree = proto_tree_add_subtree(tree, tvb, 0, 0, ett_camel_stat, NULL, "Stat");
+      stat_item = proto_tree_add_text(tree, tvb, 0, 0, "Stat");
+      stat_tree = proto_item_add_subtree(stat_item, ett_camel_stat);
     }
     camelsrt_call_matching(tvb, pinfo, stat_tree, gp_camelsrt_info);
     tap_queue_packet(camel_tap, pinfo, gp_camelsrt_info);
   }
 
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 static int
 dissect_camel_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* data)
 {
-  proto_item  *item;
+  proto_item  *item, *stat_item;
   proto_tree  *tree = NULL, *stat_tree = NULL;
   struct tcap_private_t * p_private_tcap = (struct tcap_private_t*)data;
   asn1_ctx_t asn1_ctx;
@@ -1133,19 +1135,20 @@ dissect_camel_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, voi
   if (gcamel_HandleSRT &&
       gp_camelsrt_info->tcap_context ) {
     if (gcamel_DisplaySRT && tree) {
-      stat_tree = proto_tree_add_subtree(tree, tvb, 0, 0, ett_camel_stat, NULL, "Stat");
+      stat_item = proto_tree_add_text(tree, tvb, 0, 0, "Stat");
+      stat_tree = proto_item_add_subtree(stat_item, ett_camel_stat);
     }
     camelsrt_call_matching(tvb, pinfo, stat_tree, gp_camelsrt_info);
     tap_queue_packet(camel_tap, pinfo, gp_camelsrt_info);
   }
 
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 static int
 dissect_camel(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* data)
 {
-  proto_item  *item;
+  proto_item  *item, *stat_item;
   proto_tree  *tree, *stat_tree = NULL;
   struct tcap_private_t * p_private_tcap = (struct tcap_private_t*)data;
   asn1_ctx_t asn1_ctx;
@@ -1169,13 +1172,14 @@ dissect_camel(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
   if (gcamel_HandleSRT &&
       gp_camelsrt_info->tcap_context ) {
     if (gcamel_DisplaySRT && tree) {
-      stat_tree = proto_tree_add_subtree(tree, tvb, 0, 0, ett_camel_stat, NULL, "Stat");
+      stat_item = proto_tree_add_text(tree, tvb, 0, 0, "Stat");
+      stat_tree = proto_item_add_subtree(stat_item, ett_camel_stat);
     }
     camelsrt_call_matching(tvb, pinfo, stat_tree, gp_camelsrt_info);
     tap_queue_packet(camel_tap, pinfo, gp_camelsrt_info);
   }
 
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 /*--- proto_reg_handoff_camel ---------------------------------------*/
@@ -1404,7 +1408,6 @@ void proto_register_camel(void) {
 	&ett_camel_calledpartybcdnumber,
 	&ett_camel_callingpartynumber,
 	&ett_camel_locationnumber,
-	&ett_camel_additionalcallingpartynumber,
 
 #include "packet-camel-ettarr.c"
   };

@@ -170,10 +170,9 @@ am__v_AR_0 = @echo "  AR      " $@;
 am__v_AR_1 = 
 libcodec_a_AR = $(AR) $(ARFLAGS)
 libcodec_a_LIBADD =
-am__dirstamp = $(am__leading_dot)dirstamp
-am__objects_1 = codecs.$(OBJEXT) G711a/G711adecode.$(OBJEXT) \
-	G711u/G711udecode.$(OBJEXT) G722/G722decode.$(OBJEXT) \
-	G726/G726decode.$(OBJEXT) sbc/sbc.$(OBJEXT)
+am__objects_1 = codecs.$(OBJEXT) G711adecode.$(OBJEXT) \
+	G711udecode.$(OBJEXT) G722decode.$(OBJEXT) \
+	G726decode.$(OBJEXT) sbc.$(OBJEXT)
 am__objects_2 =
 am_libcodec_a_OBJECTS = $(am__objects_1) $(am__objects_2)
 libcodec_a_OBJECTS = $(am_libcodec_a_OBJECTS)
@@ -193,12 +192,12 @@ DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 am__mv = mv -f
-COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) \
 	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
@@ -260,8 +259,8 @@ CCDEPMODE = @CCDEPMODE@
 CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
-CFLAGS_SSE42 = @CFLAGS_SSE42@
 CONFIG_ARGS = @CONFIG_ARGS@
+CONFIG_WITH_ARGS = @CONFIG_WITH_ARGS@
 COREFOUNDATION_FRAMEWORKS = @COREFOUNDATION_FRAMEWORKS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -287,7 +286,6 @@ ELINKS = @ELINKS@
 ENABLE_STATIC = @ENABLE_STATIC@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FLOORL_LO = @FLOORL_LO@
 FOP = @FOP@
 GEOIP_LIBS = @GEOIP_LIBS@
 GETOPT_LO = @GETOPT_LO@
@@ -360,7 +358,7 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
-LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDES = @LUA_INCLUDES@
 LUA_LIBS = @LUA_LIBS@
 LYNX = @LYNX@
 MAKEINFO = @MAKEINFO@
@@ -396,14 +394,14 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_LIBS = @PLUGIN_LIBS@
 POD2HTML = @POD2HTML@
 POD2MAN = @POD2MAN@
-POPCOUNT_LO = @POPCOUNT_LO@
 PORTAUDIO_INCLUDES = @PORTAUDIO_INCLUDES@
 PORTAUDIO_LIBS = @PORTAUDIO_LIBS@
 PYTHON = @PYTHON@
+PY_CFLAGS = @PY_CFLAGS@
+PY_LIBS = @PY_LIBS@
 QT_MIN_VERSION = @QT_MIN_VERSION@
 Qt_LIBS = @Qt_LIBS@
 RANLIB = @RANLIB@
-RCC = @RCC@
 RPMBUILD_WITH_ARGS = @RPMBUILD_WITH_ARGS@
 SBC_CFLAGS = @SBC_CFLAGS@
 SBC_LIBS = @SBC_LIBS@
@@ -414,6 +412,8 @@ SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+STRNCASECMP_LO = @STRNCASECMP_LO@
+STRPTIME_C = @STRPTIME_C@
 STRPTIME_LO = @STRPTIME_LO@
 SYSTEMCONFIGURATION_FRAMEWORKS = @SYSTEMCONFIGURATION_FRAMEWORKS@
 UIC = @UIC@
@@ -433,6 +433,7 @@ ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 ac_cv_wireshark_have_rpm = @ac_cv_wireshark_have_rpm@
+ac_ws_python_config = @ac_ws_python_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -462,8 +463,6 @@ echld_test_bin = @echld_test_bin@
 editcap_bin = @editcap_bin@
 editcap_man = @editcap_man@
 exec_prefix = @exec_prefix@
-extcapdir = @extcapdir@
-have_sw_vers = @have_sw_vers@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -484,10 +483,10 @@ mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 plugindir = @plugindir@
-plugins_dir = @plugins_dir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pythondir = @pythondir@
 randpkt_bin = @randpkt_bin@
 randpkt_man = @randpkt_man@
 rawshark_bin = @rawshark_bin@
@@ -610,45 +609,6 @@ $(am__aclocal_m4_deps):
 
 clean-noinstLIBRARIES:
 	-test -z "$(noinst_LIBRARIES)" || rm -f $(noinst_LIBRARIES)
-G711a/$(am__dirstamp):
-	@$(MKDIR_P) G711a
-	@: > G711a/$(am__dirstamp)
-G711a/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) G711a/$(DEPDIR)
-	@: > G711a/$(DEPDIR)/$(am__dirstamp)
-G711a/G711adecode.$(OBJEXT): G711a/$(am__dirstamp) \
-	G711a/$(DEPDIR)/$(am__dirstamp)
-G711u/$(am__dirstamp):
-	@$(MKDIR_P) G711u
-	@: > G711u/$(am__dirstamp)
-G711u/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) G711u/$(DEPDIR)
-	@: > G711u/$(DEPDIR)/$(am__dirstamp)
-G711u/G711udecode.$(OBJEXT): G711u/$(am__dirstamp) \
-	G711u/$(DEPDIR)/$(am__dirstamp)
-G722/$(am__dirstamp):
-	@$(MKDIR_P) G722
-	@: > G722/$(am__dirstamp)
-G722/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) G722/$(DEPDIR)
-	@: > G722/$(DEPDIR)/$(am__dirstamp)
-G722/G722decode.$(OBJEXT): G722/$(am__dirstamp) \
-	G722/$(DEPDIR)/$(am__dirstamp)
-G726/$(am__dirstamp):
-	@$(MKDIR_P) G726
-	@: > G726/$(am__dirstamp)
-G726/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) G726/$(DEPDIR)
-	@: > G726/$(DEPDIR)/$(am__dirstamp)
-G726/G726decode.$(OBJEXT): G726/$(am__dirstamp) \
-	G726/$(DEPDIR)/$(am__dirstamp)
-sbc/$(am__dirstamp):
-	@$(MKDIR_P) sbc
-	@: > sbc/$(am__dirstamp)
-sbc/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) sbc/$(DEPDIR)
-	@: > sbc/$(DEPDIR)/$(am__dirstamp)
-sbc/sbc.$(OBJEXT): sbc/$(am__dirstamp) sbc/$(DEPDIR)/$(am__dirstamp)
 
 libcodec.a: $(libcodec_a_OBJECTS) $(libcodec_a_DEPENDENCIES) $(EXTRA_libcodec_a_DEPENDENCIES) 
 	$(AM_V_at)-rm -f libcodec.a
@@ -657,45 +617,107 @@ libcodec.a: $(libcodec_a_OBJECTS) $(libcodec_a_DEPENDENCIES) $(EXTRA_libcodec_a_
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
-	-rm -f G711a/*.$(OBJEXT)
-	-rm -f G711u/*.$(OBJEXT)
-	-rm -f G722/*.$(OBJEXT)
-	-rm -f G726/*.$(OBJEXT)
-	-rm -f sbc/*.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/G711adecode.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/G711udecode.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/G722decode.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/G726decode.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codecs.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@G711a/$(DEPDIR)/G711adecode.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@G711u/$(DEPDIR)/G711udecode.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@G722/$(DEPDIR)/G722decode.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@G726/$(DEPDIR)/G726decode.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@sbc/$(DEPDIR)/sbc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sbc.Po@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
-@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+G711adecode.o: G711a/G711adecode.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT G711adecode.o -MD -MP -MF $(DEPDIR)/G711adecode.Tpo -c -o G711adecode.o `test -f 'G711a/G711adecode.c' || echo '$(srcdir)/'`G711a/G711adecode.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/G711adecode.Tpo $(DEPDIR)/G711adecode.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='G711a/G711adecode.c' object='G711adecode.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o G711adecode.o `test -f 'G711a/G711adecode.c' || echo '$(srcdir)/'`G711a/G711adecode.c
+
+G711adecode.obj: G711a/G711adecode.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT G711adecode.obj -MD -MP -MF $(DEPDIR)/G711adecode.Tpo -c -o G711adecode.obj `if test -f 'G711a/G711adecode.c'; then $(CYGPATH_W) 'G711a/G711adecode.c'; else $(CYGPATH_W) '$(srcdir)/G711a/G711adecode.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/G711adecode.Tpo $(DEPDIR)/G711adecode.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='G711a/G711adecode.c' object='G711adecode.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o G711adecode.obj `if test -f 'G711a/G711adecode.c'; then $(CYGPATH_W) 'G711a/G711adecode.c'; else $(CYGPATH_W) '$(srcdir)/G711a/G711adecode.c'; fi`
+
+G711udecode.o: G711u/G711udecode.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT G711udecode.o -MD -MP -MF $(DEPDIR)/G711udecode.Tpo -c -o G711udecode.o `test -f 'G711u/G711udecode.c' || echo '$(srcdir)/'`G711u/G711udecode.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/G711udecode.Tpo $(DEPDIR)/G711udecode.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='G711u/G711udecode.c' object='G711udecode.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o G711udecode.o `test -f 'G711u/G711udecode.c' || echo '$(srcdir)/'`G711u/G711udecode.c
+
+G711udecode.obj: G711u/G711udecode.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT G711udecode.obj -MD -MP -MF $(DEPDIR)/G711udecode.Tpo -c -o G711udecode.obj `if test -f 'G711u/G711udecode.c'; then $(CYGPATH_W) 'G711u/G711udecode.c'; else $(CYGPATH_W) '$(srcdir)/G711u/G711udecode.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/G711udecode.Tpo $(DEPDIR)/G711udecode.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='G711u/G711udecode.c' object='G711udecode.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o G711udecode.obj `if test -f 'G711u/G711udecode.c'; then $(CYGPATH_W) 'G711u/G711udecode.c'; else $(CYGPATH_W) '$(srcdir)/G711u/G711udecode.c'; fi`
+
+G722decode.o: G722/G722decode.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT G722decode.o -MD -MP -MF $(DEPDIR)/G722decode.Tpo -c -o G722decode.o `test -f 'G722/G722decode.c' || echo '$(srcdir)/'`G722/G722decode.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/G722decode.Tpo $(DEPDIR)/G722decode.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='G722/G722decode.c' object='G722decode.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o G722decode.o `test -f 'G722/G722decode.c' || echo '$(srcdir)/'`G722/G722decode.c
+
+G722decode.obj: G722/G722decode.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT G722decode.obj -MD -MP -MF $(DEPDIR)/G722decode.Tpo -c -o G722decode.obj `if test -f 'G722/G722decode.c'; then $(CYGPATH_W) 'G722/G722decode.c'; else $(CYGPATH_W) '$(srcdir)/G722/G722decode.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/G722decode.Tpo $(DEPDIR)/G722decode.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='G722/G722decode.c' object='G722decode.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o G722decode.obj `if test -f 'G722/G722decode.c'; then $(CYGPATH_W) 'G722/G722decode.c'; else $(CYGPATH_W) '$(srcdir)/G722/G722decode.c'; fi`
+
+G726decode.o: G726/G726decode.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT G726decode.o -MD -MP -MF $(DEPDIR)/G726decode.Tpo -c -o G726decode.o `test -f 'G726/G726decode.c' || echo '$(srcdir)/'`G726/G726decode.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/G726decode.Tpo $(DEPDIR)/G726decode.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='G726/G726decode.c' object='G726decode.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o G726decode.o `test -f 'G726/G726decode.c' || echo '$(srcdir)/'`G726/G726decode.c
+
+G726decode.obj: G726/G726decode.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT G726decode.obj -MD -MP -MF $(DEPDIR)/G726decode.Tpo -c -o G726decode.obj `if test -f 'G726/G726decode.c'; then $(CYGPATH_W) 'G726/G726decode.c'; else $(CYGPATH_W) '$(srcdir)/G726/G726decode.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/G726decode.Tpo $(DEPDIR)/G726decode.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='G726/G726decode.c' object='G726decode.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o G726decode.obj `if test -f 'G726/G726decode.c'; then $(CYGPATH_W) 'G726/G726decode.c'; else $(CYGPATH_W) '$(srcdir)/G726/G726decode.c'; fi`
+
+sbc.o: sbc/sbc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT sbc.o -MD -MP -MF $(DEPDIR)/sbc.Tpo -c -o sbc.o `test -f 'sbc/sbc.c' || echo '$(srcdir)/'`sbc/sbc.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sbc.Tpo $(DEPDIR)/sbc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sbc/sbc.c' object='sbc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o sbc.o `test -f 'sbc/sbc.c' || echo '$(srcdir)/'`sbc/sbc.c
+
+sbc.obj: sbc/sbc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT sbc.obj -MD -MP -MF $(DEPDIR)/sbc.Tpo -c -o sbc.obj `if test -f 'sbc/sbc.c'; then $(CYGPATH_W) 'sbc/sbc.c'; else $(CYGPATH_W) '$(srcdir)/sbc/sbc.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sbc.Tpo $(DEPDIR)/sbc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sbc/sbc.c' object='sbc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o sbc.obj `if test -f 'sbc/sbc.c'; then $(CYGPATH_W) 'sbc/sbc.c'; else $(CYGPATH_W) '$(srcdir)/sbc/sbc.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -816,16 +838,6 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
-	-rm -f G711a/$(DEPDIR)/$(am__dirstamp)
-	-rm -f G711a/$(am__dirstamp)
-	-rm -f G711u/$(DEPDIR)/$(am__dirstamp)
-	-rm -f G711u/$(am__dirstamp)
-	-rm -f G722/$(DEPDIR)/$(am__dirstamp)
-	-rm -f G722/$(am__dirstamp)
-	-rm -f G726/$(DEPDIR)/$(am__dirstamp)
-	-rm -f G726/$(am__dirstamp)
-	-rm -f sbc/$(DEPDIR)/$(am__dirstamp)
-	-rm -f sbc/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
@@ -837,7 +849,7 @@ clean-am: clean-generic clean-libtool clean-noinstLIBRARIES \
 	mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ./$(DEPDIR) G711a/$(DEPDIR) G711u/$(DEPDIR) G722/$(DEPDIR) G726/$(DEPDIR) sbc/$(DEPDIR)
+	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -883,7 +895,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ./$(DEPDIR) G711a/$(DEPDIR) G711u/$(DEPDIR) G722/$(DEPDIR) G726/$(DEPDIR) sbc/$(DEPDIR)
+	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

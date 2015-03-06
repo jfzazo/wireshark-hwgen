@@ -2,7 +2,7 @@
 # snmp conformation file
 
 
-#.PDU_NEW
+#.PDU
 SMUX-PDUs
 
 #.NO_EMIT
@@ -18,8 +18,6 @@ Trap-PDU/_untag/specific-trap   SpecificTrap
 Messagev2u/datav2u/plaintext v2u_plaintext
 BulkPDU/request-id bulkPDU_request-id
 
-#.FN_PARS Version    VAL_PTR = &snmp_version
-
 #.FN_PARS PDUs
 
 	VAL_PTR = &pdu_type
@@ -30,21 +28,17 @@ gint pdu_type=-1;
   col_clear(actx->pinfo->cinfo, COL_INFO);
 
 %(DEFAULT_BODY)s
-	if( (pdu_type!=-1) && snmp_PDUs_vals[pdu_type].strptr ){
-		col_prepend_fstr(actx->pinfo->cinfo, COL_INFO, "%%s", snmp_PDUs_vals[pdu_type].strptr);
-	}
+  if( (pdu_type!=-1) && snmp_PDUs_vals[pdu_type].strptr ){
+	col_prepend_fstr(actx->pinfo->cinfo, COL_INFO, "%%s", snmp_PDUs_vals[pdu_type].strptr);
+  }
 
 #.END
 
 #.FN_BODY Trap-PDU/_untag
-	generic_trap = 0;
-	enterprise_oid = NULL;
+  generic_trap = 0;
+  enterprise_oid = NULL;
 
 %(DEFAULT_BODY)s
-
-  if (snmp_version != 0) {
-    expert_add_info(actx->pinfo, tree, &ei_snmp_trap_pdu_obsolete);
-  }
 
 #.FN_PARS Trap-PDU/_untag/generic-trap    VAL_PTR = &generic_trap
 
@@ -53,28 +47,28 @@ gint pdu_type=-1;
 
 %(DEFAULT_BODY)s
 
-	if (generic_trap == 6) { /* enterprise specific */
-		const gchar *specific_str = snmp_lookup_specific_trap (specific_trap);
-		if (specific_str) {
-		proto_item_append_text(actx->created_item, " (%%s)", specific_str);
-		}
-	}
+  if (generic_trap == 6) { /* enterprise specific */
+    const gchar *specific_str = snmp_lookup_specific_trap (specific_trap);
+    if (specific_str) {
+      proto_item_append_text(actx->created_item, " (%%s)", specific_str);
+    }
+  }
 #.END
 
 
 #.FN_PARS EnterpriseOID  FN_VARIANT = _str  VAL_PTR = &enterprise_oid
 
 #.FN_BODY EnterpriseOID
-	const gchar* name;
+  const gchar* name;
 
 %(DEFAULT_BODY)s
 
-	if (display_oid && enterprise_oid) {
-		name = oid_resolved_from_string(wmem_packet_scope(), enterprise_oid);
-		if (name) {
-		col_append_fstr (actx->pinfo->cinfo, COL_INFO, " %%s", name);
-		}
-	}
+  if (display_oid && enterprise_oid) {
+    name = oid_resolved_from_string(enterprise_oid);
+    if (name) {
+      col_append_fstr (actx->pinfo->cinfo, COL_INFO, " %%s", name);
+    }
+  }
 
 #.END
 
@@ -92,19 +86,21 @@ gint pdu_type=-1;
 
 #.FN_BODY UsmSecurityParameters/msgAuthoritativeEngineID
 
-	offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index, &usm_p.engine_tvb);
+  offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index,
+                                       &usm_p.engine_tvb);
 	 if (usm_p.engine_tvb) {
 		proto_tree* engine_tree = proto_item_add_subtree(%(ACTX)s->created_item,ett_engineid);
-		dissect_snmp_engineid(engine_tree, actx->pinfo, usm_p.engine_tvb, 0, tvb_length_remaining(usm_p.engine_tvb,0));
+		dissect_snmp_engineid(engine_tree, usm_p.engine_tvb, 0, tvb_length_remaining(usm_p.engine_tvb,0));
 	}
 
 #.FN_BODY SnmpEngineID
 	tvbuff_t* param_tvb = NULL;
 
-	offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index, &param_tvb);
+	offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index,
+                                       &param_tvb);
 	 if (param_tvb) {
 		proto_tree* engine_tree = proto_item_add_subtree(%(ACTX)s->created_item,ett_engineid);
-		dissect_snmp_engineid(engine_tree, actx->pinfo, param_tvb, 0, tvb_length_remaining(param_tvb,0));
+		dissect_snmp_engineid(engine_tree, param_tvb, 0, tvb_length_remaining(param_tvb,0));
 	}
 
 #.FN_PARS UsmSecurityParameters/msgUserName
@@ -143,7 +139,10 @@ gint pdu_type=-1;
 			proto_tree* decrypted_tree;
 
 			if (! check_ScopedPdu(cleartext_tvb)) {
-				proto_tree_add_expert(encryptedpdu_tree, actx->pinfo, &ei_snmp_decrypted_data_bad_formatted, cleartext_tvb, 0, -1);
+				proto_item* cause = proto_tree_add_text(encryptedpdu_tree, cleartext_tvb, 0, -1,
+											"Decrypted data not formatted as expected, wrong key?");
+
+				expert_add_info(actx->pinfo, cause, &ei_snmp_decrypted_data_bad_formatted);
 
 				col_set_str(actx->pinfo->cinfo, COL_INFO, "encryptedPDU: Decrypted data not formatted as expected");
 
@@ -151,12 +150,12 @@ gint pdu_type=-1;
 			}
 
 
-			add_new_data_source(actx->pinfo, cleartext_tvb, "Decrypted ScopedPDU");
+            add_new_data_source(actx->pinfo, cleartext_tvb, "Decrypted ScopedPDU");
 
 			decrypted_item = proto_tree_add_item(encryptedpdu_tree, hf_snmp_decryptedPDU,cleartext_tvb,0,-1,ENC_NA);
 			decrypted_tree = proto_item_add_subtree(decrypted_item,ett_decrypted);
 			dissect_snmp_ScopedPDU(FALSE, cleartext_tvb, 0, actx, decrypted_tree, -1);
-			}
+		 }
 	} else {
 			col_set_str(actx->pinfo->cinfo, COL_INFO, "encryptedPDU: privKey Unknown");
 	}
@@ -217,17 +216,17 @@ gint pdu_type=-1;
 	tvbuff_t *parameter_tvb = NULL;
 
  %(DEFAULT_BODY)s
-	if (parameter_tvb){
-		guint8 v3_flags = tvb_get_guint8(parameter_tvb, 0);
-		proto_tree* flags_tree = proto_item_add_subtree(%(ACTX)s->created_item,ett_msgFlags);
+ if (parameter_tvb){
+	guint8 v3_flags = tvb_get_guint8(parameter_tvb, 0);
+	proto_tree* flags_tree = proto_item_add_subtree(%(ACTX)s->created_item,ett_msgFlags);
 
-		proto_tree_add_item(flags_tree, hf_snmp_v3_flags_report, parameter_tvb, 0, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(flags_tree, hf_snmp_v3_flags_crypt, parameter_tvb, 0, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(flags_tree, hf_snmp_v3_flags_auth, parameter_tvb, 0, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_item(flags_tree, hf_snmp_v3_flags_report, parameter_tvb, 0, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_item(flags_tree, hf_snmp_v3_flags_crypt, parameter_tvb, 0, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_item(flags_tree, hf_snmp_v3_flags_auth, parameter_tvb, 0, 1, ENC_BIG_ENDIAN);
 
-		usm_p.encrypted = v3_flags & TH_CRYPT ? TRUE : FALSE;
-		usm_p.authenticated = v3_flags & TH_AUTH ? TRUE : FALSE;
-	}
+	usm_p.encrypted = v3_flags & TH_CRYPT ? TRUE : FALSE;
+	usm_p.authenticated = v3_flags & TH_AUTH ? TRUE : FALSE;
+  }
 
 
 #.TYPE_ATTR

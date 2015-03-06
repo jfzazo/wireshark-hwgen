@@ -30,9 +30,11 @@
 #include <string.h>
 
 #include "epan/packet.h"
+#include "epan/packet_info.h"
 #include "epan/tap.h"
 #include "epan/value_string.h"
-#include "epan/stat_tap_ui.h"
+#include "epan/stat_cmd_args.h"
+#include "epan/asn1.h"
 #include "epan/dissectors/packet-camel.h"
 
 void register_tap_listener_camelcounter(void);
@@ -47,16 +49,16 @@ struct camelcounter_t {
 static void camelcounter_reset(void *phs)
 {
   struct camelcounter_t * p_counter= ( struct camelcounter_t *) phs;
-  memset(p_counter, 0, sizeof(struct camelcounter_t));
+  memset(p_counter,0,sizeof(struct camelcounter_t));
 }
 
 static int camelcounter_packet(void *phs,
-                               packet_info *pinfo _U_,
-                               epan_dissect_t *edt _U_,
-                               const void *phi)
+			       packet_info *pinfo _U_,
+			       epan_dissect_t *edt _U_,
+			       const void *phi)
 {
   struct camelcounter_t * p_counter =(struct camelcounter_t *)phs;
-  const struct camelsrt_info_t * pi = (const struct camelsrt_info_t *)phi;
+  const struct camelsrt_info_t * pi=(const struct camelsrt_info_t *)phi;
   if (pi->opcode != 255)
     p_counter->camel_msg[pi->opcode]++;
 
@@ -68,82 +70,57 @@ static void camelcounter_draw(void *phs)
 {
   struct camelcounter_t * p_counter= (struct camelcounter_t *)phs;
   int i;
-  gchar *tmp_str;
   printf("\n");
   printf("CAMEL Message and Response Status Counter:\n");
   printf("------------------------------------------\n");
 
-  for (i=0; i<camel_MAX_NUM_OPR_CODES; i++) {
+  for(i=0;i<camel_MAX_NUM_OPR_CODES;i++) {
     /* Message counter */
-    if (p_counter->camel_msg[i] != 0) {
-      tmp_str = val_to_str_wmem(NULL, i, camel_opr_code_strings, "Unknown message (%d)");
-      printf("%30s ", tmp_str);
-      wmem_free(NULL, tmp_str);
+    if(p_counter->camel_msg[i]!=0) {
+      printf("%30s ", val_to_str(i,camel_opr_code_strings,"Unknown message "));
       printf("%6d\n", p_counter->camel_msg[i]);
     }
   } /* Message Type */
   printf("------------------------------------------\n");
 }
 
-static void camelcounter_init(const char *opt_arg, void *userdata _U_)
+static void camelcounter_init(const char *opt_arg, void* userdata _U_)
 {
   struct camelcounter_t *p_camelcounter;
   GString *error_string;
 
-  p_camelcounter = g_new(struct camelcounter_t, 1);
-  if (!strncmp(opt_arg, "camel,counter,", 13)) {
-    p_camelcounter->filter = g_strdup(opt_arg+13);
+  p_camelcounter = g_new(struct camelcounter_t,1);
+  if(!strncmp(opt_arg,"camel,counter,",13)){
+    p_camelcounter->filter=g_strdup(opt_arg+13);
   } else {
-    p_camelcounter->filter = NULL;
+    p_camelcounter->filter=NULL;
   }
 
   camelcounter_reset(p_camelcounter);
 
-  error_string = register_tap_listener("CAMEL",
-                                     p_camelcounter,
-                                     p_camelcounter->filter,
-                                     0,
-                                     NULL,
-                                     camelcounter_packet,
-                                     camelcounter_draw);
+  error_string=register_tap_listener("CAMEL",
+				     p_camelcounter,
+				     p_camelcounter->filter,
+				     0,
+				     NULL,
+				     camelcounter_packet,
+				     camelcounter_draw);
 
-  if (error_string) {
+  if(error_string){
     /* error, we failed to attach to the tap. clean up */
     g_free(p_camelcounter->filter);
     g_free(p_camelcounter);
 
     fprintf(stderr, "tshark: Couldn't register camel,counter tap: %s\n",
-            error_string->str);
+	    error_string->str);
     g_string_free(error_string, TRUE);
     exit(1);
   }
 }
 
-static stat_tap_ui camelcounter_ui = {
-  REGISTER_STAT_GROUP_GENERIC,
-  NULL,
-  "camel,counter",
-  camelcounter_init,
-  -1,
-  0,
-  NULL
-};
 
 void  /* Next line mandatory */
 register_tap_listener_camelcounter(void)
 {
-  register_stat_tap_ui(&camelcounter_ui, NULL);
+  register_stat_cmd_arg("camel,counter", camelcounter_init, NULL);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

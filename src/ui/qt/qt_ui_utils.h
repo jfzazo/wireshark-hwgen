@@ -25,17 +25,12 @@
 
 // xxx - copied from ui/gtk/gui_utils.h
 
-/** @file
- *  Utility functions for working with the Wireshark and GLib APIs.
- */
-
 #include <stdio.h>
 
 #include "config.h"
 
 #include <glib.h>
 #include <epan/timestamp.h>
-#include <epan/value_string.h>
 
 #include <QFont>
 #include <QString>
@@ -71,8 +66,6 @@ struct remote_host_t {
     gboolean nocap_local;
 };
 
-struct _address;
-
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
@@ -93,52 +86,6 @@ gchar *qstring_strdup(QString q_string);
  * @return A QString instance created from the input string.
  */
 QString gchar_free_to_qstring(gchar *glib_string);
-
-/** Convert an address to a QString using address_to_str().
- *
- * @param address A pointer to an address.
- *
- * @return A QString representation of the address. May be the null string (QString())
- */
-const QString address_to_qstring(const struct _address *address);
-
-/** Convert an address to a QString using address_to_display().
- *
- * @param address A pointer to an address.
- *
- * @return A QString representation of the address. May be the null string (QString())
- */
-const QString address_to_display_qstring(const struct _address *address);
-
-/** Convert a value_string to a QString using val_to_str_wmem().
- *
- * @param val The value to convert to string.
- * @param vs value_string array.
- * @param fmt Formatting for value not in array.
- *
- * @return A QString representation of the value_string.
- */
-const QString val_to_qstring(const guint32 val, const value_string *vs, const char *fmt)
-G_GNUC_PRINTF(3, 0);
-
-/** Convert an value_string_ext to a QString using val_to_str_ext_wmem().
- *
- * @param val The value to convert to string.
- * @param vse value_string_ext array.
- * @param fmt Formatting for value not in array.
- *
- * @return A QString representation of the value_string_ext.
- */
-const QString val_ext_to_qstring(const guint32 val, value_string_ext *vse, const char *fmt)
-G_GNUC_PRINTF(3, 0);
-
-/** Convert bits per second value human-readable QString using format_size().
- *
- * @param val The value to convert to string.
- *
- * @return A QString representation of the data rate.
- */
-const QString bits_s_to_qstring(const double val);
 
 /**
  * Round the current size of a font up to its next "smooth" size.

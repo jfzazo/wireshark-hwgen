@@ -26,13 +26,12 @@
 #define NGHTTP2_BUF_H
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#  include <config.h>
 #endif /* HAVE_CONFIG_H */
 
 #include <nghttp2.h>
 
 #include "nghttp2_int.h"
-#include "nghttp2_mem.h"
 
 typedef struct {
   /* This points to the beginning of the buffer. The effective range
@@ -59,23 +58,24 @@ typedef struct {
 #define nghttp2_buf_pos_offset(BUF) ((ssize_t)((BUF)->pos - (BUF)->begin))
 #define nghttp2_buf_last_offset(BUF) ((ssize_t)((BUF)->last - (BUF)->begin))
 
-#define nghttp2_buf_shift_right(BUF, AMT)                                      \
-  do {                                                                         \
-    (BUF)->pos += AMT;                                                         \
-    (BUF)->last += AMT;                                                        \
-  } while (0)
+#define nghttp2_buf_shift_right(BUF, AMT) \
+  do {                                    \
+    (BUF)->pos += AMT;                    \
+    (BUF)->last += AMT;                   \
+  } while(0)
 
-#define nghttp2_buf_shift_left(BUF, AMT)                                       \
-  do {                                                                         \
-    (BUF)->pos -= AMT;                                                         \
-    (BUF)->last -= AMT;                                                        \
-  } while (0)
+#define nghttp2_buf_shift_left(BUF, AMT)            \
+  do {                                              \
+    (BUF)->pos -= AMT;                              \
+    (BUF)->last -= AMT;                             \
+  } while(0)
 
 /*
  * Initializes the |buf|. No memory is allocated in this function. Use
  * nghttp2_buf_reserve() or nghttp2_buf_reserve2() to allocate memory.
  */
 void nghttp2_buf_init(nghttp2_buf *buf);
+
 
 /*
  * Initializes the |buf| and allocates at least |initial| bytes of
@@ -87,12 +87,12 @@ void nghttp2_buf_init(nghttp2_buf *buf);
  * NGHTTP2_ERR_NOMEM
  *     Out of memory
  */
-int nghttp2_buf_init2(nghttp2_buf *buf, size_t initial, nghttp2_mem *mem);
+int nghttp2_buf_init2(nghttp2_buf *buf, size_t initial);
 
 /*
  * Frees buffer in |buf|.
  */
-void nghttp2_buf_free(nghttp2_buf *buf, nghttp2_mem *mem);
+void nghttp2_buf_free(nghttp2_buf *buf);
 
 /*
  * Extends buffer so that nghttp2_buf_cap() returns at least
@@ -105,7 +105,23 @@ void nghttp2_buf_free(nghttp2_buf *buf, nghttp2_mem *mem);
  * NGHTTP2_ERR_NOMEM
  *     Out of memory
  */
-int nghttp2_buf_reserve(nghttp2_buf *buf, size_t new_cap, nghttp2_mem *mem);
+int nghttp2_buf_reserve(nghttp2_buf *buf, size_t new_cap);
+
+/*
+ * This function behaves like nghttp2_buf_reserve(), but new capacity
+ * is calculated as nghttp2_buf_pos_offset(buf) + new_rel_cap. In
+ * other words, this function reserves memory at least |new_rel_cap|
+ * bytes from buf->pos.
+ */
+int nghttp2_buf_pos_reserve(nghttp2_buf *buf, size_t new_rel_cap);
+
+/*
+ * This function behaves like nghttp2_buf_reserve(), but new capacity
+ * is calculated as nghttp2_buf_last_offset(buf) + new_rel_cap. In
+ * other words, this function reserves memory at least |new_rel_cap|
+ * bytes from buf->last.
+ */
+int nghttp2_buf_last_reserve(nghttp2_buf *buf, size_t new_rel_cap);
 
 /*
  * Resets pos, last, mark member of |buf| to buf->begin.
@@ -136,8 +152,6 @@ typedef struct {
   nghttp2_buf_chain *head;
   /* Buffer pointer where write occurs. */
   nghttp2_buf_chain *cur;
-  /* Memory allocator */
-  nghttp2_mem *mem;
   /* The buffer capacity of each buf */
   size_t chunk_length;
   /* The maximum number of nghttp2_buf_chain */
@@ -156,15 +170,15 @@ typedef struct {
  * This is the same as calling nghttp2_bufs_init2 with the given
  * arguments and offset = 0.
  */
-int nghttp2_bufs_init(nghttp2_bufs *bufs, size_t chunk_length, size_t max_chunk,
-                      nghttp2_mem *mem);
+int nghttp2_bufs_init(nghttp2_bufs *bufs, size_t chunk_length,
+                      size_t max_chunk);
 
 /*
  * This is the same as calling nghttp2_bufs_init3 with the given
  * arguments and chunk_keep = max_chunk.
  */
 int nghttp2_bufs_init2(nghttp2_bufs *bufs, size_t chunk_length,
-                       size_t max_chunk, size_t offset, nghttp2_mem *mem);
+                       size_t max_chunk, size_t offset);
 
 /*
  * Initializes |bufs|. Each buffer size is given in the
@@ -186,8 +200,7 @@ int nghttp2_bufs_init2(nghttp2_bufs *bufs, size_t chunk_length,
  *     long.
  */
 int nghttp2_bufs_init3(nghttp2_bufs *bufs, size_t chunk_length,
-                       size_t max_chunk, size_t chunk_keep, size_t offset,
-                       nghttp2_mem *mem);
+                       size_t max_chunk, size_t chunk_keep, size_t offset);
 
 /*
  * Frees any related resources to the |bufs|.
@@ -207,30 +220,13 @@ void nghttp2_bufs_free(nghttp2_bufs *bufs);
  * NGHTTP2_ERR_NOMEM
  *     Out of memory.
  */
-int nghttp2_bufs_wrap_init(nghttp2_bufs *bufs, uint8_t *begin, size_t len,
-                           nghttp2_mem *mem);
+int nghttp2_bufs_wrap_init(nghttp2_bufs *bufs, uint8_t *begin, size_t len);
 
 /*
  * Frees any related resource to the |bufs|.  This function does not
  * free supplied buffer provided in nghttp2_bufs_wrap_init().
  */
 void nghttp2_bufs_wrap_free(nghttp2_bufs *bufs);
-
-/*
- * Reallocates internal buffer using |chunk_length|.  The max_chunk,
- * chunk_keep and offset do not change.  After successful allocation
- * of new buffer, previous buffers are deallocated without copying
- * anything into new buffers.  chunk_used is reset to 1.
- *
- * This function returns 0 if it succeeds, or one of the following
- * negative error codes:
- *
- * NGHTTP2_ERR_NOMEM
- *     Out of memory.
- * NGHTTP2_ERR_INVALID_ARGUMENT
- *     chunk_length < offset
- */
-int nghttp2_bufs_realloc(nghttp2_bufs *bufs, size_t chunk_length);
 
 /*
  * Appends the |data| of length |len| to the |bufs|. The write starts
@@ -268,15 +264,15 @@ int nghttp2_bufs_addb(nghttp2_bufs *bufs, uint8_t b);
  */
 int nghttp2_bufs_addb_hold(nghttp2_bufs *bufs, uint8_t b);
 
-#define nghttp2_bufs_fast_addb(BUFS, B)                                        \
-  do {                                                                         \
-    *(BUFS)->cur->buf.last++ = B;                                              \
-  } while (0)
+#define nghttp2_bufs_fast_addb(BUFS, B)          \
+  do {                                           \
+    *(BUFS)->cur->buf.last++ = B;                \
+  } while(0)
 
-#define nghttp2_bufs_fast_addb_hold(BUFS, B)                                   \
-  do {                                                                         \
-    *(BUFS)->cur->buf.last = B;                                                \
-  } while (0)
+#define nghttp2_bufs_fast_addb_hold(BUFS, B)     \
+  do {                                           \
+    *(BUFS)->cur->buf.last = B;                  \
+  } while(0)
 
 /*
  * Performs bitwise-OR of |b| at bufs->cur->buf.last. A new buffers
@@ -298,15 +294,15 @@ int nghttp2_bufs_orb(nghttp2_bufs *bufs, uint8_t b);
  */
 int nghttp2_bufs_orb_hold(nghttp2_bufs *bufs, uint8_t b);
 
-#define nghttp2_bufs_fast_orb(BUFS, B)                                         \
-  do {                                                                         \
-    *(BUFS)->cur->buf.last++ |= B;                                             \
-  } while (0)
+#define nghttp2_bufs_fast_orb(BUFS, B)          \
+  do {                                          \
+    *(BUFS)->cur->buf.last++ |= B;              \
+  } while(0)
 
-#define nghttp2_bufs_fast_orb_hold(BUFS, B)                                    \
-  do {                                                                         \
-    *(BUFS)->cur->buf.last |= B;                                               \
-  } while (0)
+#define nghttp2_bufs_fast_orb_hold(BUFS, B)     \
+  do {                                          \
+    *(BUFS)->cur->buf.last |= B;                \
+  } while(0)
 
 /*
  * Copies all data stored in |bufs| to the contagious buffer.  This
@@ -346,10 +342,10 @@ void nghttp2_bufs_reset(nghttp2_bufs *bufs);
 int nghttp2_bufs_advance(nghttp2_bufs *bufs);
 
 /* Sets bufs->cur to bufs->head */
-#define nghttp2_bufs_rewind(BUFS)                                              \
-  do {                                                                         \
-    (BUFS)->cur = (BUFS)->head;                                                \
-  } while (0)
+#define nghttp2_bufs_rewind(BUFS)               \
+  do {                                          \
+    (BUFS)->cur = (BUFS)->head;                 \
+  } while(0)
 
 /*
  * Move bufs->cur, from the current position, using next member, to

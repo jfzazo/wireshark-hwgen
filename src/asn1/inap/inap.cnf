@@ -46,6 +46,8 @@ ERROR.&ParameterType
 OPERATION.&ArgumentType
 OPERATION.&ResultType
 
+#.PDU
+
 # This table creates the value_sting to name Inap operation codes and errors
 # in file packet-inap-table.c which is included in the template file
 #
@@ -210,12 +212,11 @@ static const inap_err_t inap_err_tab[] = {
 #.FN_PARS Code/global FN_VARIANT = _str  VAL_PTR = &obj_id
 
 #.FN_BODY ExtensionField/value
-  proto_tree *ext_tree;
-  ext_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_inap_extention_data, NULL, "Extension Data");
+  proto_tree_add_text(tree, tvb, offset, -1, "Extension Data");
   if (obj_id){
-	 offset=call_ber_oid_callback(obj_id, tvb, offset, actx->pinfo, ext_tree, NULL);
+	 offset=call_ber_oid_callback(obj_id, tvb, offset, actx->pinfo, tree, NULL);
   }else{
-	 call_dissector(data_handle, tvb, actx->pinfo, ext_tree);
+	 call_dissector(data_handle, tvb, actx->pinfo, tree);
 	 offset = tvb_length_remaining(tvb,offset);
   }
 
@@ -272,7 +273,7 @@ dissect_isup_called_party_number_parameter(parameter_tvb, tree, NULL);
 
  if (!parameter_tvb)
 	return offset;
- dissect_isup_original_called_number_parameter(parameter_tvb, actx->pinfo, tree, NULL);
+ dissect_isup_original_called_number_parameter(parameter_tvb, tree, NULL);
 
 #.FN_BODY RedirectingPartyID VAL_PTR = &parameter_tvb
 
@@ -297,23 +298,6 @@ dissect_isup_called_party_number_parameter(parameter_tvb, tree, NULL);
 
  subtree = proto_item_add_subtree(actx->created_item, ett_inap_HighLayerCompatibility);
  dissect_q931_high_layer_compat_ie(parameter_tvb, 0, tvb_length_remaining(parameter_tvb,0), subtree);
-
- #.FN_BODY Cause VAL_PTR = &parameter_tvb
- /*
-  * -- Indicates the cause for interface related information. Refer to the Q.763 Cause  parameter for encoding
-  * -- For the use of cause and location values refer to Q.850.
-  */
-tvbuff_t *parameter_tvb;
-guint8 Cause_value;
-proto_tree *subtree;
-
-%(DEFAULT_BODY)s
-
- if (!parameter_tvb)
-	return offset;
- subtree = proto_item_add_subtree(actx->created_item, ett_inap_cause);
-
- dissect_q931_cause_ie(parameter_tvb, 0, tvb_reported_length_remaining(parameter_tvb,0), subtree, hf_inap_cause_indicator, &Cause_value, isup_parameter_type_value);
 
 #.TYPE_ATTR
 CallingPartysCategory TYPE = FT_UINT16  DISPLAY = BASE_DEC|BASE_EXT_STRING  STRINGS = &isup_calling_partys_category_value_ext

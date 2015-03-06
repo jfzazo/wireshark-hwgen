@@ -23,6 +23,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/asn1.h>
 #include <epan/tap.h>
@@ -62,8 +63,8 @@ static gint ett_credssp = -1;
 /*
 * Dissect CredSSP PDUs
 */
-static int
-dissect_credssp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *data)
+static void
+dissect_credssp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 {
 	proto_item *item=NULL;
 	proto_tree *tree=NULL;
@@ -76,7 +77,7 @@ dissect_credssp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void
   	col_clear(pinfo->cinfo, COL_INFO);
 
 	creds_type = -1;
-	return dissect_TSRequest_PDU(tvb, pinfo, tree, data);
+	dissect_TSRequest_PDU(tvb, pinfo, tree);
 }
 
 static gboolean
@@ -88,12 +89,11 @@ dissect_credssp_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree,
   gboolean pc;
   gint32 tag;
   guint32 length;
-  gint8 ver;
 
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
 
   /* Look for SEQUENCE, CONTEXT 0, and INTEGER 2 */
-  if(tvb_captured_length(tvb) > 7) {
+  if(tvb_length(tvb) > 7) {
     offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
     if((ber_class == BER_CLASS_UNI) && (tag == BER_UNI_TAG_SEQUENCE) && (pc == TRUE)) {
       offset = get_ber_length(tvb, offset, NULL, NULL);
@@ -103,8 +103,7 @@ dissect_credssp_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree,
         offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
         if((ber_class == BER_CLASS_UNI) && (tag == BER_UNI_TAG_INTEGER)) {
           offset = get_ber_length(tvb, offset, &length, NULL);
-          ver = tvb_get_guint8(tvb, offset);
-          if((length == 1) && ((ver == 2) || (ver == 3))) {
+          if((length == 1) && (tvb_get_guint8(tvb, offset) == 2)) {
             if (have_tap_listener(exported_pdu_tap)) {
               exp_pdu_data_t *exp_pdu_data;
               guint8 tags_bit_field;
@@ -120,7 +119,7 @@ dissect_credssp_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree,
 
               tap_queue_packet(exported_pdu_tap, pinfo, exp_pdu_data);
             }
-            dissect_credssp(tvb, pinfo, parent_tree, NULL);
+            dissect_credssp(tvb, pinfo, parent_tree);
             return TRUE;
           }
         }
@@ -161,14 +160,14 @@ void proto_register_credssp(void) {
 
   /* Register protocol */
   proto_credssp = proto_register_protocol(PNAME, PSNAME, PFNAME);
-  new_register_dissector("credssp", dissect_credssp, proto_credssp);
+  register_dissector("credssp", dissect_credssp, proto_credssp);
 
   /* Register fields and subtrees */
   proto_register_field_array(proto_credssp, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
 
   /* heuristic dissectors for any premable e.g. CredSSP before RDP */
-  credssp_heur_subdissector_list = register_heur_dissector_list("credssp");
+  register_heur_dissector_list("credssp", &credssp_heur_subdissector_list);
 
 }
 

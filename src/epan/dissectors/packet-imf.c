@@ -25,9 +25,12 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <epan/addr_resolv.h>
 #include <epan/prefs.h>
 #include <epan/uat.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 #include <wsutil/str_util.h>
 
 #include "packet-ber.h"
@@ -276,7 +279,7 @@ static guint num_header_fields = 0;
 static GHashTable *custom_field_table = NULL;
 
 static void
-header_fields_update_cb(void *r, char **err)
+header_fields_update_cb(void *r, const char **err)
 {
   header_field_t *rec = (header_field_t *)r;
   char c;
@@ -535,7 +538,7 @@ dissect_imf_siolabel(tvbuff_t *tvb, int offset, int length, proto_item *item, pa
     }
 
     if (tvb_strneql(tvb, item_offset, "marking", 7) == 0) {
-      proto_item_append_text(item, ": %s", tvb_get_string_enc(wmem_packet_scope(), tvb, value_offset, value_length, ENC_ASCII));
+      proto_item_append_text(item, ": %s", tvb_get_string(wmem_packet_scope(), tvb, value_offset, value_length));
       proto_tree_add_item(tree, hf_imf_siolabel_marking, tvb, value_offset, value_length, ENC_ASCII|ENC_NA);
 
     } else if (tvb_strneql(tvb, item_offset, "fgcolor", 7) == 0) {
@@ -545,15 +548,15 @@ dissect_imf_siolabel(tvbuff_t *tvb, int offset, int length, proto_item *item, pa
       proto_tree_add_item(tree, hf_imf_siolabel_bgcolor, tvb, value_offset, value_length, ENC_ASCII|ENC_NA);
 
     } else if (tvb_strneql(tvb, item_offset, "type", 4) == 0) {
-      type = tvb_get_string_enc(wmem_packet_scope(), tvb, value_offset + 1, value_length - 2, ENC_ASCII); /* quoted */
+      type = tvb_get_string(wmem_packet_scope(), tvb, value_offset + 1, value_length - 2); /* quoted */
       proto_tree_add_item(tree, hf_imf_siolabel_type, tvb, value_offset, value_length, ENC_ASCII|ENC_NA);
 
     } else if (tvb_strneql(tvb, item_offset, "label", 5) == 0) {
-      gchar *label = tvb_get_string_enc(wmem_packet_scope(), tvb, value_offset + 1, value_length - 2, ENC_ASCII); /* quoted */
+      gchar *label = tvb_get_string(wmem_packet_scope(), tvb, value_offset + 1, value_length - 2); /* quoted */
       wmem_strbuf_append(label_string, label);
 
       if (tvb_get_guint8(tvb, item_offset + 5) == '*') { /* continuations */
-        int num = (int)strtol(tvb_get_string_enc(wmem_packet_scope(), tvb, item_offset + 6, value_offset - item_offset + 6, ENC_ASCII), NULL, 10);
+        int num = (int)strtol(tvb_get_string(wmem_packet_scope(), tvb, item_offset + 6, value_offset - item_offset + 6), NULL, 10);
         proto_tree_add_string_format(tree, hf_imf_siolabel_label, tvb, value_offset, value_length,
                                      label, "Label[%d]: \"%s\"", num, label);
       } else {
@@ -574,11 +577,11 @@ dissect_imf_siolabel(tvbuff_t *tvb, int offset, int length, proto_item *item, pa
     if (strcmp (type, ":ess") == 0) {
       label_tvb = base64_to_tvb(tvb, wmem_strbuf_get_str(label_string));
       add_new_data_source(pinfo, label_tvb, "ESS Security Label");
-      dissect_ess_ESSSecurityLabel_PDU(label_tvb, pinfo, tree, NULL);
+      dissect_ess_ESSSecurityLabel_PDU(label_tvb, pinfo, tree);
     } else if (strcmp (type, ":x411") == 0) {
       label_tvb = base64_to_tvb(tvb, wmem_strbuf_get_str(label_string));
       add_new_data_source(pinfo, label_tvb, "X.411 Security Label");
-      dissect_p1_MessageSecurityLabel_PDU(label_tvb, pinfo, tree, NULL);
+      dissect_p1_MessageSecurityLabel_PDU(label_tvb, pinfo, tree);
     }
   }
 }
@@ -611,7 +614,7 @@ dissect_imf_content_type(tvbuff_t *tvb, int offset, int length, proto_item *item
     proto_tree_add_item(ct_tree, hf_imf_content_type_type, tvb, offset, len, ENC_ASCII|ENC_NA);
     if(type) {
       /* This string will be automatically freed */
-      (*type) = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII);
+      (*type) = tvb_get_string(wmem_packet_scope(), tvb, offset, len);
     }
     end_offset = imf_find_field_end (tvb, first_colon + 1, offset + length, NULL);
     if (end_offset == -1) {
@@ -622,7 +625,7 @@ dissect_imf_content_type(tvbuff_t *tvb, int offset, int length, proto_item *item
     proto_tree_add_item(ct_tree, hf_imf_content_type_parameters, tvb, first_colon + 1, len, ENC_ASCII|ENC_NA);
     if(parameters) {
       /* This string will be automatically freed */
-      (*parameters) = tvb_get_string_enc(wmem_packet_scope(), tvb, first_colon + 1, len, ENC_ASCII);
+      (*parameters) = tvb_get_string(wmem_packet_scope(), tvb, first_colon + 1, len);
     }
   }
 }
@@ -677,7 +680,6 @@ dissect_imf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   proto_item  *item;
   proto_tree  *unknown_tree, *text_tree;
   char  *content_type_str = NULL;
-  char  *content_encoding_str = NULL;
   char  *parameters = NULL;
   int   hf_id;
   gint  start_offset = 0;
@@ -693,8 +695,10 @@ dissect_imf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   col_set_str(pinfo->cinfo, COL_PROTOCOL, PSNAME);
   col_clear(pinfo->cinfo, COL_INFO);
 
-  item = proto_tree_add_item(tree, proto_imf, tvb, 0, -1, ENC_NA);
-  tree = proto_item_add_subtree(item, ett_imf);
+  if(tree){
+    item = proto_tree_add_item(tree, proto_imf, tvb, 0, -1, ENC_NA);
+    tree = proto_item_add_subtree(item, ett_imf);
+  }
 
   max_length = tvb_length(tvb);
   /* first go through the tvb until we find a blank line and extract the content type if
@@ -713,7 +717,7 @@ dissect_imf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       /* XXX: flag an error */
       break;
     } else {
-      key = tvb_get_string_enc(wmem_packet_scope(), tvb, start_offset, end_offset - start_offset, ENC_ASCII);
+      key = tvb_get_string(wmem_packet_scope(), tvb, start_offset, end_offset - start_offset);
 
       /* convert to lower case */
       ascii_strdown_inplace (key);
@@ -784,8 +788,6 @@ dissect_imf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         dissect_imf_content_type(tvb, start_offset, end_offset - start_offset, item,
                                  &content_type_str, &parameters);
 
-      } else if (hf_id == hf_imf_content_transfer_encoding) {
-        content_encoding_str = tvb_get_string_enc (wmem_packet_scope(), tvb, value_offset, end_offset - value_offset - 2, ENC_ASCII);
       } else if(f_info->subdissector) {
 
         /* we have a subdissector */
@@ -806,17 +808,15 @@ dissect_imf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   /* now dissect the MIME based upon the content type */
 
   if(content_type_str && media_type_dissector_table) {
-    col_set_fence(pinfo->cinfo, COL_INFO);
+    void* pd_save;
+    pd_save = pinfo->private_data;
+    pinfo->private_data = parameters;
 
-    if(content_encoding_str && !g_ascii_strncasecmp(content_encoding_str, "base64", 6)) {
-      char *data = tvb_get_string_enc(wmem_packet_scope(), tvb, end_offset, tvb_reported_length(tvb), ENC_ASCII);
-      next_tvb = base64_to_tvb(tvb, data);
-      add_new_data_source(pinfo, next_tvb, content_encoding_str);
-    } else {
-      next_tvb = tvb_new_subset_remaining(tvb, end_offset);
-    }
+    next_tvb = tvb_new_subset_remaining(tvb, end_offset);
 
-    dissector_try_string(media_type_dissector_table, content_type_str, next_tvb, pinfo, tree, parameters);
+    dissector_try_string(media_type_dissector_table, content_type_str, next_tvb, pinfo, tree, NULL);
+
+    pinfo->private_data = pd_save;
   } else {
 
     /* just show the lines or highlight the rest of the buffer as message text */
@@ -835,7 +835,9 @@ dissect_imf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       /*
        * Put this line.
        */
-      proto_tree_add_format_wsp_text(text_tree, tvb, start_offset, end_offset - start_offset);
+      proto_tree_add_text(text_tree, tvb, start_offset, end_offset - start_offset,
+                          "%s",
+                          tvb_format_text_wsp(tvb, start_offset, end_offset - start_offset));
       col_append_sep_str(pinfo->cinfo, COL_INFO, ", ",
                          tvb_format_text_wsp(tvb, start_offset, end_offset - start_offset));
 
@@ -870,10 +872,14 @@ header_fields_initialize_cb (void)
     /* Unregister all fields */
     for (i = 0; i < hf_size; i++) {
       proto_unregister_field (proto_imf, *(hf[i].p_id));
+
       g_free (hf[i].p_id);
+      g_free ((char *) hf[i].hfinfo.name);
+      g_free ((char *) hf[i].hfinfo.abbrev);
+      g_free ((char *) hf[i].hfinfo.blurb);
     }
     g_hash_table_destroy (custom_field_table);
-    proto_add_deregistered_data (hf);
+    g_free (hf);
     custom_field_table = NULL;
   }
 
@@ -1275,16 +1281,3 @@ proto_reg_handoff_imf(void)
   media_type_dissector_table = find_dissector_table("media_type");
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

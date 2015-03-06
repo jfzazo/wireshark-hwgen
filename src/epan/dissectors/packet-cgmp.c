@@ -22,6 +22,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 /*
@@ -115,14 +117,14 @@ proto_register_cgmp(void)
 		{ &hf_cgmp_usa,
 		{ "Unicast Source Address",	"cgmp.usa", FT_ETHER, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }},
-	};
+        };
 	static gint *ett[] = {
 		&ett_cgmp,
 	};
 
-	proto_cgmp = proto_register_protocol("Cisco Group Management Protocol",
+        proto_cgmp = proto_register_protocol("Cisco Group Management Protocol",
 	    "CGMP", "cgmp");
-	proto_register_field_array(proto_cgmp, hf, array_length(hf));
+        proto_register_field_array(proto_cgmp, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
 }
 
@@ -135,16 +137,3 @@ proto_reg_handoff_cgmp(void)
 	dissector_add_uint("llc.cisco_pid", 0x2001, cgmp_handle);
 	dissector_add_uint("ethertype", 0x2001, cgmp_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

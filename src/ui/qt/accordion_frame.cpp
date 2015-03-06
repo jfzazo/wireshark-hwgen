@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+
 #include "config.h"
 #include <glib.h>
 
@@ -26,26 +27,24 @@
 
 #include "ui/util.h"
 
-#include <QLayout>
-
 const int duration_ = 150;
 
 AccordionFrame::AccordionFrame(QWidget *parent) :
-    QFrame(parent),
-    frame_height_(0)
+    QFrame(parent)
 {
     QString subframe_style(
-//                ".QFrame {"
-//                "  background: palette(window);"
-//                "  padding-top: 0.1em;"
-//                "  padding-bottom: 0.1em;"
-//                "  border-bottom: 1px solid palette(shadow);"
-//                "}"
+                ".QFrame {"
+                "  background: palette(window);"
+                "  padding-top: 0.1em;"
+                "  padding-bottom: 0.1em;"
+                "  border-bottom: 1px solid palette(shadow);"
+                "}"
                 "QLineEdit#goToLineEdit {"
                 "  max-width: 5em;"
                 "}"
                 );
     setStyleSheet(subframe_style);
+    frame_height_ = height();
     animation_ = new QPropertyAnimation(this, "maximumHeight");
     animation_->setDuration(duration_);
     animation_->setEasingCurve(QEasingCurve::InOutQuad);
@@ -54,40 +53,16 @@ AccordionFrame::AccordionFrame(QWidget *parent) :
 
 void AccordionFrame::animatedShow()
 {
-    if (isVisible()) {
-        show();
-        return;
-    }
-
     if (strlen (get_conn_cfilter()) < 1) {
-        QWidget *parent = parentWidget();
-
-        if (parent && parent->layout()) {
-            // Force our parent layout to update its geometry. There are a number
-            // of ways of doing this. Calling invalidate + activate seems to
-            // be the best.
-            show();
-            parent->layout()->invalidate(); // Calls parent->layout()->update()
-            parent->layout()->activate(); // Calculates sizes then calls parent->updateGeometry()
-            frame_height_ = height();
-            hide();
-        }
-        if (frame_height_ > 0) {
-            animation_->setStartValue(0);
-            animation_->setEndValue(frame_height_);
-            animation_->start();
-        }
+        animation_->setStartValue(0);
+        animation_->setEndValue(frame_height_);
+        animation_->start();
     }
     show();
 }
 
 void AccordionFrame::animatedHide()
 {
-    if (!isVisible()) {
-        hide();
-        return;
-    }
-
     if (strlen (get_conn_cfilter()) < 1) {
         animation_->setStartValue(frame_height_);
         animation_->setEndValue(0);

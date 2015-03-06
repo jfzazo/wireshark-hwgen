@@ -34,11 +34,10 @@
 #include <glib.h>
 #include <epan/packet.h>
 #include <epan/to_str.h>
+#include <epan/emem.h>
 #include <epan/dissectors/packet-tcp.h>
-#include <epan/dissectors/packet-udp.h>
 #include "follow.h"
 #include <epan/conversation.h>
-#include <epan/tap.h>
 
 #define MAX_IPADDR_LEN  16
 
@@ -56,10 +55,7 @@ FILE* data_out_file = NULL;
 gboolean empty_tcp_stream;
 gboolean incomplete_tcp_stream;
 
-static guint32 stream_to_follow[MAX_STREAM] = {0};
-static gboolean find_addr[MAX_STREAM] = {FALSE};
-static gboolean find_index[MAX_STREAM] = {FALSE};
-static address tcp_addr[2];
+static guint32 tcp_stream_to_follow = 0;
 static guint8  ip_address[2][MAX_IPADDR_LEN];
 static guint   port[2];
 static guint   bytes_written[2];
@@ -91,7 +87,6 @@ build_follow_conv_filter( packet_info *pi ) {
   int len;
   conversation_t *conv=NULL;
   struct tcp_analysis *tcpd;
-  struct udp_analysis *udpd;
   wmem_list_frame_t* protos;
   int proto_id;
   const char* proto_name;
@@ -119,11 +114,11 @@ build_follow_conv_filter( packet_info *pi ) {
        (pi->net_src.type == AT_IPv6 && pi->net_dst.type == AT_IPv6))
        && is_tcp && (conv=find_conversation(pi->fd->num, &pi->src, &pi->dst, pi->ptype,
               pi->srcport, pi->destport, 0)) != NULL ) {
-    /* TCP over IPv4/6 */
+    /* TCP over IPv4 */
     tcpd=get_tcp_conversation_data(conv, pi);
     if (tcpd) {
       buf = g_strdup_printf("tcp.stream eq %d", tcpd->stream);
-      stream_to_follow[TCP_STREAM] = tcpd->stream;
+      tcp_stream_to_follow = tcpd->stream;
       if (pi->net_src.type == AT_IPv4) {
         len = 4;
         is_ipv6 = FALSE;
@@ -135,25 +130,27 @@ build_follow_conv_filter( packet_info *pi ) {
       return NULL;
     }
   }
-  else if( ((pi->net_src.type == AT_IPv4 && pi->net_dst.type == AT_IPv4) ||
-            (pi->net_src.type == AT_IPv6 && pi->net_dst.type == AT_IPv6))
-          && is_udp && (conv=find_conversation(pi->fd->num, &pi->src, &pi->dst, pi->ptype,
-              pi->srcport, pi->destport, 0)) != NULL ) {
-    /* UDP over IPv4/6 */
-    udpd=get_udp_conversation_data(conv, pi);
-    if (udpd) {
-      buf = g_strdup_printf("udp.stream eq %d", udpd->stream);
-      stream_to_follow[UDP_STREAM] = udpd->stream;
-      if (pi->net_src.type == AT_IPv4) {
-        len = 4;
-        is_ipv6 = FALSE;
-      } else {
-        len = 16;
-        is_ipv6 = TRUE;
-      }
-    } else {
-      return NULL;
-    }
+  else if( pi->net_src.type == AT_IPv4 && pi->net_dst.type == AT_IPv4
+          && is_udp ) {
+  /* UDP over IPv4 */
+    buf = g_strdup_printf(
+            "(ip.addr eq %s and ip.addr eq %s) and (udp.port eq %d and udp.port eq %d)",
+            ip_to_str((const guint8 *)pi->net_src.data),
+            ip_to_str((const guint8 *)pi->net_dst.data),
+            pi->srcport, pi->destport );
+    len = 4;
+    is_ipv6 = FALSE;
+  }
+  else if( pi->net_src.type == AT_IPv6 && pi->net_dst.type == AT_IPv6
+       && is_udp ) {
+    /* UDP over IPv6 */
+    buf = g_strdup_printf(
+            "(ipv6.addr eq %s and ipv6.addr eq %s) and (udp.port eq %d and udp.port eq %d)",
+            ip6_to_str((const struct e_in6_addr *)pi->net_src.data),
+            ip6_to_str((const struct e_in6_addr *)pi->net_dst.data),
+            pi->srcport, pi->destport );
+    len = 16;
+    is_ipv6 = TRUE;
   }
   else {
     return NULL;
@@ -165,62 +162,30 @@ build_follow_conv_filter( packet_info *pi ) {
   return buf;
 }
 
-static gboolean
-udp_follow_packet(void *tapdata _U_, packet_info *pinfo,
-                  epan_dissect_t *edt _U_, const void *data _U_)
-{
-  if (find_addr[UDP_STREAM]) {
-    if (pinfo->net_src.type == AT_IPv6) {
-      is_ipv6 = TRUE;
-    } else {
-      is_ipv6 = FALSE;
-    }
-    memcpy(ip_address[0], pinfo->net_src.data, pinfo->net_src.len);
-    memcpy(ip_address[1], pinfo->net_dst.data, pinfo->net_dst.len);
-    port[0] = pinfo->srcport;
-    port[1] = pinfo->destport;
-    find_addr[UDP_STREAM] = FALSE;
-  }
-
-  return FALSE;
-}
-
-void
-reset_udp_follow(void) {
-  remove_tap_listener(&stream_to_follow[UDP_STREAM]);
-  find_addr[UDP_STREAM] = FALSE;
-  find_addr[UDP_STREAM] = FALSE;
-}
+static gboolean         find_tcp_addr;
+static address          tcp_addr[2];
+static gboolean         find_tcp_index;
 
 gchar*
-build_follow_index_filter(stream_type stream) {
+build_follow_index_filter(void) {
   gchar *buf;
 
-  find_addr[stream] = TRUE;
-  if (stream == TCP_STREAM) {
-    buf = g_strdup_printf("tcp.stream eq %d", stream_to_follow[TCP_STREAM]);
-  } else {
-    GString * error_string;
-    buf = g_strdup_printf("udp.stream eq %d", stream_to_follow[UDP_STREAM]);
-    error_string = register_tap_listener("udp_follow", &stream_to_follow[UDP_STREAM], buf, 0, NULL, udp_follow_packet, NULL);
-    if (error_string) {
-      g_string_free(error_string, TRUE);
-    }
-  }
+  find_tcp_addr = TRUE;
+  buf = g_strdup_printf("tcp.stream eq %d", tcp_stream_to_follow);
   return buf;
 }
 
 /* select a tcp stream to follow via it's address/port pairs */
 gboolean
-follow_addr(stream_type stream, const address *addr0, guint port0,
-            const address *addr1, guint port1)
+follow_tcp_addr(const address *addr0, guint port0,
+                const address *addr1, guint port1)
 {
   if (addr0 == NULL || addr1 == NULL || addr0->type != addr1->type ||
       port0 > G_MAXUINT16 || port1 > G_MAXUINT16 )  {
     return FALSE;
   }
 
-  if (find_index[stream] || find_addr[stream]) {
+  if (find_tcp_index || find_tcp_addr) {
     return FALSE;
   }
 
@@ -233,32 +198,29 @@ follow_addr(stream_type stream, const address *addr0, guint port0,
     break;
   }
 
+  find_tcp_index = TRUE;
 
   memcpy(ip_address[0], addr0->data, addr0->len);
+  SET_ADDRESS(&tcp_addr[0], addr0->type, addr0->len, ip_address[0]);
   port[0] = port0;
 
   memcpy(ip_address[1], addr1->data, addr1->len);
+  SET_ADDRESS(&tcp_addr[1], addr1->type, addr1->len, ip_address[1]);
   port[1] = port1;
-
-  if (stream == TCP_STREAM) {
-    find_index[TCP_STREAM] = TRUE;
-    SET_ADDRESS(&tcp_addr[0], addr0->type, addr0->len, ip_address[0]);
-    SET_ADDRESS(&tcp_addr[1], addr1->type, addr1->len, ip_address[1]);
-  }
 
   return TRUE;
 }
 
-/* select a stream to follow via its index */
+/* select a tcp stream to follow via its index */
 gboolean
-follow_index(stream_type stream, guint32 indx)
+follow_tcp_index(guint32 indx)
 {
-  if (find_index[stream] || find_addr[stream]) {
+  if (find_tcp_index || find_tcp_addr) {
     return FALSE;
   }
 
-  find_addr[stream] = TRUE;
-  stream_to_follow[stream] = indx;
+  find_tcp_addr = TRUE;
+  tcp_stream_to_follow = indx;
   memset(ip_address, 0, sizeof ip_address);
   port[0] = port[1] = 0;
 
@@ -266,8 +228,8 @@ follow_index(stream_type stream, guint32 indx)
 }
 
 guint32
-get_follow_index(stream_type stream) {
-  return stream_to_follow[stream];
+get_follow_tcp_index(void) {
+  return tcp_stream_to_follow;
 }
 
 /* here we are going to try and reconstruct the data portion of a TCP
@@ -293,7 +255,7 @@ reassemble_tcp( guint32 tcp_stream, guint32 sequence, guint32 acknowledgement,
   src_index = -1;
 
   /* First, check if this packet should be processed. */
-  if (find_index[TCP_STREAM]) {
+  if (find_tcp_index) {
     if ((port[0] == srcport && port[1] == dstport &&
          ADDRESSES_EQUAL(&tcp_addr[0], net_src) &&
          ADDRESSES_EQUAL(&tcp_addr[1], net_dst))
@@ -301,14 +263,14 @@ reassemble_tcp( guint32 tcp_stream, guint32 sequence, guint32 acknowledgement,
         (port[1] == srcport && port[0] == dstport &&
          ADDRESSES_EQUAL(&tcp_addr[1], net_src) &&
          ADDRESSES_EQUAL(&tcp_addr[0], net_dst))) {
-      find_index[TCP_STREAM] = FALSE;
-      stream_to_follow[TCP_STREAM] = tcp_stream;
+      find_tcp_index = FALSE;
+      tcp_stream_to_follow = tcp_stream;
     }
     else {
       return;
     }
   }
-  else if ( tcp_stream != stream_to_follow[TCP_STREAM] )
+  else if ( tcp_stream != tcp_stream_to_follow )
     return;
 
   if ((net_src->type != AT_IPv4 && net_src->type != AT_IPv6) ||
@@ -324,8 +286,8 @@ reassemble_tcp( guint32 tcp_stream, guint32 sequence, guint32 acknowledgement,
   memcpy(dstx, net_dst->data, len);
 
   /* follow_tcp_index() needs to learn address/port pairs */
-  if (find_addr[TCP_STREAM]) {
-    find_addr[TCP_STREAM] = FALSE;
+  if (find_tcp_addr) {
+    find_tcp_addr = FALSE;
     memcpy(ip_address[0], net_src->data, net_src->len);
     port[0] = srcport;
     memcpy(ip_address[1], net_dst->data, net_dst->len);
@@ -556,8 +518,8 @@ reset_tcp_reassembly(void)
 
   empty_tcp_stream = TRUE;
   incomplete_tcp_stream = FALSE;
-  find_addr[TCP_STREAM] = FALSE;
-  find_index[TCP_STREAM] = FALSE;
+  find_tcp_addr = FALSE;
+  find_tcp_index = FALSE;
   for( i=0; i<2; i++ ) {
     seq[i] = 0;
     memset(src_addr[i], '\0', MAX_IPADDR_LEN);
@@ -590,16 +552,3 @@ write_packet_data( int idx, tcp_stream_chunk *sc, const char *data )
   bytes_written[idx] += sc->dlen;
   empty_tcp_stream = FALSE;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

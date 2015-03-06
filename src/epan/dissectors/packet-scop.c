@@ -22,6 +22,7 @@
 
 #include "config.h"
 
+#include <string.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include "packet-tcp.h"
@@ -77,7 +78,7 @@ void proto_reg_handoff_scop(void);
 static void dissect_scop_zip       (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 static void dissect_scop_bridge    (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 
-static guint get_scop_length(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data);
+static guint get_scop_length(packet_info *pinfo _U_, tvbuff_t *tvb, int offset);
 
 /*  Initialize protocol and registered fields */
 static int proto_scop = -1;
@@ -221,7 +222,7 @@ dissect_scop(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
  *---------------------------------------------------------------
  */
 static guint
-get_scop_length(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_scop_length(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     /* Byte  0:   Protocol Type.
      * Byte  1:   Protocol Version.
@@ -421,15 +422,3 @@ void proto_reg_handoff_scop(void)
     lastPort_secured = gPREF_scop_port_secured;
 } /* proto_reg_handoff_scop */
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

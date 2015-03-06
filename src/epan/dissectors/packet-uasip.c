@@ -23,13 +23,14 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
+
 #include "epan/packet.h"
 #include "epan/prefs.h"
-#if 0
-#include <epan/tap.h>
-#endif
+#include "epan/tap.h"
 #include <epan/addr_resolv.h>
-#include <wsutil/report_err.h>
 
 #include "packet-uaudp.h"
 
@@ -217,11 +218,11 @@ static void _dissect_uasip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
                 {
                     if (direction == SYS_TO_TERM)
                     {
-                        call_dissector(ua_sys_to_term_handle, tvb_new_subset_length(tvb, offset, datalen), pinfo, tree);
+                        call_dissector(ua_sys_to_term_handle, tvb_new_subset(tvb, offset, datalen, datalen), pinfo, tree);
                     }
                     else if (direction == TERM_TO_SYS)
                     {
-                        call_dissector(ua_term_to_sys_handle, tvb_new_subset_length(tvb, offset, datalen), pinfo, tree);
+                        call_dissector(ua_term_to_sys_handle, tvb_new_subset(tvb, offset, datalen, datalen), pinfo, tree);
                     }
                     else
                     {
@@ -484,20 +485,7 @@ void proto_reg_handoff_uasip(void)
         if (str_to_ip(pref_proxy_ipaddr_s, proxy_ipaddr)) {
             use_proxy_ipaddr = TRUE;
         } else {
-            report_failure("uasip: Invalid 'Proxy IP Address': \"%s\"", pref_proxy_ipaddr_s);
+            g_warning("uasip: Invalid 'Proxy IP Address': \"%s\"", pref_proxy_ipaddr_s);
         }
     }
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

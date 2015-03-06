@@ -27,10 +27,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
 
-#include "packet-dcc.h"
+#include <packet-dcc.h>
 
 void proto_register_dcc(void);
 void proto_reg_handoff_dcc(void);
@@ -57,7 +57,6 @@ static int hf_dcc_ck_sum = -1;
 static int hf_dcc_date = -1;
 
 static int hf_dcc_target = -1;
-static int hf_dcc_response_text = -1;
 
 static int hf_dcc_adminop = -1;
 static int hf_dcc_adminval = -1;
@@ -71,20 +70,11 @@ static int hf_dcc_trace_query = -1;
 static int hf_dcc_trace_ridc = -1;
 static int hf_dcc_trace_flood = -1;
 
-static int hf_dcc_addr = -1;
-static int hf_dcc_id = -1;
-static int hf_dcc_last_used = -1;
-static int hf_dcc_requests = -1;
-static int hf_dcc_pad = -1;
-static int hf_dcc_unused = -1;
-
 static gint ett_dcc = -1;
 static gint ett_dcc_opnums = -1;
 static gint ett_dcc_op = -1;
 static gint ett_dcc_ck = -1;
 static gint ett_dcc_trace = -1;
-
-static expert_field ei_dcc_len = EI_INIT;
 
 /* Utility macros */
 #define D_SIGNATURE() \
@@ -92,18 +82,19 @@ static expert_field ei_dcc_len = EI_INIT;
 		offset, (int)sizeof(DCC_SIGNATURE), ENC_NA); \
 	offset += (int)sizeof(DCC_SIGNATURE);
 
-#define D_LABEL(hf_label, len, encoding) \
-	proto_tree_add_item(dcc_optree, hf_label, tvb, offset, len, encoding); \
+#define D_LABEL(label,len) \
+	proto_tree_add_text(dcc_optree, tvb, offset, len, label); \
 	offset += len;
 
-#define D_TEXT(hf_label, endpad) { \
+#define D_TEXT(label, endpad) { \
 	int next_offset,left; \
 	while (tvb_offset_exists(tvb, offset+endpad)) { \
 		left = tvb_length_remaining(tvb,offset) - endpad; \
 		tvb_find_line_end(tvb, offset, left, &next_offset, \
 		    FALSE); \
-		proto_tree_add_item(dcc_optree, hf_label, tvb, offset, \
-			next_offset - offset, ENC_ASCII|ENC_NA); \
+		proto_tree_add_text(dcc_optree, tvb, offset, \
+			next_offset - offset, "%s: %s", \
+			label, tvb_format_text(tvb, offset, next_offset - offset)); \
 		offset = next_offset; \
 	} \
 }
@@ -124,11 +115,12 @@ static expert_field ei_dcc_len = EI_INIT;
 
 
 #define D_CHECKSUM() { \
-	proto_tree *cktree; \
-	cktree = proto_tree_add_subtree_format(dcc_optree, tvb, offset, (int)sizeof(DCC_CK), \
-		ett_dcc_ck, NULL, "Checksum - %s", val_to_str(tvb_get_guint8(tvb,offset), \
+	proto_tree *cktree, *ckti; \
+	ckti = proto_tree_add_text(dcc_optree, tvb, offset, (int)sizeof(DCC_CK), \
+		"Checksum - %s", val_to_str(tvb_get_guint8(tvb,offset), \
 		dcc_cktype_vals, \
 		"Unknown Type: %u")); \
+	cktree = proto_item_add_subtree(ckti, ett_dcc_ck); \
 	proto_tree_add_item(cktree, hf_dcc_ck_type, tvb, offset, 1, ENC_BIG_ENDIAN); \
 	offset += 1; \
 	proto_tree_add_item(cktree, hf_dcc_ck_len, tvb, offset, 1, ENC_BIG_ENDIAN); \
@@ -141,68 +133,68 @@ static expert_field ei_dcc_len = EI_INIT;
 
 /* Lookup string tables */
 static const value_string dcc_op_vals[] = {
-	{DCC_OP_INVALID,    "Invalid Op"},
-	{DCC_OP_NOP,	    "No-Op"},
-	{DCC_OP_REPORT,	    "Report and Query"},
-	{DCC_OP_QUERY,	    "Query"},
+	{DCC_OP_INVALID, "Invalid Op"},
+	{DCC_OP_NOP, 	"No-Op"},
+	{DCC_OP_REPORT, "Report and Query"},
+	{DCC_OP_QUERY, "Query"},
 	{DCC_OP_QUERY_RESP, "Server Response"},
-	{DCC_OP_ADMN,	    "Admin"},
-	{DCC_OP_OK,	    "Ok"},
-	{DCC_OP_ERROR,	    "Server Failing"},
-	{DCC_OP_DELETE,	    "Delete Checksum(s)"},
+	{DCC_OP_ADMN, "Admin"},
+	{DCC_OP_OK, "Ok"},
+	{DCC_OP_ERROR, "Server Failing"},
+	{DCC_OP_DELETE, "Delete Checksum(s)"},
 	{0, NULL}
 };
 
 static const value_string dcc_cktype_vals[] = {
-	{DCC_CK_INVALID,    "Invalid/Deleted from DB when seen"},
-	{DCC_CK_IP,	    "MD5 of binary source IPv6 address"},
-	{DCC_CK_ENV_FROM,   "MD5 of envelope Mail From value"},
-	{DCC_CK_FROM,	    "MD5 of header From: line"},
-	{DCC_CK_SUB,	    "MD5 of substitute header line"},
+	{DCC_CK_INVALID, "Invalid/Deleted from DB when seen"},
+	{DCC_CK_IP, 	"MD5 of binary source IPv6 address"},
+	{DCC_CK_ENV_FROM, "MD5 of envelope Mail From value"},
+	{DCC_CK_FROM, "MD5 of header From: line"},
+	{DCC_CK_SUB, "MD5 of substitute header line"},
 	{DCC_CK_MESSAGE_ID, "MD5 of header Message-ID: line"},
-	{DCC_CK_RECEIVED,   "MD5 of last header Received: line"},
-	{DCC_CK_BODY,	    "MD5 of body"},
-	{DCC_CK_FUZ1,	    "MD5 of filtered body - FUZ1"},
-	{DCC_CK_FUZ2,	    "MD5 of filtered body - FUZ2"},
-	{DCC_CK_FUZ3,	    "MD5 of filtered body - FUZ3"},
-	{DCC_CK_FUZ4,	    "MD5 of filtered body - FUZ4"},
-	{DCC_CK_SRVR_ID,    "hostname for server-ID check "},
-	{DCC_CK_ENV_TO,	    "MD5 of envelope Rcpt To value"},
+	{DCC_CK_RECEIVED, "MD5 of last header Received: line"},
+	{DCC_CK_BODY, "MD5 of body"},
+	{DCC_CK_FUZ1, "MD5 of filtered body - FUZ1"},
+	{DCC_CK_FUZ2, "MD5 of filtered body - FUZ2"},
+	{DCC_CK_FUZ3, "MD5 of filtered body - FUZ3"},
+	{DCC_CK_FUZ4, "MD5 of filtered body - FUZ4"},
+	{DCC_CK_SRVR_ID, "hostname for server-ID check "},
+	{DCC_CK_ENV_TO, "MD5 of envelope Rcpt To value"},
 	{0, NULL},
 };
 
 static const value_string dcc_adminop_vals[] = {
-	{DCC_AOP_OK,	      "Never sent"},
-	{DCC_AOP_STOP,	      "Stop Gracefully"},
-	{DCC_AOP_NEW_IDS,     "Load keys and client IDs"},
-	{DCC_AOP_FLOD,	      "Flood control"},
-	{DCC_AOP_DB_UNLOCK,   "Start Switch to new database"},
-	{DCC_AOP_DB_NEW,      "Finish Switch to new database"},
-	{DCC_AOP_STATS,	      "Return counters"},
+	{DCC_AOP_OK, "Never sent"},
+	{DCC_AOP_STOP, "Stop Gracefully"},
+	{DCC_AOP_NEW_IDS, "Load keys and client IDs"},
+	{DCC_AOP_FLOD, "Flood control"},
+	{DCC_AOP_DB_UNLOCK, "Start Switch to new database"},
+	{DCC_AOP_DB_NEW, "Finish Switch to new database"},
+	{DCC_AOP_STATS, "Return counters"},
 	{DCC_AOP_STATS_CLEAR, "Return and zero counters"},
-	{DCC_AOP_TRACE_ON,    "Enable tracing"},
-	{DCC_AOP_TRACE_OFF,   "Disable tracing"},
+	{DCC_AOP_TRACE_ON, "Enable tracing"},
+	{DCC_AOP_TRACE_OFF, "Disable tracing"},
 	{DCC_AOP_CUR_CLIENTS, "List clients"},
 	{0, NULL},
 };
 
 static const value_string dcc_target_vals[] = {
 	{DCC_TGTS_TOO_MANY, "Targets (>= 16777200)"},
-	{DCC_TGTS_OK,	    "Certified not spam"},
-	{DCC_TGTS_OK2,	    "Half certified not spam"},
-	{DCC_TGTS_DEL,	    "Deleted checksum"},
-	{DCC_TGTS_INVALID,  "Invalid"},
+	{DCC_TGTS_OK, "Certified not spam"},
+	{DCC_TGTS_OK2, "Half certified not spam"},
+	{DCC_TGTS_DEL, "Deleted checksum"},
+	{DCC_TGTS_INVALID, "Invalid"},
 	{0, NULL},
 };
 
 static const value_string dcc_floodop_vals[] = {
-	{DCC_AOP_FLOD_CHECK,	   "Check"},
-	{DCC_AOP_FLOD_SHUTDOWN,	   "Shutdown"},
-	{DCC_AOP_FLOD_HALT,	   "Halt"},
-	{DCC_AOP_FLOD_RESUME,	   "Resume"},
-	{DCC_AOP_FLOD_REWIND,	   "Rewind"},
-	{DCC_AOP_FLOD_LIST,	   "List"},
-	{DCC_AOP_FLOD_STATS,	   "Stats"},
+	{DCC_AOP_FLOD_CHECK, "Check"},
+	{DCC_AOP_FLOD_SHUTDOWN, "Shutdown"},
+	{DCC_AOP_FLOD_HALT, "Halt"},
+	{DCC_AOP_FLOD_RESUME, "Resume"},
+	{DCC_AOP_FLOD_REWIND, "Rewind"},
+	{DCC_AOP_FLOD_LIST, "List"},
+	{DCC_AOP_FLOD_STATS, "Stats"},
 	{DCC_AOP_FLOD_STATS_CLEAR, "Clear Stats"},
 	{0,NULL},
 };
@@ -210,9 +202,8 @@ static const value_string dcc_floodop_vals[] = {
 static gboolean
 dissect_dcc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-	proto_tree *dcc_tree, *dcc_optree, *dcc_opnumtree, *ti;
+	proto_tree      *dcc_tree, *dcc_optree, *dcc_opnumtree, *ti;
 	proto_tree *dcc_tracetree;
-	proto_item *len_item;
 	int offset = 0;
 	int client_is_le = 0;
 	int op = 0;
@@ -224,7 +215,7 @@ dissect_dcc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 	}
 
 	/* get at least a full packet structure */
-	if ( tvb_reported_length(tvb) < sizeof(DCC_HDR) ) {
+	if ( tvb_length(tvb) < sizeof(DCC_HDR) ) {
 		/* Doesn't have enough bytes to contain packet header. */
 		return FALSE;
 	}
@@ -238,22 +229,23 @@ dissect_dcc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 		"%s: %s",
 		is_response ? "Response" : "Request",
 		val_to_str(tvb_get_guint8(tvb, offset+3),
-			 dcc_op_vals, "Unknown Op: %u"));
-
-	ti = proto_tree_add_item(tree, proto_dcc, tvb, offset, -1,
-		ENC_NA);
-	dcc_tree = proto_item_add_subtree(ti, ett_dcc);
-
-	len_item = proto_tree_add_item(dcc_tree, hf_dcc_len, tvb,
-		offset, 2, ENC_BIG_ENDIAN);
-
-	if ( tvb_reported_length(tvb) < tvb_get_ntohs(tvb, offset)) {
-		/* Doesn't have number of bytes that header claims. */
-		expert_add_info(pinfo, len_item, &ei_dcc_len);
-	}
-	offset += 2;
+			 dcc_op_vals, "Unknown Op: %u")
+	);
 
 	if (tree) {
+		ti = proto_tree_add_item(tree, proto_dcc, tvb, offset, -1,
+			ENC_NA);
+		dcc_tree = proto_item_add_subtree(ti, ett_dcc);
+
+		proto_tree_add_item(dcc_tree, hf_dcc_len, tvb,
+			offset, 2, ENC_BIG_ENDIAN);
+
+		if ( tvb_length(tvb) < tvb_get_ntohs(tvb, offset)) {
+			/* Doesn't have number of bytes that header claims. */
+			proto_tree_add_text(dcc_tree, tvb, offset, 2, "Error - packet is shorter than header claims!");
+		}
+		offset += 2;
+
 		proto_tree_add_item(dcc_tree, hf_dcc_pkt_vers, tvb,
 			offset, 1, ENC_BIG_ENDIAN);
 		offset += 1;
@@ -267,7 +259,8 @@ dissect_dcc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 			offset, 4, ENC_BIG_ENDIAN);
 		offset += 4;
 
-		dcc_opnumtree = proto_tree_add_subtree(dcc_tree, tvb, offset, -1, ett_dcc_opnums, NULL, "Operation Numbers (Opaque to Server)");
+		ti = proto_tree_add_text(dcc_tree, tvb, offset, -1, "Operation Numbers (Opaque to Server)");
+		dcc_opnumtree = proto_item_add_subtree(ti, ett_dcc_opnums);
 
 		/* Note - these are indeterminate - they are sortof considered opaque to the client */
 		/* Make some attempt to figure out if this data is little endian, not guaranteed to be
@@ -296,8 +289,9 @@ dissect_dcc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 			offset, 4, client_is_le);
 		offset += 4;
 
-		dcc_optree = proto_tree_add_subtree_format(dcc_tree, tvb, offset, -1, ett_dcc_op, NULL,
-			"Operation: %s", val_to_str(op, dcc_op_vals, "Unknown Op: %u"));
+		ti = proto_tree_add_text(dcc_tree, tvb, offset, -1, "Operation: %s",
+			val_to_str(op, dcc_op_vals, "Unknown Op: %u"));
+		dcc_optree = proto_item_add_subtree(ti, ett_dcc_op);
 
 		switch(op) {
 			case DCC_OP_NOP:
@@ -330,14 +324,14 @@ dissect_dcc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 						(int)sizeof(DCC_SIGNATURE);
 					if ( left_local == sizeof(DCC_ADMN_RESP_CLIENTS) )
 					{
-						D_LABEL(hf_dcc_addr, 16, ENC_NA);
-						D_LABEL(hf_dcc_id, (int)sizeof(DCC_CLNT_ID), ENC_BIG_ENDIAN);
-						D_LABEL(hf_dcc_last_used, 4, ENC_BIG_ENDIAN);
-						D_LABEL(hf_dcc_requests, 4, ENC_BIG_ENDIAN);
+						D_LABEL("Addr", 16);
+						D_LABEL("Id", (int)sizeof(DCC_CLNT_ID));
+						D_LABEL("Last Used", 4);
+						D_LABEL("Requests", 4);
 					}
 					else
 					{
-						D_TEXT(hf_dcc_response_text, (int)sizeof(DCC_SIGNATURE));
+						D_TEXT("Response Text", (int)sizeof(DCC_SIGNATURE));
 					}
 					D_SIGNATURE();
 				}
@@ -383,7 +377,7 @@ dissect_dcc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 					offset += 4;
 
 					offset += 1; /* admin op we did in reverse order */
-					D_LABEL(hf_dcc_pad, 3, ENC_NA);
+					D_LABEL("Pad", 3);
 					D_SIGNATURE();
 				}
 				break;
@@ -393,7 +387,7 @@ dissect_dcc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 					offset, 1, ENC_BIG_ENDIAN);
 				offset += 1;
 
-				D_LABEL(hf_dcc_unused, 1, ENC_NA);
+				D_LABEL("Unused", 1);
 
 				proto_tree_add_item(dcc_optree, hf_dcc_qdelay_ms, tvb,
 					offset, 2, ENC_BIG_ENDIAN);
@@ -483,10 +477,6 @@ proto_register_dcc(void)
 				"Target", "dcc.target", FT_UINT32, BASE_HEX,
 				VALS(dcc_target_vals), 0, NULL, HFILL }},
 
-			{ &hf_dcc_response_text, {
-				"Response Text", "dcc.response_text", FT_BYTES, BASE_NONE,
-				NULL, 0, NULL, HFILL }},
-
 			{ &hf_dcc_date, {
 				"Date", "dcc.date", FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL,
 				NULL, 0, NULL, HFILL }},
@@ -535,31 +525,7 @@ proto_register_dcc(void)
 				"Flood Control Operation", "dcc.floodop", FT_UINT32, BASE_DEC,
 				VALS(dcc_floodop_vals), 0, NULL, HFILL }},
 
-			{ &hf_dcc_id, {
-				"Id", "dcc.id", FT_UINT32, BASE_DEC,
-				NULL, 0, NULL, HFILL }},
-
-			{ &hf_dcc_last_used, {
-				"Last Used", "dcc.last_used", FT_UINT32, BASE_DEC,
-				NULL, 0, NULL, HFILL }},
-
-			{ &hf_dcc_requests, {
-				"Requests", "dcc.requests", FT_UINT32, BASE_DEC,
-				NULL, 0, NULL, HFILL }},
-
-			{ &hf_dcc_addr, {
-				"Addr", "dcc.addr", FT_BYTES, BASE_NONE,
-				NULL, 0, NULL, HFILL }},
-
-			{ &hf_dcc_pad, {
-				"Pad", "dcc.pad", FT_BYTES, BASE_NONE,
-				NULL, 0, NULL, HFILL }},
-
-			{ &hf_dcc_unused, {
-				"Unused", "dcc.unused", FT_BYTES, BASE_NONE,
-				NULL, 0, NULL, HFILL }},
-		};
-
+        };
 	static gint *ett[] = {
 		&ett_dcc,
 		&ett_dcc_op,
@@ -568,18 +534,12 @@ proto_register_dcc(void)
 		&ett_dcc_trace,
 	};
 
-	static ei_register_info ei[] = {
-		{ &ei_dcc_len, { "dcc.len.short", PI_MALFORMED, PI_ERROR, "Error - packet is shorter than header claims!", EXPFILL }},
-	};
-
-	expert_module_t* expert_dcc;
-
-	proto_dcc = proto_register_protocol("Distributed Checksum Clearinghouse protocol", "DCC", "dcc");
+	proto_dcc = proto_register_protocol("Distributed Checksum Clearinghouse protocol",
+	    "DCC", "dcc");
 
 	proto_register_field_array(proto_dcc, hf, array_length(hf));
+
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_dcc = expert_register_protocol(proto_dcc);
-	expert_register_field_array(expert_dcc, ei, array_length(ei));
 }
 
 void
@@ -587,16 +547,3 @@ proto_reg_handoff_dcc(void)
 {
 	heur_dissector_add("udp", dissect_dcc, proto_dcc);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

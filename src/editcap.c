@@ -26,7 +26,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,16 +50,8 @@
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_GETOPT_H
-#include <getopt.h>
-#endif
-
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
-#endif
-
-#ifdef HAVE_LIBZ
-#include <zlib.h>     /* to get the libz version number */
 #endif
 
 #include "wtap.h"
@@ -77,7 +69,7 @@
 #endif
 #endif
 
-#ifndef HAVE_STRPTIME
+#ifdef NEED_STRPTIME_H
 # include "wsutil/strptime.h"
 #endif
 
@@ -87,8 +79,8 @@
 #include <wsutil/strnatcmp.h>
 #include <wsutil/md5.h>
 #include <wsutil/plugins.h>
-#include <wsutil/crash_info.h>
-#include <wsutil/ws_version_info.h>
+
+#include "version.h"
 
 #include "ringbuffer.h" /* For RINGBUFFER_MAX_NUM_FILES */
 
@@ -117,8 +109,7 @@ static fd_hash_t fd_hash[MAX_DUP_DEPTH];
 static int       dup_window    = DEFAULT_DUP_DEPTH;
 static int       cur_dup_entry = 0;
 
-static int       ignored_bytes  = 0;  /* Used with -I */
-
+#define ONE_MILLION    1000000
 #define ONE_BILLION 1000000000
 
 /* Weights of different errors we can introduce */
@@ -135,7 +126,7 @@ static int       ignored_bytes  = 0;  /* Used with -I */
 #define ALNUM_LEN       (sizeof(ALNUM_CHARS) - 1)
 
 struct time_adjustment {
-    nstime_t tv;
+    struct timeval tv;
     int is_negative;
 };
 
@@ -358,18 +349,18 @@ set_time_adjustment(char *optarg_str_p)
             exit(1);
         }
     }
-    time_adj.tv.secs = val;
+    time_adj.tv.tv_sec = val;
 
     /* now collect the partial seconds, if any */
     if (*frac != '\0') {             /* chars left, so get fractional part */
         val = strtol(&(frac[1]), &end, 10);
-        /* if more than 9 fractional digits truncate to 9 */
-        if ((end - &(frac[1])) > 9) {
-            frac[10] = 't'; /* 't' for truncate */
+        /* if more than 6 fractional digits truncate to 6 */
+        if ((end - &(frac[1])) > 6) {
+            frac[7] = 't'; /* 't' for truncate */
             val = strtol(&(frac[1]), &end, 10);
         }
         if (*frac != '.' || end == NULL || end == frac || val < 0
-            || val > ONE_BILLION || val == LONG_MIN || val == LONG_MAX) {
+            || val > ONE_MILLION || val == LONG_MIN || val == LONG_MAX) {
             fprintf(stderr, "editcap: \"%s\" isn't a valid time adjustment\n",
                     optarg_str_p);
             exit(1);
@@ -379,15 +370,15 @@ set_time_adjustment(char *optarg_str_p)
     }
 
     /* adjust fractional portion from fractional to numerator
-     * e.g., in "1.5" from 5 to 500000000 since .5*10^9 = 500000000 */
+     * e.g., in "1.5" from 5 to 500000 since .5*10^6 = 500000 */
     if (frac && end) {            /* both are valid */
         frac_digits = end - frac - 1;   /* fractional digit count (remember '.') */
-        while(frac_digits < 9) {    /* this is frac of 10^9 */
+        while(frac_digits < 6) {    /* this is frac of 10^6 */
             val *= 10;
             frac_digits++;
         }
     }
-    time_adj.tv.nsecs = (int)val;
+    time_adj.tv.tv_usec = (int)val;
 }
 
 static void
@@ -432,18 +423,18 @@ set_strict_time_adj(char *optarg_str_p)
             exit(1);
         }
     }
-    strict_time_adj.tv.secs = val;
+    strict_time_adj.tv.tv_sec = val;
 
     /* now collect the partial seconds, if any */
     if (*frac != '\0') {             /* chars left, so get fractional part */
         val = strtol(&(frac[1]), &end, 10);
-        /* if more than 9 fractional digits truncate to 9 */
-        if ((end - &(frac[1])) > 9) {
-            frac[10] = 't'; /* 't' for truncate */
+        /* if more than 6 fractional digits truncate to 6 */
+        if ((end - &(frac[1])) > 6) {
+            frac[7] = 't'; /* 't' for truncate */
             val = strtol(&(frac[1]), &end, 10);
         }
         if (*frac != '.' || end == NULL || end == frac || val < 0
-            || val > ONE_BILLION || val == LONG_MIN || val == LONG_MAX) {
+            || val > ONE_MILLION || val == LONG_MIN || val == LONG_MAX) {
             fprintf(stderr, "editcap: \"%s\" isn't a valid time adjustment\n",
                     optarg_str_p);
             exit(1);
@@ -453,15 +444,15 @@ set_strict_time_adj(char *optarg_str_p)
     }
 
     /* adjust fractional portion from fractional to numerator
-     * e.g., in "1.5" from 5 to 500000000 since .5*10^9 = 500000000 */
+     * e.g., in "1.5" from 5 to 500000 since .5*10^6 = 500000 */
     if (frac && end) {            /* both are valid */
         frac_digits = end - frac - 1;   /* fractional digit count (remember '.') */
-        while(frac_digits < 9) {    /* this is frac of 10^9 */
+        while(frac_digits < 6) {    /* this is frac of 10^6 */
             val *= 10;
             frac_digits++;
         }
     }
-    strict_time_adj.tv.nsecs = (int)val;
+    strict_time_adj.tv.tv_usec = (int)val;
 }
 
 static void
@@ -537,20 +528,13 @@ is_duplicate(guint8* fd, guint32 len) {
     int i;
     md5_state_t ms;
 
-    /*Hint to ignore some bytes at the start of the frame for the digest calculation(-I option) */
-    guint32 new_len;
-    guint8 *new_fd;
-
-    new_fd  = &fd[ignored_bytes];
-    new_len = len - (ignored_bytes);
-
     cur_dup_entry++;
     if (cur_dup_entry >= dup_window)
         cur_dup_entry = 0;
 
     /* Calculate our digest */
     md5_init(&ms);
-    md5_append(&ms, new_fd, new_len);
+    md5_append(&ms, fd, len);
     md5_finish(&ms, fd_hash[cur_dup_entry].digest);
 
     fd_hash[cur_dup_entry].len = len;
@@ -574,20 +558,13 @@ is_duplicate_rel_time(guint8* fd, guint32 len, const nstime_t *current) {
     int i;
     md5_state_t ms;
 
-    /*Hint to ignore some bytes at the start of the frame for the digest calculation(-I option) */
-    guint32 new_len;
-    guint8 *new_fd;
-
-    new_fd  = &fd[ignored_bytes];
-    new_len = len - (ignored_bytes);
-
     cur_dup_entry++;
     if (cur_dup_entry >= dup_window)
         cur_dup_entry = 0;
 
     /* Calculate our digest */
     md5_init(&ms);
-    md5_append(&ms, new_fd, new_len);
+    md5_append(&ms, fd, len);
     md5_finish(&ms, fd_hash[cur_dup_entry].digest);
 
     fd_hash[cur_dup_entry].len = len;
@@ -681,8 +658,22 @@ is_duplicate_rel_time(guint8* fd, guint32 len, const nstime_t *current) {
 }
 
 static void
-print_usage(FILE *output)
+usage(gboolean is_error)
 {
+    FILE *output;
+
+    if (!is_error)
+        output = stdout;
+    else
+        output = stderr;
+
+    fprintf(output, "Editcap %s"
+#ifdef GITVERSION
+        " (" GITVERSION " from " GITBRANCH ")"
+#endif
+        "\n", VERSION);
+    fprintf(output, "Edit and/or translate the format of capture files.\n");
+    fprintf(output, "See http://www.wireshark.org for more information.\n");
     fprintf(output, "\n");
     fprintf(output, "Usage: editcap [options] ... <infile> <outfile> [ <packet#>[-<packet#>] ... ]\n");
     fprintf(output, "\n");
@@ -706,14 +697,6 @@ print_usage(FILE *output)
     fprintf(output, "                         LESS THAN <dup time window> prior to current packet.\n");
     fprintf(output, "                         A <dup time window> is specified in relative seconds\n");
     fprintf(output, "                         (e.g. 0.000001).\n");
-    fprintf(output, "\n");
-    fprintf(output, "  -I <bytes to ignore>   ignore the specified bytes at the beginning of\n");
-    fprintf(output, "                         the frame during MD5 hash calculation\n");
-    fprintf(output, "                         Useful to remove duplicated packets taken on\n");
-    fprintf(output, "                         several routers(differents mac addresses for \n");
-    fprintf(output, "                         example)\n");
-    fprintf(output, "                         e.g. -I 26 in case of Ether/IP/ will ignore \n");
-    fprintf(output, "                         ether(14) and IP header(20 - 4(src ip) - 4(dst ip)).\n");
     fprintf(output, "\n");
     fprintf(output, "           NOTE: The use of the 'Duplicate packet removal' options with\n");
     fprintf(output, "           other editcap options except -v may not always work as expected.\n");
@@ -782,7 +765,7 @@ string_compare(gconstpointer a, gconstpointer b)
 static gint
 string_nat_compare(gconstpointer a, gconstpointer b)
 {
-    return ws_ascii_strnatcmp(((const struct string_elem *)a)->sstr,
+    return strnatcmp(((const struct string_elem *)a)->sstr,
         ((const struct string_elem *)b)->sstr);
 }
 
@@ -846,46 +829,13 @@ failure_message(const char *msg_format _U_, va_list ap _U_)
 }
 #endif
 
-static void
-get_editcap_compiled_info(GString *str)
-{
-  /* LIBZ */
-  g_string_append(str, ", ");
-#ifdef HAVE_LIBZ
-  g_string_append(str, "with libz ");
-#ifdef ZLIB_VERSION
-  g_string_append(str, ZLIB_VERSION);
-#else /* ZLIB_VERSION */
-  g_string_append(str, "(version unknown)");
-#endif /* ZLIB_VERSION */
-#else /* HAVE_LIBZ */
-  g_string_append(str, "without libz");
-#endif /* HAVE_LIBZ */
-}
-
-static void
-get_editcap_runtime_info(GString *str)
-{
-  /* zlib */
-#if defined(HAVE_LIBZ) && !defined(_WIN32)
-  g_string_append_printf(str, ", with libz %s", zlibVersion());
-#endif
-}
-
 int
 main(int argc, char *argv[])
 {
-    GString      *comp_info_str;
-    GString      *runtime_info_str;
     wtap         *wth;
     int           i, j, err;
     gchar        *err_info;
     int           opt;
-    static const struct option long_options[] = {
-        {(char *)"help", no_argument, NULL, 'h'},
-        {(char *)"version", no_argument, NULL, 'V'},
-        {0, 0, 0, 0 }
-    };
 
     char         *p;
     guint32       snaplen            = 0; /* No limit               */
@@ -922,23 +872,9 @@ main(int argc, char *argv[])
     create_app_running_mutex();
 #endif /* _WIN32 */
 
-    /* Get the compile-time version information string */
-    comp_info_str = get_compiled_version_info(NULL, get_editcap_compiled_info);
-
-    /* Get the run-time version information string */
-    runtime_info_str = get_runtime_version_info(get_editcap_runtime_info);
-
-    /* Add it to the information to be reported on a crash. */
-    ws_add_crash_info("Editcap (Wireshark) %s\n"
-         "\n"
-         "%s"
-         "\n"
-         "%s",
-      get_ws_vcs_version_info(), comp_info_str->str, runtime_info_str->str);
-
-    /*
-     * Get credential information for later use.
-     */
+  /*
+   * Get credential information for later use.
+   */
     init_process_policies();
     init_open_routines();
 
@@ -963,7 +899,7 @@ main(int argc, char *argv[])
 #endif
 
     /* Process the options */
-    while ((opt = getopt_long(argc, argv, "A:B:c:C:dD:E:F:hi:I:Lrs:S:t:T:vVw:", long_options, NULL)) != -1) {
+    while ((opt = getopt(argc, argv, "A:B:c:C:dD:E:F:hi:Lrs:S:t:T:vw:")) != -1) {
         switch (opt) {
         case 'A':
         {
@@ -1094,11 +1030,7 @@ main(int argc, char *argv[])
             break;
 
         case 'h':
-            printf("Editcap (Wireshark) %s\n"
-                   "Edit and/or translate the format of capture files.\n"
-                   "See http://www.wireshark.org for more information.\n",
-               get_ws_vcs_version_info());
-            print_usage(stdout);
+            usage(FALSE);
             exit(0);
             break;
 
@@ -1107,14 +1039,6 @@ main(int argc, char *argv[])
             if (secs_per_block <= 0) {
                 fprintf(stderr, "editcap: \"%s\" isn't a valid time interval\n\n",
                         optarg);
-                exit(1);
-            }
-            break;
-
-        case 'I': /* ignored_bytes at the beginning of the frame for duplications removal */
-            ignored_bytes = atoi(optarg);
-            if(ignored_bytes <= 0) {
-                fprintf(stderr, "editcap: \"%s\" isn't a valid number of bytes to ignore\n", optarg);
                 exit(1);
             }
             break;
@@ -1159,13 +1083,6 @@ main(int argc, char *argv[])
             verbose = !verbose;  /* Just invert */
             break;
 
-        case 'V':
-            show_version("Editcap (Wireshark)", comp_info_str, runtime_info_str);
-            g_string_free(comp_info_str, TRUE);
-            g_string_free(runtime_info_str, TRUE);
-            exit(0);
-            break;
-
         case 'w':
             dup_detect = FALSE;
             dup_detect_by_time = TRUE;
@@ -1182,7 +1099,7 @@ main(int argc, char *argv[])
                 list_encap_types();
                 break;
             default:
-                print_usage(stderr);
+                usage(TRUE);
                 break;
             }
             exit(1);
@@ -1195,7 +1112,7 @@ main(int argc, char *argv[])
 #endif
 
     if ((argc - optind) < 1) {
-        print_usage(stderr);
+        usage(TRUE);
         exit(1);
     }
 
@@ -1229,9 +1146,13 @@ main(int argc, char *argv[])
     if (!wth) {
         fprintf(stderr, "editcap: Can't open %s: %s\n", argv[optind],
                 wtap_strerror(err));
-        if (err_info != NULL) {
+        switch (err) {
+        case WTAP_ERR_UNSUPPORTED:
+        case WTAP_ERR_UNSUPPORTED_ENCAP:
+        case WTAP_ERR_BAD_FILE:
             fprintf(stderr, "(%s)\n", err_info);
             g_free(err_info);
+            break;
         }
         exit(2);
     }
@@ -1283,7 +1204,7 @@ main(int argc, char *argv[])
 
                 /* If we don't have an application name add Editcap */
                 if (shb_hdr->shb_user_appl == NULL) {
-                    shb_hdr->shb_user_appl = g_strdup("Editcap " VERSION);
+                    shb_hdr->shb_user_appl = "Editcap " VERSION;
                 }
 
                 pdh = wtap_dump_open_ng(filename, out_file_type_subtype, out_frame_type,
@@ -1376,13 +1297,13 @@ main(int argc, char *argv[])
                     ts_okay = (phdr->ts.secs >= starttime) && (phdr->ts.secs < stoptime);
                 else
                     ts_okay = FALSE;
-            } else {
-                /*
-                 * No selected timeframe, so all packets are "in the
-                 * selected timeframe".
-                 */
-                ts_okay = TRUE;
-            }
+	    } else {
+	        /*
+	         * No selected timeframe, so all packets are "in the
+	         * selected timeframe".
+	         */
+	        ts_okay = TRUE;
+	    }
 
             if (ts_okay && ((!selected(count) && !keep_em)
                             || (selected(count) && keep_em))) {
@@ -1437,14 +1358,14 @@ main(int argc, char *argv[])
                                      */
                                     /* fprintf(stderr, "++out of order, need to adjust this packet!\n"); */
                                     snap_phdr = *phdr;
-                                    snap_phdr.ts.secs = previous_time.secs + strict_time_adj.tv.secs;
+                                    snap_phdr.ts.secs = previous_time.secs + strict_time_adj.tv.tv_sec;
                                     snap_phdr.ts.nsecs = previous_time.nsecs;
-                                    if (snap_phdr.ts.nsecs + strict_time_adj.tv.nsecs > ONE_BILLION) {
+                                    if (snap_phdr.ts.nsecs + strict_time_adj.tv.tv_usec * 1000 > ONE_MILLION * 1000) {
                                         /* carry */
                                         snap_phdr.ts.secs++;
-                                        snap_phdr.ts.nsecs += strict_time_adj.tv.nsecs - ONE_BILLION;
+                                        snap_phdr.ts.nsecs += (strict_time_adj.tv.tv_usec - ONE_MILLION) * 1000;
                                     } else {
-                                        snap_phdr.ts.nsecs += strict_time_adj.tv.nsecs;
+                                        snap_phdr.ts.nsecs += strict_time_adj.tv.tv_usec * 1000;
                                     }
                                     phdr = &snap_phdr;
                                 }
@@ -1455,14 +1376,14 @@ main(int argc, char *argv[])
                                  * packet's timestamp plus delta.
                                  */
                                 snap_phdr = *phdr;
-                                snap_phdr.ts.secs = previous_time.secs + strict_time_adj.tv.secs;
+                                snap_phdr.ts.secs = previous_time.secs + strict_time_adj.tv.tv_sec;
                                 snap_phdr.ts.nsecs = previous_time.nsecs;
-                                if (snap_phdr.ts.nsecs + strict_time_adj.tv.nsecs > ONE_BILLION) {
+                                if (snap_phdr.ts.nsecs + strict_time_adj.tv.tv_usec * 1000 > ONE_MILLION * 1000) {
                                     /* carry */
                                     snap_phdr.ts.secs++;
-                                    snap_phdr.ts.nsecs += strict_time_adj.tv.nsecs - ONE_BILLION;
+                                    snap_phdr.ts.nsecs += (strict_time_adj.tv.tv_usec - ONE_MILLION) * 1000;
                                 } else {
-                                    snap_phdr.ts.nsecs += strict_time_adj.tv.nsecs;
+                                    snap_phdr.ts.nsecs += strict_time_adj.tv.tv_usec * 1000;
                                 }
                                 phdr = &snap_phdr;
                             }
@@ -1473,32 +1394,32 @@ main(int argc, char *argv[])
 
                     /* assume that if the frame's tv_sec is 0, then
                      * the timestamp isn't supported */
-                    if (phdr->ts.secs > 0 && time_adj.tv.secs != 0) {
+                    if (phdr->ts.secs > 0 && time_adj.tv.tv_sec != 0) {
                         snap_phdr = *phdr;
                         if (time_adj.is_negative)
-                            snap_phdr.ts.secs -= time_adj.tv.secs;
+                            snap_phdr.ts.secs -= time_adj.tv.tv_sec;
                         else
-                            snap_phdr.ts.secs += time_adj.tv.secs;
+                            snap_phdr.ts.secs += time_adj.tv.tv_sec;
                         phdr = &snap_phdr;
                     }
 
                     /* assume that if the frame's tv_sec is 0, then
                      * the timestamp isn't supported */
-                    if (phdr->ts.secs > 0 && time_adj.tv.nsecs != 0) {
+                    if (phdr->ts.secs > 0 && time_adj.tv.tv_usec != 0) {
                         snap_phdr = *phdr;
                         if (time_adj.is_negative) { /* subtract */
-                            if (snap_phdr.ts.nsecs < time_adj.tv.nsecs) { /* borrow */
+                            if (snap_phdr.ts.nsecs/1000 < time_adj.tv.tv_usec) { /* borrow */
                                 snap_phdr.ts.secs--;
-                                snap_phdr.ts.nsecs += ONE_BILLION;
+                                snap_phdr.ts.nsecs += ONE_MILLION * 1000;
                             }
-                            snap_phdr.ts.nsecs -= time_adj.tv.nsecs;
+                            snap_phdr.ts.nsecs -= time_adj.tv.tv_usec * 1000;
                         } else {                  /* add */
-                            if (snap_phdr.ts.nsecs + time_adj.tv.nsecs > ONE_BILLION) {
+                            if (snap_phdr.ts.nsecs + time_adj.tv.tv_usec * 1000 > ONE_MILLION * 1000) {
                                 /* carry */
                                 snap_phdr.ts.secs++;
-                                snap_phdr.ts.nsecs += time_adj.tv.nsecs - ONE_BILLION;
+                                snap_phdr.ts.nsecs += (time_adj.tv.tv_usec - ONE_MILLION) * 1000;
                             } else {
-                                snap_phdr.ts.nsecs += time_adj.tv.nsecs;
+                                snap_phdr.ts.nsecs += time_adj.tv.tv_usec * 1000;
                             }
                         }
                         phdr = &snap_phdr;
@@ -1614,9 +1535,9 @@ main(int argc, char *argv[])
                     }
                 }
 
-                if (!wtap_dump(pdh, phdr, buf, &err, &err_info)) {
+                if (!wtap_dump(pdh, phdr, buf, &err)) {
                     switch (err) {
-                    case WTAP_ERR_UNWRITABLE_ENCAP:
+                    case WTAP_ERR_UNSUPPORTED_ENCAP:
                         /*
                          * This is a problem with the particular frame we're
                          * writing and the file type and subtype we're
@@ -1624,7 +1545,7 @@ main(int argc, char *argv[])
                          * and file type/subtype.
                          */
                         fprintf(stderr,
-                                "editcap: Frame %u of \"%s\" has a network type that can't be saved in a \"%s\" file.\n",
+                                "editcap: Frame %u of \"%s\" has a network type that can't be saved in a \"%s\" file\n.",
                                 read_count, argv[optind],
                                 wtap_file_type_subtype_string(out_file_type_subtype));
                         break;
@@ -1637,37 +1558,9 @@ main(int argc, char *argv[])
                          * and file type/subtype.
                          */
                         fprintf(stderr,
-                                "editcap: Frame %u of \"%s\" is too large for a \"%s\" file.\n",
+                                "editcap: Frame %u of \"%s\" is too large for a \"%s\" file\n.",
                                 read_count, argv[optind],
                                 wtap_file_type_subtype_string(out_file_type_subtype));
-                        break;
-
-                    case WTAP_ERR_UNWRITABLE_REC_TYPE:
-                        /*
-                         * This is a problem with the particular record we're
-                         * writing and the file type and subtype we're
-                         * writing; note that, and report the record number
-                         * and file type/subtype.
-                         */
-                        fprintf(stderr,
-                                "editcap: Record %u of \"%s\" has a record type that can't be saved in a \"%s\" file.\n",
-                                read_count, argv[optind],
-                                wtap_file_type_subtype_string(out_file_type_subtype));
-                        break;
-
-                    case WTAP_ERR_UNWRITABLE_REC_DATA:
-                        /*
-                         * This is a problem with the particular record we're
-                         * writing and the file type and subtype we're
-                         * writing; note that, and report the record number
-                         * and file type/subtype.
-                         */
-                        fprintf(stderr,
-                                "editcap: Record %u of \"%s\" has data that can't be saved in a \"%s\" file.\n(%s)\n",
-                                read_count, argv[optind],
-                                wtap_file_type_subtype_string(out_file_type_subtype),
-                                err_info != NULL ? err_info : "no information supplied");
-                        g_free(err_info);
                         break;
 
                     default:
@@ -1691,9 +1584,13 @@ main(int argc, char *argv[])
             fprintf(stderr,
                     "editcap: An error occurred while reading \"%s\": %s.\n",
                     argv[optind], wtap_strerror(err));
-            if (err_info != NULL) {
+            switch (err) {
+            case WTAP_ERR_UNSUPPORTED:
+            case WTAP_ERR_UNSUPPORTED_ENCAP:
+            case WTAP_ERR_BAD_FILE:
                 fprintf(stderr, "(%s)\n", err_info);
                 g_free(err_info);
+                break;
             }
         }
 

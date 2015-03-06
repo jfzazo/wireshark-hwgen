@@ -189,13 +189,16 @@ dissect_fmp_fileHandleSrc(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
 {
     nativeProtocol      np;
 
+    proto_item *fileHandleItem;
     proto_tree *fileHandleTree;
     int         length;
 
     length = get_fileHandleSrc_size(tvb, offset);
 
-    fileHandleTree = proto_tree_add_subtree(tree, tvb, offset, length,
-                                          ett_fmp_fileHandle, NULL, "Source File Handle");
+    fileHandleItem =  proto_tree_add_text(tree, tvb, offset, length,
+                                          "Source File Handle");
+    fileHandleTree = proto_item_add_subtree(fileHandleItem,
+                                            ett_fmp_fileHandle);
 
     np = (nativeProtocol)tvb_get_ntohl(tvb, offset);
     proto_tree_add_item(fileHandleTree, hf_fmp_native_protocol, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -277,10 +280,13 @@ dissect_fmp_extentState(tvbuff_t *tvb, int offset, proto_tree *tree)
 static int
 dissect_fmp_extent(tvbuff_t *tvb, int offset, packet_info *pinfo _U_, proto_tree *tree, guint32 ext_num)
 {
+    proto_item *extItem;
     proto_tree *extTree;
 
-    extTree = proto_tree_add_subtree_format(tree, tvb, offset, 20 ,
-                                  ett_fmp_ext, NULL, "Extent (%u)", (guint32) ext_num);
+    extItem = proto_tree_add_text(tree, tvb, offset, 20 ,
+                                  "Extent (%u)", (guint32) ext_num);
+
+    extTree = proto_item_add_subtree(extItem, ett_fmp_ext);
 
     offset = dissect_rpc_uint32(tvb,  extTree, hf_fmp_firstLogBlk,
                                 offset);
@@ -300,14 +306,16 @@ dissect_fmp_extentList(tvbuff_t *tvb, int offset, packet_info *pinfo,
 {
     guint32     numExtents;
     guint32     totalLength;
+    proto_item *extListItem;
     proto_tree *extListTree;
     guint32     i;
 
     numExtents = tvb_get_ntohl(tvb, offset);
     totalLength = 4 + (20 * numExtents);
 
-    extListTree =  proto_tree_add_subtree(tree, tvb, offset, totalLength,
-                                       ett_fmp_extList, NULL, "Extent List");
+    extListItem =  proto_tree_add_text(tree, tvb, offset, totalLength,
+                                       "Extent List");
+    extListTree = proto_item_add_subtree(extListItem, ett_fmp_extList);
 
     offset = dissect_rpc_uint32(tvb, extListTree,
                                 hf_fmp_extentList_len, offset);
@@ -325,6 +333,7 @@ dissect_fmp_extentListEx(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
                          proto_tree *tree)
 {
     guint32     numExtents;
+    proto_item *extListItem;
     proto_tree *extListTree;
     guint32     i;
 
@@ -333,8 +342,10 @@ dissect_fmp_extentListEx(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
     offset += 4;
 
     for (i = 0; i < numExtents; i++) {
-        extListTree =  proto_tree_add_subtree(tree, tvb, offset, 28,
-                                           ett_fmp_extList, NULL, "Extent List");
+        extListItem =  proto_tree_add_text(tree, tvb, offset, 28,
+                                           "Extent List");
+        extListTree = proto_item_add_subtree(extListItem, ett_fmp_extList);
+
 
         offset = dissect_rpc_uint64(tvb,extListTree , hf_fmp_firstLogBlk64,  offset);
 
@@ -828,10 +839,13 @@ dissect_fmp_cerrInfo(tvbuff_t *tvb, int offset, proto_tree *tree)
 static int
 dissect_fmp_attrs(tvbuff_t *tvb, int offset, proto_tree *tree)
 {
+    proto_tree *attrstree;
     proto_tree *attrsTree;
 
-    attrsTree =  proto_tree_add_subtree(tree, tvb, offset, 84,
-                                     ett_attrs, NULL, "Attribute: ");
+    attrstree =  proto_tree_add_text(tree, tvb, offset, 84,
+                                     "Attribute: ");
+    attrsTree = proto_item_add_subtree(attrstree,
+                                       ett_attrs );
     offset = dissect_rpc_uint32(tvb, attrsTree, hf_fmp_nfsv3Attr_type, offset);
     offset = dissect_rpc_uint32(tvb, attrsTree, hf_fmp_nfsv3Attr_mode, offset);
     offset = dissect_rpc_uint32(tvb, attrsTree, hf_fmp_nfsv3Attr_nlink, offset);
@@ -2279,16 +2293,3 @@ proto_reg_handoff_fmp(void)
     /* Register the procedure tables */
     rpc_init_proc_table(FMP_PROGRAM, FMP_VERSION_3, fmp3_proc, hf_fmp_procedure);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

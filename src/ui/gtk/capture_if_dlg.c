@@ -22,6 +22,7 @@
 
 #include "config.h"
 
+#include <gtk/gtk.h>
 
 #ifdef HAVE_LIBPCAP
 
@@ -31,21 +32,21 @@
 #include <epan/to_str.h>
 
 #include "../capture_opts.h"
-#include <capchild/capture_session.h>
-#include "caputils/capture_ifinfo.h"
-#include "ui/capture.h"
-#include "caputils/capture-pcap-util.h"
+#include "../capture_session.h"
+#include "../capture_ifinfo.h"
+#include "../capture.h"
+#include "../capture-pcap-util.h"
+#include "../capture_ui_utils.h"
 #include "wsutil/file_util.h"
 #include <wiretap/wtap.h>
 
-#include "ui/capture_ui_utils.h"
 #include "ui/capture_globals.h"
 #include "ui/recent.h"
 #include "ui/simple_dialog.h"
 
 #ifdef _WIN32
 #include "ui/gtk/capture_if_details_dlg_win32.h"
-#include "caputils/capture-wpcap.h"
+#include "../../capture-wpcap.h"
 #endif
 
 #include "ui/gtk/stock_icons.h"
@@ -83,8 +84,8 @@
 
 
 #ifdef HAVE_AIRPCAP
-#include <caputils/airpcap.h>
-#include <caputils/airpcap_loader.h>
+#include "airpcap.h"
+#include "airpcap_loader.h"
 #include "airpcap_gui_utils.h"
 #include "airpcap_dlg.h"
 #endif
@@ -425,9 +426,6 @@ GtkWidget * capture_get_if_icon(interface_t *device)
     return pixbuf_to_widget(network_wired_pb_data);
   case IF_PIPE:
   case IF_STDIN:
-#ifdef HAVE_EXTCAP
-  case IF_EXTCAP:
-#endif
     return pixbuf_to_widget(pipe_pb_data);
   default:
     printf("unknown device type\n");
@@ -467,8 +465,7 @@ set_ip_addr_label(GSList *addr_list, GtkWidget *ip_lb, guint selected_ip_addr)
 {
   GSList      *curr_addr;
   if_addr_t   *addr;
-  address     addr_address;
-  char       *addr_str = NULL;
+  const gchar *addr_str = NULL;
 
   curr_addr = g_slist_nth(addr_list, selected_ip_addr);
   if (curr_addr) {
@@ -476,13 +473,11 @@ set_ip_addr_label(GSList *addr_list, GtkWidget *ip_lb, guint selected_ip_addr)
     switch (addr->ifat_type) {
 
     case IF_AT_IPv4:
-      SET_ADDRESS(&addr_address, AT_IPv4, 4, &addr->addr.ip4_addr);
-      addr_str = (char*)address_to_str(NULL, &addr_address);
+      addr_str = ip_to_str((guint8 *)&addr->addr.ip4_addr);
       break;
 
     case IF_AT_IPv6:
-      SET_ADDRESS(&addr_address, AT_IPv6, 16, addr->addr.ip6_addr);
-      addr_str = (char*)address_to_str(NULL, &addr_address);
+      addr_str = ip6_to_str((struct e_in6_addr *)&addr->addr.ip6_addr);
       break;
 
     default:
@@ -496,7 +491,6 @@ set_ip_addr_label(GSList *addr_list, GtkWidget *ip_lb, guint selected_ip_addr)
   } else {
     gtk_label_set_text(GTK_LABEL(ip_lb), "none");
   }
-  wmem_free(NULL, addr_str);
   g_object_set_data(G_OBJECT(ip_lb), CAPTURE_IF_SELECTED_IP_ADDR, GINT_TO_POINTER(selected_ip_addr));
 
   return addr_str;

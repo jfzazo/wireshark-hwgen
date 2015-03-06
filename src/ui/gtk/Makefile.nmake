@@ -12,8 +12,7 @@ GENERATED_CFLAGS=\
 	$(STANDARD_CFLAGS) \
 	/Zm800 \
 	/I../.. /I../../wiretap $(GTK_CFLAGS) $(GNUTLS_CFLAGS) \
-	$(ZLIB_CFLAGS) /I$(PCAP_DIR)\WPCAP\LIBPCAP \
-	/I$(PCAP_DIR)\WPCAP\LIBPCAP\bpf \
+	/I$(PCAP_DIR)\WPCAP\LIBPCAP /I$(PCAP_DIR)\WPCAP\LIBPCAP\bpf \
 	/I$(PCAP_DIR)\WPCAP\LIBPCAP\lbl \
 	/I$(PCAP_DIR)\include $(AIRPCAP_CFLAGS) \
 	$(PORTAUDIO_CFLAGS) $(GEOIP_CFLAGS) \
@@ -84,14 +83,25 @@ wsiconcap.h:
 	for %n in (16 24 32 48 64) do \
 	gdk-pixbuf-csource --raw --name=wsiconcap_%n_pb_data ../../image/wsiconcap%n.png >> $@
 
+# The shell script runs slowly, as multiple greps and seds are run
+# for each input file; this is especially slow on Windows.  Therefore,
+# if Python is present (as indicated by PYTHON being defined), we run
+# a faster Python script to do that work instead.
+#
 # The first argument is the directory in which the source files live.
 # The second argument is "plugin", to indicate that we should build
 # a plugin.c file for a plugin.
 # All subsequent arguments are the files to scan.
 #
+!IFDEF PYTHON
 wireshark-tap-register.c: $(WIRESHARK_TAP_SRC) ../../tools/make-tap-reg.py
-	@echo Making wireshark-tap-register.c
+	@echo Making wireshark-tap-register.c (using python)
 	@$(PYTHON) "../../tools/make-tap-reg.py" . taps $(WIRESHARK_TAP_SRC)
+!ELSE
+wireshark-tap-register.c: $(WIRESHARK_TAP_SRC) ../../tools/make-tapreg-dotc Makefile.common
+	@echo Making wireshark-tap-register.c
+	@$(SH) ../../tools/make-tapreg-dotc wireshark-tap-register.c . $(WIRESHARK_TAP_SRC)
+!ENDIF
 
 !IF "$(PORTAUDIO_VERSION)" == "18"
 pa_lib.obj: $(PORTAUDIO_DIR)\pa_common\pa_lib.c
@@ -145,7 +155,7 @@ pa_win_waveformat.obj: $(PORTAUDIO_DIR)\src\os\win\pa_win_waveformat.c
 !ENDIF
 
 clean:
-	rm -f $(WIRESHARK_LIBGTKUI_OBJECTS) libgtkui.lib *.nativecodeanalysis.xml *.pdb *.sbr \
+	rm -f $(WIRESHARK_LIBGTKUI_OBJECTS) libgtkui.lib *.pdb *.sbr \
 		doxygen.cfg html/*.* wireshark-tap-register-cache.pkl \
 		wireshark-tap-register.c-tmp
 	if exist html rmdir html

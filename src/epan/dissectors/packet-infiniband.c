@@ -25,22 +25,26 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/wmem/wmem.h>
 #include <epan/conversation.h>
 #include <epan/prefs.h>
+#include <wiretap/wtap.h>
 #include <epan/etypes.h>
 #include <epan/show_exception.h>
-#include <wiretap/erf.h>
+#include <epan/to_str.h>
 
 #include "packet-infiniband.h"
 
 void proto_register_infiniband(void);
 void proto_reg_handoff_infiniband(void);
 
-/*Default RRoce UDP port*/
-#define DEFAULT_RROCE_UDP_PORT    0
+#define PROTO_TAG_INFINIBAND    "Infiniband"
 
 /* Wireshark ID */
 static int proto_infiniband = -1;
@@ -103,7 +107,6 @@ static gint ett_link = -1;
 
 /* Dissector Declaration */
 static dissector_handle_t ib_handle;
-static dissector_handle_t ib_link_handle;
 
 /* Subdissectors Declarations */
 static dissector_handle_t ipv6_handle;
@@ -126,27 +129,20 @@ typedef struct {
     char data[232];
 } MAD_Data;
 
-typedef enum {
-    IB_PACKET_STARTS_WITH_LRH, /* Regular IB packet */
-    IB_PACKET_STARTS_WITH_GRH, /* ROCE packet */
-    IB_PACKET_STARTS_WITH_BTH  /* RROCE packet */
-} ib_packet_start_header;
-
 /* Forward-declarations */
 
 static void dissect_roce(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
-static void dissect_rroce(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 static void dissect_infiniband(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
-static void dissect_infiniband_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, ib_packet_start_header starts_with);
+static void dissect_infiniband_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean starts_with_grh);
 static void dissect_infiniband_link(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
-static gint32 find_next_header_sequence(struct infinibandinfo* ibInfo);
+static gint32 find_next_header_sequence(guint32 OpCode);
 static gboolean contains(guint32 value, guint32* arr, int length);
-static void dissect_general_info(tvbuff_t *tvb, gint offset, packet_info *pinfo, ib_packet_start_header starts_with);
+static void dissect_general_info(tvbuff_t *tvb, gint offset, packet_info *pinfo, gboolean starts_with_grh);
 
 /* Parsing Methods for specific IB headers. */
 
 static void parse_VENDOR(proto_tree *, tvbuff_t *, gint *);
-static void parse_PAYLOAD(proto_tree *, packet_info *, struct infinibandinfo *, tvbuff_t *, gint *, gint length, gint crclen, proto_tree *);
+static void parse_PAYLOAD(proto_tree *, packet_info *, struct infinibandinfo *, tvbuff_t *, gint *, gint length, proto_tree *);
 static void parse_IETH(proto_tree *, tvbuff_t *, gint *);
 static void parse_IMMDT(proto_tree *, tvbuff_t *, gint *offset);
 static void parse_ATOMICACKETH(proto_tree *, tvbuff_t *, gint *offset);
@@ -157,7 +153,6 @@ static void parse_DETH(proto_tree *, packet_info *, tvbuff_t *, gint *offset);
 static void parse_RDETH(proto_tree *, tvbuff_t *, gint *offset);
 static void parse_IPvSix(proto_tree *, tvbuff_t *, gint *offset, packet_info *);
 static void parse_RWH(proto_tree *, tvbuff_t *, gint *offset, packet_info *, proto_tree *);
-static void parse_DCCETH(proto_tree *parentTree, tvbuff_t *tvb, gint *offset);
 static gboolean parse_EoIB(proto_tree *, tvbuff_t *, gint offset, packet_info *, proto_tree *);
 
 static void parse_SUBN_LID_ROUTED(proto_tree *, packet_info *, tvbuff_t *, gint *offset);
@@ -1251,33 +1246,7 @@ static const value_string OpCodeMap[] =
 
 };
 
-/* Mellanox DCT has the same opcodes as RD so will use the same RD macros */
-static const value_string DctOpCodeMap[] =
-{
-    { RD_SEND_FIRST,                "DC Send First "},
-    { RD_SEND_MIDDLE,               "DC Send Middle " },
-    { RD_SEND_LAST,                 "DC Send Last "},
-    { RD_SEND_LAST_IMM,             "DC Last Immediate " },
-    { RD_SEND_ONLY,                 "DC Send Only "},
-    { RD_SEND_ONLY_IMM,             "DC Send Only Immediate "},
-    { RD_RDMA_WRITE_FIRST,          "DC RDMA Write First "},
-    { RD_RDMA_WRITE_MIDDLE,         "DC RDMA Write Middle "},
-    { RD_RDMA_WRITE_LAST,           "DC RDMA Write Last "},
-    { RD_RDMA_WRITE_LAST_IMM,       "DC RDMA Write Last Immediate "},
-    { RD_RDMA_WRITE_ONLY,           "DC RDMA Write Only "},
-    { RD_RDMA_WRITE_ONLY_IMM,       "DC RDMA Write Only Immediate "},
-    { RD_RDMA_READ_REQUEST,         "DC RDMA Read Request "},
-    { RD_RDMA_READ_RESPONSE_FIRST,  "DC RDMA Read Response First "},
-    { RD_RDMA_READ_RESPONSE_MIDDLE, "DC RDMA Read Response Middle "},
-    { RD_RDMA_READ_RESPONSE_LAST,   "DC RDMA Read Response Last "},
-    { RD_RDMA_READ_RESPONSE_ONLY,   "DC RDMA Read Response Only "},
-    { RD_ACKNOWLEDGE,               "DC Acknowledge "},
-    { RD_ATOMIC_ACKNOWLEDGE,        "DC Atomic Acknowledge "},
-    { RD_CMP_SWAP,                  "DC Compare Swap "},
-    { RD_FETCH_ADD,                 "DC Fetch Add "},
-    { RD_RESYNC,                    "DC Unknown Opcode "},
-    { 0, NULL}
-};
+
 
 /* Header Ordering Based on OPCODES
 * These are simply an enumeration of the possible header combinations defined by the IB Spec.
@@ -1329,8 +1298,6 @@ static const value_string DctOpCodeMap[] =
 #define ATOMICETH                   21
 /* ___________________________________ */
 #define IETH_PAYLD                  22
-/* ___________________________________ */
-#define DCCETH                      23
 /* ___________________________________ */
 
 
@@ -1464,7 +1431,6 @@ static guint32 opCode_PAYLD[] = {
 /* settings to be set by the user via the preferences dialog */
 static gboolean pref_dissect_eoib = TRUE;
 static gboolean pref_identify_iba_payload = TRUE;
-static guint pref_rroce_udp_port = DEFAULT_RROCE_UDP_PORT;
 
 /* saves information about connections that have been/are in the process of being
    negotiated via ConnectionManagement packets */
@@ -1511,15 +1477,6 @@ static void table_destroy_notify(gpointer data) {
 }
 
 /* --------------------------------------------------------------------------------------------------------*/
-/* Helper dissector for correctly dissecting RRoCE packets (encapsulated within an IP */
-/* frame). The only difference from regular IB packets is that RRoCE packets do not contain */
-/* a LRH, and always start with a BTH.                                                      */
-static void
-dissect_rroce(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
-{
-    /* this is a RRoCE packet, so signal the IB dissector not to look for LRH/GRH */
-    dissect_infiniband_common(tvb, pinfo, tree, IB_PACKET_STARTS_WITH_BTH);
-}
 
 /* Helper dissector for correctly dissecting RoCE packets (encapsulated within an Ethernet */
 /* frame). The only difference from regular IB packets is that RoCE packets do not contain */
@@ -1528,13 +1485,13 @@ static void
 dissect_roce(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     /* this is a RoCE packet, so signal the IB dissector not to look for LRH */
-    dissect_infiniband_common(tvb, pinfo, tree, IB_PACKET_STARTS_WITH_GRH);
+    dissect_infiniband_common(tvb, pinfo, tree, TRUE);
 }
 
 static void
 dissect_infiniband(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-    dissect_infiniband_common(tvb, pinfo, tree, IB_PACKET_STARTS_WITH_LRH);
+    dissect_infiniband_common(tvb, pinfo, tree, FALSE);
 }
 
 /* Common Dissector for both InfiniBand and RoCE packets
@@ -1542,24 +1499,19 @@ dissect_infiniband(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
  *       tvb - The tvbbuff of packet data
  *       pinfo - The packet info structure with column information
  *       tree - The tree structure under which field nodes are to be added
- *       starts_with - regular IB packet starts with LRH, ROCE starts with GRH and RROCE starts with BTH,
- *                     this tells the parser what headers of (LRH/GRH) to skip.
+ *       starts_with_grh - If true this packets start with a GRH header (RoCE), otherwise with LRH as usual
  * Notes:
  * 1.) Floating "offset+=" statements should probably be "functionized" but they are inline
  * Offset is only passed by reference in specific places, so do not be confused when following code
  * In any code path, adding up "offset+=" statements will tell you what byte you are at */
 static void
-dissect_infiniband_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, ib_packet_start_header starts_with)
+dissect_infiniband_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean starts_with_grh)
 {
     /* Top Level Item */
     proto_item *infiniband_packet;
 
     /* The Headers Subtree */
     proto_tree *all_headers_tree;
-
-    /* BTH - Base Trasport Header */
-    gboolean dctBthHeader = FALSE;
-    gint bthSize = 12;
 
     /* LRH - Local Route Header */
     proto_item *local_route_header_item;
@@ -1572,14 +1524,15 @@ dissect_infiniband_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
 
     /* General Variables */
     gboolean bthFollows = FALSE;    /* Tracks if we are parsing a BTH.  This is a significant decision point */
-    struct infinibandinfo info = { 0, FALSE };
+    struct infinibandinfo info = { 0, };
     gint32 nextHeaderSequence = -1; /* defined by this dissector. #define which indicates the upcoming header sequence from OpCode */
     guint8 nxtHdr = 0;              /* Keyed off for header dissection order */
     guint16 packetLength = 0;       /* Packet Length.  We track this as tvb_length - offset.   */
                                     /*  It provides the parsing methods a known size            */
                                     /*   that must be available for that header.                */
+    struct e_in6_addr SRCgid;       /* Structures to hold GIDs should we need them */
+    struct e_in6_addr DSTgid;
     gint crc_length = 0;
-    gint crclen = 6;
 
     void *src_addr,                 /* the address to be displayed in the source/destination columns */
          *dst_addr;                 /* (lid/gid number) will be stored here */
@@ -1587,7 +1540,11 @@ dissect_infiniband_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
     pinfo->srcport = pinfo->destport = 0xffffffff;  /* set the src/dest QPN to something impossible instead of the default 0,
                                                        so we don't mistake it for a MAD. (QP is only 24bit, so can't be 0xffffffff)*/
 
-    pinfo->ptype = PT_IBQP;     /* set the port-type for this packet to be Infiniband QP number */
+    /* add any code that should only run the first time the packet is dissected here: */
+    if (!pinfo->fd->flags.visited)
+    {
+        pinfo->ptype = PT_IBQP;     /* set the port-type for this packet to be Infiniband QP number */
+    }
 
     /* Mark the Packet type as Infiniband in the wireshark UI */
     /* Clear other columns */
@@ -1600,22 +1557,12 @@ dissect_infiniband_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
     /* Headers Level Tree */
     all_headers_tree = proto_item_add_subtree(infiniband_packet, ett_all_headers);
 
-    if (starts_with == IB_PACKET_STARTS_WITH_GRH) {
+    if (starts_with_grh) {
         /* this is a RoCE packet, skip LRH parsing */
-        col_set_str(pinfo->cinfo, COL_PROTOCOL, "RoCE");
         lnh_val = IBA_GLOBAL;
-        packetLength = tvb_reported_length_remaining(tvb, offset);
-        crclen = 4;
+        packetLength = tvb_get_ntohs(tvb, 4);   /* since we have no LRH to get PktLen from, use that of the GRH */
         goto skip_lrh;
     }
-     else if (starts_with == IB_PACKET_STARTS_WITH_BTH) {
-         /* this is a RRoCE packet, skip LRH/GRH parsing and go directly to BTH */
-         col_set_str(pinfo->cinfo, COL_PROTOCOL, "RRoCE");
-         lnh_val = IBA_LOCAL;
-         packetLength = tvb_reported_length_remaining(tvb, offset);
-         crclen = 4;
-         goto skip_lrh;
-     }
 
     /* Local Route Header Subtree */
     local_route_header_item = proto_tree_add_item(all_headers_tree, hf_infiniband_LRH, tvb, offset, 8, ENC_NA);
@@ -1690,13 +1637,23 @@ skip_lrh:
             proto_tree_add_item(global_route_header_tree, hf_infiniband_hop_limit,          tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
             proto_tree_add_item(global_route_header_tree, hf_infiniband_source_gid,         tvb, offset, 16, ENC_NA);
 
+            tvb_get_ipv6(tvb, offset, &SRCgid);
+
             /* set source GID in packet view*/
-            TVB_SET_ADDRESS(&pinfo->src, AT_IB, tvb, offset, GID_SIZE);
+            src_addr = wmem_alloc(pinfo->pool, GID_SIZE);
+            memcpy(src_addr, &SRCgid, GID_SIZE);
+            SET_ADDRESS(&pinfo->src, AT_IB, GID_SIZE, src_addr);
+
             offset += 16;
 
             proto_tree_add_item(global_route_header_tree, hf_infiniband_destination_gid,    tvb, offset, 16, ENC_NA);
+
+            tvb_get_ipv6(tvb, offset, &DSTgid);
+
             /* set destination GID in packet view*/
-            TVB_SET_ADDRESS(&pinfo->dst, AT_IB, tvb, offset, GID_SIZE);
+            dst_addr = wmem_alloc(pinfo->pool, GID_SIZE);
+            memcpy(dst_addr, &DSTgid, GID_SIZE);
+            SET_ADDRESS(&pinfo->dst, AT_IB, GID_SIZE, dst_addr);
 
             offset += 16;
             packetLength -= 40; /* Shave 40 bytes for GRH */
@@ -1712,49 +1669,30 @@ skip_lrh:
             proto_item *base_transport_header_item;
             proto_tree *base_transport_header_tree;
             bthFollows = TRUE;
-            /* Get the OpCode - this tells us what headers are following */
-            info.opCode = tvb_get_guint8(tvb, offset);
-
-            if ((info.opCode >> 5) == 0x2) {
-                info.dctConnect = !(tvb_get_guint8(tvb, offset + 1) & 0x80);
-                dctBthHeader = TRUE;
-                bthSize += 8;
-            }
-
-            base_transport_header_item = proto_tree_add_item(all_headers_tree, hf_infiniband_BTH, tvb, offset, bthSize, ENC_NA);
+            base_transport_header_item = proto_tree_add_item(all_headers_tree, hf_infiniband_BTH, tvb, offset, 12, ENC_NA);
             proto_item_set_text(base_transport_header_item, "%s", "Base Transport Header");
             base_transport_header_tree = proto_item_add_subtree(base_transport_header_item, ett_bth);
             proto_tree_add_item(base_transport_header_tree, hf_infiniband_opcode,                       tvb, offset, 1, ENC_BIG_ENDIAN);
 
-            if (dctBthHeader) {
-                /* since DCT uses the same opcodes as RD we will use another name mapping */
-                col_append_str(pinfo->cinfo, COL_INFO, val_to_str_const((guint32)info.opCode, DctOpCodeMap, "Unknown OpCode"));
-            }
-            else {
-                col_append_str(pinfo->cinfo, COL_INFO, val_to_str_const((guint32)info.opCode, OpCodeMap, "Unknown OpCode"));
-            }
+            /* Get the OpCode - this tells us what headers are following */
+            info.opCode = tvb_get_guint8(tvb, offset);
+            col_append_str(pinfo->cinfo, COL_INFO, val_to_str_const((guint32)info.opCode, OpCodeMap, "Unknown OpCode"));
             offset += 1;
 
             proto_tree_add_item(base_transport_header_tree, hf_infiniband_solicited_event,              tvb, offset, 1, ENC_BIG_ENDIAN);
             proto_tree_add_item(base_transport_header_tree, hf_infiniband_migreq,                       tvb, offset, 1, ENC_BIG_ENDIAN);
             proto_tree_add_item(base_transport_header_tree, hf_infiniband_pad_count,                    tvb, offset, 1, ENC_BIG_ENDIAN);
-            proto_tree_add_item(base_transport_header_tree, hf_infiniband_transport_header_version,     tvb, offset, 1, ENC_BIG_ENDIAN);
-            offset += 1;
-            proto_tree_add_item(base_transport_header_tree, hf_infiniband_partition_key,                tvb, offset, 2, ENC_BIG_ENDIAN);
-            offset += 2;
-            proto_tree_add_item(base_transport_header_tree, hf_infiniband_reserved8,                    tvb, offset, 1, ENC_BIG_ENDIAN);
-            offset += 1;
+            proto_tree_add_item(base_transport_header_tree, hf_infiniband_transport_header_version,     tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
+            proto_tree_add_item(base_transport_header_tree, hf_infiniband_partition_key,                tvb, offset, 2, ENC_BIG_ENDIAN); offset += 2;
+            proto_tree_add_item(base_transport_header_tree, hf_infiniband_reserved8,                    tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
             proto_tree_add_item(base_transport_header_tree, hf_infiniband_destination_qp,               tvb, offset, 3, ENC_BIG_ENDIAN);
-            pinfo->destport = tvb_get_ntoh24(tvb, offset);
-            col_append_fstr(pinfo->cinfo, COL_INFO, "QP=0x%06x ", pinfo->destport);
-            offset += 3;
+            pinfo->destport = tvb_get_ntoh24(tvb, offset); offset += 3;
             proto_tree_add_item(base_transport_header_tree, hf_infiniband_acknowledge_request,          tvb, offset, 1, ENC_BIG_ENDIAN);
-            proto_tree_add_item(base_transport_header_tree, hf_infiniband_reserved7,                    tvb, offset, 1, ENC_BIG_ENDIAN);
-            offset += 1;
-            proto_tree_add_item(base_transport_header_tree, hf_infiniband_packet_sequence_number,       tvb, offset, 3, ENC_BIG_ENDIAN);
-            offset += 3;
-            offset += bthSize - 12;
-            packetLength -= bthSize; /* Shave bthSize for Base Transport Header */
+            proto_tree_add_item(base_transport_header_tree, hf_infiniband_reserved7,                    tvb, offset, 1, ENC_BIG_ENDIAN); offset += 1;
+            proto_tree_add_item(base_transport_header_tree, hf_infiniband_packet_sequence_number,       tvb, offset, 3, ENC_BIG_ENDIAN); offset += 3;
+
+
+            packetLength -= 12; /* Shave 12 for Base Transport Header */
         }
             break;
         case IP_NON_IBA:
@@ -1783,7 +1721,7 @@ skip_lrh:
         * The find_next_header_sequence method could be used to automate this.
         * We need to keep track of this so we know much data to mark as payload/ICRC/VCRC values. */
 
-        nextHeaderSequence = find_next_header_sequence(&info);
+        nextHeaderSequence = find_next_header_sequence((guint32) info.opCode);
 
         /* find_next_header_sequence gives us the DEFINE value corresponding to the header order following */
         /* Enumerations are named intuitively, e.g. RDETH DETH PAYLOAD means there is an RDETH Header, DETH Header, and a packet payload */
@@ -1796,7 +1734,7 @@ skip_lrh:
                 packetLength -= 4; /* RDETH */
                 packetLength -= 8; /* DETH */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case RDETH_DETH_RETH_PAYLD:
                 parse_RDETH(all_headers_tree, tvb, &offset);
@@ -1807,7 +1745,7 @@ skip_lrh:
                 packetLength -= 8; /* DETH */
                 packetLength -= 16; /* RETH */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case RDETH_DETH_IMMDT_PAYLD:
                 parse_RDETH(all_headers_tree, tvb, &offset);
@@ -1818,7 +1756,7 @@ skip_lrh:
                 packetLength -= 8; /* DETH */
                 packetLength -= 4; /* IMMDT */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case RDETH_DETH_RETH_IMMDT_PAYLD:
                 parse_RDETH(all_headers_tree, tvb, &offset);
@@ -1831,7 +1769,7 @@ skip_lrh:
                 packetLength -= 16; /* RETH */
                 packetLength -= 4;  /* IMMDT */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case RDETH_DETH_RETH:
                 parse_RDETH(all_headers_tree, tvb, &offset);
@@ -1850,14 +1788,14 @@ skip_lrh:
                 packetLength -= 4; /* RDETH */
                 packetLength -= 4; /* AETH */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case RDETH_PAYLD:
                 parse_RDETH(all_headers_tree, tvb, &offset);
 
                 packetLength -= 4; /* RDETH */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case RDETH_AETH:
                 parse_AETH(all_headers_tree, tvb, &offset);
@@ -1901,18 +1839,18 @@ skip_lrh:
 
                 packetLength -= 8; /* DETH */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case PAYLD:
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case IMMDT_PAYLD:
                 parse_IMMDT(all_headers_tree, tvb, &offset);
 
                 packetLength -= 4; /* IMMDT */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case RETH_IMMDT_PAYLD:
                 parse_RETH(all_headers_tree, tvb, &offset);
@@ -1921,14 +1859,14 @@ skip_lrh:
                 packetLength -= 16; /* RETH */
                 packetLength -= 4; /* IMMDT */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case RETH_PAYLD:
                 parse_RETH(all_headers_tree, tvb, &offset);
 
                 packetLength -= 16; /* RETH */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case RETH:
                 parse_RETH(all_headers_tree, tvb, &offset);
@@ -1941,7 +1879,7 @@ skip_lrh:
 
                 packetLength -= 4; /* AETH */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case AETH:
                 parse_AETH(all_headers_tree, tvb, &offset);
@@ -1968,7 +1906,7 @@ skip_lrh:
 
                 packetLength -= 4; /* IETH */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
             case DETH_IMMDT_PAYLD:
                 parse_DETH(all_headers_tree, pinfo, tvb, &offset);
@@ -1977,15 +1915,8 @@ skip_lrh:
                 packetLength -= 8; /* DETH */
                 packetLength -= 4; /* IMMDT */
 
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
+                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, tree);
                 break;
-            case DCCETH:
-                parse_DCCETH(all_headers_tree, tvb, &offset);
-                packetLength -= 16; /* DCCETH */
-
-                parse_PAYLOAD(all_headers_tree, pinfo, &info, tvb, &offset, packetLength, crclen, tree);
-                break;
-
             default:
                 parse_VENDOR(all_headers_tree, tvb, &offset);
                 break;
@@ -2036,7 +1967,7 @@ dissect_infiniband_link(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
              val_to_str(operand, Operand_Description, "Unknown (0x%1x)"));
 
     /* Assigns column values */
-    dissect_general_info(tvb, offset, pinfo, IB_PACKET_STARTS_WITH_LRH);
+    dissect_general_info(tvb, offset, pinfo, FALSE);
 
     /* Top Level Packet */
     infiniband_link_packet = proto_tree_add_item(tree, proto_infiniband_link, tvb, offset, -1, ENC_NA);
@@ -2070,78 +2001,75 @@ dissect_infiniband_link(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 * IN: OpCode: The OpCode from the Base Transport Header.
 * OUT: The Header Sequence enumeration.  See Declarations for #defines from (0-22) */
 static gint32
-find_next_header_sequence(struct infinibandinfo* ibInfo)
+find_next_header_sequence(guint32 OpCode)
 {
-    if (ibInfo->opCode == 0x55)
-        return ibInfo->dctConnect ? DCCETH : PAYLD;
-
-    if (contains(ibInfo->opCode, &opCode_PAYLD[0], (gint32)array_length(opCode_PAYLD)))
+    if (contains(OpCode, &opCode_PAYLD[0], (gint32)array_length(opCode_PAYLD)))
         return PAYLD;
 
-    if (contains(ibInfo->opCode, &opCode_IMMDT_PAYLD[0], (gint32)array_length(opCode_IMMDT_PAYLD)))
+    if (contains(OpCode, &opCode_IMMDT_PAYLD[0], (gint32)array_length(opCode_IMMDT_PAYLD)))
         return IMMDT_PAYLD;
 
-    if (contains(ibInfo->opCode, &opCode_RDETH_DETH_PAYLD[0], (gint32)array_length(opCode_RDETH_DETH_PAYLD)))
+    if (contains(OpCode, &opCode_RDETH_DETH_PAYLD[0], (gint32)array_length(opCode_RDETH_DETH_PAYLD)))
         return RDETH_DETH_PAYLD;
 
-    if (contains(ibInfo->opCode, &opCode_RETH_PAYLD[0], (gint32)array_length(opCode_RETH_PAYLD)))
+    if (contains(OpCode, &opCode_RETH_PAYLD[0], (gint32)array_length(opCode_RETH_PAYLD)))
         return RETH_PAYLD;
 
-    if (contains(ibInfo->opCode, &opCode_RDETH_AETH_PAYLD[0], (gint32)array_length(opCode_RDETH_AETH_PAYLD)))
+    if (contains(OpCode, &opCode_RDETH_AETH_PAYLD[0], (gint32)array_length(opCode_RDETH_AETH_PAYLD)))
         return RDETH_AETH_PAYLD;
 
-    if (contains(ibInfo->opCode, &opCode_AETH_PAYLD[0], (gint32)array_length(opCode_AETH_PAYLD)))
+    if (contains(OpCode, &opCode_AETH_PAYLD[0], (gint32)array_length(opCode_AETH_PAYLD)))
         return AETH_PAYLD;
 
-    if (contains(ibInfo->opCode, &opCode_RDETH_DETH_IMMDT_PAYLD[0], (gint32)array_length(opCode_RDETH_DETH_IMMDT_PAYLD)))
+    if (contains(OpCode, &opCode_RDETH_DETH_IMMDT_PAYLD[0], (gint32)array_length(opCode_RDETH_DETH_IMMDT_PAYLD)))
         return RDETH_DETH_IMMDT_PAYLD;
 
-    if (contains(ibInfo->opCode, &opCode_RETH_IMMDT_PAYLD[0], (gint32)array_length(opCode_RETH_IMMDT_PAYLD)))
+    if (contains(OpCode, &opCode_RETH_IMMDT_PAYLD[0], (gint32)array_length(opCode_RETH_IMMDT_PAYLD)))
         return RETH_IMMDT_PAYLD;
 
-    if (contains(ibInfo->opCode, &opCode_RDETH_DETH_RETH_PAYLD[0], (gint32)array_length(opCode_RDETH_DETH_RETH_PAYLD)))
+    if (contains(OpCode, &opCode_RDETH_DETH_RETH_PAYLD[0], (gint32)array_length(opCode_RDETH_DETH_RETH_PAYLD)))
         return RDETH_DETH_RETH_PAYLD;
 
-    if (contains(ibInfo->opCode, &opCode_ATOMICETH[0], (gint32)array_length(opCode_ATOMICETH)))
+    if (contains(OpCode, &opCode_ATOMICETH[0], (gint32)array_length(opCode_ATOMICETH)))
         return ATOMICETH;
 
-    if (contains(ibInfo->opCode, &opCode_IETH_PAYLD[0], (gint32)array_length(opCode_IETH_PAYLD)))
+    if (contains(OpCode, &opCode_IETH_PAYLD[0], (gint32)array_length(opCode_IETH_PAYLD)))
         return IETH_PAYLD;
 
-    if (contains(ibInfo->opCode, &opCode_RDETH_DETH_ATOMICETH[0], (gint32)array_length(opCode_RDETH_DETH_ATOMICETH)))
+    if (contains(OpCode, &opCode_RDETH_DETH_ATOMICETH[0], (gint32)array_length(opCode_RDETH_DETH_ATOMICETH)))
         return RDETH_DETH_ATOMICETH;
 
-    if ((ibInfo->opCode ^ RC_ACKNOWLEDGE) == 0)
+    if ((OpCode ^ RC_ACKNOWLEDGE) == 0)
         return AETH;
 
-    if ((ibInfo->opCode ^ RC_RDMA_READ_REQUEST) == 0)
+    if ((OpCode ^ RC_RDMA_READ_REQUEST) == 0)
         return RETH;
 
-    if ((ibInfo->opCode ^ RC_ATOMIC_ACKNOWLEDGE) == 0)
+    if ((OpCode ^ RC_ATOMIC_ACKNOWLEDGE) == 0)
         return AETH_ATOMICACKETH;
 
-    if ((ibInfo->opCode ^ RD_RDMA_READ_RESPONSE_MIDDLE) == 0)
+    if ((OpCode ^ RD_RDMA_READ_RESPONSE_MIDDLE) == 0)
         return RDETH_PAYLD;
 
-    if ((ibInfo->opCode ^ RD_ACKNOWLEDGE) == 0)
+    if ((OpCode ^ RD_ACKNOWLEDGE) == 0)
         return RDETH_AETH;
 
-    if ((ibInfo->opCode ^ RD_ATOMIC_ACKNOWLEDGE) == 0)
+    if ((OpCode ^ RD_ATOMIC_ACKNOWLEDGE) == 0)
         return RDETH_AETH_ATOMICACKETH;
 
-    if ((ibInfo->opCode ^ RD_RDMA_WRITE_ONLY_IMM) == 0)
+    if ((OpCode ^ RD_RDMA_WRITE_ONLY_IMM) == 0)
         return RDETH_DETH_RETH_IMMDT_PAYLD;
 
-    if ((ibInfo->opCode ^ RD_RDMA_READ_REQUEST) == 0)
+    if ((OpCode ^ RD_RDMA_READ_REQUEST) == 0)
         return RDETH_DETH_RETH;
 
-    if ((ibInfo->opCode ^ RD_RESYNC) == 0)
+    if ((OpCode ^ RD_RESYNC) == 0)
         return RDETH_DETH;
 
-    if ((ibInfo->opCode ^ UD_SEND_ONLY) == 0)
+    if ((OpCode ^ UD_SEND_ONLY) == 0)
         return DETH_PAYLD;
 
-    if ((ibInfo->opCode ^ UD_SEND_ONLY_IMM) == 0)
+    if ((OpCode ^ UD_SEND_ONLY_IMM) == 0)
         return DETH_IMMDT_PAYLD;
 
     return -1;
@@ -2208,18 +2136,6 @@ parse_DETH(proto_tree *parentTree, packet_info *pinfo, tvbuff_t *tvb, gint *offs
     pinfo->srcport = tvb_get_ntoh24(tvb, local_offset); local_offset += 3;
 
     *offset = local_offset;
-}
-
-/* Parse DETH - DC Connected Extended Transport Header
-* IN: parentTree to add the dissection to - in this code the all_headers_tree
-* IN: dctConnect - True if this is a DCT-Connect packet.
-* IN: tvb - the data buffer from wireshark
-* IN/OUT: The current and updated offset  */
-static void
-parse_DCCETH(proto_tree *parentTree _U_, tvbuff_t *tvb _U_, gint *offset)
-{
-    /* Do nothing just skip the header size */
-    *offset += 16;
 }
 
 /* Parse RETH - RDMA Extended Transport Header
@@ -2349,7 +2265,7 @@ parse_IETH(proto_tree * parentTree, tvbuff_t *tvb, gint *offset)
     *offset = local_offset;
 }
 
-/* Parse Payload - Packet Payload / Invariant CRC / maybe Variant CRC
+/* Parse Payload - Packet Payload / Invariant CRC / Variant CRC
 * IN: parentTree to add the dissection to - in this code the all_headers_tree
 * IN: pinfo - packet info from wireshark
 * IN: info - infiniband info passed to subdissectors
@@ -2359,7 +2275,7 @@ parse_IETH(proto_tree * parentTree, tvbuff_t *tvb, gint *offset)
 * IN: top_tree - parent tree of Infiniband dissector */
 static void parse_PAYLOAD(proto_tree *parentTree,
                           packet_info *pinfo, struct infinibandinfo *info,
-                          tvbuff_t *tvb, gint *offset, gint length, gint crclen, proto_tree *top_tree)
+                          tvbuff_t *tvb, gint *offset, gint length, proto_tree *top_tree)
 {
     gint                local_offset    = *offset;
     /* Payload - Packet Payload */
@@ -2472,10 +2388,11 @@ static void parse_PAYLOAD(proto_tree *parentTree,
          * call the appropriate dissector. If not we call the "data" dissector.
          */
         if (!dissector_found && pref_identify_iba_payload && (reserved == 0)) {
+            void *pd_save;
 
             /* Get the captured length and reported length of the data
                after the Ethernet type. */
-            captured_length = tvb_captured_length_remaining(tvb, local_offset+4);
+            captured_length = tvb_length_remaining(tvb, local_offset+4);
             reported_length = tvb_reported_length_remaining(tvb, local_offset+4);
 
             next_tvb = tvb_new_subset(tvb, local_offset+4, captured_length, reported_length);
@@ -2485,6 +2402,7 @@ static void parse_PAYLOAD(proto_tree *parentTree,
                was reduced by some dissector before an exception was thrown,
                we can still put in an item for the trailer. */
             saved_proto = pinfo->current_proto;
+            pd_save = pinfo->private_data;
 
             TRY {
                 dissector_found = dissector_try_uint(ethertype_dissector_table,
@@ -2501,7 +2419,11 @@ static void parse_PAYLOAD(proto_tree *parentTree,
                    the trailer, after noting that a dissector was found
                    and restoring the protocol value that was in effect
                    before we called the subdissector.
-                */
+
+                   Restore the private_data structure in case one of the
+                   called dissectors modified it (and, due to the exception,
+                   was unable to restore it). */
+                pinfo->private_data = pd_save;
 
                 show_exception(next_tvb, pinfo, top_tree, EXCEPT_CODE, GET_MESSAGE);
                 dissector_found = TRUE;
@@ -2528,12 +2450,12 @@ static void parse_PAYLOAD(proto_tree *parentTree,
 
         }
 
-        captured_length = tvb_captured_length_remaining(tvb, local_offset);
+        captured_length = tvb_length_remaining(tvb, local_offset);
         reported_length = tvb_reported_length_remaining(tvb,
                                 local_offset);
 
-        if (reported_length >= crclen)
-            reported_length -= crclen;
+        if (reported_length >= 6)
+            reported_length -= 6;
         if (captured_length > reported_length)
             captured_length = reported_length;
 
@@ -2556,8 +2478,8 @@ static void parse_PAYLOAD(proto_tree *parentTree,
 
         /*parse_RWH(parentTree, tvb, &local_offset, pinfo, top_tree);*/
 
-        /* Will contain ICRC <and maybe VCRC> = 4 or 4+2 (crclen) */
-        local_offset = tvb_reported_length(tvb) - crclen;
+        /* Will contain ICRC and VCRC = 4+2 */
+        local_offset = tvb_reported_length(tvb) - 6;
     }
 
     *offset = local_offset;
@@ -2591,7 +2513,7 @@ static void parse_IPvSix(proto_tree *parentTree, tvbuff_t *tvb, gint *offset, pa
 
     /* (- 2) for VCRC which lives at the end of the packet   */
     ipv6_tvb = tvb_new_subset(tvb, *offset,
-                  tvb_captured_length_remaining(tvb, *offset) - 2,
+                  tvb_length_remaining(tvb, *offset) - 2,
                   tvb_reported_length_remaining(tvb, *offset) - 2);
     call_dissector(ipv6_handle, ipv6_tvb, pinfo, parentTree);
     *offset = tvb_reported_length(tvb) - 2;
@@ -2633,7 +2555,7 @@ static void parse_RWH(proto_tree *ah_tree, tvbuff_t *tvb, gint *offset, packet_i
 
     /* Get the captured length and reported length of the data
      * after the Ethernet type. */
-    captured_length = tvb_captured_length_remaining(tvb, *offset);
+    captured_length = tvb_length_remaining(tvb, *offset);
     reported_length = tvb_reported_length_remaining(tvb, *offset);
 
     /* Construct a tvbuff for the payload after the Ethernet type,
@@ -2677,7 +2599,7 @@ static gboolean parse_EoIB(proto_tree *tree, tvbuff_t *tvb, gint offset, packet_
         return FALSE;
     }
 
-    encap_tvb = tvb_new_subset(tvb, offset + 4, tvb_captured_length_remaining(tvb, offset + 4), encap_size - 4);
+    encap_tvb = tvb_new_subset(tvb, offset + 4, tvb_length_remaining(tvb, offset + 4), encap_size - 4);
 
     header_item = proto_tree_add_item(tree, hf_infiniband_EOIB, tvb, offset, 4, ENC_NA);
     header_subtree = proto_item_add_subtree(header_item, ett_eoib);
@@ -2998,7 +2920,7 @@ static void parse_COM_MGT(proto_tree *parentTree, packet_info *pinfo, tvbuff_t *
             tvb_get_ipv6(tvb, local_offset, (struct e_in6_addr*)local_gid); local_offset += 16;
             proto_tree_add_item(CM_header_tree, hf_cm_req_primary_remote_gid, tvb, local_offset, 16, ENC_NA);
             tvb_get_ipv6(tvb, local_offset, (struct e_in6_addr*)remote_gid); local_offset += 16;
-            proto_tree_add_item(CM_header_tree, hf_cm_req_primary_flow_label, tvb, local_offset, 3, ENC_BIG_ENDIAN); local_offset += 2;
+            proto_tree_add_item(CM_header_tree, hf_cm_req_primary_flow_label, tvb, local_offset, 2, ENC_BIG_ENDIAN); local_offset += 2;
             local_offset += 1;  /* skip reserved */
             proto_tree_add_item(CM_header_tree, hf_cm_req_primary_packet_rate, tvb, local_offset, 1, ENC_BIG_ENDIAN); local_offset += 1;
             proto_tree_add_item(CM_header_tree, hf_cm_req_primary_traffic_class, tvb, local_offset, 1, ENC_BIG_ENDIAN); local_offset += 1;
@@ -3012,7 +2934,7 @@ static void parse_COM_MGT(proto_tree *parentTree, packet_info *pinfo, tvbuff_t *
             proto_tree_add_item(CM_header_tree, hf_cm_req_alt_remote_lid, tvb, local_offset, 2, ENC_BIG_ENDIAN); local_offset += 2;
             proto_tree_add_item(CM_header_tree, hf_cm_req_alt_local_gid, tvb, local_offset, 16, ENC_NA); local_offset += 16;
             proto_tree_add_item(CM_header_tree, hf_cm_req_alt_remote_gid, tvb, local_offset, 16, ENC_NA); local_offset += 16;
-            proto_tree_add_item(CM_header_tree, hf_cm_req_flow_label, tvb, local_offset, 3, ENC_BIG_ENDIAN); local_offset += 2;
+            proto_tree_add_item(CM_header_tree, hf_cm_req_flow_label, tvb, local_offset, 2, ENC_BIG_ENDIAN); local_offset += 2;
             local_offset += 1;  /* skip reserved */
             proto_tree_add_item(CM_header_tree, hf_cm_req_packet_rate, tvb, local_offset, 1, ENC_BIG_ENDIAN); local_offset += 1;
             proto_tree_add_item(CM_header_tree, hf_cm_req_alt_traffic_class, tvb, local_offset, 1, ENC_BIG_ENDIAN); local_offset += 1;
@@ -4922,32 +4844,26 @@ static int parse_PERF_PortCountersExtended(proto_tree* parentTree, tvbuff_t* tvb
 *       tvb - The tvbbuff of packet data
 *       offset - The offset in TVB where the attribute begins
 *       pinfo - The packet info structure with column information
-*       starts_with - regular IB packet starts with LRH, ROCE starts with GRH and RROCE starts with BTH,
-*                     this tells the parser what headers of (LRH/GRH) to skip. */
-static void dissect_general_info(tvbuff_t *tvb, gint offset, packet_info *pinfo, ib_packet_start_header starts_with)
+*       starts_with_grh - If true this packets start with a GRH header, otherwise with LRH  */
+static void dissect_general_info(tvbuff_t *tvb, gint offset, packet_info *pinfo, gboolean starts_with_grh)
 {
     guint8            lnh_val            = 0; /* The Link Next Header Value.  Tells us which headers are coming */
     gboolean          bthFollows         = FALSE; /* Tracks if we are parsing a BTH.  This is a significant decision point */
     guint8            virtualLane        = 0; /* The Virtual Lane of the current Packet */
+    guint8            opCode             = 0; /* OpCode from BTH header. */
     gint32            nextHeaderSequence = -1; /* defined by this dissector. #define which indicates the upcoming header sequence from OpCode */
     guint8            nxtHdr             = 0; /* that must be available for that header. */
+    struct e_in6_addr SRCgid;   /* Struct to display ipv6 Address */
+    struct e_in6_addr DSTgid;   /* Struct to display ipv6 Address */
     guint8            management_class   = 0;
     MAD_Data          MadData;
 
-    /* BTH - Base Trasport Header */
-    struct infinibandinfo info = { 0, FALSE};
-    gint bthSize = 12;
     void *src_addr,                 /* the address to be displayed in the source/destination columns */
          *dst_addr;                 /* (lid/gid number) will be stored here */
 
-    if (starts_with == IB_PACKET_STARTS_WITH_GRH) {
+    if (starts_with_grh) {
         /* this is a RoCE packet, skip LRH parsing */
         lnh_val = IBA_GLOBAL;
-        goto skip_lrh;
-    }
-    else if (starts_with == IB_PACKET_STARTS_WITH_BTH) {
-        /* this is a RRoCE packet, skip LRH/GRH parsing and go directly to BTH */
-        lnh_val = IBA_LOCAL;
         goto skip_lrh;
     }
 
@@ -4983,12 +4899,22 @@ skip_lrh:
             nxtHdr = tvb_get_guint8(tvb, offset);
             offset += 2;
 
+            tvb_get_ipv6(tvb, offset, &SRCgid);
+
             /* Set source GID in packet view. */
-            TVB_SET_ADDRESS(&pinfo->src, AT_IB, tvb, offset, GID_SIZE);
+            src_addr = wmem_alloc(pinfo->pool, GID_SIZE);
+            memcpy(src_addr, &SRCgid, GID_SIZE);
+            SET_ADDRESS(&pinfo->src, AT_IB, GID_SIZE, src_addr);
+
             offset += 16;
 
+            tvb_get_ipv6(tvb, offset, &DSTgid);
+
             /* Set destination GID in packet view. */
-            TVB_SET_ADDRESS(&pinfo->dst, AT_IB, tvb, offset, GID_SIZE);
+            dst_addr = wmem_alloc(pinfo->pool, GID_SIZE);
+            memcpy(dst_addr, &DSTgid, GID_SIZE);
+            SET_ADDRESS(&pinfo->dst, AT_IB, GID_SIZE, dst_addr);
+
             offset += 16;
 
             if (nxtHdr != 0x1B)
@@ -5005,13 +4931,9 @@ skip_lrh:
             bthFollows = TRUE;
 
             /* Get the OpCode - this tells us what headers are following */
-            info.opCode = tvb_get_guint8(tvb, offset);
-            if ((info.opCode >> 5) == 0x2) {
-                info.dctConnect = !(tvb_get_guint8(tvb, offset + 1) & 0x80);
-                bthSize += 8;
-            }
-            col_append_str(pinfo->cinfo, COL_INFO, val_to_str_const(info.opCode, OpCodeMap, "Unknown OpCode"));
-            offset += bthSize;
+            opCode = tvb_get_guint8(tvb, offset);
+            col_append_str(pinfo->cinfo, COL_INFO, val_to_str_const((guint32)opCode, OpCodeMap, "Unknown OpCode"));
+            offset += 12;
             break;
         case IP_NON_IBA:
             /* Raw IPv6 Packet */
@@ -5029,7 +4951,7 @@ skip_lrh:
         /* Find our next header sequence based on the Opcode
          * Since we're not doing dissection here, we just need the proper offsets to get our labels in packet view */
 
-        nextHeaderSequence = find_next_header_sequence(&info);
+        nextHeaderSequence = find_next_header_sequence((guint32) opCode);
         switch (nextHeaderSequence)
         {
             case RDETH_DETH_PAYLD:
@@ -5119,9 +5041,6 @@ skip_lrh:
             case DETH_IMMDT_PAYLD:
                 offset += 8; /* DETH */
                 offset += 4; /* IMMDT */
-                break;
-            case DCCETH:
-                offset += 16; /* DCCETH */
                 break;
             default:
                 break;
@@ -5509,7 +5428,7 @@ void proto_register_infiniband(void)
         },
         {&hf_cm_req_e2e_flow_ctrl, {
                 "End-to-End Flow Control", "infiniband.cm.req.e2eflowctrl",
-                FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x80, NULL, HFILL}
         },
         {&hf_cm_req_start_psn, {
                 "Starting PSN", "infiniband.cm.req.startpsn",
@@ -5517,11 +5436,11 @@ void proto_register_infiniband(void)
         },
         {&hf_cm_req_local_cm_resp_to, {
                 "Local CM Response Timeout", "infiniband.cm.req.localresptout",
-                FT_UINT8, BASE_HEX, NULL, 0xf8, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x1f, NULL, HFILL}
         },
         {&hf_cm_req_retry_count, {
                 "Retry Count", "infiniband.cm.req.retrcount",
-                FT_UINT8, BASE_HEX, NULL, 0x7, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0xe0, NULL, HFILL}
         },
         {&hf_cm_req_pkey, {
                 "Partition Key", "infiniband.cm.req.pkey",
@@ -5529,23 +5448,23 @@ void proto_register_infiniband(void)
         },
         {&hf_cm_req_path_pp_mtu, {
                 "Path Packet Payload MTU", "infiniband.cm.req.pppmtu",
-                FT_UINT8, BASE_HEX, NULL, 0xf0, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0xf, NULL, HFILL}
         },
         {&hf_cm_req_rdc_exists, {
                 "RDC Exists", "infiniband.cm.req.rdcexist",
-                FT_UINT8, BASE_HEX, NULL, 0x8, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x10, NULL, HFILL}
         },
         {&hf_cm_req_rnr_retry_count, {
                 "RNR Retry Count", "infiniband.cm.req.rnrretrcount",
-                FT_UINT8, BASE_HEX, NULL, 0x7, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0xe0, NULL, HFILL}
         },
         {&hf_cm_req_max_cm_retries, {
                 "Max CM Retries", "infiniband.cm.req.maxcmretr",
-                FT_UINT8, BASE_HEX, NULL, 0xf0, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0xf, NULL, HFILL}
         },
         {&hf_cm_req_srq, {
                 "SRQ", "infiniband.cm.req.srq",
-                FT_UINT8, BASE_HEX, NULL, 0x8, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x10, NULL, HFILL}
         },
         {&hf_cm_req_primary_local_lid, {
                 "Primary Local Port LID", "infiniband.cm.req.prim_locallid",
@@ -5565,11 +5484,11 @@ void proto_register_infiniband(void)
         },
         {&hf_cm_req_primary_flow_label, {
                 "Primary Flow Label", "infiniband.cm.req.prim_flowlabel",
-                FT_UINT24, BASE_HEX, NULL, 0xfffff0, NULL, HFILL}
+                FT_UINT24, BASE_HEX, NULL, 0xfffff, NULL, HFILL}
         },
         {&hf_cm_req_primary_packet_rate, {
                 "Primary Packet Rate", "infiniband.cm.req.prim_pktrate",
-                FT_UINT8, BASE_HEX, NULL, 0x3f, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0xfc, NULL, HFILL}
         },
         {&hf_cm_req_primary_traffic_class, {
                 "Primary Traffic Class", "infiniband.cm.req.prim_tfcclass",
@@ -5581,15 +5500,15 @@ void proto_register_infiniband(void)
         },
         {&hf_cm_req_primary_sl, {
                 "Primary SL", "infiniband.cm.req.prim_sl",
-                FT_UINT8, BASE_HEX, NULL, 0xf0, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0xf, NULL, HFILL}
         },
         {&hf_cm_req_primary_subnet_local, {
                 "Primary Subnet Local", "infiniband.cm.req.prim_subnetlocal",
-                FT_UINT8, BASE_HEX, NULL, 0x8, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x10, NULL, HFILL}
         },
         {&hf_cm_req_primary_local_ack_to, {
                 "Primary Local ACK Timeout", "infiniband.cm.req.prim_localacktout",
-                FT_UINT8, BASE_HEX, NULL, 0xf8, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x1f, NULL, HFILL}
         },
         {&hf_cm_req_alt_local_lid, {
                 "Alternate Local Port LID", "infiniband.cm.req.alt_locallid",
@@ -5609,11 +5528,11 @@ void proto_register_infiniband(void)
         },
         {&hf_cm_req_flow_label, {
                 "Alternate Flow Label", "infiniband.cm.req.alt_flowlabel",
-                FT_UINT24, BASE_HEX, NULL, 0xfffff0, NULL, HFILL}
+                FT_UINT24, BASE_HEX, NULL, 0xfffff, NULL, HFILL}
         },
         {&hf_cm_req_packet_rate, {
                 "Alternate Packet Rate", "infiniband.cm.req.alt_pktrate",
-                FT_UINT8, BASE_HEX, NULL, 0x3f, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0xfc, NULL, HFILL}
         },
         {&hf_cm_req_alt_traffic_class, {
                 "Alternate Traffic Class", "infiniband.cm.req.alt_tfcclass",
@@ -5625,15 +5544,15 @@ void proto_register_infiniband(void)
         },
         {&hf_cm_req_SL, {
                 "Alternate SL", "infiniband.cm.req.alt_sl",
-                FT_UINT8, BASE_HEX, NULL, 0xf0, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0xf, NULL, HFILL}
         },
         {&hf_cm_req_subnet_local, {
                 "Alternate Subnet Local", "infiniband.cm.req.alt_subnetlocal",
-                FT_UINT8, BASE_HEX, NULL, 0x8, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x10, NULL, HFILL}
         },
         {&hf_cm_req_local_ACK_timeout, {
                 "Alternate Local ACK Timeout", "infiniband.cm.req.alt_localacktout",
-                FT_UINT8, BASE_HEX, NULL, 0xf8, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x1f, NULL, HFILL}
         },
         {&hf_cm_req_private_data, {
                 "PrivateData", "infiniband.cm.req.private",
@@ -5674,23 +5593,23 @@ void proto_register_infiniband(void)
         },
         {&hf_cm_rep_tgtackdelay, {
                 "Target ACK Delay", "infiniband.cm.rep.tgtackdelay",
-                FT_UINT8, BASE_HEX, NULL, 0xf8, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x1f, NULL, HFILL}
         },
         {&hf_cm_rep_failoveracc, {
                 "Failover Accepted", "infiniband.cm.rep.failoveracc",
-                FT_UINT8, BASE_HEX, NULL, 0x6, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x60, NULL, HFILL}
         },
         {&hf_cm_rep_e2eflowctl, {
                 "End-To-End Flow Control", "infiniband.cm.rep.e2eflowctrl",
-                FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x80, NULL, HFILL}
         },
         {&hf_cm_rep_rnrretrycount, {
                 "RNR Retry Count", "infiniband.cm.rep.rnrretrcount",
-                FT_UINT8, BASE_HEX, NULL, 0xe0, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x7, NULL, HFILL}
         },
         {&hf_cm_rep_srq, {
                 "SRQ", "infiniband.cm.rep.srq",
-                FT_UINT8, BASE_HEX, NULL, 0x10, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x8, NULL, HFILL}
         },
         {&hf_cm_rep_localcaguid, {
                 "Local CA GUID", "infiniband.cm.rep.localcaguid",
@@ -5724,11 +5643,11 @@ void proto_register_infiniband(void)
         },
         {&hf_cm_rej_msg_rej, {
                 "Message REJected", "infiniband.cm.rej.msgrej",
-                FT_UINT8, BASE_HEX, NULL, 0xc0, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x3, NULL, HFILL}
         },
         {&hf_cm_rej_rej_info_len, {
                 "Reject Info Length", "infiniband.cm.rej.rejinfolen",
-                FT_UINT8, BASE_HEX, NULL, 0xfe, NULL, HFILL}
+                FT_UINT8, BASE_HEX, NULL, 0x7f, NULL, HFILL}
         },
         {&hf_cm_rej_reason, {
                 "Reason", "infiniband.cm.rej.reason",
@@ -7426,18 +7345,18 @@ void proto_register_infiniband(void)
         &ett_link
     };
 
-    proto_infiniband = proto_register_protocol("InfiniBand", "IB", "infiniband");
+    proto_infiniband = proto_register_protocol("InfiniBand", "InfiniBand", "infiniband");
     ib_handle = register_dissector("infiniband", dissect_infiniband, proto_infiniband);
 
     proto_register_field_array(proto_infiniband, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
 
     /* register the subdissector tables */
-    heur_dissectors_payload = register_heur_dissector_list("infiniband.payload");
-    heur_dissectors_cm_private = register_heur_dissector_list("infiniband.mad.cm.private");
+    register_heur_dissector_list("infiniband.payload", &heur_dissectors_payload);
+    register_heur_dissector_list("infiniband.mad.cm.private", &heur_dissectors_cm_private);
 
     /* register dissection preferences */
-    infiniband_module = prefs_register_protocol(proto_infiniband, proto_reg_handoff_infiniband);
+    infiniband_module = prefs_register_protocol(proto_infiniband, NULL);
 
     prefs_register_bool_preference(infiniband_module, "identify_payload",
                                    "Attempt to identify and parse encapsulated IBA payloads",
@@ -7449,12 +7368,9 @@ void proto_register_infiniband(void)
                                    "When set, dissector will attempt to identify and parse "
                                    "Mellanox Ethernet-over-InfiniBand packets",
                                    &pref_dissect_eoib);
-    prefs_register_uint_preference(infiniband_module, "rroce.port", "RRoce UDP Port(Default 1021)", "when set "
-                                   "the Analyser will consider this as RRoce UDP Port and parse it accordingly",
-                                    10, &pref_rroce_udp_port);
 
     proto_infiniband_link = proto_register_protocol("InfiniBand Link", "InfiniBand Link", "infiniband_link");
-    ib_link_handle = register_dissector("infiniband_link", dissect_infiniband_link, proto_infiniband_link);
+    register_dissector("infiniband_link", dissect_infiniband_link, proto_infiniband_link);
 
     proto_register_field_array(proto_infiniband_link, hf_link, array_length(hf_link));
     proto_register_subtree_array(ett_link_array, array_length(ett_link_array));
@@ -7467,52 +7383,16 @@ void proto_register_infiniband(void)
 /* Reg Handoff.  Register dissectors we'll need for IPoIB and RoCE */
 void proto_reg_handoff_infiniband(void)
 {
-    static gboolean initialized = FALSE;
-    static guint prev_rroce_udp_port;
-    dissector_handle_t roce_handle, rroce_handle;
+    dissector_handle_t roce_handle;
 
     ipv6_handle               = find_dissector("ipv6");
     data_handle               = find_dissector("data");
     eth_handle                = find_dissector("eth");
     ethertype_dissector_table = find_dissector_table("ethertype");
 
-    /* announce an anonymous Infiniband dissector */
-    dissector_add_uint("erf.types.type", ERF_TYPE_INFINIBAND, ib_handle);
-
-    /* announce an anonymous Infiniband dissector */
-    dissector_add_uint("erf.types.type", ERF_TYPE_INFINIBAND_LINK, ib_link_handle);
-
     /* create and announce an anonymous RoCE dissector */
     roce_handle = create_dissector_handle(dissect_roce, proto_infiniband);
     dissector_add_uint("ethertype", ETHERTYPE_ROCE, roce_handle);
 
-    /* create and announce an anonymous RRoCE dissector */
-    rroce_handle = create_dissector_handle(dissect_rroce, proto_infiniband);
-    if (!initialized)
-    {
-        initialized = TRUE;
-    }
-    else
-    {
-        dissector_delete_uint("udp.port", prev_rroce_udp_port, rroce_handle);
-    }
-    /*we are saving the previous value of rroce udp port so we will be able to remove the dissector
-     * the next time user pref is updated and we get called back to proto_reg_handoff_infiniband.*/
-    prev_rroce_udp_port = pref_rroce_udp_port;
-    dissector_add_uint("udp.port", pref_rroce_udp_port, rroce_handle);
-
     dissector_add_uint("wtap_encap", WTAP_ENCAP_INFINIBAND, ib_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -24,7 +24,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include <wsutil/str_util.h>
 
 void proto_register_http_urlencoded(void);
@@ -137,7 +140,13 @@ dissect_form_urlencoded(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 			/*
 			 * No information from dissector data
 			 */
-			data_name = NULL;
+			data_name = (char *)(pinfo->private_data);
+			if (! (data_name && data_name[0])) {
+				/*
+				 * No information from "private_data"
+				 */
+				data_name = NULL;
+			}
 		}
 	}
 

@@ -40,6 +40,8 @@
 #include <epan/stats_tree_priv.h>
 
 #include "ui/simple_dialog.h"
+#include "../globals.h"
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
@@ -47,8 +49,9 @@
 #include "ui/gtk/tap_param_dlg.h"
 #include "ui/gtk/main.h"
 
-#include "ui/gtk/gui_stat_menu.h"
+#include "ui/gtk/old-gtk-compat.h"
 
+#include "ui/gtk/gui_stat_menu.h"
 
 #ifdef _WIN32
 #define USE_WIN32_FILE_DIALOGS
@@ -448,7 +451,7 @@ init_gtk_tree(const char* opt_arg, void *userdata _U_)
 
 	window_name = g_strdup_printf("%s Stats Tree", st->display_name);
 
-	st->pr->win = window_new_with_geom(GTK_WINDOW_TOPLEVEL, window_name, NULL, GTK_WIN_POS_CENTER_ON_PARENT);
+	st->pr->win = window_new_with_geom(GTK_WINDOW_TOPLEVEL,window_name,window_name);
 	gtk_window_set_default_size(GTK_WINDOW(st->pr->win), st->num_columns*80+80, 400);
 	g_free(window_name);
 
@@ -538,7 +541,7 @@ init_gtk_tree(const char* opt_arg, void *userdata _U_)
 }
 
 static tap_param tree_stat_params[] = {
-	{ PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+	{ PARAM_FILTER, "Filter", NULL }
 };
 
 static void

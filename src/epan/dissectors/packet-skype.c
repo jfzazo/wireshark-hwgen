@@ -40,6 +40,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+#include <epan/wmem/wmem.h>
 #include <epan/packet.h>
 #include <epan/conversation.h>
 
@@ -206,9 +208,9 @@ dissect_skype_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			ENC_BIG_ENDIAN);
 		offset += 2;
 		proto_tree_add_item(skype_tree, hf_skype_som_unk, tvb, offset, 1,
-			ENC_BIG_ENDIAN);
+			ENC_NA);
 		proto_tree_add_item(skype_tree, hf_skype_som_type, tvb, offset, 1,
-			ENC_BIG_ENDIAN);
+			ENC_NA);
 		offset += 1;
 
 		/* Body dissection */
@@ -232,7 +234,7 @@ dissect_skype_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			break;
 		case SKYPE_TYPE_FFR:
 			proto_tree_add_item(skype_tree, hf_skype_ffr_num, tvb, offset, 1,
-				ENC_BIG_ENDIAN);
+				ENC_NA);
 			offset += 1;
 			proto_tree_add_item(skype_tree, hf_skype_ffr_unk1, tvb, offset, 4,
 				ENC_BIG_ENDIAN);
@@ -446,8 +448,8 @@ proto_reg_handoff_skype(void)
 	dissector_handle_t skype_handle;
 
 	skype_handle = new_create_dissector_handle(dissect_skype_static, proto_skype);
-	dissector_add_for_decode_as("tcp.port", skype_handle);
-	dissector_add_for_decode_as("udp.port", skype_handle);
+	dissector_add_handle("tcp.port", skype_handle);
+	dissector_add_handle("udp.port", skype_handle);
 #if SKYPE_HEUR
 	heur_dissector_add("tcp", dissect_skype_heur, proto_skype);
 	heur_dissector_add("udp", dissect_skype_heur, proto_skype);
@@ -455,15 +457,3 @@ proto_reg_handoff_skype(void)
 
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

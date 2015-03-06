@@ -27,12 +27,15 @@
 #include <string.h>
 #include <gtk/gtk.h>
 
+#include <epan/epan.h>
 #include <epan/packet_info.h>
 #include <epan/value_string.h>
 #include <epan/tap.h>
 #include <epan/packet.h>
+#include <epan/asn1.h>
 #include <epan/dissectors/packet-camel.h>
 
+#include "../stat_menu.h"
 
 #include "ui/simple_dialog.h"
 
@@ -42,6 +45,7 @@
 #include "ui/gtk/gui_stat_util.h"
 #include "ui/gtk/tap_param_dlg.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 static void gtk_camelcounter_reset(void *phs);
 static int gtk_camelcounter_packet(void *phs,
@@ -97,7 +101,6 @@ static void gtk_camelcounter_draw(void *phs)
   struct camelcounter_t *p_counter=(struct camelcounter_t *)phs;
   int i;
   char str[256];
-  gchar* tmp_str;
   GtkListStore *store;
   GtkTreeIter iter;
 
@@ -109,9 +112,7 @@ static void gtk_camelcounter_draw(void *phs)
   for(i=0;i<camel_MAX_NUM_OPR_CODES;i++) {
     /* Message counter */
     if(p_counter->camel_msg[i]!=0) {
-      tmp_str = val_to_str_wmem(NULL, i,camel_opr_code_strings,"Unknown message (%d)");
-      g_snprintf(str, 256, "Request %s", tmp_str);
-      wmem_free(NULL, tmp_str);
+      g_snprintf(str, 256, "Request %s", val_to_str(i,camel_opr_code_strings,"Unknown message "));
 
       gtk_list_store_append(store, &iter);
       gtk_list_store_set(store, &iter,
@@ -205,7 +206,7 @@ static void gtk_camelcounter_init(const char *opt_arg, void *userdata _U_)
 }
 
 static tap_param camel_counter_params[] = {
-  { PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+  { PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg camel_counter_dlg = {

@@ -25,8 +25,12 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/strutil.h>
+
+#include <glib.h>
+
+#include <epan/packet.h>
 
 void proto_register_bvlc(void);
 void proto_reg_handoff_bvlc(void);
@@ -158,10 +162,12 @@ dissect_bvlc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 		bvlc_length = packet_length;
 	}
 
-	if (bvlc_length < 4) {
-		return 0;	/* reject */
-	}
 	if (tree) {
+		if (bvlc_length < 4) {
+			proto_tree_add_text(tree, tvb, 2, 2,
+				"Bogus length: %d", bvlc_length);
+			return tvb_reported_length(tvb);	/* XXX - reject? */
+		}
 		ti = proto_tree_add_item(tree, proto_bvlc, tvb, 0,
 			bvlc_length, ENC_NA);
 		bvlc_tree = proto_item_add_subtree(ti, ett_bvlc);
@@ -184,7 +190,7 @@ dissect_bvlc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 		switch (bvlc_function) {
 		case 0x00: /* BVLC-Result */
 			bvlc_result = tvb_get_ntohs(tvb, offset);
-			/* I don't know why the result code is encoded in 4 nibbles,
+			/* I dont know why the result code is encoded in 4 nibbles,
 			 * but only using one: 0x00r0. Shifting left 4 bits.
 			 */
 			/* We should bitmask the result correctly when we have a
@@ -437,16 +443,3 @@ proto_reg_handoff_bvlc(void)
 	}
 	additional_bvlc_udp_port = global_additional_bvlc_udp_port;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

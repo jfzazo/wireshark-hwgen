@@ -84,13 +84,12 @@ get_guid(const char *s, e_guid_t *guid)
 }
 
 static gboolean
-guid_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, gchar **err_msg)
+guid_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, LogFunc logfunc)
 {
      e_guid_t guid;
 
     if (!get_guid(s, &guid)) {
-        if (err_msg != NULL)
-            *err_msg = g_strdup_printf("\"%s\" is not a valid GUID.", s);
+        logfunc("\"%s\" is not a valid GUID.", s);
         return FALSE;
     }
 
@@ -99,13 +98,13 @@ guid_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_
 }
 
 static int
-guid_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_, int field_display _U_)
+guid_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_)
 {
     return GUID_STR_LEN;
 }
 
 static void
-guid_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, int field_display _U_, char *buf)
+guid_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, char *buf)
 {
     guid_to_str_buf(&fv->value.guid, buf, GUID_STR_LEN);
 }

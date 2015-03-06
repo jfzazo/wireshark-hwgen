@@ -27,9 +27,10 @@
  */
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/dissectors/packet-usb.h>
 #include <epan/prefs.h>
-#include "packet-usb.h"
 
 static int proto_ccid = -1;
 
@@ -50,9 +51,9 @@ static int hf_ccid_wLevelParameter = -1;
 static int hf_ccid_bcdCCID = -1;
 static int hf_ccid_bMaxSlotIndex = -1;
 static int hf_ccid_bVoltageSupport = -1;
-static int hf_ccid_bVoltageSupport18 = -1;
-static int hf_ccid_bVoltageSupport30 = -1;
 static int hf_ccid_bVoltageSupport50 = -1;
+static int hf_ccid_bVoltageSupport30 = -1;
+static int hf_ccid_bVoltageSupport18 = -1;
 static int hf_ccid_dwProtocols = -1;
 static int hf_ccid_dwDefaultClock = -1;
 static int hf_ccid_dwMaximumClock = -1;
@@ -63,39 +64,19 @@ static int hf_ccid_bNumDataRatesSupported = -1;
 static int hf_ccid_dwSynchProtocols = -1;
 static int hf_ccid_dwMechanical = -1;
 static int hf_ccid_dwFeatures = -1;
-static int hf_ccid_dwFeatures_autoParam = -1;
-static int hf_ccid_dwFeatures_autoIccActivation = -1;
 static int hf_ccid_dwMaxCCIDMessageLength = -1;
 static int hf_ccid_bClassGetResponse = -1;
 static int hf_ccid_bClassEnvelope = -1;
 static int hf_ccid_wLcdLayout = -1;
-static int hf_ccid_wLcdLayout_lines = -1;
-static int hf_ccid_wLcdLayout_chars = -1;
 static int hf_ccid_bPINSupport = -1;
-static int hf_ccid_bPINSupport_modify = -1;
-static int hf_ccid_bPINSupport_vrfy = -1;
 static int hf_ccid_bMaxCCIDBusySlots = -1;
-static int hf_ccid_Reserved = -1;
 
 static dissector_handle_t usb_ccid_handle;
 
 static const int *bVoltageLevel_fields[] = {
-    &hf_ccid_bVoltageSupport18,
-    &hf_ccid_bVoltageSupport30,
     &hf_ccid_bVoltageSupport50,
-    NULL
-};
-
-static const int *bFeatures_fields[] = {
-    /* XXX - add the missing components */
-    &hf_ccid_dwFeatures_autoIccActivation,
-    &hf_ccid_dwFeatures_autoParam,
-    NULL
-};
-
-static const int *bPINSupport_fields[] = {
-    &hf_ccid_bPINSupport_modify,
-    &hf_ccid_bPINSupport_vrfy,
+    &hf_ccid_bVoltageSupport30,
+    &hf_ccid_bVoltageSupport18,
     NULL
 };
 
@@ -233,9 +214,6 @@ static const value_string ccid_proto_structs_vals[] = {
 static gint ett_ccid      = -1;
 static gint ett_ccid_desc = -1;
 static gint ett_ccid_voltage_level = -1;
-static gint ett_ccid_features = -1;
-static gint ett_ccid_lcd_layout = -1;
-static gint ett_ccid_pin_support = -1;
 
 /* Table of payload types - adapted from the I2C dissector */
 enum {
@@ -262,19 +240,18 @@ dissect_usb_ccid_descriptor(tvbuff_t *tvb, packet_info *pinfo _U_,
     gint        offset = 0;
     guint8      descriptor_type;
     guint8      descriptor_len;
-    proto_item *freq_item;
+    proto_item *item, *freq_item;
     proto_tree *desc_tree;
     guint8      num_clock_supp;
-    proto_item *lcd_layout_item;
-    proto_tree *lcd_layout_tree;
 
     descriptor_len  = tvb_get_guint8(tvb, offset);
     descriptor_type = tvb_get_guint8(tvb, offset+1);
     if (descriptor_type!=USB_DESC_TYPE_SMARTCARD)
         return 0;
 
-    desc_tree = proto_tree_add_subtree(tree, tvb, offset, descriptor_len,
-                ett_ccid_desc, NULL, "SMART CARD DEVICE CLASS DESCRIPTOR");
+    item = proto_tree_add_text(tree, tvb, offset, descriptor_len,
+                "SMART CARD DEVICE CLASS DESCRIPTOR");
+    desc_tree = proto_item_add_subtree(item, ett_ccid_desc);
 
     dissect_usb_descriptor_header(desc_tree, tvb, offset,
             &ccid_descriptor_type_vals_ext);
@@ -333,9 +310,8 @@ dissect_usb_ccid_descriptor(tvbuff_t *tvb, packet_info *pinfo _U_,
             tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
-    proto_tree_add_bitmask(desc_tree, tvb, offset,
-            hf_ccid_dwFeatures, ett_ccid_features, bFeatures_fields,
-            ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(desc_tree, hf_ccid_dwFeatures,
+            tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
     proto_tree_add_item(desc_tree, hf_ccid_dwMaxCCIDMessageLength,
@@ -349,19 +325,11 @@ dissect_usb_ccid_descriptor(tvbuff_t *tvb, packet_info *pinfo _U_,
             tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset++;
 
-    lcd_layout_item = proto_tree_add_item(desc_tree, hf_ccid_wLcdLayout,
+    proto_tree_add_item(desc_tree, hf_ccid_wLcdLayout,
             tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    lcd_layout_tree = proto_item_add_subtree(
-            lcd_layout_item, ett_ccid_lcd_layout);
-    proto_tree_add_item(lcd_layout_tree, hf_ccid_wLcdLayout_lines,
-            tvb, offset+1, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(lcd_layout_tree, hf_ccid_wLcdLayout_chars,
-            tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 2;
-
-    proto_tree_add_bitmask(desc_tree, tvb, offset,
-            hf_ccid_bPINSupport, ett_ccid_pin_support, bPINSupport_fields,
-            ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(desc_tree, hf_ccid_bPINSupport,
+            tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset++;
 
     proto_tree_add_item(desc_tree, hf_ccid_bMaxCCIDBusySlots,
@@ -393,7 +361,7 @@ dissect_ccid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     item = proto_tree_add_item(tree, proto_ccid, tvb, 0, 10, ENC_NA);
     ccid_tree = proto_item_add_subtree(item, ett_ccid);
 
-    proto_tree_add_item(ccid_tree, hf_ccid_bMessageType, tvb, 0, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(ccid_tree, hf_ccid_bMessageType, tvb, 0, 1, ENC_NA);
     cmd = tvb_get_guint8(tvb, 0);
 
     col_append_fstr(pinfo->cinfo, COL_INFO, " - %s", val_to_str_const(cmd, ccid_messagetypes_vals, "Unknown"));
@@ -407,7 +375,7 @@ dissect_ccid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         proto_tree_add_item(ccid_tree, hf_ccid_bProtocolNum, tvb, 7, 1, ENC_LITTLE_ENDIAN);
 
         /* Placeholder for abRFU */
-        proto_tree_add_item(ccid_tree, hf_ccid_Reserved, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_text(ccid_tree, tvb, 8, 2, "Reserved for Future Use");
         if (tvb_get_letohl(tvb, 1) != 0)
         {
             next_tvb = tvb_new_subset_remaining(tvb, 10);
@@ -422,7 +390,7 @@ dissect_ccid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         proto_tree_add_item(ccid_tree, hf_ccid_bPowerSelect, tvb, 7, 1, ENC_LITTLE_ENDIAN);
 
         /* Placeholder for abRFU */
-        proto_tree_add_item(ccid_tree, hf_ccid_Reserved, tvb, 8, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_text(ccid_tree, tvb, 8, 2, "Reserved for Future Use");
         break;
 
     case PC_RDR_ICC_OFF:
@@ -431,7 +399,7 @@ dissect_ccid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         proto_tree_add_item(ccid_tree, hf_ccid_bSeq, tvb, 6, 1, ENC_LITTLE_ENDIAN);
 
         /* Placeholder for abRFU */
-        proto_tree_add_item(ccid_tree, hf_ccid_Reserved, tvb, 7, 3, ENC_LITTLE_ENDIAN);
+        proto_tree_add_text(ccid_tree, tvb, 7, 3, "Reserved for Future Use");
         break;
 
     case PC_RDR_GET_SLOT_STATUS:
@@ -440,7 +408,7 @@ dissect_ccid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         proto_tree_add_item(ccid_tree, hf_ccid_bSeq, tvb, 6, 1, ENC_LITTLE_ENDIAN);
 
         /* Placeholder for abRFU */
-        proto_tree_add_item(ccid_tree, hf_ccid_Reserved, tvb, 7, 3, ENC_LITTLE_ENDIAN);
+        proto_tree_add_text(ccid_tree, tvb, 7, 3, "Reserved for Future Use");
         break;
 
     case PC_RDR_GET_PARAMS:
@@ -449,7 +417,7 @@ dissect_ccid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         proto_tree_add_item(ccid_tree, hf_ccid_bSeq, tvb, 6, 1, ENC_LITTLE_ENDIAN);
 
         /* Placeholder for abRFU */
-        proto_tree_add_item(ccid_tree, hf_ccid_Reserved, tvb, 7, 3, ENC_LITTLE_ENDIAN);
+        proto_tree_add_text(ccid_tree, tvb, 7, 3, "Reserved for Future Use");
         break;
 
     case PC_RDR_XFR_BLOCK:
@@ -511,7 +479,7 @@ dissect_ccid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             next_tvb = tvb_new_subset_remaining(tvb, 10);
 
             if (sub_selected == SUB_PN532) {
-                next_tvb= tvb_new_subset_length(tvb, 10, tvb_get_guint8(tvb, 1));
+                next_tvb= tvb_new_subset(tvb, 10, tvb_get_guint8(tvb, 1), tvb_get_guint8(tvb, 1));
                 call_dissector_with_data(sub_handles[SUB_PN532], next_tvb, pinfo, tree, usb_conv_info);
             } else if (sub_selected == SUB_ACR122_PN532) {
                 pinfo->p2p_dir = P2P_DIR_RECV;
@@ -600,15 +568,15 @@ proto_register_ccid(void)
         {&hf_ccid_bVoltageSupport,
          { "voltage support", "usbccid.bVoltageSupport", FT_UINT8, BASE_HEX,
            NULL, 0x0, NULL, HFILL }},
-        {&hf_ccid_bVoltageSupport18,
-         { "1.8V", "usbccid.bVoltageSupport.18", FT_BOOLEAN, 8,
-            TFS(&tfs_supported_not_supported), 0x04, NULL, HFILL }},
-        {&hf_ccid_bVoltageSupport30,
-         { "3.0V", "usbccid.bVoltageSupport.30", FT_BOOLEAN, 8,
-            TFS(&tfs_supported_not_supported), 0x02, NULL, HFILL }},
         {&hf_ccid_bVoltageSupport50,
-         { "5.0V", "usbccid.bVoltageSupport.50", FT_BOOLEAN, 8,
-            TFS(&tfs_supported_not_supported), 0x01, NULL, HFILL }},
+         { "supports 5.0V", "usbccid.bVoltageSupport.50", FT_BOOLEAN, 8,
+            TFS(&tfs_set_notset), 0x01, NULL, HFILL }},
+        {&hf_ccid_bVoltageSupport30,
+         { "supports 3.0V", "usbccid.bVoltageSupport.30", FT_BOOLEAN, 8,
+            TFS(&tfs_set_notset), 0x02, NULL, HFILL }},
+        {&hf_ccid_bVoltageSupport18,
+         { "supports 1.8V", "usbccid.bVoltageSupport.18", FT_BOOLEAN, 8,
+            TFS(&tfs_set_notset), 0x04, NULL, HFILL }},
         {&hf_ccid_dwProtocols,
          { "dwProtocols", "usbccid.dwProtocols", FT_UINT32, BASE_HEX,
            NULL, 0x0, NULL, HFILL }},
@@ -639,14 +607,6 @@ proto_register_ccid(void)
         {&hf_ccid_dwFeatures,
          { "intelligent features", "usbccid.dwFeatures",
              FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_ccid_dwFeatures_autoIccActivation,
-         { "Automatic activation of ICC on inserting",
-             "usbccid.dwFeatures.autoIccActivation", FT_BOOLEAN, 32,
-             TFS(&tfs_supported_not_supported), 0x04, NULL, HFILL }},
-        {&hf_ccid_dwFeatures_autoParam,
-         { "Automatic parameter configuration based on ATR",
-             "usbccid.dwFeatures.autoParam", FT_BOOLEAN, 32,
-             TFS(&tfs_supported_not_supported), 0x02, NULL, HFILL }},
         {&hf_ccid_dwMaxCCIDMessageLength,
          { "maximum CCID message length", "usbccid.dwMaxCCIDMessageLength",
              FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
@@ -659,36 +619,18 @@ proto_register_ccid(void)
         {&hf_ccid_wLcdLayout,
          { "LCD layout", "usbccid.hf_ccid_wLcdLayout",
              FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_ccid_wLcdLayout_lines,
-         { "Lines", "usbccid.hf_ccid_wLcdLayout.lines",
-             FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-        {&hf_ccid_wLcdLayout_chars,
-         { "Characters per line", "usbccid.hf_ccid_wLcdLayout.chars",
-             FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
         {&hf_ccid_bPINSupport,
          { "PIN support", "usbccid.hf_ccid_bPINSupport",
              FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_ccid_bPINSupport_modify,
-         { "PIN modification", "usbccid.hf_ccid_bPINSupport.modify",
-             FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x02, NULL, HFILL }},
-        {&hf_ccid_bPINSupport_vrfy,
-         { "PIN verification", "usbccid.hf_ccid_bPINSupport.verify",
-             FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x01, NULL, HFILL }},
         {&hf_ccid_bMaxCCIDBusySlots,
          { "maximum number of busy slots", "usbccid.hf_ccid_bMaxCCIDBusySlots",
-             FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        {&hf_ccid_Reserved,
-         { "Reserved for Future Use", "usbccid.hf_ccid_Reserved",
-             FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }}
+             FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }}
     };
 
     static gint *ett[] = {
         &ett_ccid,
         &ett_ccid_desc,
-        &ett_ccid_voltage_level,
-        &ett_ccid_features,
-        &ett_ccid_lcd_layout,
-        &ett_ccid_pin_support
+        &ett_ccid_voltage_level
     };
 
     static const enum_val_t sub_enum_vals[] = {
@@ -725,9 +667,9 @@ proto_reg_handoff_ccid(void)
 
     dissector_add_uint("usb.bulk", IF_CLASS_SMART_CARD, usb_ccid_handle);
 
-    dissector_add_for_decode_as("usb.device", usb_ccid_handle);
-    dissector_add_for_decode_as("usb.product", usb_ccid_handle);
-    dissector_add_for_decode_as("usb.protocol", usb_ccid_handle);
+    dissector_add_handle("usb.device", usb_ccid_handle);
+    dissector_add_handle("usb.product", usb_ccid_handle);
+    dissector_add_handle("usb.protocol", usb_ccid_handle);
 
     sub_handles[SUB_DATA] = find_dissector("data");
     sub_handles[SUB_ISO7816] = find_dissector("iso7816");

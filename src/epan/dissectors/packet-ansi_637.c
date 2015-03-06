@@ -39,9 +39,11 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
 #include <epan/strutil.h>
 #include <epan/to_str.h>
+#include <epan/tfs.h>
 
 #include "packet-gsm_sms.h"
 #include "packet-ansi_a.h"
@@ -622,6 +624,7 @@ static void
 tele_param_user_data_cmas(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint len, guint32 offset, gboolean *has_private_data_p _U_)
 {
     proto_tree  *subtree;
+    proto_item  *item;
     guint8      bit_mask_8;
     guint8      oct, oct2;
     guint8      encoding;
@@ -695,9 +698,12 @@ tele_param_user_data_cmas(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
 
         record_len = tvb_get_guint8(tvb_out, offset + 1);
 
-        subtree =
-            proto_tree_add_subtree(tree, tvb_out, offset, record_len + 2,
-                ett_tia_1149_cmas_param[subtree_idx], NULL,  str);
+        item =
+            proto_tree_add_text(tree, tvb_out, offset, record_len + 2,
+                "%s",
+                str);
+
+        subtree = proto_item_add_subtree(item, ett_tia_1149_cmas_param[subtree_idx]);
 
         proto_tree_add_uint_format_value(subtree, hf_ansi_637_tele_cmas_record_type, tvb_out, offset, 1,
             record_type,
@@ -770,8 +776,10 @@ tele_param_user_data_cmas(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
             }
 
             temp_offset = offset;
-            text_decoder(tvb_out, pinfo, subtree, temp_offset, encoding, num_fields,
-                num_bits, 3 /* (5 bits used from 'temp_offset' octet for encoding */, 0);
+            if (num_fields) {
+                text_decoder(tvb_out, pinfo, subtree, temp_offset, encoding, num_fields,
+                    num_bits, 3 /* (5 bits used from 'temp_offset' octet for encoding */, 0);
+            }
 
             offset += (record_len - 1);
 
@@ -1046,6 +1054,7 @@ tele_param_user_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
     {
         gsm_sms_udh_fields_t    udh_fields;
         gint32                  num_udh_bits;
+        guint8                  ud_length;
 
         memset(&udh_fields, 0, sizeof(udh_fields));
 
@@ -1079,14 +1088,16 @@ tele_param_user_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
 
         offset = 0;
         fill_bits = 0;
+        ud_length = num_fields;
         if (encoding_bit_len == 16) {
             /* the NUM_FIELD value represents the number of characters in Unicode encoding.
                Let's translate it into bytes */
-            num_fields <<= 1;
+            ud_length <<= 1;
         }
-        dis_field_udh(tvb_out, pinfo, tree, &offset, &required_octs, &num_fields, cset, &fill_bits, &udh_fields);
+        dis_field_udh(tvb_out, tree, &offset, &required_octs, &ud_length, cset, &fill_bits, &udh_fields);
 
         offset = saved_offset;
+        num_fields = ud_length;
 
         if (encoding_bit_len == 7)
         {
@@ -1130,8 +1141,10 @@ tele_param_user_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
         }
     }
 
-    text_decoder(tvb, pinfo, tree, offset, encoding, num_fields,
-        num_fields * encoding_bit_len, unused_bits, fill_bits);
+    if (num_fields) {
+        text_decoder(tvb, pinfo, tree, offset, encoding, num_fields,
+            num_fields * encoding_bit_len, unused_bits, fill_bits);
+    }
 
     if (reserved_bits > 0)
     {
@@ -2169,7 +2182,7 @@ trans_param_bearer_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree _U_,
     /*
      * dissect the embedded teleservice data
      */
-    tele_tvb = tvb_new_subset_length(tvb, offset, len);
+    tele_tvb = tvb_new_subset(tvb, offset, len, len);
 
     dissector_try_uint(tele_dissector_table, ansi_637_trans_tele_id, tele_tvb, pinfo, g_tree);
 }
@@ -2220,9 +2233,12 @@ dissect_ansi_637_tele_param(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     ett_param_idx = ett_ansi_637_tele_param[idx];
     param_fcn = ansi_637_tele_param_fcn[idx];
 
-    subtree =
-        proto_tree_add_subtree(tree, tvb, curr_offset, -1,
-            ett_param_idx, &item, str);
+    item =
+        proto_tree_add_text(tree, tvb, curr_offset, -1,
+            "%s",
+            str);
+
+    subtree = proto_item_add_subtree(item, ett_param_idx);
 
     proto_tree_add_uint(subtree, hf_ansi_637_tele_subparam_id, tvb, curr_offset, 1, oct);
 
@@ -2276,7 +2292,7 @@ dissect_ansi_637_tele_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ans
     guint32     curr_offset;
 
     curr_offset = 0;
-    len = tvb_reported_length(tvb);
+    len = tvb_length(tvb);
 
     while ((len - curr_offset) > 0)
     {
@@ -2421,7 +2437,9 @@ dissect_ansi_637_trans_param(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
     ett_param_idx = ett_ansi_637_trans_param[idx];
     param_fcn = ansi_637_trans_param_fcn[idx];
 
-    subtree = proto_tree_add_subtree(tree, tvb, curr_offset, -1, ett_param_idx, &item, str);
+    item = proto_tree_add_text(tree, tvb, curr_offset, -1, "%s", str);
+
+    subtree = proto_item_add_subtree(item, ett_param_idx);
 
     proto_tree_add_uint(subtree, hf_ansi_637_trans_param_id, tvb, curr_offset, 1, oct);
 
@@ -2530,7 +2548,7 @@ dissect_ansi_637_trans(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         curr_offset = 1;
 
-        len = tvb_reported_length(tvb);
+        len = tvb_length(tvb);
 
         while ((len - curr_offset) > 0)
         {

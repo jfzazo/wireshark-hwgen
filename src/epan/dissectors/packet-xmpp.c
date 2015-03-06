@@ -24,13 +24,21 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include <epan/conversation.h>
 #include <epan/prefs.h>
 
-#include "packet-xmpp.h"
-#include "packet-xmpp-core.h"
+#include <epan/dissectors/packet-xml.h>
+
+#include <packet-xmpp-utils.h>
+#include <packet-xmpp.h>
+#include <packet-xmpp-core.h>
+#include <packet-xmpp-jingle.h>
 
 #define XMPP_PORT 5222
 
@@ -369,7 +377,6 @@ static void
 dissect_xmpp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
     xml_frame_t *xml_frame;
-    xml_frame_t *xml_dissector_frame;
     gboolean     out_packet;
 
     conversation_t   *conversation;
@@ -380,8 +387,6 @@ dissect_xmpp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     proto_item *outin_item;
 
     xmpp_element_t *packet = NULL;
-
-    int proto_xml = dissector_handle_get_protocol_index(xml_handle);
 
     /*check if desegment
      * now it checks that last char is '>',
@@ -442,10 +447,10 @@ dissect_xmpp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
     xmpp_item = proto_tree_add_item(tree, proto_xmpp, tvb, 0, -1, ENC_NA);
     xmpp_tree = proto_item_add_subtree(xmpp_item, ett_xmpp);
 
-    call_dissector_with_data(xml_handle, tvb, pinfo, xmpp_tree, NULL);
+    call_dissector(xml_handle, tvb, pinfo, xmpp_tree);
 
     /* If XML dissector is disabled, we can't do much */
-    if (!proto_is_protocol_enabled(find_protocol_by_id(proto_xml)))
+    if (!proto_is_protocol_enabled(find_protocol_by_id(dissector_handle_get_protocol_index(xml_handle))))
     {
         col_append_str(pinfo->cinfo, COL_INFO, "(XML dissector disabled, can't dissect XMPP)");
         expert_add_info(pinfo, xmpp_item, &ei_xmpp_xml_disabled);
@@ -460,12 +465,11 @@ dissect_xmpp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
         return;
     }
 
-    xml_dissector_frame = (xml_frame_t *)p_get_proto_data(pinfo->pool, pinfo, proto_xml, 0);
-    if(xml_dissector_frame == NULL)
+    if(!pinfo->private_data)
         return;
 
     /*data from XML dissector*/
-    xml_frame = xml_dissector_frame->first_child;
+    xml_frame = ((xml_frame_t*)pinfo->private_data)->first_child;
 
     if(!xml_frame)
         return;

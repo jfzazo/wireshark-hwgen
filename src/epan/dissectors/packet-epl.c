@@ -1,6 +1,6 @@
 /* packet-epl.c
  * Routines for "Ethernet POWERLINK 2.0" dissection
- * (Ethernet POWERLINK V2.0 Communication Profile Specification Draft Standard Version 1.2.0)
+ * (Ethernet POWERLINK V2.0 Communication Profile Specification Draft Standard Version 1.0.0)
  *
  * Copyright (c) 2006: Zurich University of Applied Sciences Winterthur (ZHW)
  *                     Institute of Embedded Systems (InES)
@@ -46,6 +46,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/etypes.h>
 #include <epan/prefs.h>
@@ -59,14 +60,14 @@ void proto_reg_handoff_epl(void);
 #define UDP_PORT_EPL            3819
 #endif
 
-/* Allow heuristic dissection and ASND manufacturer dissection */
+/* Allow heuristic dissection */
 static heur_dissector_list_t heur_epl_subdissector_list;
 static heur_dissector_list_t heur_epl_data_subdissector_list;
-static dissector_table_t     epl_asnd_dissector_table;
+
 #if 0
 /* Container for tapping relevant data */
 typedef struct _epl_info_t {
-	unsigned char epl_mtyp;
+    unsigned char epl_mtyp;
 } epl_info_t;
 #endif
 
@@ -78,21 +79,21 @@ typedef struct _epl_info_t {
 #define EPL_BROADCAST_NODEID                    255
 
 static const value_string addr_str_vals[] = {
-	{EPL_INVALID_NODEID,                    " (invalid)"                        },
-	{EPL_MN_NODEID,                         " (Managing Node)"                  },
-	{EPL_DIAGNOSTIC_DEVICE_NODEID,          " (Diagnostic Device)"              },
-	{EPL_TO_LEGACY_ETHERNET_ROUTER_NODEID,  " (POWERLINK to legacy Ethernet Router)"  },
-	{EPL_BROADCAST_NODEID,                  " (broadcast)"                      },
-	{0,NULL}
+    {EPL_INVALID_NODEID,                    " (invalid)"                        },
+    {EPL_MN_NODEID,                         " (Managing Node)"                  },
+    {EPL_DIAGNOSTIC_DEVICE_NODEID,          " (Diagnostic Device)"              },
+    {EPL_TO_LEGACY_ETHERNET_ROUTER_NODEID,  " (EPL to legacy Ethernet Router)"  },
+    {EPL_BROADCAST_NODEID,                  " (broadcast)"                      },
+    {0,NULL}
 };
 
 static const value_string addr_str_abbr_vals[] _U_ = {
-	{EPL_INVALID_NODEID,                    " (inv.)"   },
-	{EPL_MN_NODEID,                         " (MN)"     },
-	{EPL_DIAGNOSTIC_DEVICE_NODEID,          " (diag.)"  },
-	{EPL_TO_LEGACY_ETHERNET_ROUTER_NODEID,  " (router)" },
-	{EPL_BROADCAST_NODEID,                  " (bc)"     },
-	{0,NULL}
+    {EPL_INVALID_NODEID,                    " (inv.)"   },
+    {EPL_MN_NODEID,                         " (MN)"     },
+    {EPL_DIAGNOSTIC_DEVICE_NODEID,          " (diag.)"  },
+    {EPL_TO_LEGACY_ETHERNET_ROUTER_NODEID,  " (router)" },
+    {EPL_BROADCAST_NODEID,                  " (bc)"     },
+    {0,NULL}
 };
 /*
 static const gchar* addr_str_abbr_cn  = " (CN)";
@@ -131,21 +132,18 @@ static const gchar* addr_str_abbr_res = " (res.)";
 #define EPL_AINV    0x0D
 
 static const value_string mtyp_vals[] = {
-	{EPL_SOC,  "Start of Cycle (SoC)"         },
-	{EPL_PREQ, "PollRequest (PReq)"           },
-	{EPL_PRES, "PollResponse (PRes)"          },
-	{EPL_SOA,  "Start of Asynchronous (SoA)"  },
-	{EPL_ASND, "Asynchronous Send (ASnd)"     },
-	{EPL_AINV, "Asynchronous Invite (AInv)"   },
-	{0,NULL}
+    {EPL_SOC,  "Start of Cycle (SoC)"         },
+    {EPL_PREQ, "PollRequest (PReq)"           },
+    {EPL_PRES, "PollResponse (PRes)"          },
+    {EPL_SOA,  "Start of Asynchronous (SoA)"  },
+    {EPL_ASND, "Asynchronous Send (ASnd)"     },
+    {EPL_AINV, "Asynchronous Invite (AInv)"   },
+    {0,NULL}
 };
 
 #define EPL_SOC_MC_MASK              0x80
 #define EPL_SOC_PS_MASK              0x40
 #define EPL_PDO_RD_MASK              0x01
-
-#define EPL_PDO_RS_MASK              0x07
-#define EPL_PDO_PR_MASK              0x38
 
 /* RequestedServiceID s for EPL message type "SoA" */
 #define EPL_SOA_NOSERVICE               0
@@ -155,26 +153,14 @@ static const value_string mtyp_vals[] = {
 #define EPL_SOA_SYNCREQUEST             6
 #define EPL_SOA_UNSPECIFIEDINVITE     255
 
-#define EPL_SOA_SYNC_PRES_FIRST         0x01
-#define EPL_SOA_SYNC_PRES_SECOND        0x02
-#define EPL_SOA_SYNC_MND_FIRST          0x04
-#define EPL_SOA_SYNC_MND_SECOND         0x08
-#define EPL_SOA_SYNC_PRES_TIMEOUT       0x10
-#define EPL_SOA_SYNC_MAC_VALID          0x20
-#define EPL_SOA_SYNC_PRES_RESET         0x40
-#define EPL_SOA_SYNC_PRES_SET           0x80
-
-static const range_string soa_svid_vals[] = {
-	{EPL_SOA_NOSERVICE,         EPL_SOA_NOSERVICE,          "NoService"},
-	{EPL_SOA_IDENTREQUEST,      EPL_SOA_IDENTREQUEST,       "IdentRequest"},
-	{EPL_SOA_STATUSREQUEST,     EPL_SOA_STATUSREQUEST,      "StatusRequest"},
-	{EPL_SOA_NMTREQUESTINVITE,  EPL_SOA_NMTREQUESTINVITE,   "NMTRequestInvite"},
-	{0x04,                      0x05,                       "Reserved"},
-	{EPL_SOA_SYNCREQUEST,       EPL_SOA_SYNCREQUEST,        "SyncRequest"},
-	{0x07,                      0x9F,                       "Reserved"},
-	{0xA0,                      0xFE,                       "Manufacturer Specific"},
-	{EPL_SOA_UNSPECIFIEDINVITE, EPL_SOA_UNSPECIFIEDINVITE,  "UnspecifiedInvite"},
-	{0,                         0,                          NULL}
+static const value_string soa_svid_vals[] = {
+    {EPL_SOA_NOSERVICE,           "NoService"        },
+    {EPL_SOA_IDENTREQUEST,        "IdentRequest"     },
+    {EPL_SOA_STATUSREQUEST,       "StatusRequest"    },
+    {EPL_SOA_NMTREQUESTINVITE,    "NMTRequestInvite" },
+    {EPL_SOA_SYNCREQUEST,         "SyncRequest"      },
+    {EPL_SOA_UNSPECIFIEDINVITE,   "UnspecifiedInvite"},
+    {0,NULL}
 };
 
 /* ServiceID values for EPL message type "ASnd" */
@@ -185,49 +171,14 @@ static const range_string soa_svid_vals[] = {
 #define EPL_ASND_SDO                    5
 #define EPL_ASND_SYNCRESPONSE           6
 
-#define EPL_ASND_SYNCRESPONSE_FST_VALID    0x01
-#define EPL_ASND_SYNCRESPONSE_SEC_VALID    0x02
-#define EPL_ASND_SYNCRESPONSE_MODE         0x80
-
-static const range_string soa_svid_id_vals[] = {
-	{EPL_SOA_NOSERVICE,         EPL_SOA_NOSERVICE,          "NO_SERVICE"},
-	{EPL_SOA_IDENTREQUEST,      EPL_SOA_IDENTREQUEST,       "IDENT_REQUEST"},
-	{EPL_SOA_STATUSREQUEST,     EPL_SOA_STATUSREQUEST,      "STATUS_REQUEST"},
-	{EPL_SOA_NMTREQUESTINVITE,  EPL_SOA_NMTREQUESTINVITE,   "NMT_REQUEST_INV"},
-	{0x04,                      0x05,                       "RESERVED"},
-	{EPL_SOA_SYNCREQUEST,       EPL_SOA_SYNCREQUEST,        "SYNC_REQUEST"},
-	{0x07,                      0x9F,                       "RESERVED"},
-	{0xA0,                      0xFE,                       "MANUFACTURER SPECIFIC"},
-	{EPL_SOA_UNSPECIFIEDINVITE, EPL_SOA_UNSPECIFIEDINVITE,  "UNSPEC_INVITE"},
-	{0,                         0,                          NULL}
-};
-
-static const range_string asnd_svid_vals[] = {
-	{0,                       0,                       "Reserved"},
-	{EPL_ASND_IDENTRESPONSE,  EPL_ASND_IDENTRESPONSE,  "IdentResponse"},
-	{EPL_ASND_STATUSRESPONSE, EPL_ASND_STATUSRESPONSE, "StatusResponse"},
-	{EPL_ASND_NMTREQUEST,     EPL_ASND_NMTREQUEST,     "NMTRequest"},
-	{EPL_ASND_NMTCOMMAND,     EPL_ASND_NMTCOMMAND,     "NMTCommand"},
-	{EPL_ASND_SDO,            EPL_ASND_SDO,            "SDO"},
-	{EPL_ASND_SYNCRESPONSE,   EPL_ASND_SYNCRESPONSE,   "SyncResponse"},
-	{0x07,                    0x9F,                    "Reserved"},
-	{0xA0,                    0xFE,                    "Manufacturer Specific"},
-	{0xFF,                    0xFF,                    "Reserved"},
-	{0,                       0,                        NULL}
-};
-
-static const range_string asnd_svid_id_vals[] = {
-	{0,                       0,                       "RESERVED"},
-	{EPL_ASND_IDENTRESPONSE,  EPL_ASND_IDENTRESPONSE,  "IDENT_RESPONSE"},
-	{EPL_ASND_STATUSRESPONSE, EPL_ASND_STATUSRESPONSE, "STATUS_RESPONSE"},
-	{EPL_ASND_NMTREQUEST,     EPL_ASND_NMTREQUEST,     "NMT_REQUEST"},
-	{EPL_ASND_NMTCOMMAND,     EPL_ASND_NMTCOMMAND,     "NMT_COMMAND"},
-	{EPL_ASND_SDO,            EPL_ASND_SDO,            "SDO"},
-	{EPL_ASND_SYNCRESPONSE,   EPL_ASND_SYNCRESPONSE,   "SYNC_RESPONSE"},
-	{0x07,                    0x9F,                    "RESERVED"},
-	{0xA0,                    0xFE,                    "MANUFACTURER SPECIFIC"},
-	{0xFF,                    0xFF,                    "RESERVED"},
-	{0,                       0,                        NULL}
+static const value_string asnd_svid_vals[] = {
+    {EPL_ASND_IDENTRESPONSE,  "IdentResponse" },
+    {EPL_ASND_STATUSRESPONSE, "StatusResponse"},
+    {EPL_ASND_NMTREQUEST,     "NMTRequest"    },
+    {EPL_ASND_NMTCOMMAND,     "NMTCommand"    },
+    {EPL_ASND_SDO,            "SDO"           },
+    {EPL_ASND_SYNCRESPONSE,   "SyncResponse"  },
+    {0,NULL}
 };
 
 /* NMTCommand values for EPL message type "ASnd" */
@@ -263,166 +214,63 @@ static const range_string asnd_svid_id_vals[] = {
 #define EPL_ASND_NMTCOMMAND_NMTINVALIDSERVICE           0xFF
 
 static const value_string asnd_cid_vals[] = {
-	/* "special" values to cover all possibilities of CommandID in NMTRequests */
-	{EPL_ASND_IDENTRESPONSE,                          "IdentResponse"             },
-	{EPL_ASND_STATUSRESPONSE,                         "StatusResponse"            },
-	/* ... */
-	{EPL_ASND_NMTCOMMAND_NMTSTARTNODE,                "NMTStartNode"              },
-	{EPL_ASND_NMTCOMMAND_NMTSTOPNODE,                 "NMTStopNode"               },
-	{EPL_ASND_NMTCOMMAND_NMTENTERPREOPERATIONAL2,     "NMTEnterPreOperational2"   },
-	{EPL_ASND_NMTCOMMAND_NMTENABLEREADYTOOPERATE,     "NMTEnableReadyToOperate"   },
-	{EPL_ASND_NMTCOMMAND_NMTRESETNODE,                "NMTResetNode"              },
-	{EPL_ASND_NMTCOMMAND_NMTRESETCOMMUNICATION,       "NMTResetCommunication"     },
-	{EPL_ASND_NMTCOMMAND_NMTRESETCONFIGURATION,       "NMTResetConfiguration"     },
-	{EPL_ASND_NMTCOMMAND_NMTSWRESET,                  "NMTSwReset"                },
-	{EPL_ASND_NMTCOMMAND_NMTSTARTNODEEX,              "NMTStartNodeEx"            },
-	{EPL_ASND_NMTCOMMAND_NMTSTOPNODEEX,               "NMTStopNodeEx"             },
-	{EPL_ASND_NMTCOMMAND_NMTENTERPREOPERATIONAL2EX,   "NMTEnterPreOperational2Ex" },
-	{EPL_ASND_NMTCOMMAND_NMTENABLEREADYTOOPERATEEX,   "NMTEnableReadyToOperateEx" },
-	{EPL_ASND_NMTCOMMAND_NMTRESETNODEEX,              "NMTResetNodeEx"            },
-	{EPL_ASND_NMTCOMMAND_NMTRESETCOMMUNICATIONEX,     "NMTCommunicationEx"        },
-	{EPL_ASND_NMTCOMMAND_NMTRESETCONFIGURATIONEX,     "NMTResetConfigurationEx"   },
-	{EPL_ASND_NMTCOMMAND_NMTSWRESETEX,                "NMTSwResetEx"              },
-	{EPL_ASND_NMTCOMMAND_NMTNETHOSTNAMESET,           "NMTNetHostNameSet"         },
-	{EPL_ASND_NMTCOMMAND_NMTFLUSHARPENTRY,            "NMTFlushArpEntry"          },
-	{EPL_ASND_NMTCOMMAND_NMTPUBLISHCONFIGUREDNODES,   "NMTPublishConfiguredNodes" },
-	{EPL_ASND_NMTCOMMAND_NMTPUBLISHACTIVENODES,       "NMTPublishActiveNodes"     },
-	{EPL_ASND_NMTCOMMAND_NMTPUBLISHPREOPERATIONAL1,   "NMTPublishPreOperational1" },
-	{EPL_ASND_NMTCOMMAND_NMTPUBLISHPREOPERATIONAL2,   "NMTPublishPreOperational2" },
-	{EPL_ASND_NMTCOMMAND_NMTPUBLISHREADYTOOPERATE,    "NMTPublishReadyToOperate"  },
-	{EPL_ASND_NMTCOMMAND_NMTPUBLISHOPERATIONAL,       "NMTPublishOperational"     },
-	{EPL_ASND_NMTCOMMAND_NMTPUBLISHSTOPPED,           "NMTPublishStopped"         },
-	{EPL_ASND_NMTCOMMAND_NMTPUBLISHEMERGENCYNEW,      "NMTPublishEmergencyNew"    },
-	{EPL_ASND_NMTCOMMAND_NMTPUBLISHTIME,              "NMTPublishTime"            },
-	{EPL_ASND_NMTCOMMAND_NMTINVALIDSERVICE,           "NMTInvalidService"         },
-	{0,NULL}
+    /* "special" values to cover all possibilities of CommandID in NMTRequests */
+    {EPL_ASND_IDENTRESPONSE,                          "IdentResponse"             },
+    {EPL_ASND_STATUSRESPONSE,                         "StatusResponse"            },
+    /* ... */
+    {EPL_ASND_NMTCOMMAND_NMTSTARTNODE,                "NMTStartNode"              },
+    {EPL_ASND_NMTCOMMAND_NMTSTOPNODE,                 "NMTStopNode"               },
+    {EPL_ASND_NMTCOMMAND_NMTENTERPREOPERATIONAL2,     "NMTEnterPreOperational2"   },
+    {EPL_ASND_NMTCOMMAND_NMTENABLEREADYTOOPERATE,     "NMTEnableReadyToOperate"   },
+    {EPL_ASND_NMTCOMMAND_NMTRESETNODE,                "NMTResetNode"              },
+    {EPL_ASND_NMTCOMMAND_NMTRESETCOMMUNICATION,       "NMTResetCommunication"     },
+    {EPL_ASND_NMTCOMMAND_NMTRESETCONFIGURATION,       "NMTResetConfiguration"     },
+    {EPL_ASND_NMTCOMMAND_NMTSWRESET,                  "NMTSwReset"                },
+    {EPL_ASND_NMTCOMMAND_NMTSTARTNODEEX,              "NMTStartNodeEx"            },
+    {EPL_ASND_NMTCOMMAND_NMTSTOPNODEEX,               "NMTStopNodeEx"             },
+    {EPL_ASND_NMTCOMMAND_NMTENTERPREOPERATIONAL2EX,   "NMTEnterPreOperational2Ex" },
+    {EPL_ASND_NMTCOMMAND_NMTENABLEREADYTOOPERATEEX,   "NMTEnableReadyToOperateEx" },
+    {EPL_ASND_NMTCOMMAND_NMTRESETNODEEX,              "NMTResetNodeEx"            },
+    {EPL_ASND_NMTCOMMAND_NMTRESETCOMMUNICATIONEX,     "NMTCommunicationEx"        },
+    {EPL_ASND_NMTCOMMAND_NMTRESETCONFIGURATIONEX,     "NMTResetConfigurationEx"   },
+    {EPL_ASND_NMTCOMMAND_NMTSWRESETEX,                "NMTSwResetEx"              },
+    {EPL_ASND_NMTCOMMAND_NMTNETHOSTNAMESET,           "NMTNetHostNameSet"         },
+    {EPL_ASND_NMTCOMMAND_NMTFLUSHARPENTRY,            "NMTFlushArpEntry"          },
+    {EPL_ASND_NMTCOMMAND_NMTPUBLISHCONFIGUREDNODES,   "NMTPublishConfiguredNodes" },
+    {EPL_ASND_NMTCOMMAND_NMTPUBLISHACTIVENODES,       "NMTPublishActiveNodes"     },
+    {EPL_ASND_NMTCOMMAND_NMTPUBLISHPREOPERATIONAL1,   "NMTPublishPreOperational1" },
+    {EPL_ASND_NMTCOMMAND_NMTPUBLISHPREOPERATIONAL2,   "NMTPublishPreOperational2" },
+    {EPL_ASND_NMTCOMMAND_NMTPUBLISHREADYTOOPERATE,    "NMTPublishReadyToOperate"  },
+    {EPL_ASND_NMTCOMMAND_NMTPUBLISHOPERATIONAL,       "NMTPublishOperational"     },
+    {EPL_ASND_NMTCOMMAND_NMTPUBLISHSTOPPED,           "NMTPublishStopped"         },
+    {EPL_ASND_NMTCOMMAND_NMTPUBLISHEMERGENCYNEW,      "NMTPublishEmergencyNew"    },
+    {EPL_ASND_NMTCOMMAND_NMTPUBLISHTIME,              "NMTPublishTime"            },
+    {EPL_ASND_NMTCOMMAND_NMTINVALIDSERVICE,           "NMTInvalidService"         },
+    {0,NULL}
 };
 static value_string_ext asnd_cid_vals_ext = VALUE_STRING_EXT_INIT(asnd_cid_vals);
 
 /* Maximal Sequence */
 #define EPL_MAX_SEQUENCE      0x40
-#define EPL_MAX_ADDRESSES     0xF1
 /* SCON and RCON values*/
 #define EPL_NO_CONNECTION     0x00
 #define EPL_INITIALIZATION    0x01
 #define EPL_VALID             0x02
-#define EPL_ACKREQ            0x03
 #define EPL_RETRANSMISSION    0x03
 /* MAX Frame offset */
 #define EPL_MAX_FRAME_OFFSET  0x64
 
+typedef struct _epl_sdo_duplication{
+	guint32 sequence[EPL_MAX_SEQUENCE][EPL_MAX_SEQUENCE];
+	guint32 duplication[EPL_MAX_SEQUENCE][EPL_MAX_SEQUENCE];
+	guint32 frame[EPL_MAX_SEQUENCE][EPL_MAX_SEQUENCE];
+}epl_sdo_duplication;
 
-/* error codes */
-#define E_NO_ERROR                          0x0000
-#define E_NMT_NO_IDENT_RES                  0xF001
-#define E_NMT_NO_STATUS_RES                 0xF002
-#define E_DLL_BAD_PHYS_MODE                 0x8161
-#define E_DLL_COLLISION                     0x8162
-#define E_DLL_COLLISION_TH                  0x8163
-#define E_DLL_CRC_TH                        0x8164
-#define E_DLL_LOSS_OF_LINK                  0x8165
-#define E_DLL_MAC_BUFFER                    0x8166
-#define E_DLL_ADDRESS_CONFLICT              0x8201
-#define E_DLL_MULTIPLE_MN                   0x8202
-#define E_PDO_SHORT_RX                      0x8210
-#define E_PDO_MAP_VERS                      0x8211
-#define E_NMT_ASND_MTU_DIF                  0x8212
-#define E_NMT_ASND_MTU_LIM                  0x8213
-#define E_NMT_ASND_TX_LIM                   0x8214
-#define E_NMT_CYCLE_LEN                     0x8231
-#define E_DLL_CYCLE_EXCEED                  0x8232
-#define E_DLL_CYCLE_EXCEED_TH               0x8233
-#define E_NMT_IDLE_LIM                      0x8234
-#define E_DLL_JITTER_TH                     0x8235
-#define E_DLL_LATE_PRES_TH                  0x8236
-#define E_NMT_PREQ_CN                       0x8237
-#define E_NMT_PREQ_LIM                      0x8238
-#define E_NMT_PRES_CN                       0x8239
-#define E_NMT_PRES_RX_LIM                   0x823A
-#define E_NMT_PRES_TX_LIM                   0x823B
-#define E_DLL_INVALID_FORMAT                0x8241
-#define E_DLL_LOSS_PREQ_TH                  0x8242
-#define E_DLL_LOSS_PRES_TH                  0x8243
-#define E_DLL_LOSS_SOA_TH                   0x8244
-#define E_DLL_LOSS_SOC_TH                   0x8245
-#define E_NMT_BA1                           0x8410
-#define E_NMT_BA1_NO_MN_SUPPORT             0x8411
-#define E_NMT_BPO1                          0x8420
-#define E_NMT_BPO1_GET_IDENT                0x8421
-#define E_NMT_BPO1_DEVICE_TYPE              0x8422
-#define E_NMT_BPO1_VENDOR_ID                0x8423
-#define E_NMT_BPO1_PRODUCT_CODE             0x8424
-#define E_NMT_BPO1_REVISION_NO              0x8425
-#define E_NMT_BPO1_SERIAL_NO                0x8426
-#define E_NMT_BPO1_CF_VERIFY                0x8428
-#define E_NMT_BPO2                          0x8430
-#define E_NMT_BRO                           0x8440
-#define E_NMT_WRONG_STATE                   0x8480
-
-static const value_string errorcode_vals[] = {
-	{ E_NO_ERROR,               "E_NO_ERROR" },
-	{ E_DLL_BAD_PHYS_MODE,      "E_DLL_BAD_PHYS_MODE" },
-	{ E_DLL_COLLISION,          "E_DLL_COLLISION" },
-	{ E_DLL_COLLISION_TH,       "E_DLL_COLLISION_TH" },
-	{ E_DLL_CRC_TH,             "E_DLL_CRC_TH" },
-	{ E_DLL_LOSS_OF_LINK,       "E_DLL_LOSS_OF_LINK" },
-	{ E_DLL_MAC_BUFFER,         "E_DLL_MAC_BUFFER" },
-	{ E_DLL_ADDRESS_CONFLICT,   "E_DLL_ADDRESS_CONFLICT" },
-	{ E_DLL_MULTIPLE_MN,        "E_DLL_MULTIPLE_MN" },
-	{ E_PDO_SHORT_RX,           "E_PDO_SHORT_RX" },
-	{ E_PDO_MAP_VERS,           "E_PDO_MAP_VERS" },
-	{ E_NMT_ASND_MTU_DIF,       "E_NMT_ASND_MTU_DIF" },
-	{ E_NMT_ASND_MTU_LIM,       "E_NMT_ASND_MTU_LIM" },
-	{ E_NMT_ASND_TX_LIM,        "E_NMT_ASND_TX_LIM" },
-	{ E_NMT_CYCLE_LEN,          "E_NMT_CYCLE_LEN" },
-	{ E_DLL_CYCLE_EXCEED,       "E_DLL_CYCLE_EXCEED" },
-	{ E_DLL_CYCLE_EXCEED_TH,    "E_DLL_CYCLE_EXCEED_TH" },
-	{ E_NMT_IDLE_LIM,           "E_NMT_IDLE_LIM" },
-	{ E_DLL_JITTER_TH,          "E_DLL_JITTER_TH" },
-	{ E_DLL_LATE_PRES_TH,       "E_DLL_LATE_PRES_TH" },
-	{ E_NMT_PREQ_CN,            "E_NMT_PREQ_CN" },
-	{ E_NMT_PREQ_LIM,           "E_NMT_PREQ_LIM" },
-	{ E_NMT_PRES_CN,            "E_NMT_PRES_CN" },
-	{ E_NMT_PRES_RX_LIM,        "E_NMT_PRES_RX_LIM" },
-	{ E_NMT_PRES_TX_LIM,        "E_NMT_PRES_TX_LIM" },
-	{ E_DLL_INVALID_FORMAT,     "E_DLL_INVALID_FORMAT" },
-	{ E_DLL_LOSS_PREQ_TH,       "E_DLL_LOSS_PREQ_TH" },
-	{ E_DLL_LOSS_PRES_TH,       "E_DLL_LOSS_PRES_TH" },
-	{ E_DLL_LOSS_SOA_TH,        "E_DLL_LOSS_SOA_TH" },
-	{ E_DLL_LOSS_SOC_TH,        "E_DLL_LOSS_SOC_TH" },
-	{ E_NMT_BA1,                "E_NMT_BA1" },
-	{ E_NMT_BA1_NO_MN_SUPPORT,  "E_NMT_BA1_NO_MN_SUPPORT" },
-	{ E_NMT_BPO1,               "E_NMT_BPO1" },
-	{ E_NMT_BPO1_GET_IDENT,     "E_NMT_BPO1_GET_IDENT" },
-	{ E_NMT_BPO1_DEVICE_TYPE,   "E_NMT_BPO1_DEVICE_TYPE" },
-	{ E_NMT_BPO1_VENDOR_ID,     "E_NMT_BPO1_VENDOR_ID" },
-	{ E_NMT_BPO1_PRODUCT_CODE,  "E_NMT_BPO1_PRODUCT_CODE" },
-	{ E_NMT_BPO1_REVISION_NO,   "E_NMT_BPO1_REVISION_NO" },
-	{ E_NMT_BPO1_SERIAL_NO,     "E_NMT_BPO1_SERIAL_NO" },
-	{ E_NMT_BPO1_CF_VERIFY,     "E_NMT_BPO1_CF_VERIFY" },
-	{ E_NMT_BPO2,               "E_NMT_BPO2" },
-	{ E_NMT_BRO,                "E_NMT_BRO" },
-	{ E_NMT_WRONG_STATE,        "E_NMT_WRONG_STATE" },
-	{ E_NMT_NO_IDENT_RES,       "E_NMT_NO_IDENT_RES" },
-	{ E_NMT_NO_STATUS_RES,      "E_NMT_NO_STATUS_RES" },
-	{0,NULL}
-};
-
-static value_string_ext errorcode_vals_ext = VALUE_STRING_EXT_INIT(errorcode_vals);
-
-/* duplication table key */
-typedef struct {
-	guint8 src;
-	guint8 dest;
-	guint8 seq_send;
-	guint8 seq_recv;
-} duplication_key;
-
-/* duplication table value */
-typedef struct {
+typedef struct{
 	guint32 frame;
-} duplication_data;
+}epl_sdo_frame_ref;
 
+static epl_sdo_duplication epl_asnd_sdo_duplication;
 static guint32 ct = 0;
 static guint32 count = 0;
 
@@ -446,15 +294,15 @@ static epl_sdo_reassembly epl_asnd_sdo_reassembly_read;
 #define EPL_PR_NMTREQUEST       0x07
 
 static const value_string epl_pr_vals[] = {
-	{0,                       "lowest"},
-	{1,                       "lower"},
-	{2,                       "below generic"},
-	{EPL_PR_GENERICREQUEST,   "GenericRequest"},
-	{4,                       "above generic"},
-	{5,                       "higher"},
-	{6,                       "below NMTRequest"},
-	{EPL_PR_NMTREQUEST,       "NMTRequest"},
-	{0,NULL}
+    {0,                       "lowest"},
+    {1,                       "lower"},
+    {2,                       "below generic"},
+    {EPL_PR_GENERICREQUEST,   "GenericRequest"},
+    {4,                       "above generic"},
+    {5,                       "higher"},
+    {6,                       "below NMTRequest"},
+    {EPL_PR_NMTREQUEST,       "NMTRequest"},
+    {0,NULL}
 };
 
 /* NMT State values (for CN)*/
@@ -471,18 +319,18 @@ static const value_string epl_pr_vals[] = {
 #define EPL_NMT_CS_BASIC_ETHERNET       0x1E
 
 static const value_string epl_nmt_cs_vals[] = {
-	{EPL_NMT_GS_OFF,                  "NMT_GS_OFF"                },
-	{EPL_NMT_GS_INITIALIZING,         "NMT_GS_INITIALIZING"       },
-	{EPL_NMT_GS_RESET_APPLICATION,    "NMT_GS_RESET_APPLICATION"  },
-	{EPL_NMT_GS_RESET_COMMUNICATION,  "NMT_GS_RESET_COMMUNICATION"},
-	{EPL_NMT_CS_NOT_ACTIVE,           "NMT_CS_NOT_ACTIVE"         },
-	{EPL_NMT_CS_PRE_OPERATIONAL_1,    "NMT_CS_PRE_OPERATIONAL_1"  },
-	{EPL_NMT_CS_PRE_OPERATIONAL_2,    "NMT_CS_PRE_OPERATIONAL_2"  },
-	{EPL_NMT_CS_READY_TO_OPERATE,     "NMT_CS_READY_TO_OPERATE"   },
-	{EPL_NMT_CS_OPERATIONAL,          "NMT_CS_OPERATIONAL"        },
-	{EPL_NMT_CS_STOPPED,              "NMT_CS_STOPPED"            },
-	{EPL_NMT_CS_BASIC_ETHERNET,       "NMT_CS_BASIC_ETHERNET"     },
-	{0,NULL}
+    {EPL_NMT_GS_OFF,                  "NMT_GS_OFF"                },
+    {EPL_NMT_GS_INITIALIZING,         "NMT_GS_INITIALIZING"       },
+    {EPL_NMT_GS_RESET_APPLICATION,    "NMT_GS_RESET_APPLICATION"  },
+    {EPL_NMT_GS_RESET_COMMUNICATION,  "NMT_GS_RESET_COMMUNICATION"},
+    {EPL_NMT_CS_NOT_ACTIVE,           "NMT_CS_NOT_ACTIVE"         },
+    {EPL_NMT_CS_PRE_OPERATIONAL_1,    "NMT_CS_PRE_OPERATIONAL_1"  },
+    {EPL_NMT_CS_PRE_OPERATIONAL_2,    "NMT_CS_PRE_OPERATIONAL_2"  },
+    {EPL_NMT_CS_READY_TO_OPERATE,     "NMT_CS_READY_TO_OPERATE"   },
+    {EPL_NMT_CS_OPERATIONAL,          "NMT_CS_OPERATIONAL"        },
+    {EPL_NMT_CS_STOPPED,              "NMT_CS_STOPPED"            },
+    {EPL_NMT_CS_BASIC_ETHERNET,       "NMT_CS_BASIC_ETHERNET"     },
+    {0,NULL}
 };
 
 /* NMT State values (for MN)*/
@@ -559,14 +407,6 @@ static const value_string epl_sdo_receive_con_vals[] = {
 #define EPL_ASND_SDO_SEQ_SEND_CON_CONNECTION_VALID          0x02
 #define EPL_ASND_SDO_SEQ_SEND_CON_ERROR_VALID_ACK_REQ       0x03
 
-static const value_string epl_sdo_init_abbr_vals[] = {
-	{EPL_ASND_SDO_SEQ_RECEIVE_CON_NO_CONNECTION,      "n" },
-	{EPL_ASND_SDO_SEQ_RECEIVE_CON_INITIALIZATION,     "i" },
-	{EPL_ASND_SDO_SEQ_RECEIVE_CON_CONNECTION_VALID,   "c" },
-	{EPL_ASND_SDO_SEQ_RECEIVE_CON_ERROR_RESPONSE,     "e" },
-	{0,NULL}
-};
-
 static const value_string epl_sdo_send_con_vals[] = {
 	{EPL_ASND_SDO_SEQ_SEND_CON_NO_CONNECTION,         "No connection"                             },
 	{EPL_ASND_SDO_SEQ_SEND_CON_INITIALIZATION,        "Initialization"                            },
@@ -575,57 +415,11 @@ static const value_string epl_sdo_send_con_vals[] = {
 	{0,NULL}
 };
 
-#define EPL_SDO_INIT_REQUEST    ((EPL_NO_CONNECTION << 8) | EPL_INITIALIZATION)
-#define EPL_SDO_INIT_ACK        ((EPL_INITIALIZATION << 8) | EPL_INITIALIZATION)
-#define EPL_SDO_INIT_RESPONSE   ((EPL_INITIALIZATION << 8) | EPL_VALID)
-#define EPL_SDO_VALID           ((EPL_VALID << 8) | EPL_VALID)
-#define EPL_SDO_RETRANSMISSION  ((EPL_RETRANSMISSION << 8) | EPL_VALID)
-#define EPL_SDO_ACKREQ          ((EPL_VALID << 8) | EPL_ACKREQ)
-#define EPL_SDO_CLOSE           ((EPL_NO_CONNECTION << 8) | EPL_NO_CONNECTION)
-
-static const value_string epl_sdo_init_con_vals[] = {
-	{EPL_SDO_INIT_REQUEST,         "InitReq"        },
-	{EPL_SDO_INIT_ACK,             "InitAck"        },
-	{EPL_SDO_INIT_RESPONSE,        "InitResp"       },
-	{EPL_SDO_VALID,                "Valid"          },
-	{EPL_SDO_RETRANSMISSION,       "Retrans"        },
-	{EPL_SDO_ACKREQ,               "AckReq"         },
-	{EPL_SDO_CLOSE,                "Close"          },
-	{0,NULL}
-};
-
-
-/* SDO Command Layer Protocol */
+/* SDO EPL Command Layer Protocol */
 #define EPL_ASND_SDO_CMD_ABORT_FILTER                    0x40
 #define EPL_ASND_SDO_CMD_SEGMENTATION_FILTER             0x30
 #define EPL_ASND_SDO_CMD_RESPONSE_FILTER                 0x80
 
-#define EPL_ASND_SDO_CMD_RESPONSE_RESPONSE                  0
-#define EPL_ASND_SDO_CMD_RESPONSE_REQUEST                   1
-
-#define EPL_ASND_SDO_CMD_ABORT_TRANSFER_OK                  0
-#define EPL_ASND_SDO_CMD_ABORT_ABORT_TRANSFER               1
-
-#define EPL_ASND_SDO_CMD_SEGMENTATION_EPEDITED_TRANSFER     0
-#define EPL_ASND_SDO_CMD_SEGMENTATION_INITIATE_TRANSFER     1
-#define EPL_ASND_SDO_CMD_SEGMENTATION_SEGMENT               2
-#define EPL_ASND_SDO_CMD_SEGMENTATION_TRANSFER_COMPLETE     3
-
-#define EPL_ASND_SDO_COMMAND_NOT_IN_LIST                        0x00
-#define EPL_ASND_SDO_COMMAND_WRITE_BY_INDEX                     0x01
-#define EPL_ASND_SDO_COMMAND_READ_BY_INDEX                      0x02
-#define EPL_ASND_SDO_COMMAND_WRITE_ALL_BY_INDEX                 0x03
-#define EPL_ASND_SDO_COMMAND_READ_ALL_BY_INDEX                  0x04
-#define EPL_ASND_SDO_COMMAND_WRITE_BY_NAME                      0x05
-#define EPL_ASND_SDO_COMMAND_READ_BY_NAME                       0x06
-#define EPL_ASND_SDO_COMMAND_FILE_WRITE                         0x20
-#define EPL_ASND_SDO_COMMAND_FILE_READ                          0x21
-#define EPL_ASND_SDO_COMMAND_WRITE_MULTIPLE_PARAMETER_BY_INDEX  0x31
-#define EPL_ASND_SDO_COMMAND_READ_MULTIPLE_PARAMETER_BY_INDEX   0x32
-#define EPL_ASND_SDO_COMMAND_MAXIMUM_SEGMENT_SIZE               0x70
-#define EPL_ASND_SDO_COMMAND_LINK_NAME_TO_INDEX                 0x71
-
-/* OD indexes */
 #define EPL_SOD_CYLE_LEN        0x1006
 #define EPL_SOD_PDO_RX_COMM     0x1400
 #define EPL_SOD_PDO_RX_MAPP     0x1600
@@ -1134,33 +928,50 @@ static const value_string sdo_cmd_abort_code[] = {
 };
 static value_string_ext sdo_cmd_abort_code_ext = VALUE_STRING_EXT_INIT(sdo_cmd_abort_code);
 
+#define EPL_ASND_SDO_CMD_RESPONSE_RESPONSE      0
+#define EPL_ASND_SDO_CMD_RESPONSE_REQUEST       1
+
 static const value_string epl_sdo_asnd_cmd_response[] = {
-	{EPL_ASND_SDO_CMD_RESPONSE_RESPONSE,                    "Request"   },
-	{EPL_ASND_SDO_CMD_RESPONSE_REQUEST,                     "Response"  },
+	{EPL_ASND_SDO_CMD_RESPONSE_RESPONSE,  "Request"   },
+	{EPL_ASND_SDO_CMD_RESPONSE_REQUEST,   "Response"  },
 	{0,NULL}
 };
+
+#define EPL_ASND_SDO_CMD_ABORT_TRANSFER_OK      0
+#define EPL_ASND_SDO_CMD_ABORT_ABORT_TRANSFER   1
 
 static const value_string epl_sdo_asnd_cmd_abort[] = {
-	{EPL_ASND_SDO_CMD_ABORT_TRANSFER_OK,                    "Transfer OK"    },
-	{EPL_ASND_SDO_CMD_ABORT_ABORT_TRANSFER,                 "Abort Transfer" },
+	{EPL_ASND_SDO_CMD_ABORT_TRANSFER_OK,      "Transfer OK"    },
+	{EPL_ASND_SDO_CMD_ABORT_ABORT_TRANSFER,   "Abort Transfer" },
 	{0,NULL}
 };
+
+#define EPL_ASND_SDO_CMD_SEGMENTATION_EPEDITED_TRANSFER 0
+#define EPL_ASND_SDO_CMD_SEGMENTATION_INITIATE_TRANSFER 1
+#define EPL_ASND_SDO_CMD_SEGMENTATION_SEGMENT           2
+#define EPL_ASND_SDO_CMD_SEGMENTATION_TRANSFER_COMPLETE 3
 
 static const value_string epl_sdo_asnd_cmd_segmentation[] = {
-	{EPL_ASND_SDO_CMD_SEGMENTATION_EPEDITED_TRANSFER,       "Expedited Transfer" },
-	{EPL_ASND_SDO_CMD_SEGMENTATION_INITIATE_TRANSFER,       "Initiate Transfer"  },
-	{EPL_ASND_SDO_CMD_SEGMENTATION_SEGMENT,                 "Segment"            },
-	{EPL_ASND_SDO_CMD_SEGMENTATION_TRANSFER_COMPLETE,       "Transfer Complete"  },
+	{EPL_ASND_SDO_CMD_SEGMENTATION_EPEDITED_TRANSFER, "Expedited Transfer" },
+	{EPL_ASND_SDO_CMD_SEGMENTATION_INITIATE_TRANSFER, "Initiate Transfer"  },
+	{EPL_ASND_SDO_CMD_SEGMENTATION_SEGMENT,           "Segment"            },
+	{EPL_ASND_SDO_CMD_SEGMENTATION_TRANSFER_COMPLETE, "Transfer Complete"  },
 	{0,NULL}
 };
 
-static const value_string epl_sdo_asnd_cmd_segmentation_abbr[] = {
-	{EPL_ASND_SDO_CMD_SEGMENTATION_EPEDITED_TRANSFER,       "EX" },
-	{EPL_ASND_SDO_CMD_SEGMENTATION_INITIATE_TRANSFER,       "SI"  },
-	{EPL_ASND_SDO_CMD_SEGMENTATION_SEGMENT,                 "ST"            },
-	{EPL_ASND_SDO_CMD_SEGMENTATION_TRANSFER_COMPLETE,       "SC"  },
-	{0,NULL}
-};
+#define EPL_ASND_SDO_COMMAND_NOT_IN_LIST                        0x00
+#define EPL_ASND_SDO_COMMAND_WRITE_BY_INDEX                     0x01
+#define EPL_ASND_SDO_COMMAND_READ_BY_INDEX                      0x02
+#define EPL_ASND_SDO_COMMAND_WRITE_ALL_BY_INDEX                 0x03
+#define EPL_ASND_SDO_COMMAND_READ_ALL_BY_INDEX                  0x04
+#define EPL_ASND_SDO_COMMAND_WRITE_BY_NAME                      0x05
+#define EPL_ASND_SDO_COMMAND_READ_BY_NAME                       0x06
+#define EPL_ASND_SDO_COMMAND_FILE_WRITE                         0x20
+#define EPL_ASND_SDO_COMMAND_FILE_READ                          0x21
+#define EPL_ASND_SDO_COMMAND_WRITE_MULTIPLE_PARAMETER_BY_INDEX  0x31
+#define EPL_ASND_SDO_COMMAND_READ_MULTIPLE_PARAMETER_BY_INDEX   0x32
+#define EPL_ASND_SDO_COMMAND_MAXIMUM_SEGMENT_SIZE               0x70
+#define EPL_ASND_SDO_COMMAND_LINK_NAME_TO_INDEX                 0x71
 
 static const value_string epl_sdo_asnd_commands[] = {
 	{EPL_ASND_SDO_COMMAND_NOT_IN_LIST                      , "Not in List"                       },
@@ -1179,26 +990,20 @@ static const value_string epl_sdo_asnd_commands[] = {
 	{0,NULL}
 };
 
+#define EPL_SOA_SYNC_PRES_FIRST                                 0x01
+#define EPL_SOA_SYNC_PRES_SECOND                                0x02
+#define EPL_SOA_SYNC_MND_FIRST                                  0x04
+#define EPL_SOA_SYNC_MND_SECOND                                 0x08
+#define EPL_SOA_SYNC_PRES_TIMEOUT                               0x10
+#define EPL_SOA_SYNC_MAC_VALID                                  0x20
+#define EPL_SOA_SYNC_PRES_RESET                                 0x40
+#define EPL_SOA_SYNC_PRES_SET                                   0x80
+
+#define EPL_ASND_SYNCRESPONSE_FST_VALID                         0x01
+#define EPL_ASND_SYNCRESPONSE_SEC_VALID                         0x02
+#define EPL_ASND_SYNCRESPONSE_MODE                              0x80
+
 static value_string_ext epl_sdo_asnd_commands_ext = VALUE_STRING_EXT_INIT(epl_sdo_asnd_commands);
-
-static const value_string epl_sdo_asnd_commands_short[] = {
-	{EPL_ASND_SDO_COMMAND_NOT_IN_LIST                      , "NotInList"                        },
-	{EPL_ASND_SDO_COMMAND_WRITE_BY_INDEX                   , "WriteByIndex"                     },
-	{EPL_ASND_SDO_COMMAND_READ_BY_INDEX                    , "ReadByIndex"                      },
-	{EPL_ASND_SDO_COMMAND_WRITE_ALL_BY_INDEX               , "WriteAllByIndex"                  },
-	{EPL_ASND_SDO_COMMAND_READ_ALL_BY_INDEX                , "ReadAllByIndex"                   },
-	{EPL_ASND_SDO_COMMAND_WRITE_BY_NAME                    , "WriteByName"                      },
-	{EPL_ASND_SDO_COMMAND_READ_BY_NAME                     , "ReadByName"                       },
-	{EPL_ASND_SDO_COMMAND_FILE_WRITE                       , "FileWrite"                        },
-	{EPL_ASND_SDO_COMMAND_FILE_READ                        , "FileRead"                         },
-	{EPL_ASND_SDO_COMMAND_WRITE_MULTIPLE_PARAMETER_BY_INDEX, "WriteMultipleParam"               },
-	{EPL_ASND_SDO_COMMAND_READ_MULTIPLE_PARAMETER_BY_INDEX , "ReadMultipleParam"                },
-	{0,NULL}
-};
-
-
-static value_string_ext epl_sdo_asnd_commands_short_ext = VALUE_STRING_EXT_INIT(epl_sdo_asnd_commands_short);
-
 
 static const gchar* addr_str_cn  = " (Controlled Node)";
 static const gchar* addr_str_res = " (reserved)";
@@ -1221,9 +1026,9 @@ static gint dissect_epl_asnd_sdo(proto_tree *epl_tree, tvbuff_t *tvb, packet_inf
 static gint dissect_epl_asnd_resp(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset);
 static gint dissect_epl_sdo_sequence(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset);
 static gint dissect_epl_sdo_command(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset);
-static gint dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented, gboolean response, guint16 segment_size);
-static gint dissect_epl_sdo_command_write_multiple_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented, gboolean response, guint16 segment_size);
-static gint dissect_epl_sdo_command_read_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented, gboolean response, guint16 segment_size);
+static gint dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented, gboolean response);
+static gint dissect_epl_sdo_command_write_multiple_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented, gboolean response);
+static gint dissect_epl_sdo_command_read_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented, gboolean response);
 
 static const gchar* decode_epl_address(guchar adr);
 
@@ -1234,13 +1039,11 @@ static gint hf_epl_node          = -1;
 static gint hf_epl_dest          = -1;
 static gint hf_epl_src           = -1;
 
-static gint hf_epl_soc           = -1;
 static gint hf_epl_soc_mc        = -1;
 static gint hf_epl_soc_ps        = -1;
 static gint hf_epl_soc_nettime   = -1;
 static gint hf_epl_soc_relativetime = -1;
 
-static gint hf_epl_preq          = -1;
 static gint hf_epl_preq_ms       = -1;
 static gint hf_epl_preq_ea       = -1;
 static gint hf_epl_preq_rd       = -1;
@@ -1249,7 +1052,6 @@ static gint hf_epl_preq_size     = -1;
 
 static gint hf_epl_pres_stat_ms  = -1;
 static gint hf_epl_pres_stat_cs  = -1;
-static gint hf_epl_pres          = -1;
 static gint hf_epl_pres_ms       = -1;
 static gint hf_epl_pres_en       = -1;
 static gint hf_epl_pres_rd       = -1;
@@ -1388,7 +1190,6 @@ static gint hf_epl_asnd_nmtrequest_rcd                       = -1;
 /*NMTCommand*/
 static gint hf_epl_asnd_nmtcommand_cid                       = -1;
 static gint hf_epl_asnd_nmtcommand_cdat                      = -1;
-static gint hf_epl_asnd_nmtcommand_resetnode_reason           = -1;
 /*static gint hf_epl_asnd_nmtcommand_nmtnetparameterset_mtu    = -1;*/
 static gint hf_epl_asnd_nmtcommand_nmtnethostnameset_hn      = -1;
 static gint hf_epl_asnd_nmtcommand_nmtflusharpentry_nid      = -1;
@@ -1472,9 +1273,6 @@ static gint hf_epl_asnd_sdo_cmd_abort_code                   = -1;
 
 /* Initialize the subtree pointers */
 static gint ett_epl                 = -1;
-static gint ett_epl_soc             = -1;
-static gint ett_epl_preq            = -1;
-static gint ett_epl_pres            = -1;
 static gint ett_epl_feat            = -1;
 static gint ett_epl_seb             = -1;
 static gint ett_epl_el              = -1;
@@ -1501,139 +1299,12 @@ static dissector_handle_t epl_handle;
 static gint ett_epl_asnd_sdo_data_reassembled = -1;
 
 static reassembly_table epl_reassembly_table;
-static GHashTable *epl_duplication_table = NULL;
-
-/* epl duplication table hash function */
-static guint
-epl_duplication_hash(gconstpointer k)
-{
-	duplication_key *key = (duplication_key*)k;
-	guint hash;
-
-	hash = ((key->src)<<24) | ((key->dest)<<16)|
-		((key->seq_recv)<<8)|(key->seq_send);
-
-	return hash;
-}
-
-/* epl duplication table equal function */
-static gint
-epl_duplication_equal(gconstpointer k1, gconstpointer k2)
-{
-	duplication_key *key1 = (duplication_key*)k1;
-	duplication_key *key2 = (duplication_key*)k2;
-	gint hash;
-
-	hash = (key1->src == key2->src)&&(key1->dest == key2->dest)&&
-		(key1->seq_recv == key2->seq_recv)&&(key1->seq_send == key2->seq_send);
-
-	return hash;
-}
-
-/* free the permanent key */
-static void
-free_key(gpointer ptr)
-{
-	duplication_key *key = (duplication_key *)ptr;
-
-	if(key)
-		g_slice_free(duplication_key, key);
-}
-
-/* removes the table entries of a specific transfer */
-static void
-epl_duplication_remove(GHashTable* table, guint8 src, guint8 dest)
-{
-	GHashTableIter iter;
-	gpointer pkey, pvalue;
-	duplication_key *key;
-
-	g_hash_table_iter_init(&iter, table);
-
-	while(g_hash_table_iter_next(&iter, &pkey, &pvalue))
-	{
-		key = (duplication_key *)pkey;
-
-		if((src == key->src) && (dest == key->dest))
-		{
-			/* remove the key + value from the hash table */
-			g_hash_table_iter_remove(&iter);
-		}
-	}
-}
-
-/* insert function */
-static void
-epl_duplication_insert(GHashTable* table, gpointer ptr, guint32 frame)
-{
-	duplication_data *data = NULL;
-	duplication_key *key = NULL;
-	gpointer *pkey = NULL;
-	gpointer pdata;
-
-	/* check if the values are stored */
-	if(g_hash_table_lookup_extended(table,ptr,pkey,&pdata))
-	{
-			/* it happened that pkey was NULL
-			to prevent a crash this if was created */
-			if(pkey != NULL)
-			{
-				data = (duplication_data *)pdata;
-				data->frame = frame;
-				g_hash_table_insert(table, pkey, data);
-			}
-	}
-	/* insert the data struct into the table */
-	else
-	{
-		key = (duplication_key *)g_memdup(ptr,sizeof(duplication_key));
-		/* create memory */
-		data = (duplication_data *)g_malloc0(sizeof(duplication_data));
-		data->frame = frame;
-		g_hash_table_insert(table,(gpointer)key, data);
-	}
-}
-
-/* create a key*/
-static gpointer
-epl_duplication_key(guint8 src, guint8 dest, guint8 seq_recv, guint8 seq_send)
-{
-	duplication_key *key = g_slice_new(duplication_key);
-
-	key->src = src;
-	key->dest = dest;
-	key->seq_recv = seq_recv;
-	key->seq_send = seq_send;
-
-	return (gpointer)key;
-}
-
-/* get the saved data */
-static guint32
-epl_duplication_get(GHashTable* table, gpointer ptr)
-{
-	duplication_data *data = NULL;
-	gpointer *pkey = NULL;
-	gpointer pdata;
-
-	if(g_hash_table_lookup_extended(table,ptr,pkey,&pdata))
-	{
-		data = (duplication_data *)pdata;
-		if(data->frame == 0x00)
-			return 0x00;
-	}
-	if(data != NULL)
-		return data->frame;
-	else
-		return 0x00;
-}
 
 static void
 setup_dissector(void)
 {
-	/* init duplication hash table */
-	epl_duplication_table = g_hash_table_new(epl_duplication_hash, epl_duplication_equal);
-
+	/* create memory block for duplication*/
+	memset(&epl_asnd_sdo_duplication, 0, sizeof(epl_sdo_duplication));
 	/* create memory block for uploda/download */
 	memset(&epl_asnd_sdo_reassembly_write, 0, sizeof(epl_sdo_reassembly));
 	memset(&epl_asnd_sdo_reassembly_read, 0, sizeof(epl_sdo_reassembly));
@@ -1674,12 +1345,12 @@ dissect_eplpdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean udp
 	/* Make entries in Protocol column and Info column on summary display */
 	if (!udpencap)
 	{
-		col_set_str(pinfo->cinfo, COL_PROTOCOL, "POWERLINK");
+		col_set_str(pinfo->cinfo, COL_PROTOCOL, "EPL");
 	}
 	else
 	{
 		/* guess that this is an EPL frame encapsulated into an UDP datagram */
-		col_set_str(pinfo->cinfo, COL_PROTOCOL, "POWERLINK/UDP");
+		col_set_str(pinfo->cinfo, COL_PROTOCOL, "EPL/UDP");
 	}
 
 	/* Get message type */
@@ -1714,40 +1385,46 @@ dissect_eplpdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean udp
 	switch (epl_mtyp)
 	{
 		case EPL_SOC:
-			col_add_fstr(pinfo->cinfo, COL_INFO, "%3d->%3d SoC    ", epl_src, epl_dest);
+			/* source and destination NodeID are fixed according to the spec */
+			col_set_str(pinfo->cinfo, COL_INFO, "SoC    ");
 			break;
 
 		case EPL_PREQ:
-			col_add_fstr(pinfo->cinfo, COL_INFO, "%3d->%3d  PReq ", epl_src, epl_dest);
+			/* show only destination NodeID, because source is always 240 (MN) */
+			col_add_fstr(pinfo->cinfo, COL_INFO, "PReq   dst = %3d   ", epl_dest);
 			break;
 
 		case EPL_PRES:
-			col_add_fstr(pinfo->cinfo, COL_INFO, "%3d->%3d  PRes ", epl_src, epl_dest);
+			/* show only source NodeID, because destination is always 255 (broadcast) */
+			col_add_fstr(pinfo->cinfo, COL_INFO, "PRes   src = %3d   ", epl_src);
 			break;
 
 		case EPL_SOA:
-			col_add_fstr(pinfo->cinfo, COL_INFO, "%3d->%3d  SoA  ", epl_src, epl_dest);
+			/* source and destination NodeID are fixed according to the spec */
+			col_set_str(pinfo->cinfo, COL_INFO, "SoA    ");
 			break;
 
 		case EPL_ASND:
 			if (udpencap)
 			{
-				col_set_str(pinfo->cinfo, COL_INFO,  "          ASnd ");
+				col_set_str(pinfo->cinfo, COL_INFO, "ASnd   ");
 			}
 			else
 			{
-				col_add_fstr(pinfo->cinfo, COL_INFO, "%3d->%3d  ASnd ", epl_src, epl_dest);
+				col_add_fstr(pinfo->cinfo, COL_INFO,
+						"ASnd   src = %3d   dst = %3d   ", epl_src, epl_dest);
 			}
 			break;
 
 		case EPL_AINV:
 			if (udpencap)
 			{
-				col_set_str(pinfo->cinfo, COL_INFO,  "          AInv ");
+				col_set_str(pinfo->cinfo, COL_INFO, "AInv   ");
 			}
 			else
 			{
-				col_add_fstr(pinfo->cinfo, COL_INFO, "%3d->%3d  AInv ", epl_src, epl_dest);
+				col_add_fstr(pinfo->cinfo, COL_INFO,
+						"AInv   src = %3d   dst = %3d   ", epl_src, epl_dest);
 			}
 			break;
 
@@ -1823,13 +1500,13 @@ dissect_eplpdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean udp
 static int
 dissect_epl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-	return dissect_eplpdu(tvb, pinfo, tree, FALSE);
+    return dissect_eplpdu(tvb, pinfo, tree, FALSE);
 }
 
 static int
 dissect_epludp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-	return dissect_eplpdu(tvb, pinfo, tree, TRUE);
+    return dissect_eplpdu(tvb, pinfo, tree, TRUE);
 }
 
 
@@ -1883,22 +1560,17 @@ dissect_epl_soc(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint of
 {
 	nstime_t nettime;
 	guint8  flags;
-	static const int * soc_flags[] = {
-		&hf_epl_soc_mc,
-		&hf_epl_soc_ps,
-		NULL
-	};
 
 	offset += 1;
 
 	flags = tvb_get_guint8(tvb, offset);
-	proto_tree_add_bitmask(epl_tree, tvb, offset, hf_epl_soc, ett_epl_soc, soc_flags, ENC_NA);
-
+	proto_tree_add_boolean(epl_tree, hf_epl_soc_mc, tvb, offset, 1, flags);
+	proto_tree_add_boolean(epl_tree, hf_epl_soc_ps, tvb, offset, 1, flags);
 	offset += 2;
 
 	if (show_soc_flags)
 	{
-		col_append_fstr(pinfo->cinfo, COL_INFO, "F:MC=%d,PS=%d",
+		col_append_fstr(pinfo->cinfo, COL_INFO, "MC = %d   PS = %d",
 				((EPL_SOC_MC_MASK & flags) >> 7), ((EPL_SOC_PS_MASK & flags) >> 6));
 	}
 
@@ -1920,29 +1592,25 @@ dissect_epl_preq(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint o
 	guint16 len;
 	guint8  pdoversion;
 	guint8  flags;
-	static const int * req_flags[] = {
-		&hf_epl_preq_ms,
-		&hf_epl_preq_ea,
-		&hf_epl_preq_rd,
-		NULL
-	};
 
 	offset += 1;
 
 	flags = tvb_get_guint8(tvb, offset);
-	proto_tree_add_bitmask(epl_tree, tvb, offset, hf_epl_preq, ett_epl_preq, req_flags, ENC_NA);
+	proto_tree_add_boolean(epl_tree, hf_epl_preq_ms, tvb, offset, 1, flags);
+	proto_tree_add_boolean(epl_tree, hf_epl_preq_ea, tvb, offset, 1, flags);
+	proto_tree_add_boolean(epl_tree, hf_epl_preq_rd, tvb, offset, 1, flags);
 	offset += 2;
 
 	pdoversion = tvb_get_guint8(tvb, offset);
-	proto_tree_add_item(epl_tree, hf_epl_preq_pdov, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item(epl_tree, hf_epl_preq_pdov, tvb, offset, 1, ENC_NA);
 	offset += 2;
 
 	/* get size of payload */
 	len = tvb_get_letohs(tvb, offset);
 	proto_tree_add_uint(epl_tree, hf_epl_preq_size, tvb, offset, 2, len);
 
-	col_append_fstr(pinfo->cinfo, COL_INFO, "[%4d]  F:RD=%d  V:%d.%d", len,
-			(EPL_PDO_RD_MASK & flags), hi_nibble(pdoversion), lo_nibble(pdoversion));
+	col_append_fstr(pinfo->cinfo, COL_INFO, "RD = %d   size = %d   ver = %d.%d",
+			(EPL_PDO_RD_MASK & flags), len, hi_nibble(pdoversion), lo_nibble(pdoversion));
 
 	offset += 2;
 	offset += dissect_epl_payload(epl_tree, tvb, pinfo, offset, len, EPL_PREQ );
@@ -1957,15 +1625,8 @@ dissect_epl_pres(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8
 {
 	guint16  len;
 	guint8  pdoversion;
-	guint8  state, flags, flags2;
-	static const int * res_flags[] = {
-		&hf_epl_pres_ms,
-		&hf_epl_pres_en,
-		&hf_epl_pres_rd,
-		NULL
-	};
+	guint8  flags;
 
-	state = tvb_get_guint8(tvb, offset);
 	if (epl_src != EPL_MN_NODEID)   /* check if the sender is CN or MN */
 	{
 		proto_tree_add_item(epl_tree, hf_epl_pres_stat_cs, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -1977,10 +1638,11 @@ dissect_epl_pres(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8
 	offset += 1;
 
 	flags = tvb_get_guint8(tvb, offset);
-	proto_tree_add_bitmask(epl_tree, tvb, offset, hf_epl_pres, ett_epl_pres, res_flags, ENC_NA);
+	proto_tree_add_boolean(epl_tree, hf_epl_pres_ms, tvb, offset, 1, flags);
+	proto_tree_add_boolean(epl_tree, hf_epl_pres_en, tvb, offset, 1, flags);
+	proto_tree_add_boolean(epl_tree, hf_epl_pres_rd, tvb, offset, 1, flags);
 	offset += 1;
 
-	flags2 = tvb_get_guint8(tvb, offset);
 	proto_tree_add_item(epl_tree, hf_epl_pres_pr, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 	proto_tree_add_item(epl_tree, hf_epl_pres_rs, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 	offset += 1;
@@ -1993,23 +1655,8 @@ dissect_epl_pres(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8
 	len = tvb_get_letohs(tvb, offset);
 	proto_tree_add_uint(epl_tree, hf_epl_pres_size, tvb, offset, 2, len);
 
-	col_append_fstr(pinfo->cinfo, COL_INFO, "[%4d]", len);
-
-	col_append_fstr(pinfo->cinfo, COL_INFO, "  F:RD=%d,RS=%d,PR=%d  V=%d.%d",
-			(EPL_PDO_RD_MASK & flags), (EPL_PDO_RS_MASK & flags2), (EPL_PDO_PR_MASK & flags2) >> 3,
-			hi_nibble(pdoversion), lo_nibble(pdoversion));
-
-	if (epl_src != EPL_MN_NODEID)   /* check if the sender is CN or MN */
-	{
-		col_append_fstr(pinfo->cinfo, COL_INFO, "  %s",
-						val_to_str(state, epl_nmt_cs_vals, "Unknown(%d)"));
-	}
-	else /* MN */
-	{
-		col_append_fstr(pinfo->cinfo, COL_INFO, "  %s",
-						val_to_str(state, epl_nmt_ms_vals, "Unknown(%d)"));
-	}
-
+	col_append_fstr(pinfo->cinfo, COL_INFO, "RD = %d   size = %d   ver = %d.%d",
+			(EPL_PDO_RD_MASK & flags), len, hi_nibble(pdoversion), lo_nibble(pdoversion));
 
 	offset += 2;
 	offset += dissect_epl_payload ( epl_tree, tvb, pinfo, offset, len, EPL_PRES );
@@ -2022,11 +1669,10 @@ gint
 dissect_epl_soa(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8 epl_src, gint offset)
 {
 	guint8 svid, target;
-	guint8 state;
 	proto_item *psf_item = NULL;
 	proto_tree *psf_tree  = NULL;
 
-	state = tvb_get_guint8(tvb, offset);
+
 	if (epl_src != EPL_MN_NODEID)   /* check if CN or MN */
 	{
 		proto_tree_add_item(epl_tree, hf_epl_soa_stat_cs, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2035,7 +1681,6 @@ dissect_epl_soa(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8 
 	{
 		proto_tree_add_item(epl_tree, hf_epl_soa_stat_ms, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 	}
-
 	offset += 1;
 
 	proto_tree_add_item(epl_tree, hf_epl_soa_ea, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2050,21 +1695,13 @@ dissect_epl_soa(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8 
 	proto_tree_add_uint(epl_tree, hf_epl_soa_svtg, tvb, offset, 1, target);
 	offset += 1;
 
-	col_append_fstr(pinfo->cinfo, COL_INFO, "(%s)->%3d",
-					rval_to_str(svid, soa_svid_id_vals, "Unknown"), target);
-
-	if (epl_src != EPL_MN_NODEID)   /* check if CN or MN */
+	if (svid != EPL_SOA_NOSERVICE)
 	{
-		col_append_fstr(pinfo->cinfo, COL_INFO, "  %s",
-						val_to_str(state, epl_nmt_cs_vals, "Unknown(%d)"));
-	}
-	else /* MN */
-	{
-		col_append_fstr(pinfo->cinfo, COL_INFO, "  %s",
-						val_to_str(state, epl_nmt_ms_vals, "Unknown(%d)"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, "tgt = %3d   %s",
+						target, val_to_str(svid, soa_svid_vals, "Unknown (%d)"));
 	}
 
-	proto_tree_add_item(epl_tree, hf_epl_soa_eplv, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item(epl_tree, hf_epl_soa_eplv, tvb, offset, 1, ENC_NA);
 	offset += 1;
 
 	if (svid == EPL_SOA_SYNCREQUEST)
@@ -2132,19 +1769,17 @@ gint
 dissect_epl_asnd(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8 epl_src, gint offset)
 {
 	guint8  svid;
-	gint size, reported_len;
-	tvbuff_t *next_tvb;
 	proto_item *item;
 	proto_tree *subtree;
 
 	/* get ServiceID of payload */
 	svid = tvb_get_guint8(tvb, offset);
-	item = proto_tree_add_uint(epl_tree, hf_epl_asnd_svid, tvb, offset, 1, svid );
+	item = proto_tree_add_uint(epl_tree, hf_epl_asnd_svid, tvb, offset, 1, svid);
 
 	offset += 1;
 
-	col_append_fstr(pinfo->cinfo, COL_INFO, "(%s) ",
-			rval_to_str(svid, asnd_svid_id_vals, "Unknown"));
+	col_append_fstr(pinfo->cinfo, COL_INFO, "%s   ",
+						val_to_str(svid, asnd_svid_vals, "Unknown (%d)"));
 
 	switch (svid)
 	{
@@ -2170,21 +1805,6 @@ dissect_epl_asnd(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8
 			break;
 		case EPL_ASND_SYNCRESPONSE:
 			offset = dissect_epl_asnd_resp(epl_tree, tvb, pinfo, offset);
-			break;
-		default:
-			size = tvb_captured_length_remaining(tvb, offset);
-			reported_len = tvb_reported_length_remaining(tvb, offset);
-
-			next_tvb = tvb_new_subset(tvb, offset, size, reported_len);
-			/* Manufacturer specific entries for ASND services */
-			if ( svid >= 0xA0 && svid < 0xFF )
-			{
-				if (! dissector_try_uint(epl_asnd_dissector_table, svid, next_tvb, pinfo,
-						( epl_tree != NULL ? epl_tree->parent : epl_tree ) ) )
-					dissect_epl_payload ( epl_tree, tvb, pinfo, offset, size, EPL_ASND );
-			} else {
-				dissect_epl_payload ( epl_tree, tvb, pinfo, offset, size, EPL_ASND );
-			}
 			break;
 	}
 
@@ -2215,9 +1835,10 @@ dissect_epl_ainv(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8
 
 	svid = tvb_get_guint8(tvb, offset);
 
-	col_append_fstr(pinfo->cinfo, COL_INFO, "(%s)  ", rval_to_str(svid, asnd_svid_id_vals, "UNKNOWN(%d)"));
+	col_append_fstr(pinfo->cinfo, COL_INFO, "%s   ",
+	val_to_str(svid, asnd_svid_vals, "Unknown (%d)"));
 
-	item = proto_tree_add_uint(epl_tree, hf_epl_asnd_svid, tvb, offset, 1, svid );
+	item = proto_tree_add_uint(epl_tree, hf_epl_asnd_svid, tvb, offset, 1, svid);
 	offset += 1;
 
 	switch (svid)
@@ -2239,9 +1860,9 @@ dissect_epl_ainv(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8
 			break;
 
 		case EPL_SOA_UNSPECIFIEDINVITE:
-			proto_tree_add_item(epl_tree, hf_epl_asnd_svtg, tvb, offset, 1, ENC_LITTLE_ENDIAN );
+			proto_tree_add_item(epl_tree, hf_epl_asnd_svtg, tvb, offset, 1, ENC_NA );
 			offset += 1;
-			proto_tree_add_item(epl_tree, hf_epl_soa_eplv, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+			proto_tree_add_item(epl_tree, hf_epl_soa_eplv, tvb, offset, 1, ENC_NA);
 			break;
 
 		case EPL_ASND_SDO:
@@ -2278,14 +1899,11 @@ dissect_epl_asnd_nmtreq(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo,
 gint
 dissect_epl_asnd_nmtcmd(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset)
 {
-	guint8  epl_asnd_nmtcommand_cid;
-	guint16 errorcode;
+	guint8 epl_asnd_nmtcommand_cid;
 
 	epl_asnd_nmtcommand_cid = tvb_get_guint8(tvb, offset);
 	proto_tree_add_uint(epl_tree, hf_epl_asnd_nmtcommand_cid, tvb, offset, 1, epl_asnd_nmtcommand_cid);
 	offset += 2;
-
-	col_append_str(pinfo->cinfo, COL_INFO, val_to_str_ext(epl_asnd_nmtcommand_cid, &asnd_cid_vals_ext, "Unknown(%d)"));
 
 	switch (epl_asnd_nmtcommand_cid)
 	{
@@ -2304,20 +1922,12 @@ dissect_epl_asnd_nmtcmd(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo,
 			offset += 6;
 			break;
 
-		case EPL_ASND_NMTCOMMAND_NMTRESETNODE:
-			errorcode = tvb_get_letohs(tvb, offset);
-			if (errorcode != 0)
-			{
-				col_append_fstr(pinfo->cinfo, COL_INFO, " (%s)", val_to_str(errorcode, errorcode_vals, "Unknown Error(0x%04x"));
-				proto_tree_add_item(epl_tree, hf_epl_asnd_nmtcommand_resetnode_reason, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-			}
-			else
-				proto_tree_add_item(epl_tree, hf_epl_asnd_nmtcommand_cdat, tvb, offset, -1, ENC_NA);
-			break;
-
 		default:
 			proto_tree_add_item(epl_tree, hf_epl_asnd_nmtcommand_cdat, tvb, offset, -1, ENC_NA);
 	}
+
+	col_append_str(pinfo->cinfo, COL_INFO,
+						val_to_str_ext(epl_asnd_nmtcommand_cid, &asnd_cid_vals_ext, "Unknown (%d)"));
 
 	return offset;
 }
@@ -2350,7 +1960,7 @@ dissect_epl_asnd_ires(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, g
 	}
 	offset += 2;
 
-	proto_tree_add_item(epl_tree, hf_epl_asnd_identresponse_ever, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item(epl_tree, hf_epl_asnd_identresponse_ever, tvb, offset, 1, ENC_NA);
 	offset += 2;
 
 	/* decode FeatureFlags */
@@ -2394,8 +2004,8 @@ dissect_epl_asnd_ires(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, g
 	profile    = tvb_get_letohs(tvb, offset);
 	additional = tvb_get_letohs(tvb, offset+2);
 	proto_tree_add_string_format_value(epl_tree, hf_epl_asnd_identresponse_dt, tvb, offset,
-								4, "", "Profile %d (%s), Additional Information: 0x%4.4X",
-								profile, val_to_str_const(profile, epl_device_profiles, "Unknown Profile"), additional);
+								 4, "", "Profile %d (%s), Additional Information: 0x%4.4X",
+								 profile, val_to_str_const(profile, epl_device_profiles, "Unknown Profile"), additional);
 
 	proto_tree_add_item(epl_tree, hf_epl_asnd_identresponse_profile, tvb, offset, 2, ENC_LITTLE_ENDIAN);
 	offset += 4;
@@ -2506,7 +2116,7 @@ dissect_epl_asnd_resp(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo _U
 gint
 dissect_epl_asnd_sres(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, guint8 epl_src, gint offset)
 {
-	proto_item  *ti_el_entry, *ti_el_entry_type;
+	proto_item  *ti_seb, *ti_el, *ti_el_entry, *ti_el_entry_type;
 	proto_tree  *epl_seb_tree, *epl_el_tree, *epl_el_entry_tree, *epl_el_entry_type_tree;
 	guint       number_of_entries, cnt;    /* used for dissection of ErrorCodeList */
 	guint8      nmt_state;
@@ -2533,7 +2143,9 @@ dissect_epl_asnd_sres(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, g
 	offset += 4;
 
 	/* Subtree for the static error bitfield */
-	epl_seb_tree = proto_tree_add_subtree(epl_tree, tvb, offset, 8, ett_epl_seb, NULL, "StaticErrorBitfield");
+	ti_seb = proto_tree_add_text(epl_tree, tvb, offset, 8, "StaticErrorBitfield");
+
+	epl_seb_tree = proto_item_add_subtree(ti_seb, ett_epl_seb);
 
 	proto_tree_add_item(epl_seb_tree, hf_epl_asnd_statusresponse_seb_err_errorregister_u8_bit0, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 	proto_tree_add_item(epl_seb_tree, hf_epl_asnd_statusresponse_seb_err_errorregister_u8_bit1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2551,16 +2163,20 @@ dissect_epl_asnd_sres(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, g
 	/* get the number of entries in the error code list*/
 	number_of_entries = (tvb_reported_length(tvb)-offset)/20;
 
-	epl_el_tree = proto_tree_add_subtree_format(epl_tree, tvb, offset, -1, ett_epl_el, NULL, "ErrorCodeList: %d entries", number_of_entries);
+	ti_el = proto_tree_add_text(epl_tree, tvb, offset, -1, "ErrorCodeList: %d entries", number_of_entries);
+
+	epl_el_tree = proto_item_add_subtree(ti_el, ett_epl_el);
 
 	/*Dissect the whole Error List (display each entry)*/
 	for (cnt = 0; cnt<number_of_entries; cnt++)
 	{
-		epl_el_entry_tree = proto_tree_add_subtree_format(epl_el_tree, tvb, offset, 20, ett_epl_el_entry, &ti_el_entry, "Entry %d", cnt+1);
+		ti_el_entry = proto_tree_add_text(epl_el_tree, tvb, offset, 20, "Entry %d", cnt+1);
+
+		epl_el_entry_tree = proto_item_add_subtree(ti_el_entry, ett_epl_el_entry);
 
 		/*Entry Type*/
 		ti_el_entry_type = proto_tree_add_item(ti_el_entry,
-							hf_epl_asnd_statusresponse_el_entry_type, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+						       hf_epl_asnd_statusresponse_el_entry_type, tvb, offset, 2, ENC_LITTLE_ENDIAN);
 
 		epl_el_entry_type_tree = proto_item_add_subtree(ti_el_entry_type,
 								ett_epl_el_entry_type);
@@ -2616,8 +2232,7 @@ dissect_epl_sdo_sequence(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo
 	proto_tree *sod_seq_tree;
 	proto_item *item;
 	guint8 duplication = 0x00;
-	gpointer key;
-	guint32 saved_frame;
+	epl_sdo_frame_ref *frame_ref = NULL;
 
 	/* read buffer */
 	seq_recv = tvb_get_guint8(tvb, offset);
@@ -2636,21 +2251,20 @@ dissect_epl_sdo_sequence(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo
 	/* get the current frame-number */
 	frame = pinfo->fd->num;
 
-	/* Create a key */
-	key = epl_duplication_key(epl_segmentation.src,epl_segmentation.dest,seq_recv,seq_send);
-
-	/* Get the saved data */
-	saved_frame = epl_duplication_get(epl_duplication_table, key);
+	/* get frame_ref */
+	frame_ref = (epl_sdo_frame_ref *)p_get_proto_data(wmem_file_scope(), pinfo,proto_epl,frame);
+	/* if the frame is opened the first time create a new memory block */
+	if(!frame_ref)
+		frame_ref = (epl_sdo_frame_ref *)wmem_new0(wmem_file_scope(), epl_sdo_frame_ref);
 
 	/* clear array at the start Sequence */
 	if((rcon < EPL_VALID && scon < EPL_VALID)
 		||(rcon == EPL_VALID && scon < EPL_VALID)
 		||(rcon < EPL_VALID && scon == EPL_VALID))
 	{
-		/* remove all the keys of the specified src and dest address*/
-		epl_duplication_remove(epl_duplication_table,epl_segmentation.src,epl_segmentation.dest);
-		/* There is no cmd layer */
-		pinfo->fd->subnum = 0x02;
+		/* reset memory block */
+		memset(&epl_asnd_sdo_duplication, 0, sizeof(epl_sdo_duplication));
+		duplication = 0x00;
 	}
 	/* if cooked/fuzzed capture*/
 	else if(seq_recv >= EPL_MAX_SEQUENCE || seq_send >= EPL_MAX_SEQUENCE
@@ -2680,49 +2294,89 @@ dissect_epl_sdo_sequence(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo
 		/* if retransmission request or connection valid with acknowledge request */
 		if((rcon == EPL_VALID && scon == EPL_RETRANSMISSION) || (rcon == EPL_RETRANSMISSION && scon == EPL_VALID))
 		{
-			/* replace the saved frame with the new frame */
-			epl_duplication_insert(epl_duplication_table, key, frame);
+			epl_asnd_sdo_duplication.duplication[seq_recv][seq_send] = 0x00;
+			epl_asnd_sdo_duplication.frame[seq_recv][seq_send] = frame;
 		}
-		/* if connection valid */
+		/* if connection valid*/
 		else
 		{
-			/* store the new frame in the hash table */
-			if(saved_frame == 0x00)
+			/* for a filter to prevent false detection of duplicated frames add
+			100 frames to the saved frame, in this time retransmission can occur,
+			if the frame is bigger, then no retransmission occurs.
+			--------------------------------------------------------------------
+			if the saved frame is bigger than the current frame save the frame
+			and reset duplication value. */
+			if(((frame > (epl_asnd_sdo_duplication.frame[seq_recv][seq_send] + EPL_MAX_FRAME_OFFSET))
+				||(epl_asnd_sdo_duplication.frame[seq_recv][seq_send] > frame))
+				&& epl_asnd_sdo_duplication.frame[seq_recv][seq_send] != 0x00)
 			{
-				/* store the new frame in the hash table */
-				epl_duplication_insert(epl_duplication_table,key,frame);
+				epl_asnd_sdo_duplication.frame[seq_recv][seq_send] = frame;
+				epl_asnd_sdo_duplication.duplication[seq_recv][seq_send] = 0x00;
 			}
-			/* if the frame is bigger than the stored frame + the max frame offset
-			   or the saved frame is bigger that the current frame then store the current
-			   frame */
-			else if(((frame > (saved_frame + EPL_MAX_FRAME_OFFSET))
-				||(saved_frame > frame)))
+			/* if the frame is the same as the saved frame reset the value */
+			if((frame == epl_asnd_sdo_duplication.frame[seq_recv][seq_send])
+				&&(epl_asnd_sdo_duplication.duplication[seq_recv][seq_send] == 0x01))
 			{
-				/* store the new frame in the hash table */
-				epl_duplication_insert(epl_duplication_table,key,frame);
+				epl_asnd_sdo_duplication.duplication[seq_recv][seq_send] = 0x00;
 			}
-			else if((frame < (saved_frame + EPL_MAX_FRAME_OFFSET))
-				&&(frame > saved_frame))
+			else
+				epl_asnd_sdo_duplication.sequence[seq_recv][seq_send] = 0x01;
+
+			/* if the frame is a duplicated frame */
+			if(epl_asnd_sdo_duplication.sequence[seq_recv][seq_send] == epl_asnd_sdo_duplication.duplication[seq_recv][seq_send])
 			{
-				duplication = 0x01;
+				/* if the frame has no frame reference */
+				if(frame_ref->frame == 0x00)
+				{
+					duplication = 0x01;
+					/* store the frame with the first occurrence of this SequenceNumber
+					 in the frame_ref_num */
+					frame_ref->frame = epl_asnd_sdo_duplication.frame[seq_recv][seq_send];
+				}
+				/* if the frame has a reference */
+				else if(frame_ref->frame != frame)
+				{
+					duplication = 0x01;
+				}
+			}
+			/* if stored values are not equal */
+			else if(epl_asnd_sdo_duplication.sequence[seq_recv][seq_send] != epl_asnd_sdo_duplication.duplication[seq_recv][seq_send])
+			{
+				/* if the frame has no frame_ref_num */
+				if(frame_ref->frame == 0x00)
+				{
+					epl_asnd_sdo_duplication.duplication[seq_recv][seq_send] = 0x01;
+					/* save the frame number */
+					epl_asnd_sdo_duplication.frame[seq_recv][seq_send] = frame;
+					/* save the frame as a reference for possible duplicated frames */
+					frame_ref->frame = frame;
+				}
+				/* if the frame is in the frame_ref_num */
+				else if(frame_ref->frame == frame)
+				{
+					epl_asnd_sdo_duplication.duplication[seq_recv][seq_send] = 0x01;
+					/* save the frame number */
+					epl_asnd_sdo_duplication.frame[seq_recv][seq_send] = frame;
+				}
 			}
 		}
 	}
 	/* if the frame is a duplicated frame */
-	if((duplication == 0x01 && pinfo->fd->subnum == 0x00)||(pinfo->fd->subnum == 0x01))
+	if((duplication == 0x01 && pinfo->fd->subnum == 0x00)||(pinfo->fd->subnum != 0x00))
 	{
 		pinfo->fd->subnum = 0x01;
 		expert_add_info_format(pinfo, epl_tree, &ei_duplicated_frame,
 			"Duplication of Frame: %d ReceiveSequenceNumber: %d and SendSequenceNumber: %d ",
-			saved_frame,seq_recv,seq_send );
+			frame_ref->frame,seq_recv,seq_send );
 	}
 	/* if the last frame in the ReceiveSequence is sent get new memory */
 	if(seq_recv == 0x3f && seq_send <= 0x3f)
 	{
-		/* reset all entries of the transfer */
-		epl_duplication_remove(epl_duplication_table,epl_segmentation.src,epl_segmentation.dest);
+		/* reset memory block */
+		memset(&epl_asnd_sdo_duplication, 0, sizeof(epl_sdo_duplication));
 	}
-	free_key(key);
+
+	p_add_proto_data(wmem_file_scope(), pinfo,proto_epl,frame,frame_ref);
 	item = proto_tree_add_item(epl_tree, hf_epl_asnd_sdo_seq, tvb,  offset, 5, ENC_NA);
 	sod_seq_tree = proto_item_add_subtree(item, ett_epl_sdo_sequence_layer);
 	/* Asynchronuous SDO Sequence Layer */
@@ -2738,15 +2392,19 @@ dissect_epl_sdo_sequence(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo
 	proto_tree_add_uint(sod_seq_tree, hf_epl_asnd_sdo_seq_send_con, tvb, offset, 1, seq_send);
 	offset += 3;
 
-	col_append_fstr(pinfo->cinfo, COL_INFO, "Seq:%02d%s,%02d%s",
-					seq_recv >> EPL_ASND_SDO_SEQ_MASK, val_to_str(seq_recv & EPL_ASND_SDO_SEQ_CON_MASK, epl_sdo_init_abbr_vals, "x"),
-					seq_send >> EPL_ASND_SDO_SEQ_MASK, val_to_str(seq_send & EPL_ASND_SDO_SEQ_CON_MASK, epl_sdo_init_abbr_vals, "x"));
-
 	seq_recv &= EPL_ASND_SDO_SEQ_CON_MASK;
 	seq_send &= EPL_ASND_SDO_SEQ_CON_MASK;
 
-	col_append_fstr(pinfo->cinfo, COL_INFO, "(%s) ", val_to_str((seq_recv << 8) | seq_send, epl_sdo_init_con_vals, "Invalid"));
-
+	if ((seq_recv == EPL_NO_CONNECTION) && (seq_send == EPL_NO_CONNECTION))
+	{
+		/* Sequence layer will be closed */
+		col_append_str(pinfo->cinfo, COL_INFO, "Close  ");
+	}
+	else if ((seq_recv < EPL_VALID) || (seq_send < EPL_VALID))
+	{
+		col_append_fstr(pinfo->cinfo, COL_INFO, "Init=%d%d  ",
+			seq_recv, seq_send);
+	}
 	return offset;
 }
 
@@ -2754,7 +2412,7 @@ gint
 dissect_epl_sdo_command(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset)
 {
 	gint    payload_length;
-	guint8  segmented, command_id, transaction_id;
+	guint8  segmented, command_id;
 	gboolean response, abort_flag;
 	guint32 abort_code = 0;
 	guint32 fragmentId = 0;
@@ -2767,6 +2425,7 @@ dissect_epl_sdo_command(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo,
 	offset += 1;
 
 	command_id = tvb_get_guint8(tvb, offset + 2);
+
 	abort_flag = tvb_get_guint8(tvb, offset + 1) & EPL_ASND_SDO_CMD_ABORT_FILTER;
 
 	/* test if CommandField == empty */
@@ -2775,13 +2434,9 @@ dissect_epl_sdo_command(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo,
 		item = proto_tree_add_item(epl_tree, hf_epl_asnd_sdo_cmd, tvb,  offset, 0, ENC_NA);
 		sdo_cmd_tree = proto_item_add_subtree(item, ett_epl_sdo_command_layer);
 
-		transaction_id = tvb_get_guint8(tvb, offset);
-		response   = tvb_get_guint8(tvb, offset + 1) & EPL_ASND_SDO_CMD_RESPONSE_FILTER;
 		segmented  = (tvb_get_guint8(tvb, offset + 1) & EPL_ASND_SDO_CMD_SEGMENTATION_FILTER) >> 4;
+		response   = tvb_get_guint8(tvb, offset + 1) & EPL_ASND_SDO_CMD_RESPONSE_FILTER;
 		segment_size = tvb_get_letohs(tvb, offset + 3);
-
-		col_append_fstr(pinfo->cinfo, COL_INFO, "Cmd:%s,TID=%02d ",
-						val_to_str(segmented, epl_sdo_asnd_cmd_segmentation_abbr, " Inv(%d)"), transaction_id);
 
 		proto_tree_add_item(sdo_cmd_tree, hf_epl_asnd_sdo_cmd_transaction_id, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 		offset += 1;
@@ -2803,7 +2458,8 @@ dissect_epl_sdo_command(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo,
 
 		if (segmented == EPL_ASND_SDO_CMD_SEGMENTATION_INITIATE_TRANSFER)
 		{
-			if((command_id == EPL_ASND_SDO_COMMAND_WRITE_BY_INDEX) || (command_id == EPL_ASND_SDO_COMMAND_READ_BY_INDEX))
+			if((command_id == EPL_ASND_SDO_COMMAND_WRITE_BY_INDEX) ||
+				(command_id == EPL_ASND_SDO_COMMAND_READ_BY_INDEX))
 			{
 				/* if download => reset counter */
 				if(command_id == EPL_ASND_SDO_COMMAND_WRITE_BY_INDEX)
@@ -2847,22 +2503,23 @@ dissect_epl_sdo_command(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo,
 			abort_code = tvb_get_letohl(tvb, offset);
 			/* if AbortBit is set then print AbortMessage */
 			proto_tree_add_uint(sdo_cmd_tree, hf_epl_asnd_sdo_cmd_abort_code, tvb, offset, 4, abort_code);
-			col_append_fstr(pinfo->cinfo, COL_INFO, "Abort:0x%08X (%s)", abort_code, val_to_str_ext_const(abort_code, &sdo_cmd_abort_code_ext, "Unknown"));
+
+			col_append_fstr(pinfo->cinfo, COL_INFO, "Abort = 0x%08X", abort_code);
 		}
 		else
 		{
 			switch (command_id)
 			{
 			case EPL_ASND_SDO_COMMAND_WRITE_BY_INDEX:
-				offset = dissect_epl_sdo_command_write_by_index(sdo_cmd_tree, tvb, pinfo, offset, segmented, response, segment_size);
+				offset = dissect_epl_sdo_command_write_by_index(sdo_cmd_tree, tvb, pinfo, offset, segmented, response);
 				break;
 
 			case EPL_ASND_SDO_COMMAND_WRITE_MULTIPLE_PARAMETER_BY_INDEX:
-				offset = dissect_epl_sdo_command_write_multiple_by_index(sdo_cmd_tree, tvb, pinfo, offset, segmented, response, segment_size);
+				offset = dissect_epl_sdo_command_write_multiple_by_index(sdo_cmd_tree, tvb, pinfo, offset, segmented, response);
 				break;
 
 			case EPL_ASND_SDO_COMMAND_READ_BY_INDEX:
-				offset = dissect_epl_sdo_command_read_by_index(sdo_cmd_tree, tvb, pinfo, offset, segmented, response, segment_size);
+				offset = dissect_epl_sdo_command_read_by_index(sdo_cmd_tree, tvb, pinfo, offset, segmented, response);
 				break;
 
 			default:
@@ -2873,8 +2530,9 @@ dissect_epl_sdo_command(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo,
 	return offset;
 }
 
+
 gint
-dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented, gboolean response, guint16 segment_size)
+dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented, gboolean response)
 {
 	gint size, payload_length;
 	guint16 idx = 0x00, nosub = 0x00, sod_index = 0x00, error = 0xFF, entries = 0x00, sub_val = 0x00;
@@ -2899,6 +2557,8 @@ dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, pack
 			idx = tvb_get_letohs(tvb, offset);
 			/* add index item */
 			psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_index, tvb, offset, 2, idx, "OD Index: 0x%04X", idx);
+			/* info text */
+			col_append_fstr(pinfo->cinfo, COL_INFO, " Req. %s", val_to_str(segmented, epl_sdo_asnd_cmd_segmentation, " User Defined (%d)"));
 			/* value to string */
 			index_str = rval_to_str_const(idx, sod_cmd_str, "unknown");
 			/* get index string value */
@@ -2907,18 +2567,6 @@ dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, pack
 			sub_index_str = val_to_str_ext_const(idx, &sod_cmd_no_sub, "unknown");
 			/* get subindex string value*/
 			nosub = str_to_val(sub_index_str, sod_cmd_str_no_sub,error);
-
-			offset += 2;
-			/* get subindex offset */
-			subindex = tvb_get_guint8(tvb, offset);
-			/* get subindex string */
-			sub_str = val_to_str_ext_const(idx, &sod_cmd_sub_str, "unknown");
-			/* get string value */
-			sub_val = str_to_val(sub_str, sod_cmd_sub_str_val,error);
-
-			col_append_fstr(pinfo->cinfo, COL_INFO, "%s[%d]: (0x%04X/%d)",
-							val_to_str_ext(EPL_ASND_SDO_COMMAND_WRITE_BY_INDEX, &epl_sdo_asnd_commands_short_ext, "Command(%02X)"),
-							segment_size, idx, subindex);
 
 			/* string is in list */
 			if(sod_index != error)
@@ -2935,7 +2583,7 @@ dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, pack
 					proto_item_append_text(psf_item,"_REC)");
 				}
 				/* info text */
-				col_append_fstr(pinfo->cinfo, COL_INFO, " (%s", val_to_str_ext_const(((guint32)(sod_index << 16)), &sod_index_names, "User Defined"));
+				col_append_fstr(pinfo->cinfo, COL_INFO, " [%s", val_to_str_ext_const(((guint32)(sod_index << 16)), &sod_index_names, "User Defined"));
 				col_append_fstr(pinfo->cinfo, COL_INFO, "_%02Xh", (idx-sod_index));
 				if(sod_index == EPL_SOD_PDO_RX_MAPP || sod_index == EPL_SOD_PDO_TX_MAPP)
 				{
@@ -2950,47 +2598,51 @@ dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, pack
 			else
 			{
 				proto_item_append_text(psf_item," (%s)", val_to_str_ext_const(((guint32)(idx<<16)), &sod_index_names, "User Defined"));
-				col_append_fstr(pinfo->cinfo, COL_INFO, " (%s", val_to_str_ext_const(((guint32) (idx << 16)), &sod_index_names, "User Defined"));
+				col_append_fstr(pinfo->cinfo, COL_INFO, " [%s", val_to_str_ext_const(((guint32) (idx << 16)), &sod_index_names, "User Defined"));
 			}
+
+			offset += 2;
+			/* get subindex offset */
+			subindex = tvb_get_guint8(tvb, offset);
+			/* get subindex string */
+			sub_str = val_to_str_ext_const(idx, &sod_cmd_sub_str, "unknown");
+			/* get string value */
+			sub_val = str_to_val(sub_str, sod_cmd_sub_str_val,error);
 
 			if(sub_val != error)
 				idx = sub_val;
 
 			/* if the subindex is a EPL_SOD_STORE_PARAM */
-			/* if the subindex is a EPL_SOD_RESTORE_PARAM */
-			if((idx == EPL_SOD_STORE_PARAM && subindex <= 0x7F && subindex >= 0x04) ||
-			   (idx == EPL_SOD_RESTORE_PARAM && subindex <= 0x7F && subindex >= 0x04))
+			if(idx == EPL_SOD_STORE_PARAM && subindex <= 0x7F && subindex >= 0x04)
 			{
 				psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, subindex, "OD SubIndex: 0x%02X", subindex);
-				proto_item_append_text(psf_item, " (ManufacturerParam_%02Xh_U32)", subindex);
-				col_append_fstr(pinfo->cinfo, COL_INFO, "/ManufacturerParam_%02Xh_U32)", subindex);
+				proto_item_append_text(psf_item, " (ManufacturerParam_%02Xh_U32)",subindex);
+				col_append_fstr(pinfo->cinfo, COL_INFO, " | ManufacturerParam_%02Xh_U32]",subindex);
 			}
-			/* if the subindex is a EPL_SOD_PDO_RX_MAPP */
-			/* if the subindex is a EPL_SOD_PDO_TX_MAPP */
-			else if((idx == EPL_SOD_PDO_RX_MAPP && subindex >= 0x01 && subindex <= 0xfe) ||
-			        (idx == EPL_SOD_PDO_TX_MAPP && subindex >= 0x01 && subindex <= 0xfe))
+			/* if the subindex is a EPL_SOD_RESTORE_PARAM */
+			else if(idx == EPL_SOD_RESTORE_PARAM && subindex <= 0x7F && subindex >= 0x04)
 			{
 				psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, subindex, "OD SubIndex: 0x%02X", subindex);
-				proto_item_append_text(psf_item, " (ObjectMapping)");
-				col_append_fstr(pinfo->cinfo, COL_INFO, "/ObjectMapping)");
+				proto_item_append_text(psf_item, " (ManufacturerParam_%02Xh_U32)",subindex);
+				col_append_fstr(pinfo->cinfo, COL_INFO, " | ManufacturerParam_%02Xh_U32]",subindex);
 			}
 			/* no subindex */
 			else if(nosub != error)
 			{
-				col_append_fstr(pinfo->cinfo, COL_INFO, ")");
+				col_append_fstr(pinfo->cinfo, COL_INFO, "]");
 			}
 			/* if the subindex has the value 0x00 */
 			else if(subindex == entries)
 			{
 				psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, subindex, "OD SubIndex: 0x%02X", subindex);
 				proto_item_append_text(psf_item, " (NumberOfEntries)");
-				col_append_fstr(pinfo->cinfo, COL_INFO, "/NumberOfEntries)");
+				col_append_fstr(pinfo->cinfo, COL_INFO, " | NumberOfEntries]");
 			}
 			else
 			{
 				psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, subindex, "OD SubIndex: 0x%02X", subindex);
-				proto_item_append_text(psf_item, " (%s)", val_to_str_ext_const((subindex | (idx << 16)), &sod_index_names, "User Defined"));
-				col_append_fstr(pinfo->cinfo, COL_INFO, "/%s)",val_to_str_ext_const((subindex | (idx << 16)), &sod_index_names, "User Defined"));
+				proto_item_append_text(psf_item, " (%s)", val_to_str_ext_const((subindex|(idx<<16)), &sod_index_names, "User Defined"));
+				col_append_fstr(pinfo->cinfo, COL_INFO, " | %s]",val_to_str_ext_const((subindex|(idx<<16)), &sod_index_names, "User Defined"));
 			}
 			offset += 2;
 		}
@@ -3016,19 +2668,16 @@ dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, pack
 				/* save the current frame and increase the counter */
 				epl_asnd_sdo_reassembly_write.frame[epl_segmentation.recv][epl_segmentation.send] = frame;
 				ct += 1;
-				/* add the frame to reassembly_table */
-				frag_msg = fragment_add_seq_check(&epl_reassembly_table, tvb, offset, pinfo,
-							  fragmentId, NULL, ct, payload_length, end_segment ? FALSE : TRUE );
 			}
 			else if(epl_asnd_sdo_reassembly_write.frame[epl_segmentation.recv][epl_segmentation.send] == 0x00)
 			{
 				/* save the current frame and increase counter */
 				epl_asnd_sdo_reassembly_write.frame[epl_segmentation.recv][epl_segmentation.send] = frame;
 				ct += 1;
-				/* add the frame to reassembly_table */
-				frag_msg = fragment_add_seq_check(&epl_reassembly_table, tvb, offset, pinfo,
-								  fragmentId, NULL, ct, payload_length, end_segment ? FALSE : TRUE );
 			}
+			/* add the frame to reassembly_table */
+			frag_msg = fragment_add_seq_check(&epl_reassembly_table, tvb, offset, pinfo,
+                                               fragmentId, NULL, ct, payload_length, end_segment ? FALSE : TRUE );
 
 			/* if the reassembly_table is not Null and the frame stored is the same as the current frame */
 			if(frag_msg != NULL && (epl_asnd_sdo_reassembly_write.frame[epl_segmentation.recv][epl_segmentation.send] == frame))
@@ -3042,7 +2691,7 @@ dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, pack
 					/* add the reassembley fields */
 					process_reassembled_data(tvb, 0, pinfo, "Reassembled Message", frag_msg, &epl_frag_items, NULL, payload_tree );
 					proto_tree_add_uint_format_value(payload_tree, hf_epl_asnd_sdo_cmd_reassembled, tvb, 0, 0,
-									payload_length, "%d bytes (over all fragments)", frag_msg->len);
+                                                                payload_length, "%d bytes (over all fragments)", frag_msg->len);
 					col_append_str(pinfo->cinfo, COL_INFO, " (Message Reassembled)" );
 					/* reset memory */
 					memset(&epl_asnd_sdo_reassembly_write,0,sizeof(epl_sdo_reassembly));
@@ -3060,7 +2709,7 @@ dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, pack
 
 		size = tvb_reported_length_remaining(tvb, offset);
 
-		/* if the frame is a PDO Mapping and the subindex is bigger than 0x00 */
+		/* if the index is a R/TPDO and its not a segmentation initiated transfer */
 		if((idx == EPL_SOD_PDO_TX_MAPP && subindex > entries) ||(idx == EPL_SOD_PDO_RX_MAPP && subindex > entries))
 		{
 			psf_item = proto_tree_add_item(epl_tree, hf_epl_asnd_sdo_cmd_data_mapping, tvb, offset, 1, ENC_NA);
@@ -3069,7 +2718,7 @@ dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, pack
 			proto_tree_add_uint_format(psf_tree, hf_epl_asnd_sdo_cmd_data_mapping_index, tvb, offset, 2, idx,"Index: 0x%04X", idx);
 			offset += 2;
 			idx = tvb_get_letohs(tvb, offset);
-			proto_tree_add_uint_format(psf_tree, hf_epl_asnd_sdo_cmd_data_mapping_subindex, tvb, offset, 1, idx,"SubIndex: 0x%02X", idx);
+			proto_tree_add_uint_format(psf_tree, hf_epl_asnd_sdo_cmd_data_mapping_subindex, tvb, offset, 2, idx,"SubIndex: 0x%02X", idx);
 			offset += 2;
 			idx = tvb_get_letohs(tvb, offset);
 			proto_tree_add_uint_format(psf_tree, hf_epl_asnd_sdo_cmd_data_mapping_offset, tvb, offset, 2, idx,"Offset: 0x%04X", idx);
@@ -3079,7 +2728,7 @@ dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, pack
 		}
 		else
 		{
-			offset += dissect_epl_payload ( epl_tree, tvb, pinfo, offset, size, EPL_ASND );
+		offset += dissect_epl_payload ( epl_tree, tvb, pinfo, offset, size, EPL_ASND );
 		}
 	}
 	else
@@ -3091,12 +2740,12 @@ dissect_epl_sdo_command_write_by_index(proto_tree *epl_tree, tvbuff_t *tvb, pack
 }
 
 gint
-dissect_epl_sdo_command_write_multiple_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented  _U_, gboolean response, guint16 segment_size)
+dissect_epl_sdo_command_write_multiple_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented  _U_, gboolean response)
 {
 	gint dataoffset;
 	guint8 subindex = 0x00,  padding = 0x00;
-	guint16 idx = 0x00, sod_index = 0x00, nosub = 0x00 ,error = 0xFF, entries = 0x00, sub_val = 0x00;
-	guint32 size, offsetincrement, datalength, remlength, objectcnt;
+	guint16 idx = 0x00, sod_index = 0x00, nosub = 0x00 , error = 0xFF, entries = 0x00, sub_val = 0x00;
+	guint32 size, offsetincrement, datalength, remlength;
 	gboolean lastentry = FALSE;
 	const gchar *index_str, *sub_str, *sub_index_str;
 	proto_item *psf_item;
@@ -3108,27 +2757,24 @@ dissect_epl_sdo_command_write_multiple_by_index(proto_tree *epl_tree, tvbuff_t *
 	* EPL_SOA_EPLV_OFFSET has to be recognized, because the increment of PLK SDO payloads
 	* is calculated, starting with the byte position AFTER the Sequence Layer.
 	*/
+
 	if (!response)
 	{   /* request */
 
-		col_append_fstr(pinfo->cinfo, COL_INFO, "%s[%d]:",
-				val_to_str_ext(EPL_ASND_SDO_COMMAND_WRITE_MULTIPLE_PARAMETER_BY_INDEX,
-				&epl_sdo_asnd_commands_short_ext, "Command(%02X)"),
-				segment_size);
+		col_append_str(pinfo->cinfo, COL_INFO, "Write Multiple Parameter by Index" );
 
 		remlength = (guint32)tvb_reported_length_remaining(tvb, offset);
-		objectcnt = 0;
-
 		/* As long as no lastentry has been detected, and we have still bytes left,
 		 * we start the loop. lastentry is probably not necessary anymore, since
 		 * we now use length_remaining, but it is kept to be on the safe side. */
 		while ( !lastentry && remlength > 0 )
 		{
-
 			offsetincrement = tvb_get_letohl(tvb, offset);
 
 			/* the data is aligned in 4-byte increments, therfore maximum padding is 3 */
 			padding = tvb_get_guint8 ( tvb, offset + 7 ) & 0x03;
+			if ( padding > 3 )
+				break;
 
 			datalength = offsetincrement - ( offset - EPL_SOA_EPLV_OFFSET );
 			/* An offset increment of zero usually indicates, that we are at the end
@@ -3200,20 +2846,24 @@ dissect_epl_sdo_command_write_multiple_by_index(proto_tree *epl_tree, tvbuff_t *
 					{
 						proto_item_append_text(psf_item,"_REC)");
 					}
+					/* info text */
+					col_append_fstr(pinfo->cinfo, COL_INFO, " [%s", val_to_str_ext_const(((guint32)(sod_index << 16)), &sod_index_names, "User Defined"));
+					col_append_fstr(pinfo->cinfo, COL_INFO, "_%02Xh", (idx-sod_index));
+					if(sod_index == EPL_SOD_PDO_RX_MAPP || sod_index == EPL_SOD_PDO_TX_MAPP)
+					{
+						col_append_fstr(pinfo->cinfo, COL_INFO, "_AU64");
+					}
+					else
+					{
+						col_append_fstr(pinfo->cinfo, COL_INFO, "_REC");
+					}
+					idx = sod_index;
 				}
 				else
 				{
 					proto_item_append_text(psf_item," (%s)", val_to_str_ext_const(((guint32)(idx<<16)), &sod_index_names, "User Defined"));
+					col_append_fstr(pinfo->cinfo, COL_INFO, " [%s", val_to_str_ext_const(((guint32) (idx << 16)), &sod_index_names, "User Defined"));
 				}
-
-				if (objectcnt < 8)
-					col_append_fstr(pinfo->cinfo, COL_INFO, " (0x%04X", idx);
-				else
-					col_append_str(pinfo->cinfo, COL_INFO, ".");
-
-				if (sod_index != error)
-					idx = sod_index;
-
 				dataoffset += 2;
 
 				/* get subindex offset */
@@ -3229,87 +2879,67 @@ dissect_epl_sdo_command_write_multiple_by_index(proto_tree *epl_tree, tvbuff_t *
 				/* if the subindex is a EPL_SOD_STORE_PARAM */
 				if(idx == EPL_SOD_STORE_PARAM && subindex <= 0x7F && subindex >= 0x04)
 				{
-					psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, subindex, "OD SubIndex: 0x%d", subindex);
-					proto_item_append_text(psf_item, " (ManufacturerParam_%02Xh_U32)", subindex);
+					psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, dataoffset, 1, subindex, "OD SubIndex: 0x%02X", subindex);
+					proto_item_append_text(psf_item, " (ManufacturerParam_%02Xh_U32)",subindex);
+					col_append_fstr(pinfo->cinfo, COL_INFO, " | ManufacturerParam_%02Xh_U32]",subindex);
 				}
 				/* if the subindex is a EPL_SOD_RESTORE_PARAM */
 				else if(idx == EPL_SOD_RESTORE_PARAM && subindex <= 0x7F && subindex >= 0x04)
 				{
-					psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, subindex, "OD SubIndex: 0x%d", subindex);
-					proto_item_append_text(psf_item, " (ManufacturerParam_%02Xh_U32)", subindex);
+					psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, dataoffset, 1, subindex, "OD SubIndex: 0x%02X", subindex);
+					proto_item_append_text(psf_item, " (ManufacturerParam_%02Xh_U32)",subindex);
+					col_append_fstr(pinfo->cinfo, COL_INFO, " | ManufacturerParam_%02Xh_U32]",subindex);
 				}
-				/* if the subindex is a EPL_SOD_PDO_RX_MAPP */
-				else if(idx == EPL_SOD_PDO_RX_MAPP && subindex >= 0x01 && subindex <= 0xfe)
+				/* no subindex */
+				else if(nosub != error)
 				{
-					psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, subindex, "OD SubIndex: 0x%d", subindex);
-					proto_item_append_text(psf_item, " (ObjectMapping)");
-				}
-				/* if the subindex is a EPL_SOD_PDO_TX_MAPP */
-				else if(idx == EPL_SOD_PDO_TX_MAPP && subindex >= 0x01 && subindex <= 0xfe)
-				{
-					psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, subindex, "OD SubIndex: 0x%d", subindex);
-					proto_item_append_text(psf_item, " (ObjectMapping)");
+					col_append_fstr(pinfo->cinfo, COL_INFO, "]");
 				}
 				/* if the subindex has the value 0x00 */
 				else if(subindex == entries)
 				{
-					psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, subindex, "OD SubIndex: 0x%d", subindex);
+					psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, dataoffset, 1, subindex, "OD SubIndex: 0x%02X", subindex);
 					proto_item_append_text(psf_item, " (NumberOfEntries)");
+					col_append_fstr(pinfo->cinfo, COL_INFO, " | NumberOfEntries]");
 				}
 				/* subindex */
 				else
 				{
-					psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, subindex, "OD SubIndex: 0x%d", subindex);
-					proto_item_append_text(psf_item, " (%s)", val_to_str_ext_const((subindex | (idx << 16)), &sod_index_names, "User Defined"));
+					psf_item = proto_tree_add_uint_format(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, dataoffset, 1, subindex, "OD SubIndex: 0x%02X", subindex);
+					proto_item_append_text(psf_item, " (%s)", val_to_str_ext_const((subindex|(idx<<16)), &sod_index_names, "User Defined"));
+					col_append_fstr(pinfo->cinfo, COL_INFO, " | %s]",val_to_str_ext_const((subindex|(idx<<16)), &sod_index_names, "User Defined"));
 				}
-
-				/* info text */
-				if (objectcnt < 8)
-				{
-					if (nosub != error)
-						/* no subindex */
-						col_append_fstr(pinfo->cinfo, COL_INFO, ")");
-					else
-						col_append_fstr(pinfo->cinfo, COL_INFO, "/%d)", subindex);
-				}
-
-
 				dataoffset += 1;
+
 				proto_tree_add_uint(epl_tree, hf_epl_asnd_sdo_cmd_data_padding, tvb, dataoffset, 1, padding);
 				dataoffset += 1;
-				objectcnt++;
 			}
 
-			/* if the frame is a PDO Mapping and the subindex is bigger than 0x00 */
+			/* if the index is a R/TPDO and its not a segmentation initiated transfer */
 			if((idx == EPL_SOD_PDO_TX_MAPP && subindex > entries) ||(idx == EPL_SOD_PDO_RX_MAPP && subindex > entries))
 			{
 				psf_item = proto_tree_add_item(epl_tree, hf_epl_asnd_sdo_cmd_data_mapping, tvb, dataoffset, 1, ENC_NA);
 				psf_tree = proto_item_add_subtree(psf_item, ett_epl_asnd_sdo_cmd_data_mapping);
-				idx = tvb_get_letohs(tvb, dataoffset);
+				idx = tvb_get_letohs(tvb, offset);
 				proto_tree_add_uint_format(psf_tree, hf_epl_asnd_sdo_cmd_data_mapping_index, tvb, dataoffset, 2, idx,"Index: 0x%04X", idx);
 				dataoffset += 2;
-				idx = tvb_get_letohs(tvb, dataoffset);
-				proto_tree_add_uint_format(psf_tree, hf_epl_asnd_sdo_cmd_data_mapping_subindex, tvb, dataoffset, 1, idx,"SubIndex: 0x%02X", idx);
+				idx = tvb_get_letohs(tvb, offset);
+				proto_tree_add_uint_format(psf_tree, hf_epl_asnd_sdo_cmd_data_mapping_subindex, tvb, dataoffset, 2, idx,"SubIndex: 0x%02X", idx);
 				dataoffset += 2;
-				idx = tvb_get_letohs(tvb, dataoffset);
+				idx = tvb_get_letohs(tvb, offset);
 				proto_tree_add_uint_format(psf_tree, hf_epl_asnd_sdo_cmd_data_mapping_offset, tvb, dataoffset, 2, idx,"Offset: 0x%04X", idx);
 				dataoffset += 2;
 				proto_tree_add_item(psf_tree, hf_epl_asnd_sdo_cmd_data_mapping_length, tvb, dataoffset, 2, ENC_LITTLE_ENDIAN);
-				/*dataoffset += 2;*/
+				dataoffset += 2;
 			}
-			else
-			{
-				/* dissect the payload */
-				dissect_epl_payload ( epl_tree, tvb, pinfo, dataoffset, size, EPL_ASND);
-			}
+			/* dissect the payload */
+			dissect_epl_payload ( epl_tree, tvb, pinfo, dataoffset, size, EPL_ASND);
 
 			offset += datalength;
 
 			/* calculating the remaining length, based on the current offset */
 			remlength = (guint32)tvb_reported_length_remaining(tvb, offset);
 		}
-
-		col_append_fstr(pinfo->cinfo, COL_INFO, " (%d)", objectcnt);
 	}
 	else
 	{
@@ -3320,7 +2950,7 @@ dissect_epl_sdo_command_write_multiple_by_index(proto_tree *epl_tree, tvbuff_t *
 }
 
 gint
-dissect_epl_sdo_command_read_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented, gboolean response, guint16 segment_size)
+dissect_epl_sdo_command_read_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packet_info *pinfo, gint offset, guint8 segmented, gboolean response)
 {
 	gint size, payload_length;
 	guint16 idx = 0x00;
@@ -3336,22 +2966,19 @@ dissect_epl_sdo_command_read_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packe
 
 	if (!response)
 	{   /* request */
+		col_append_fstr(pinfo->cinfo, COL_INFO, " Req. %s",
+					val_to_str(segmented, epl_sdo_asnd_cmd_segmentation, "User Defined (%d)"));
 		idx = tvb_get_letohs(tvb, offset);
 		psf_item = proto_tree_add_item(epl_tree, hf_epl_asnd_sdo_cmd_data_index, tvb, offset, 2, ENC_LITTLE_ENDIAN);
 		proto_item_append_text(psf_item," (%s)", val_to_str_ext_const(((guint32)(idx<<16)), &sod_index_names, "User Defined" ));
+		col_append_fstr(pinfo->cinfo, COL_INFO, " [%s", val_to_str_ext_const(((guint32) (idx << 16)), &sod_index_names, "User Defined"));
 		offset += 2;
 
 		subindex = tvb_get_guint8(tvb, offset);
 		psf_item = proto_tree_add_item(epl_tree, hf_epl_asnd_sdo_cmd_data_subindex, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 		proto_item_append_text(psf_item, " (%s)", val_to_str_ext_const((subindex|(idx<<16)), &sod_index_names, "User Defined"));
-
+		col_append_fstr(pinfo->cinfo, COL_INFO, " | %s]",val_to_str_ext_const((subindex|(idx<<16)), &sod_index_names, "User Defined"));
 		offset += 1;
-
-		col_append_fstr(pinfo->cinfo, COL_INFO, "%s[%d]: (0x%04X/%d)",
-						 val_to_str_ext(EPL_ASND_SDO_COMMAND_READ_BY_INDEX, &epl_sdo_asnd_commands_short_ext, "Command(%02X)"),
-						 segment_size, idx, subindex);
-		col_append_fstr(pinfo->cinfo, COL_INFO, " (%s", val_to_str_ext_const(((guint32) (idx << 16)), &sod_index_names, "User Defined"));
-		col_append_fstr(pinfo->cinfo, COL_INFO, "/%s)",val_to_str_ext_const((subindex|(idx<<16)), &sod_index_names, "User Defined"));
 
 	}
 	else
@@ -3385,7 +3012,7 @@ dissect_epl_sdo_command_read_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packe
 			}
 			/* add the frame to reassembly_table */
 			frag_msg = fragment_add_seq_check(&epl_reassembly_table, tvb, offset, pinfo,
-							fragmentId, NULL, count, payload_length, end_segment ? FALSE : TRUE );
+                                               fragmentId, NULL, count, payload_length, end_segment ? FALSE : TRUE );
 
 			/* if the reassembly_table is not Null and the frame stored is the same as the current frame */
 			if(frag_msg != NULL && (epl_asnd_sdo_reassembly_read.frame[epl_segmentation.recv][epl_segmentation.send] == frame))
@@ -3398,7 +3025,7 @@ dissect_epl_sdo_command_read_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packe
 					/* add the reassembley fields */
 					process_reassembled_data(tvb, 0, pinfo, "Reassembled Message", frag_msg, &epl_frag_items, NULL, payload_tree );
 					proto_tree_add_uint_format_value(payload_tree, hf_epl_asnd_sdo_cmd_reassembled, tvb, 0, 0,
-									payload_length, "%d bytes (over all fragments)", frag_msg->len);
+                                                                payload_length, "%d bytes (over all fragments)", frag_msg->len);
 					col_append_str(pinfo->cinfo, COL_INFO, " (Message Reassembled)" );
 					/* reset memory */
 					memset(&epl_asnd_sdo_reassembly_read,0,sizeof(epl_sdo_reassembly));
@@ -3414,10 +3041,13 @@ dissect_epl_sdo_command_read_by_index(proto_tree *epl_tree, tvbuff_t *tvb, packe
 			}
 		}
 		/* response */
-		col_append_str(pinfo->cinfo, COL_INFO, "Response");
+		col_append_fstr(pinfo->cinfo, COL_INFO, " Resp. %s",
+					val_to_str(segmented, epl_sdo_asnd_cmd_segmentation, "User Defined (%d)"));
 
 		size = tvb_reported_length_remaining(tvb, offset);
-		offset = dissect_epl_payload ( epl_tree, tvb, pinfo, offset, size, EPL_ASND );
+		offset += dissect_epl_payload ( epl_tree, tvb, pinfo, offset, size, EPL_ASND );
+
+		offset += size;
 	}
 
 	return offset;
@@ -3450,10 +3080,6 @@ proto_register_epl(void)
 		},
 
 		/* SoC data fields*/
-		{ &hf_epl_soc,
-			{ "Flags", "epl.soc",
-				FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }
-		},
 		{ &hf_epl_soc_mc,
 			{ "MC (Multiplexed Cycle Completed)", "epl.soc.mc",
 				FT_BOOLEAN, 8, NULL, EPL_SOC_MC_MASK, NULL, HFILL }
@@ -3472,10 +3098,6 @@ proto_register_epl(void)
 		},
 
 		/* PReq data fields*/
-		{ &hf_epl_preq,
-			{ "Flags", "epl.preq",
-				FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }
-		},
 		{ &hf_epl_preq_ms,
 			{ "MS (Multiplexed Slot)", "epl.preq.ms",
 				FT_BOOLEAN, 8, NULL, 0x20, NULL, HFILL }
@@ -3505,10 +3127,6 @@ proto_register_epl(void)
 		{ &hf_epl_pres_stat_cs,
 			{ "NMTStatus", "epl.pres.stat",
 				FT_UINT8, BASE_HEX, VALS(epl_nmt_cs_vals), 0x00, NULL, HFILL }
-		},
-		{ &hf_epl_pres,
-			{ "Flags", "epl.pres",
-				FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }
 		},
 		{ &hf_epl_pres_ms,
 			{ "MS (Multiplexed Slot)", "epl.pres.ms",
@@ -3558,7 +3176,7 @@ proto_register_epl(void)
 		},
 		{ &hf_epl_soa_svid,
 			{ "RequestedServiceID", "epl.soa.svid",
-				FT_UINT8, BASE_DEC|BASE_RANGE_STRING, RVALS(soa_svid_vals), 0x00, NULL, HFILL }
+				FT_UINT8, BASE_DEC, VALS(soa_svid_vals), 0x00, NULL, HFILL }
 		},
 		{ &hf_epl_soa_svtg,
 			{ "RequestedServiceTarget", "epl.soa.svtg",
@@ -3632,7 +3250,7 @@ proto_register_epl(void)
 		/* ASnd header */
 		{ &hf_epl_asnd_svid,
 			{ "Requested Service ID", "epl.asnd.svid",
-				FT_UINT8, BASE_HEX|BASE_RANGE_STRING, RVALS(asnd_svid_vals), 0x00, NULL, HFILL }
+				FT_UINT8, BASE_DEC, VALS(asnd_svid_vals), 0x00, NULL, HFILL }
 		},
 		{ &hf_epl_asnd_svtg,
 			{ "Requested Service Target", "epl.asnd.svtg",
@@ -4012,11 +3630,6 @@ proto_register_epl(void)
 				FT_UINT8, BASE_HEX_DEC | BASE_EXT_STRING,
 				&asnd_cid_vals_ext, 0x00, NULL, HFILL }
 		},
-		{ &hf_epl_asnd_nmtcommand_resetnode_reason,
-			{ "Reset Reason", "epl.asnd.nmtcommand.resetnode_reason",
-				FT_UINT16, BASE_HEX | BASE_EXT_STRING,
-				&errorcode_vals_ext, 0x00, NULL, HFILL }
-		},
 		{ &hf_epl_asnd_nmtcommand_cdat,
 			{ "NMTCommandData", "epl.asnd.nmtcommand.cdat",
 				FT_BYTES, BASE_NONE, NULL, 0x00, NULL, HFILL }
@@ -4185,9 +3798,6 @@ proto_register_epl(void)
 	/* Setup protocol subtree array */
 	static gint *ett[] = {
 		&ett_epl,
-		&ett_epl_soc,
-		&ett_epl_preq,
-		&ett_epl_pres,
 		&ett_epl_feat,
 		&ett_epl_seb,
 		&ett_epl_el,
@@ -4236,10 +3846,8 @@ proto_register_epl(void)
 	proto_epl = proto_register_protocol("Ethernet POWERLINK", "EPL", "epl");
 
 	/* subdissector code */
-	heur_epl_subdissector_list = register_heur_dissector_list("epl");
-	heur_epl_data_subdissector_list = register_heur_dissector_list("epl_data");
-	epl_asnd_dissector_table = register_dissector_table("epl.asnd",
-	        "Manufacturer specific ASND service", FT_UINT8, BASE_DEC);
+	register_heur_dissector_list("epl", &heur_epl_subdissector_list);
+	register_heur_dissector_list("epl_data", &heur_epl_data_subdissector_list);
 
 	/* Registering protocol to be called by another dissector */
 	epl_handle = new_register_dissector("epl", dissect_epl, proto_epl);

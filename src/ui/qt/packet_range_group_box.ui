@@ -252,6 +252,7 @@
    <header>syntax_line_edit.h</header>
   </customwidget>
  </customwidgets>
+ <resources/>
  <connections/>
  <buttongroups>
   <buttongroup name="packetSelectionButtonGroup"/>

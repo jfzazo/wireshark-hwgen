@@ -43,14 +43,19 @@
 #include <gtk/gtk.h>
 
 #include <epan/ftypes/ftypes-int.h>
+#include <epan/to_str.h>
 
 #include "ui/simple_dialog.h"
 
+#include "ui/gtk/main.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
+#include "ui/gtk/proto_dlg.h"
+#include "ui/gtk/filter_dlg.h"
 #include "ui/gtk/dfilter_expr_dlg.h"
 #include "ui/gtk/proto_hier_tree_model.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 #define E_DFILTER_EXPR_TREE_KEY			"dfilter_expr_tree"
 #define E_DFILTER_EXPR_CURRENT_VAR_KEY		"dfilter_expr_current_var"
@@ -188,7 +193,7 @@ field_select_row_cb(GtkTreeSelection *sel, gpointer tree)
             ! ((hfinfo->display & FIELD_DISPLAY_E_MASK) == BASE_CUSTOM)) {
             const value_string *vals = (const value_string *)hfinfo->strings;
             if (hfinfo->display & BASE_EXT_STRING)
-                vals = VALUE_STRING_EXT_VS_P((value_string_ext *)vals);
+                vals = VALUE_STRING_EXT_VS_P((const value_string_ext *)vals);
             build_enum_values(value_list_scrolled_win, value_list, vals);
         } else
             gtk_list_store_clear(GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW(value_list))));
@@ -583,6 +588,19 @@ value_list_sel_cb(GtkTreeSelection *sel, gpointer value_entry_arg)
 }
 
 static void
+dfilter_report_bad_value(const char *format, ...)
+{
+	char error_msg_buf[1024];
+	va_list args;
+
+	va_start(args, format);
+	g_vsnprintf(error_msg_buf, sizeof error_msg_buf, format, args);
+	va_end(args);
+
+	simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", error_msg_buf);
+}
+
+static void
 dfilter_expr_dlg_accept_cb(GtkWidget *w, gpointer filter_te_arg)
 {
     GtkWidget *filter_te = (GtkWidget *)filter_te_arg;
@@ -602,7 +620,6 @@ dfilter_expr_dlg_accept_cb(GtkWidget *w, gpointer filter_te_arg)
     ftenum_t      ftype;
     gboolean      can_compare;
     fvalue_t     *fvalue;
-    gchar        *err_msg;
     GtkTreeModel *model;
     GtkTreeIter   iter;
     gboolean      quote_it;
@@ -731,18 +748,19 @@ dfilter_expr_dlg_accept_cb(GtkWidget *w, gpointer filter_te_arg)
          */
     	if (strcmp(item_str, "contains") == 0) {
             fvalue = fvalue_from_unparsed(ftype, stripped_value_str, TRUE,
-                                          &err_msg);
+                                          dfilter_report_bad_value);
 	}
 	else {
             fvalue = fvalue_from_unparsed(ftype, stripped_value_str, FALSE,
-                                          &err_msg);
+                                          dfilter_report_bad_value);
 	}
         if (fvalue == NULL) {
             /*
              * It's not valid.
+             *
+             * The dialog box was already popped up by
+             * "dfilter_report_bad_value()".
              */
-            simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", err_msg);
-            g_free(err_msg);
             g_free(range_str);
             g_free(value_str);
             g_free(item_str);

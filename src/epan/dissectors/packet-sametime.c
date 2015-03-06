@@ -24,9 +24,11 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
+#include <epan/dissectors/packet-tcp.h>
 #include <epan/prefs.h>
+#include <epan/tap.h>
 #include <epan/stats_tree.h>
-#include "packet-tcp.h"
 
 #define DEFAULT_SAMETIME_PORT 1533
 
@@ -665,8 +667,7 @@ sametime_stats_tree_init(stats_tree* st)
         length of the sametime message
 */
 static guint
-get_sametime_message_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                         int offset, void *data _U_)
+get_sametime_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
    /* XXX: Actually: the length of the tvb will always be 4 or greater at this point */
    /*      because tcp_dissect_pdus was called with 4 as a required "fixed length".  */

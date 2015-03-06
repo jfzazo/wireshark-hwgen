@@ -29,7 +29,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-csn1.h"
 
 void proto_register_gmr1_bcch(void);
@@ -55,7 +58,7 @@ static int hf_seg1a_syncinfo_sa_freq_offset = -1;
 
 static int hf_seg1a_rachctrl_max_retrans = -1;
 static int hf_seg1a_rachctrl_acc[16] = { -1, -1, -1, -1, -1, -1, -1, -1,
-					 -1, -1, -1, -1, -1, -1, -1, -1 };
+                                         -1, -1, -1, -1, -1, -1, -1, -1 };
 static int hf_seg1a_rachctrl_cell_bar_access = -1;
 
 static int hf_seg1a_miscinfo_sb_reselection_hysteresis = -1;

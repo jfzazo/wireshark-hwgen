@@ -25,8 +25,6 @@
 #include "wsutil/filesystem.h"
 #include "epan/prefs.h"
 
-#include "qt_ui_utils.h"
-
 #include "ui/profile.h"
 
 #include "profile_dialog.h"
@@ -52,7 +50,6 @@ ProfileDialog::ProfileDialog(QWidget *parent) :
     const gchar *profile_name = get_profile_name();
 
     pd_ui_->setupUi(this);
-    setWindowTitle(wsApp->windowTitleString(tr("Configuration Profiles")));
     ok_button_ = pd_ui_->buttonBox->button(QDialogButtonBox::Ok);
 
     // XXX - Use NSImageNameAddTemplate and NSImageNameRemoveTemplate to set stock
@@ -273,7 +270,6 @@ void ProfileDialog::on_buttonBox_accepted()
         QMessageBox::critical(this, tr("Profile Error"),
                               err_msg,
                               QMessageBox::Ok);
-        g_free((gchar*)err_msg);
         return;
     }
 
@@ -303,7 +299,7 @@ void ProfileDialog::editingFinished()
         profile_def *profile = (profile_def *) item->data(0, Qt::UserRole).value<GList *>()->data;
         if (item->text(0).compare(profile->name) != 0) {
             g_free(profile->name);
-            profile->name = qstring_strdup(item->text(0));
+            profile->name = g_strdup(item->text(0).toUtf8().constData());
         }
     }
     updateWidgets();

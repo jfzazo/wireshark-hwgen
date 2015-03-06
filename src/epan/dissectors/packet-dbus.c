@@ -30,7 +30,7 @@
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 #include <epan/expert.h>
-#include "packet-tcp.h"
+#include <epan/dissectors/packet-tcp.h>
 
 void proto_register_dbus(void);
 void proto_reg_handoff_dbus(void);
@@ -309,7 +309,7 @@ dissect_dbus_sig(tvbuff_t *tvb, dbus_info_t *dinfo, proto_tree *tree, int offset
 			len = dinfo->get32(tvb, offset);
 			offset += 4;
 
-			val = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII);
+			val = tvb_get_string(wmem_packet_scope(), tvb, offset, len);
 			offset += (len + 1 /* NUL-byte */ + 3) & ~3;
 
 			if (sig == 's') {
@@ -337,7 +337,7 @@ dissect_dbus_sig(tvbuff_t *tvb, dbus_info_t *dinfo, proto_tree *tree, int offset
 			len = tvb_get_guint8(tvb, offset);
 			offset += 1;
 
-			val = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII);
+			val = tvb_get_string(wmem_packet_scope(), tvb, offset, len);
 			offset += (len + 1);
 
 			ti = proto_tree_add_string_format(tree, hfi_dbus_value_str.id, tvb, org_offset, offset - org_offset, val, "SIGNATURE: %s", val);
@@ -368,7 +368,7 @@ dissect_dbus_field_signature(tvbuff_t *tvb, dbus_info_t *dinfo, proto_tree *tree
 
 	/* sig_len = tvb_strsize(tvb, offset); */
 
-	sig = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, sig_len, ENC_ASCII);
+	sig = tvb_get_string(wmem_packet_scope(), tvb, offset, sig_len);
 	offset += (sig_len + 1);
 
 	ti = proto_tree_add_string(tree, &hfi_dbus_type_signature, tvb, org_offset, offset - org_offset, sig);
@@ -588,8 +588,7 @@ dissect_dbus(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 #define DBUS_HEADER_LEN 16
 
 static guint
-get_dbus_message_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                     int offset, void *data _U_)
+get_dbus_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
 	guint32 (*get_guint32)(tvbuff_t *, const gint);
 
@@ -687,18 +686,6 @@ void
 proto_reg_handoff_dbus(void)
 {
 	dissector_add_uint("wtap_encap", WTAP_ENCAP_DBUS, dbus_handle);
-	dissector_add_for_decode_as("tcp.port", dbus_handle_tcp);
+	dissector_add_handle("tcp.port", dbus_handle_tcp);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

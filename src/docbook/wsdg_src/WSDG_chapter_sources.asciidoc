@@ -162,16 +162,6 @@ upload a key for each computer that you use.
 in many Linux distributions. You can also install it as a
 https://pypi.python.org/pypi/git-review[Python package]. (This step
 isn't strictly necessary but it makes working with Gerrit much easier.)
-To install it from Chocolatey run
-+
---
-----
-# Make sure "Scripts" is in our path
-PS$>$env:path += ";C:\tools\python2\Scripts"
-PS$>choco install pip
-PS$>choco install git-review -source python
-----
---
 
 . Now on to the command line. First, make sure `git` works:
 +
@@ -394,17 +384,31 @@ to see what options you have.
 
 ==== Win32 native
 
-Ensure you have correctly set your build environment as discussed in
-<<ChSetupPrepareCommandCom>>
+First, check the file 'config.nmake' to determine if it reflects your
+configuration. The settings in this file are well documented but there are a lot
+of them so please look closely. If you've installed the libraries and tools as
+recommended there should be no need to change anything.
+
+Many of the file and directory names used in the build process go past the old
+8.3 naming limitations. As a result you should use the `cmd.exe` command
+interpreter instead of the old `command.com`.
+
+Be sure that your command-line environment is set up to compile
+and link with MSV$$C++$$. When installing MSV$$C++$$, you can have your
+system's environment set up to always allow compiling from the
+command line, or you can invoke the vcvars32.bat script, which can
+usually be found in the _VC98\Bin_subdirectory of the
+directory in which Visual Studio was installed.
+
 
 You should then cleanup any intermediate files, which are shipped for
-convenience of Unix users, by typing at the command line prompt:
+convenience of Unix users, by typing at the command line prompt (cmd.exe):
 
 ----
 > nmake -f Makefile.nmake distclean
 ----
 
-After doing this, typing at the command line prompt:
+After doing this, typing at the command line prompt (cmd.exe):
 
 ----
 > nmake -f Makefile.nmake all
@@ -465,12 +469,8 @@ be informative when things don't work as expected.
 ==== Win32 native
 
 During the build all relevant program files are collected in a subdirectory
-'wireshark-qt-release'. You can run the program from there by
-launching the Wireshark.exe executable.
-
-The older GTK based version is also available in the 'wireshark-gtk'
-subdirectory.  You can run the program from there by launching the
-Wireshark-gtk.exe executable.
+'wireshark-gtk2'. You can run the program from there by
+launching the wireshark.exe executable.
 
 
 [[ChSrcDebug]]
@@ -509,8 +509,9 @@ See http://library.gnome.org/devel/glib/stable/glib-running.html[]
 
 ==== Win32 native
 
-You can debug using the Visual Studio Debugger or WinDbg.  See the section
-on using the <<ChToolsDebugger, Debugger Tools>>.
+****
+To be written
+****
 
 [[ChSrcChange]]
 
@@ -832,7 +833,7 @@ You'll take a capture file containing packets affecting your dissector
 and the fuzz test will randomly change bytes in this file, so that unusual
 code paths in your dissector are checked. There are tools available to
 automatically do this on any number of input files, see:
-wireshark-wiki-site:[]FuzzTesting[] for details.
+wireshark-wiki-site:[]/FuzzTesting[] for details.
 
 [[ChSrcUpload]]
 
@@ -1104,9 +1105,9 @@ installing the _qt-devel_ package.
 
 [[ChSrcOSX]]
 
-==== Mac OS X: .dmg packages
+==== MAC OS X: .dmg packages
 
-The Mac OS X Package is built using OS X packaging tools, based on information
+The MAC OS X Package is built using OS X packaging tools, based on information
 found in the source tree under 'packaging/macosx'.
 
 In the wireshark directory, type:
@@ -1115,7 +1116,7 @@ In the wireshark directory, type:
 $ make osx-package
 ----
 
-to build the Mac OS X Package.
+to build the MAC OS X Package.
 
 [[ChSrcNSIS]]
 
@@ -1130,7 +1131,7 @@ You will probably have to modify the MAKENSIS setting in the
 'config.nmake' file to specify where the NSIS binaries
 are installed.
 
-In the top-level source directory type:
+In the wireshark directory, type:
 
 ----
 > nmake -f makefile.nmake packaging
@@ -1138,8 +1139,8 @@ In the top-level source directory type:
 
 to build the installer.
 
-[TIP]
 .This might take a while
+[TIP]
 ====
 Please be patient while the package is compressed.
 It might take some time, even on fast machines.
@@ -1148,36 +1149,6 @@ It might take some time, even on fast machines.
 If everything went well, you will now find something like:
 'wireshark-setup-wireshark-version:[].exe' in
 the 'packaging/nsis' directory.
-
-[[ChSrcPortableApps]]
-
-==== Win32: PortableApps .paf.exe package
-
-_PortableApps.com_ is an environment that lets users run popular applications
-from portable media such as flash drives and cloud drive services.
-
-You will probably have to modify the MAKENSIS setting in the
-'config.nmake' file to specify where the NSIS binaries
-are installed.
-
-In the top-level source directory type:
-
-----
-> nmake -f makefile.nmake packaging_papps
-----
-
-to build the installer.
-
-[TIP]
-.This might take a while
-====
-Please be patient while the package is compressed.
-It might take some time, even on fast machines.
-====
-
-If everything went well, you will now find something like:
-'WiresharkPortable-wireshark-major-minor-version:[].paf.exe' in
-the 'packaging/portableapps/win32' directory.
 
 ++++++++++++++++++++++++++++++++++++++
 <!-- End of WSDG Chapter Sources -->

@@ -718,14 +718,15 @@ dissect_status_data_set(guint32 status_data_set, proto_tree* tree, tvbuff_t* tvb
 static guint32
 dissect_cntr_cyclic(guint32 con_format _U_, tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size, guint32 instance _U_)
 {
-   proto_item *temp_proto_item;
+   proto_item *header_item, *temp_proto_item;
    proto_tree *header_tree, *temp_proto_tree;
    guint32     temp_data;
    gboolean    lreal_pos;
    guint32     bytes_used = 0;
 
    /* Create the tree for the entire instance data header */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_cyclic_data_block, NULL, "Cyclic Data Block");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Cyclic Data Block");
+   header_tree = proto_item_add_subtree(header_item, ett_cyclic_data_block);
 
    /* Add the control mode header field to the tree */
    proto_tree_add_item(header_tree, hf_cip_motor_cntrl, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -807,13 +808,14 @@ dissect_cntr_cyclic(guint32 con_format _U_, tvbuff_t* tvb, proto_tree* tree, gui
 static guint32
 dissect_devce_cyclic(guint32 con_format _U_, tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size, guint32 instance _U_)
 {
-   proto_item *temp_proto_item;
+   proto_item *header_item, *temp_proto_item;
    proto_tree *header_tree, *temp_proto_tree;
    guint32 temp_data;
    guint32 bytes_used = 0;
 
    /* Create the tree for the entire instance data header */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_cyclic_data_block, NULL, "Cyclic Data Block");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Cyclic Data Block");
+   header_tree = proto_item_add_subtree(header_item, ett_cyclic_data_block);
 
    /* Add the control mode header field to the tree */
    proto_tree_add_item(header_tree, hf_cip_motor_cntrl, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -881,10 +883,12 @@ dissect_devce_cyclic(guint32 con_format _U_, tvbuff_t* tvb, proto_tree* tree, gu
 static guint32
 dissect_cyclic_wt(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
+   proto_item *header_item;
    proto_tree *header_tree;
 
    /* Create the tree for the entire cyclic write data block */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_cyclic_rd_wt, NULL, "Cyclic Write Data Block");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Cyclic Write Data Block");
+   header_tree = proto_item_add_subtree(header_item, ett_cyclic_rd_wt);
 
    /* Display the cyclic write block id value */
    proto_tree_add_item(header_tree, hf_cip_cyclic_write_blk, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -912,10 +916,12 @@ dissect_cyclic_wt(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 static guint32
 dissect_cyclic_rd(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
+   proto_item *header_item;
    proto_tree *header_tree;
 
    /* Create the tree for the entire cyclic write data block */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_cyclic_rd_wt, NULL, "Cyclic Read Data Block");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Cyclic Read Data Block");
+   header_tree = proto_item_add_subtree(header_item, ett_cyclic_rd_wt);
 
    /* Display the cyclic write block id value */
    proto_tree_add_item(header_tree, hf_cip_cyclic_write_blk, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -949,14 +955,15 @@ dissect_cyclic_rd(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 static guint32
 dissect_cntr_event(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
-   proto_item *temp_proto_item;
+   proto_item *header_item, *temp_proto_item;
    proto_tree *header_tree, *temp_proto_tree;
    guint32 temp_data;
    guint32 acks, cur_ack;
    guint32 bytes_used = 0;
 
    /* Create the tree for the entire cyclic write data block */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_event, NULL, "Event Data Block");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Event Data Block");
+   header_tree = proto_item_add_subtree(header_item, ett_event);
 
    /* Read the event checking control header field from the packet into memory */
    temp_data = tvb_get_letohl(tvb, offset);
@@ -1019,14 +1026,15 @@ dissect_cntr_event(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size
 static guint32
 dissect_devce_event(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
-   proto_item *temp_proto_item;
+   proto_item *header_item, *temp_proto_item;
    proto_tree *header_tree, *temp_proto_tree;
    guint64     temp_data;
    guint64     nots, cur_not;
    guint32     bytes_used = 0;
 
    /* Create the tree for the entire cyclic write data block */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_event, NULL, "Event Data Block");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Event Data Block");
+   header_tree = proto_item_add_subtree(header_item, ett_event);
 
    /* Read the event checking control header field from the packet into memory */
    temp_data = tvb_get_letohl(tvb, offset);
@@ -1100,14 +1108,15 @@ dissect_devce_event(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 siz
 static void
 dissect_get_axis_attr_list_request (tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
-   proto_item *attr_item;
+   proto_item *header_item, *attr_item;
    proto_tree *header_tree, *attr_tree;
    guint16     attribute, attribute_cnt;
    guint32     local_offset;
    guint8      increment_size, dimension;
 
    /* Create the tree for the get axis attribute list request */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_get_axis_attribute, NULL, "Get Axis Attribute List Request");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Get Axis Attribute List Request");
+   header_tree = proto_item_add_subtree(header_item, ett_get_axis_attribute);
 
    /* Read the number of attributes that are contained within the request */
    attribute_cnt = tvb_get_letohs(tvb, offset);
@@ -1158,7 +1167,7 @@ dissect_get_axis_attr_list_request (tvbuff_t* tvb, proto_tree* tree, guint32 off
 static void
 dissect_set_axis_attr_list_request (tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
-   proto_item *attr_item;
+   proto_item *header_item, *attr_item;
    proto_tree *header_tree, *attr_tree;
    guint16     attribute, attribute_cnt, data_elements;
    guint32     local_offset;
@@ -1166,7 +1175,8 @@ dissect_set_axis_attr_list_request (tvbuff_t* tvb, proto_tree* tree, guint32 off
    guint8      dimension, attribute_start, increment_size;
 
    /* Create the tree for the set axis attribute list request */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_set_axis_attribute, NULL, "Set Axis Attribute List Request");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Set Axis Attribute List Request");
+   header_tree = proto_item_add_subtree(header_item, ett_set_axis_attribute);
 
    /* Read the number of attributes that are contained within the request */
    attribute_cnt = tvb_get_letohs(tvb, offset);
@@ -1237,10 +1247,12 @@ dissect_set_axis_attr_list_request (tvbuff_t* tvb, proto_tree* tree, guint32 off
 static void
 dissect_group_sync_request (tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
+   proto_item *header_item;
    proto_tree *header_tree;
 
    /* Create the tree for the group sync request */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_group_sync, NULL, "Group Sync Request");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Group Sync Request");
+   header_tree = proto_item_add_subtree(header_item, ett_group_sync);
 
    /* Read the grandmaster id from the payload */
    proto_tree_add_item(header_tree, hf_cip_ptp_grandmaster, tvb, offset, 8, ENC_LITTLE_ENDIAN);
@@ -1258,11 +1270,13 @@ dissect_group_sync_request (tvbuff_t* tvb, proto_tree* tree, guint32 offset, gui
 static guint32
 dissect_cntr_service(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
+   proto_item *header_item;
    proto_tree *header_tree;
    guint8      service;
 
    /* Create the tree for the entire service data block */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_service, NULL, "Service Data Block");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Service Data Block");
+   header_tree = proto_item_add_subtree(header_item, ett_service);
 
    /* Display the transaction id value */
    proto_tree_add_item(header_tree, hf_cip_svc_transction, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -1301,13 +1315,14 @@ dissect_cntr_service(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 si
 static void
 dissect_set_axis_attr_list_response (tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
-   proto_item *attr_item;
+   proto_item *header_item, *attr_item;
    proto_tree *header_tree, *attr_tree;
    guint16     attribute, attribute_cnt;
    guint32     local_offset;
 
    /* Create the tree for the set axis attribute list response */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_get_axis_attribute, NULL, "Set Axis Attribute List Response");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Set Axis Attribute List Response");
+   header_tree = proto_item_add_subtree(header_item, ett_get_axis_attribute);
 
    /* Read the number of attributes that are contained within the response */
    attribute_cnt = tvb_get_letohs(tvb, offset);
@@ -1341,7 +1356,7 @@ dissect_set_axis_attr_list_response (tvbuff_t* tvb, proto_tree* tree, guint32 of
 static void
 dissect_get_axis_attr_list_response (tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
-   proto_item *attr_item;
+   proto_item *header_item, *attr_item;
    proto_tree *header_tree, *attr_tree;
    guint16     attribute, attribute_cnt, data_elements;
    guint32     attribute_size;
@@ -1349,7 +1364,8 @@ dissect_get_axis_attr_list_response (tvbuff_t* tvb, proto_tree* tree, guint32 of
    guint32     local_offset;
 
    /* Create the tree for the get axis attribute list response */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_get_axis_attribute, NULL, "Get Axis Attribute List Response");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Get Axis Attribute List Response");
+   header_tree = proto_item_add_subtree(header_item, ett_get_axis_attribute);
 
    /* Read the number of attributes that are contained within the request */
    attribute_cnt = tvb_get_letohs(tvb, offset);
@@ -1445,10 +1461,12 @@ dissect_group_sync_response (tvbuff_t* tvb, proto_tree* tree, guint32 offset, gu
 static guint32
 dissect_devce_service(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint32 size)
 {
+   proto_item *header_item;
    proto_tree *header_tree;
 
    /* Create the tree for the entire service data block */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, size, ett_service, NULL, "Service Data Block");
+   header_item = proto_tree_add_text(tree, tvb, offset, size, "Service Data Block");
+   header_tree = proto_item_add_subtree(header_item, ett_service);
 
    /* Display the transaction id value */
    proto_tree_add_item(header_tree, hf_cip_svc_transction, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -1495,13 +1513,14 @@ dissect_var_inst_header(tvbuff_t* tvb, proto_tree* tree, guint32 offset, guint8*
                         guint32* cyc_blk_size, guint32* evnt_size, guint32* servc_size)
 {
    guint8      temp_data;
+   proto_item *header_item;
    proto_tree *header_tree;
 
    /* Create the tree for the entire instance data header */
    *inst_number = tvb_get_guint8(tvb, offset);
 
-   header_tree = proto_tree_add_subtree_format(tree, tvb, offset, 8, ett_inst_data_header, NULL,
-                                                "Instance Data Header - Instance: %d", *inst_number);
+   header_item = proto_tree_add_text(tree, tvb, offset, 8, "Instance Data Header - Instance: %d", *inst_number);
+   header_tree = proto_item_add_subtree(header_item, ett_inst_data_header);
 
    /* Read the instance number field from the instance data header */
    proto_tree_add_item(header_tree, hf_var_devce_instance, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -1552,7 +1571,7 @@ dissect_var_cont_conn_header(tvbuff_t* tvb, proto_tree* tree, guint32* inst_coun
 {
    guint32     header_size;
    guint32     temp_data;
-   proto_item *temp_proto_item;
+   proto_item *header_item, *temp_proto_item;
    proto_tree *header_tree, *temp_proto_tree;
 
    /* Calculate the header size, start with the basic header size */
@@ -1572,7 +1591,8 @@ dissect_var_cont_conn_header(tvbuff_t* tvb, proto_tree* tree, guint32* inst_coun
    }
 
    /* Create the tree for the entire connection header */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, header_size, ett_cont_dev_header, NULL, "Connection Header");
+   header_item = proto_tree_add_text(tree, tvb, offset, header_size, "Connection Header");
+   header_tree = proto_item_add_subtree(header_item, ett_cont_dev_header);
 
    /* Add the connection header fields that are common to all types of messages */
    proto_tree_add_item(header_tree, hf_cip_format,   tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -1641,7 +1661,7 @@ dissect_var_devce_conn_header(tvbuff_t* tvb, proto_tree* tree, guint32* inst_cou
 {
    guint32     header_size;
    guint32     temp_data;
-   proto_item *temp_proto_item;
+   proto_item *header_item, *temp_proto_item;
    proto_tree *header_tree, *temp_proto_tree;
 
    /* Calculate the header size, start with the basic header size */
@@ -1666,7 +1686,8 @@ dissect_var_devce_conn_header(tvbuff_t* tvb, proto_tree* tree, guint32* inst_cou
    }
 
    /* Create the tree for the entire connection header */
-   header_tree = proto_tree_add_subtree(tree, tvb, offset, header_size, ett_cont_dev_header, NULL, "Connection Header");
+   header_item = proto_tree_add_text(tree, tvb, offset, header_size, "Connection Header");
+   header_tree = proto_item_add_subtree(header_item, ett_cont_dev_header);
 
    /* Add the connection header fields that are common to all types of messages */
    proto_tree_add_item(header_tree, hf_cip_format,   tvb, offset, 1, ENC_LITTLE_ENDIAN);

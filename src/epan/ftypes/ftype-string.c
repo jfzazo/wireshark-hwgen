@@ -22,6 +22,7 @@
 
 #include <stdio.h>
 #include <ftypes-int.h>
+#include <epan/emem.h>
 #include <string.h>
 
 #define CMP_MATCHES cmp_matches
@@ -52,7 +53,7 @@ string_fvalue_set_string(fvalue_t *fv, const gchar *value)
 }
 
 static int
-string_repr_len(fvalue_t *fv, ftrepr_t rtype, int field_display _U_)
+string_repr_len(fvalue_t *fv, ftrepr_t rtype)
 {
 	switch (rtype) {
 		case FTREPR_DISPLAY:
@@ -66,7 +67,7 @@ string_repr_len(fvalue_t *fv, ftrepr_t rtype, int field_display _U_)
 }
 
 static void
-string_to_repr(fvalue_t *fv, ftrepr_t rtype, int field_display _U_, char *buf)
+string_to_repr(fvalue_t *fv, ftrepr_t rtype, char *buf)
 {
 	switch (rtype) {
 		case FTREPR_DISPLAY:
@@ -88,7 +89,7 @@ value_get(fvalue_t *fv)
 }
 
 static gboolean
-val_from_string(fvalue_t *fv, const char *s, gchar **err_msg _U_)
+val_from_string(fvalue_t *fv, const char *s, LogFunc logfunc _U_)
 {
 	/* Free up the old value, if we have one */
 	string_fvalue_free(fv);
@@ -98,7 +99,7 @@ val_from_string(fvalue_t *fv, const char *s, gchar **err_msg _U_)
 }
 
 static gboolean
-val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, gchar **err_msg)
+val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, LogFunc logfunc)
 {
 	fvalue_t *fv_bytes;
 
@@ -122,7 +123,7 @@ val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_,
 	}
 
 	/* Just turn it into a string */
-	return val_from_string(fv, s, err_msg);
+	return val_from_string(fv, s, logfunc);
 }
 
 static guint

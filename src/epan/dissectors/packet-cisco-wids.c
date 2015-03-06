@@ -45,8 +45,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/etypes.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
 #include <epan/show_exception.h>
@@ -64,8 +66,6 @@ static int hf_cwids_unknown3 = -1;
 
 static gint ett_cwids = -1;
 
-static expert_field ie_ieee80211_subpacket = EI_INIT;
-
 static dissector_handle_t ieee80211_handle;
 
 static void
@@ -75,6 +75,7 @@ dissect_cwids(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	proto_tree *ti, *cwids_tree;
 	volatile int offset = 0;
 	guint16 capturelen;
+	void *pd_save;
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "CWIDS");
 	col_set_str(pinfo->cinfo, COL_INFO, "Cwids: ");
@@ -102,14 +103,29 @@ dissect_cwids(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		proto_tree_add_item(cwids_tree, hf_cwids_unknown3, tvb, offset, 8, ENC_NA);
 		offset += 8;
 
-		wlan_tvb = tvb_new_subset_length(tvb, offset, capturelen);
+		wlan_tvb = tvb_new_subset(tvb, offset, capturelen, capturelen);
 		/* Continue after ieee80211 dissection errors */
+		pd_save = pinfo->private_data;
 		TRY {
 			call_dissector(ieee80211_handle, wlan_tvb, pinfo, tree);
 		} CATCH_BOUNDS_ERRORS {
 			show_exception(wlan_tvb, pinfo, tree, EXCEPT_CODE, GET_MESSAGE);
 
-			expert_add_info(pinfo, ti, &ie_ieee80211_subpacket);
+			/*  Restore the private_data structure in case one of the
+			 *  called dissectors modified it (and, due to the exception,
+			 *  was unable to restore it).
+			 */
+			pinfo->private_data = pd_save;
+
+#if 0
+	wlan_tvb = tvb_new_subset(tvb, offset, capturelen, capturelen);
+			/* FIXME: Why does this throw an exception? */
+			proto_tree_add_text(cwids_tree, wlan_tvb, offset, capturelen,
+				"[Malformed or short IEEE80211 subpacket]");
+#else
+			tvb_new_subset(tvb, offset, capturelen, capturelen);
+#endif
+	;
 		} ENDTRY;
 
 		offset += capturelen;
@@ -156,18 +172,11 @@ proto_register_cwids(void)
 		&ett_cwids,
 	};
 
-	static ei_register_info ei[] = {
-		{ &ie_ieee80211_subpacket, { "cwids.ieee80211_malformed", PI_MALFORMED, PI_ERROR, "Malformed or short IEEE80211 subpacket", EXPFILL }},
-	};
-
 	module_t *cwids_module;
-	expert_module_t* expert_cwids;
 
 	proto_cwids = proto_register_protocol("Cisco Wireless IDS Captures", "CWIDS", "cwids");
 	proto_register_field_array(proto_cwids, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_cwids = expert_register_protocol(proto_cwids);
-	expert_register_field_array(expert_cwids, ei, array_length(ei));
 
 	cwids_module = prefs_register_protocol(proto_cwids, proto_reg_handoff_cwids);
 	prefs_register_uint_preference(cwids_module, "udp.port",
@@ -186,7 +195,7 @@ proto_reg_handoff_cwids(void)
 
 	if (!initialized) {
 		cwids_handle = create_dissector_handle(dissect_cwids, proto_cwids);
-		dissector_add_for_decode_as("udp.port", cwids_handle);
+		dissector_add_handle("udp.port", cwids_handle);
 		ieee80211_handle = find_dissector("wlan_withoutfcs");
 		initialized = TRUE;
 	} else {
@@ -200,15 +209,3 @@ proto_reg_handoff_cwids(void)
 	saved_udp_port = global_udp_port;
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

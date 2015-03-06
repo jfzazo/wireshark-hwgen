@@ -263,8 +263,8 @@ OPERATION.&ResultType
 	dissect_ber_length(actx->pinfo, tree, tvb, offset+1, &len, NULL);
 
 	if(len == 0) {
-		/* it's an empty set - i.e anonymous  (assuming version is DEFAULTed) */
-		proto_tree_add_expert(tree, actx->pinfo, &ei_dap_anonymous, tvb, offset, -1);
+		/* its an empty set - i.e anonymous  (assuming version is DEFAULTed) */
+		proto_tree_add_text(tree, tvb, offset, -1,"Anonymous");
 
 		col_append_str(actx->pinfo->cinfo, COL_INFO, " anonymous");
 

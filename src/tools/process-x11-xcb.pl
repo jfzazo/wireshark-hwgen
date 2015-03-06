@@ -4,8 +4,6 @@
 # X11 dissector. Creates header files containing code to
 # dissect X11 extensions.
 #
-# Instructions for using this script are in epan/dissectors/README.X11
-#
 # Copyright 2008, 2009, 2013, 2014 Open Text Corporation <pharris[AT]opentext.com>
 #
 # Wireshark - Network traffic analyzer
@@ -624,7 +622,7 @@ sub reference_elements($$)
                 }
             }
 
-	    my @elements = $e->children(qr/(bit)?case/);
+	    my @elements = $e->children('bitcase');
 	    for my $case (@elements) {
 		my @sub_elements = $case->children(qr/list|switch/);
 
@@ -765,7 +763,7 @@ sub dissect_element($$$$$;$$)
                     $length += $align - $length % $align;
                 }
                 if ($adjustlength) {
-                    say $impl $indent.'length = ((length + '.($align-1).') & ~'.($align-1).');';
+                    say $impl $indent.'length = (length + '.($align-1).' & ~'.($align-1).';';
                 }
             }
 	}
@@ -873,33 +871,28 @@ sub dissect_element($$$$$;$$)
 	    my $switchtype = $e->first_child() or die("Switch element not defined");
 
 	    my $switchon = get_ref($switchtype, {});
-	    my @elements = $e->children(qr/(bit)?case/);
+	    my @elements = $e->children('bitcase');
 	    for my $case (@elements) {
                 my @refs = $case->children('enumref');
-                my @test;
+                my @bits;
                 my $fieldname;
                 foreach my $ref (@refs) {
                     my $enum_ref = $ref->att('ref');
                     my $field = $ref->text();
                     $fieldname //= $field; # Use first named field
-                    if ($case->name() eq 'bitcase') {
-                        my $bit = $enum{$enum_name{$enum_ref}}{rbit}{$field};
-                        if (! defined($bit)) {
-                            for my $foo (keys %{$enum{$enum_name{$enum_ref}}{rbit}}) { say "'$foo'"; }
-                            die ("Field '$field' not found in '$enum_ref'");
-                        }
-                        push @test , "($switchon & (1 << $bit))";
-                    } else {
-                        my $val = $enum{$enum_name{$enum_ref}}{rvalue}{$field};
-                        if (! defined($val)) {
-                            for my $foo (keys %{$enum{$enum_name{$enum_ref}}{rvalue}}) { say "'$foo'"; }
-                            die ("Field '$field' not found in '$enum_ref'");
-                        }
-                        push @test , "($switchon == $val)";
+                    my $bit = $enum{$enum_name{$enum_ref}}{rbit}{$field};
+                    if (! defined($bit)) {
+                        for my $foo (keys %{$enum{$enum_name{$enum_ref}}{rbit}}) { say "'$foo'"; }
+                        die ("Field '$field' not found in '$enum_ref'");
                     }
+                    push @bits , "(1 << $bit)";
                 }
-                my $list = join ' || ', @test;
-                say $impl $indent."if ($list) {";
+                if (scalar @bits == 1) {
+                    say $impl $indent."if (($switchon & $bits[0]) != 0) {";
+                } else {
+                    my $list = join '|', @bits;
+                    say $impl $indent."if (($switchon & ($list)) != 0) {";
+                }
 
 		my $vp = $varpat;
 		my $hp = $humanpat;
@@ -1000,8 +993,7 @@ sub struct {
 		}
 	    }
 	    when ('field') { }
-	    when ('switch') { } # New field in xcbproto/src/xinput.xml
-	    default { die("unrecognized field: $_\n"); }
+	    default { die("unrecognized field $_\n"); }
 	}
 
 	my $type = $e->att('type');
@@ -1228,9 +1220,8 @@ sub enum {
 
     my $value = {};
     my $bit = {};
-    my $rvalue = {};
     my $rbit = {};
-    $enum{$fullname} = { value => $value, bit => $bit, rbit => $rbit, rvalue => $rvalue };
+    $enum{$fullname} = { value => $value, bit => $bit, rbit => $rbit };
 
     my $nextvalue = 0;
 
@@ -1242,7 +1233,6 @@ sub enum {
 	    given ($valtype->name()) {
 		when ('value') {
 		    $$value{$val} = $n;
-		    $$rvalue{$n} = $val;
 		    $nextvalue = $val + 1;
 
                     # Ugly hack to support (temporary, hopefully) ugly

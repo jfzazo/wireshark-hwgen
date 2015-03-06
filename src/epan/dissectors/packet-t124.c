@@ -32,6 +32,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/conversation.h>
@@ -285,7 +286,7 @@ static int hf_t124_Segmentation_begin = -1;
 static int hf_t124_Segmentation_end = -1;
 
 /*--- End of included file: packet-t124-hf.c ---*/
-#line 53 "../../asn1/t124/packet-t124-template.c"
+#line 54 "../../asn1/t124/packet-t124-template.c"
 
 /* Initialize the subtree pointers */
 static int ett_t124 = -1;
@@ -408,7 +409,7 @@ static gint ett_t124_TokenTestConfirm = -1;
 static gint ett_t124_DomainMCSPDU = -1;
 
 /*--- End of included file: packet-t124-ett.c ---*/
-#line 70 "../../asn1/t124/packet-t124-template.c"
+#line 71 "../../asn1/t124/packet-t124-template.c"
 
 
 /*--- Included file: packet-t124-fn.c ---*/
@@ -2878,7 +2879,7 @@ dissect_t124_DomainMCSPDU(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U
 
 
 /*--- End of included file: packet-t124-fn.c ---*/
-#line 72 "../../asn1/t124/packet-t124-template.c"
+#line 73 "../../asn1/t124/packet-t124-template.c"
 
 static const per_sequence_t t124Heur_sequence[] = {
   { &hf_t124_t124Identifier , ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_t124_Key },
@@ -2940,13 +2941,13 @@ dissect_t124_new(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, voi
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "T.124");
   col_clear(pinfo->cinfo, COL_INFO);
 
-  item = proto_tree_add_item(parent_tree, proto_t124, tvb, 0, tvb_captured_length(tvb), ENC_NA);
+  item = proto_tree_add_item(parent_tree, proto_t124, tvb, 0, tvb_length(tvb), ENC_NA);
   tree = proto_item_add_subtree(item, ett_t124);
 
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
   dissect_t124_ConnectData(tvb, 0, &asn1_ctx, tree, hf_t124_ConnectData);
 
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 static void
@@ -3900,7 +3901,7 @@ void proto_register_t124(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-t124-hfarr.c ---*/
-#line 201 "../../asn1/t124/packet-t124-template.c"
+#line 202 "../../asn1/t124/packet-t124-template.c"
   };
 
   /* List of subtrees */
@@ -4013,7 +4014,7 @@ void proto_register_t124(void) {
     &ett_t124_DomainMCSPDU,
 
 /*--- End of included file: packet-t124-ettarr.c ---*/
-#line 208 "../../asn1/t124/packet-t124-template.c"
+#line 209 "../../asn1/t124/packet-t124-template.c"
   };
 
   /* Register protocol */

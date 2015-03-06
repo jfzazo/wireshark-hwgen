@@ -30,12 +30,16 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/ipproto.h>
 #include <epan/addr_resolv.h>
+#include <packet-tcp.h>
 #include <epan/prefs.h>
+#include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
-#include "packet-tcp.h"
 
 void proto_register_xmcp(void);
 
@@ -316,8 +320,7 @@ static gint32 xmcp_service_port = -1;
 static proto_item *xmcp_it_service_port = NULL;
 
 static guint
-get_xmcp_message_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                     int offset, void *data _U_)
+get_xmcp_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   return(XMCP_HDR_LEN + tvb_get_ntohs(tvb, offset+2));
 }
@@ -405,19 +408,19 @@ add_xmcp_port_name (void)
   switch(xmcp_service_protocol) {
   case IP_PROTO_TCP:
     proto_item_append_text(xmcp_it_service_port, " (TCP: %s)",
-                           tcp_port_to_display(wmem_packet_scope(), xmcp_service_port));
+                           ep_tcp_port_to_display(xmcp_service_port));
     break;
   case IP_PROTO_UDP:
     proto_item_append_text(xmcp_it_service_port, " (UDP: %s)",
-                           udp_port_to_display(wmem_packet_scope(), xmcp_service_port));
+                           ep_udp_port_to_display(xmcp_service_port));
     break;
   case IP_PROTO_DCCP:
     proto_item_append_text(xmcp_it_service_port, " (DCCP: %s)",
-                           dccp_port_to_display(wmem_packet_scope(), xmcp_service_port));
+                           ep_dccp_port_to_display(xmcp_service_port));
     break;
   case IP_PROTO_SCTP:
     proto_item_append_text(xmcp_it_service_port, " (SCTP: %s)",
-                           sctp_port_to_display(wmem_packet_scope(), xmcp_service_port));
+                           ep_sctp_port_to_display(xmcp_service_port));
     break;
   default:
     break;
@@ -436,14 +439,14 @@ decode_xmcp_attr_value (proto_tree *attr_tree, guint16 attr_type,
     proto_tree_add_item(attr_tree, xmcp_attr_username, tvb, offset,
                         attr_length, ENC_ASCII|ENC_NA);
     proto_item_append_text(attr_tree, ": %s",
-                           tvb_get_string_enc(wmem_packet_scope(), tvb, offset, attr_length, ENC_ASCII));
+                           tvb_get_string(wmem_packet_scope(), tvb, offset, attr_length));
     /*
      * Many message methods may include this attribute,
      * but it's only interesting when Registering at first
      */
     if (xmcp_msg_type_method == XMCP_METHOD_REGISTER) {
       col_append_fstr(pinfo->cinfo, COL_INFO, ", user \"%s\"",
-                      tvb_get_string_enc(wmem_packet_scope(), tvb, offset, attr_length, ENC_ASCII));
+                      tvb_get_string(wmem_packet_scope(), tvb, offset, attr_length));
     }
     break;
   case XMCP_MESSAGE_INTEGRITY:
@@ -506,15 +509,15 @@ decode_xmcp_attr_value (proto_tree *attr_tree, guint16 attr_type,
     proto_tree_add_item(attr_tree, xmcp_attr_error_reason, tvb, (offset+4),
                         (attr_length - 4), ENC_ASCII|ENC_NA);
     proto_item_append_text(attr_tree, " (%s)",
-                           tvb_get_string_enc(wmem_packet_scope(), tvb, (offset+4),
-                                                    (attr_length-4), ENC_ASCII));
+                           tvb_get_string(wmem_packet_scope(), tvb, (offset+4),
+                                                    (attr_length-4)));
     break;
   case XMCP_REALM:
     it = proto_tree_add_item(attr_tree, xmcp_attr_realm, tvb, offset,
                         attr_length, ENC_ASCII|ENC_NA);
     {
       guint8 *realm;
-      realm = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, attr_length, ENC_ASCII);
+      realm = tvb_get_string(wmem_packet_scope(), tvb, offset, attr_length);
       proto_item_append_text(attr_tree, ": %s", realm);
       /* In XMCP the REALM string should always be "SAF" including the quotes */
       if (attr_length != 5 || strncmp(realm, "\"SAF\"", attr_length)) {
@@ -526,15 +529,15 @@ decode_xmcp_attr_value (proto_tree *attr_tree, guint16 attr_type,
     proto_tree_add_item(attr_tree, xmcp_attr_nonce, tvb, offset,
                         attr_length, ENC_ASCII|ENC_NA);
     proto_item_append_text(attr_tree, ": %s",
-                           tvb_get_string_enc(wmem_packet_scope(), tvb, offset, attr_length, ENC_ASCII));
+                           tvb_get_string(wmem_packet_scope(), tvb, offset, attr_length));
     break;
   case XMCP_CLIENT_NAME:
     proto_tree_add_item(attr_tree, xmcp_attr_client_name, tvb, offset,
                         attr_length, ENC_ASCII|ENC_NA);
     proto_item_append_text(attr_tree, ": %s",
-                           tvb_get_string_enc(wmem_packet_scope(), tvb, offset, attr_length, ENC_ASCII));
+                           tvb_get_string(wmem_packet_scope(), tvb, offset, attr_length));
     col_append_fstr(pinfo->cinfo, COL_INFO, ", name \"%s\"",
-                      tvb_get_string_enc(wmem_packet_scope(), tvb, offset, attr_length, ENC_ASCII));
+                      tvb_get_string(wmem_packet_scope(), tvb, offset, attr_length));
     break;
   case XMCP_CLIENT_HANDLE:
     if (attr_length < 4)
@@ -575,9 +578,9 @@ decode_xmcp_attr_value (proto_tree *attr_tree, guint16 attr_type,
     proto_tree_add_item(attr_tree, xmcp_attr_client_label, tvb, offset,
                         attr_length, ENC_ASCII|ENC_NA);
     proto_item_append_text(attr_tree, ": %s",
-                           tvb_get_string_enc(wmem_packet_scope(), tvb, offset, attr_length, ENC_ASCII));
+                           tvb_get_string(wmem_packet_scope(), tvb, offset, attr_length));
     col_append_fstr(pinfo->cinfo, COL_INFO, ", label \"%s\"",
-                      tvb_get_string_enc(wmem_packet_scope(), tvb, offset, attr_length, ENC_ASCII));
+                      tvb_get_string(wmem_packet_scope(), tvb, offset, attr_length));
     break;
   case XMCP_KEEPALIVE:
     if (attr_length < 4)
@@ -638,9 +641,11 @@ decode_xmcp_attr_value (proto_tree *attr_tree, guint16 attr_type,
       if (attr_length != 8) {
         expert_add_info_format(pinfo, attr_tree, &ei_xmcp_attr_length_bad, "Malformed IPv4 address");
       } else {
+        guint32 ip;
         proto_tree_add_item(attr_tree, xmcp_attr_servtrans_ipv4, tvb,
                             (offset+4), 4, ENC_BIG_ENDIAN);
-        proto_item_append_text(attr_tree, ": %s:%u", tvb_ip_to_str(tvb, offset+4),
+        ip = tvb_get_ipv4(tvb, (offset+4));
+        proto_item_append_text(attr_tree, ": %s:%u", ip_to_str((guint8 *)&ip),
                                tvb_get_ntohs(tvb, (offset+2)));
       }
       break;
@@ -648,9 +653,11 @@ decode_xmcp_attr_value (proto_tree *attr_tree, guint16 attr_type,
       if (attr_length != 20) {
         expert_add_info_format(pinfo, attr_tree, &ei_xmcp_attr_length_bad, "Malformed IPv6 address");
       } else {
+        struct e_in6_addr ipv6;
         proto_tree_add_item(attr_tree, xmcp_attr_servtrans_ipv6, tvb,
                             (offset+4), 16, ENC_NA);
-        proto_item_append_text(attr_tree, ": [%s]:%u", tvb_ip6_to_str(tvb, (offset+4)),
+        tvb_get_ipv6(tvb, (offset+4), &ipv6);
+        proto_item_append_text(attr_tree, ": [%s]:%u", ip6_to_str(&ipv6),
                                tvb_get_ntohs(tvb, (offset+2)));
       }
       break;
@@ -756,15 +763,15 @@ decode_xmcp_attr_value (proto_tree *attr_tree, guint16 attr_type,
       tvbuff_t *next_tvb;
       guint8 *test_string, *tok;
 
-      next_tvb = tvb_new_subset_length(tvb, offset, attr_length);
+      next_tvb = tvb_new_subset(tvb, offset, attr_length, attr_length);
       /*
        * Service-Data is usually (but not always) plain text, specifically XML.
        * If it "looks like" XML (begins with optional whitespace followed by
        * a '<'), try XML.
        * Otherwise, try plain-text.
        */
-      test_string = tvb_get_string_enc(wmem_packet_scope(), next_tvb, 0, (attr_length < 32 ?
-                                                           attr_length : 32), ENC_ASCII);
+      test_string = tvb_get_string(wmem_packet_scope(), next_tvb, 0, (attr_length < 32 ?
+                                                           attr_length : 32));
       tok = strtok(test_string, " \t\r\n");
       if (tok && tok[0] == '<') {
         /* Looks like XML */
@@ -1250,7 +1257,7 @@ proto_register_xmcp(void)
     },
     { &xmcp_attr_service_protocol,
       { "Protocol",             "xmcp.attr.service.transport.protocol",
-        FT_UINT8, BASE_DEC|BASE_EXT_STRING, &ipproto_val_ext,
+        FT_UINT8, BASE_DEC|BASE_EXT_STRING, (&ipproto_val_ext),
         0x0, NULL, HFILL }
     },
     { &xmcp_attr_flag,

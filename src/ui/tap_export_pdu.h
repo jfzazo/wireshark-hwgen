@@ -1,5 +1,5 @@
 /* tap_export_pdu.h
- * Routines for exporting PDUs to file
+ * Routines for exporting PDU:s to file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -32,7 +32,8 @@ typedef struct _exp_pdu_t {
     wtap_dumper* wdh;
 } exp_pdu_t;
 
-gboolean do_export_pdu(const char *filter, gchar *tap_name, exp_pdu_t *data);
+void exp_pdu_file_open(exp_pdu_t *exp_pdu_tap_data);
+gboolean do_export_pdu(const char *filter, gchar *tap_name, gpointer data);
 
 #ifdef __cplusplus
 }

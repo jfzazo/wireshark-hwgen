@@ -373,8 +373,8 @@ dissect_gmtrailer(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void 
   /* Verify the checksum; if not valid, it means that the trailer is not valid */
   {
     vec_t vec;
-
-    SET_CKSUM_VEC_TVB(vec, tvb, offset, length + 3);
+    vec.len = length + 3;
+    vec.ptr = tvb_get_ptr(tvb, offset, vec.len);
 
     comp_cksum = in_cksum(&vec, 1);
     if (pntoh16(&comp_cksum) != cksum) {
@@ -527,15 +527,3 @@ proto_reg_handoff_gmhdr(void)
   heur_dissector_add("eth.trailer", dissect_gmtimestamp_trailer, proto_gmtrailer);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

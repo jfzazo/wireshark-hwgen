@@ -26,6 +26,9 @@
 #include "config.h"
 
 
+#include <glib.h>
+
+#include <string.h>
 
 #include <epan/packet.h>
 #include <epan/strutil.h>
@@ -48,23 +51,24 @@ void proto_reg_handoff_aim_messaging(void);
 #define INCOMING_CH1_TYPING            0x000b
 
 static const aim_tlv aim_messaging_incoming_ch1_tlvs[] = {
-	{ INCOMING_CH1_MESSAGE_BLOCK,	  "Message Block", dissect_aim_tlv_value_messageblock },
-	{ INCOMING_CH1_SERVER_ACK_REQ,	  "Server Ack Requested", dissect_aim_tlv_value_bytes },
+	{ INCOMING_CH1_MESSAGE_BLOCK, "Message Block", dissect_aim_tlv_value_messageblock },
+	{ INCOMING_CH1_SERVER_ACK_REQ, "Server Ack Requested", dissect_aim_tlv_value_bytes },
 	{ INCOMING_CH1_MESSAGE_AUTH_RESP, "Message is Auto Response", dissect_aim_tlv_value_bytes },
-	{ INCOMING_CH1_MESSAGE_OFFLINE,	  "Message was received offline", dissect_aim_tlv_value_bytes },
-	{ INCOMING_CH1_ICON_PRESENT,	  "Icon present", dissect_aim_tlv_value_bytes },
-	{ INCOMING_CH1_BUDDY_REQ,	  "Buddy Req", dissect_aim_tlv_value_bytes },
-	{ INCOMING_CH1_TYPING,		  "Non-direct connect typing notification", dissect_aim_tlv_value_bytes },
+	{ INCOMING_CH1_MESSAGE_OFFLINE, "Message was received offline", dissect_aim_tlv_value_bytes },
+	{ INCOMING_CH1_ICON_PRESENT, "Icon present", dissect_aim_tlv_value_bytes },
+	{ INCOMING_CH1_BUDDY_REQ, "Buddy Req", dissect_aim_tlv_value_bytes },
+	{ INCOMING_CH1_TYPING, "Non-direct connect typing notification", dissect_aim_tlv_value_bytes },
 	{ 0, NULL, NULL },
 };
 
 static int dissect_aim_tlv_value_rendezvous(proto_item *ti, guint16 valueid _U_, tvbuff_t *tvb, packet_info *pinfo);
+static int dissect_aim_tlv_value_extended_data(proto_item *ti, guint16 valueid _U_, tvbuff_t *tvb, packet_info *pinfo _U_);
 
 #define ICBM_CHANNEL_IM		0x0001
 #define ICBM_CHANNEL_RENDEZVOUS	0x0002
 
 static const value_string icbm_channel_types[] = {
-	{ ICBM_CHANNEL_IM,	   "IM" },
+	{ ICBM_CHANNEL_IM, "IM" },
 	{ ICBM_CHANNEL_RENDEZVOUS, "Rendezvous" },
 	{ 0, NULL },
 };
@@ -106,36 +110,36 @@ static const aim_tlv aim_messaging_incoming_ch2_tlvs[] = {
 #define RENDEZVOUS_TLV_ICHAT_INVITEES_DATA		0x277E
 
 static const aim_tlv aim_rendezvous_tlvs[] = {
-	{ RENDEZVOUS_TLV_CHANNEL,		"Rendezvous ICBM Channel", dissect_aim_tlv_value_uint16 },
-	{ RENDEZVOUS_TLV_IP_ADDR,		"Rendezvous IP", dissect_aim_tlv_value_ipv4 },
-	{ RENDEZVOUS_TLV_INT_IP,		"Internal IP", dissect_aim_tlv_value_ipv4 },
-	{ RENDEZVOUS_TLV_EXT_IP,		"External IP", dissect_aim_tlv_value_ipv4 },
-	{ RENDEZVOUS_TLV_EXT_PORT,		"External Port", dissect_aim_tlv_value_uint16 },
-	{ RENDEZVOUS_TLV_DOWNLOAD_URL,		"Service Support Download URL", dissect_aim_tlv_value_string },
+	{ RENDEZVOUS_TLV_CHANNEL, "Rendezvous ICBM Channel", dissect_aim_tlv_value_uint16 },
+	{ RENDEZVOUS_TLV_IP_ADDR, "Rendezvous IP", dissect_aim_tlv_value_ipv4 },
+	{ RENDEZVOUS_TLV_INT_IP, "Internal IP", dissect_aim_tlv_value_ipv4 },
+	{ RENDEZVOUS_TLV_EXT_IP, "External IP", dissect_aim_tlv_value_ipv4 },
+	{ RENDEZVOUS_TLV_EXT_PORT, "External Port", dissect_aim_tlv_value_uint16 },
+	{ RENDEZVOUS_TLV_DOWNLOAD_URL, "Service Support Download URL", dissect_aim_tlv_value_string },
 	{ RENDEZVOUS_TLV_VERIFIED_DOWNLOAD_URL, "Verified Service Support Download URL", dissect_aim_tlv_value_string },
-	{ RENDEZVOUS_TLV_SEQ_NUM,		"Sequence Number", dissect_aim_tlv_value_uint16 },
-	{ RENDEZVOUS_TLV_CANCEL_REASON,		"Cancel Reason", dissect_aim_tlv_value_uint16 },
-	{ RENDEZVOUS_TLV_INVITATION,		"Invitation Text", dissect_aim_tlv_value_string },
-	{ RENDEZVOUS_TLV_INVITE_MIME_CHARSET,	"Data MIME Type", dissect_aim_tlv_value_string },
-	{ RENDEZVOUS_TLV_INVITE_MIME_LANG,	"Data Language", dissect_aim_tlv_value_string },
-	{ RENDEZVOUS_TLV_REQ_HOST_CHECK,	"Request Host Check", NULL },
-	{ RENDEZVOUS_TLV_REQ_USE_ARS,		"Request Data via Rendezvous Server", NULL },
-	{ RENDEZVOUS_TLV_REQ_SECURE,		"Request SSL Connection", NULL },
-	{ RENDEZVOUS_TLV_MAX_PROTOCOL_VER,	"Maximum Protocol Version", dissect_aim_tlv_value_uint16 },
-	{ RENDEZVOUS_TLV_MIN_PROTOCOL_VER,	"Minimum Protocol Version", dissect_aim_tlv_value_uint16 },
-	{ RENDEZVOUS_TLV_COUNTER_REASON,	"Counter Proposal Reason", dissect_aim_tlv_value_uint16 },
-	{ RENDEZVOUS_TLV_INVITE_MIME_TYPE,	"Data MIME Type", dissect_aim_tlv_value_string },
-	{ RENDEZVOUS_TLV_IP_ADDR_XOR,		"XORed Rendezvous IP", dissect_aim_tlv_value_ipv4 },
-	{ RENDEZVOUS_TLV_PORT_XOR,		"XORed Port", dissect_aim_tlv_value_uint16 },
-	{ RENDEZVOUS_TLV_ADDR_LIST,		"Address/Port List", dissect_aim_tlv_value_string08_array },
-	{ RENDEZVOUS_TLV_SESSION_ID,		"Session ID", dissect_aim_tlv_value_string },
-	{ RENDEZVOUS_TLV_ROLLOVER_ID,		"Rollover ID", dissect_aim_tlv_value_string },
+	{ RENDEZVOUS_TLV_SEQ_NUM, "Sequence Number", dissect_aim_tlv_value_uint16 },
+	{ RENDEZVOUS_TLV_CANCEL_REASON, "Cancel Reason", dissect_aim_tlv_value_uint16 },
+	{ RENDEZVOUS_TLV_INVITATION, "Invitation Text", dissect_aim_tlv_value_string },
+	{ RENDEZVOUS_TLV_INVITE_MIME_CHARSET, "Data MIME Type", dissect_aim_tlv_value_string },
+	{ RENDEZVOUS_TLV_INVITE_MIME_LANG, "Data Language", dissect_aim_tlv_value_string },
+	{ RENDEZVOUS_TLV_REQ_HOST_CHECK, "Request Host Check", NULL },
+	{ RENDEZVOUS_TLV_REQ_USE_ARS, "Request Data via Rendezvous Server", NULL },
+	{ RENDEZVOUS_TLV_REQ_SECURE, "Request SSL Connection", NULL },
+	{ RENDEZVOUS_TLV_MAX_PROTOCOL_VER, "Maximum Protocol Version", dissect_aim_tlv_value_uint16 },
+	{ RENDEZVOUS_TLV_MIN_PROTOCOL_VER, "Minimum Protocol Version", dissect_aim_tlv_value_uint16 },
+	{ RENDEZVOUS_TLV_COUNTER_REASON, "Counter Proposal Reason", dissect_aim_tlv_value_uint16 },
+	{ RENDEZVOUS_TLV_INVITE_MIME_TYPE, "Data MIME Type", dissect_aim_tlv_value_string },
+	{ RENDEZVOUS_TLV_IP_ADDR_XOR, "XORed Rendezvous IP", dissect_aim_tlv_value_ipv4 },
+	{ RENDEZVOUS_TLV_PORT_XOR, "XORed Port", dissect_aim_tlv_value_uint16 },
+	{ RENDEZVOUS_TLV_ADDR_LIST, "Address/Port List", dissect_aim_tlv_value_string08_array },
+	{ RENDEZVOUS_TLV_SESSION_ID, "Session ID", dissect_aim_tlv_value_string },
+	{ RENDEZVOUS_TLV_ROLLOVER_ID, "Rollover ID", dissect_aim_tlv_value_string },
 /*
 	The dissect_aim_tlv_value_extended_data function does not work for iChat generated rendezvous data
-	{ RENDEZVOUS_TLV_EXTENDED_DATA,		"Extended Data", dissect_aim_tlv_value_extended_data },
+	{ RENDEZVOUS_TLV_EXTENDED_DATA, "Extended Data", dissect_aim_tlv_value_extended_data },
 */
-	{ RENDEZVOUS_TLV_EXTENDED_DATA,		"Extended Data", NULL },
-	{ RENDEZVOUS_TLV_ICHAT_INVITEES_DATA,	"iChat Invitees Data", NULL },
+	{ RENDEZVOUS_TLV_EXTENDED_DATA, "Extended Data", NULL },
+	{ RENDEZVOUS_TLV_ICHAT_INVITEES_DATA, "iChat Invitees Data", NULL },
 	{ 0, NULL, NULL },
 };
 
@@ -144,9 +148,9 @@ static const aim_tlv aim_rendezvous_tlvs[] = {
 #define MINITYPING_BEGUN_SIGN				0x0002
 
 static const value_string minityping_type[] _U_ = {
-	{MINITYPING_FINISHED_SIGN,   "Typing finished sign" },
+	{MINITYPING_FINISHED_SIGN, "Typing finished sign" },
 	{MINITYPING_TEXT_TYPED_SIGN, "Text typed sign" },
-	{MINITYPING_BEGUN_SIGN,	     "Typing begun sign" },
+	{MINITYPING_BEGUN_SIGN, "Typing begun sign" },
 	{0, NULL }
 };
 
@@ -156,8 +160,8 @@ static const value_string minityping_type[] _U_ = {
 
 static const value_string rendezvous_msg_types[] = {
 	{ RENDEZVOUS_MSG_REQUEST, "Request" },
-	{ RENDEZVOUS_MSG_CANCEL,  "Cancel" },
-	{ RENDEZVOUS_MSG_ACCEPT,  "Accept" },
+	{ RENDEZVOUS_MSG_CANCEL, "Cancel" },
+	{ RENDEZVOUS_MSG_ACCEPT, "Accept" },
 	{ 0, NULL },
 };
 
@@ -167,8 +171,8 @@ static const value_string rendezvous_msg_types[] = {
 
 static const value_string client_err_reason_types[] = {
 	{ CLIENT_ERR__REASON_UNSUPPORTED_CHANNEL, "Unsupported Channel" },
-	{ CLIENT_ERR__REASON_BUSTED_PAYLOAD,	  "Busted Payload" },
-	{ CLIENT_ERR__REASON_CHANNEL_SPECIFIC,	  "Channel Specific Error" },
+	{ CLIENT_ERR__REASON_BUSTED_PAYLOAD, "Busted Payload" },
+	{ CLIENT_ERR__REASON_CHANNEL_SPECIFIC, "Channel Specific Error" },
 	{ 0, NULL },
 };
 
@@ -186,18 +190,18 @@ static const value_string client_err_reason_types[] = {
 #define RENDEZVOUS_NAK_SERVICE_SPECIFIC_REASON 15
 
 static const value_string rendezvous_nak_reason_types[] = {
-	{ RENDEZVOUS_NAK_PROPOSAL_UNSUPPORTED,	   "Proposal UUID not supported" },
-	{ RENDEZVOUS_NAK_PROPOSAL_DENIED,	   "Not authorized, or user declined" },
-	{ RENDEZVOUS_NAK_PROPOSAL_IGNORED,	   "Proposal ignored" },
-	{ RENDEZVOUS_NAK_BUSTED_PARAMETERS,	   "Proposal malformed" },
-	{ RENDEZVOUS_NAK_PROPOSAL_TIMED_OUT,	   "Attempt to act on proposal (e.g. connect) timed out" },
+	{ RENDEZVOUS_NAK_PROPOSAL_UNSUPPORTED, "Proposal UUID not supported" },
+	{ RENDEZVOUS_NAK_PROPOSAL_DENIED, "Not authorized, or user declined" },
+	{ RENDEZVOUS_NAK_PROPOSAL_IGNORED, "Proposal ignored" },
+	{ RENDEZVOUS_NAK_BUSTED_PARAMETERS, "Proposal malformed" },
+	{ RENDEZVOUS_NAK_PROPOSAL_TIMED_OUT, "Attempt to act on proposal (e.g. connect) timed out" },
 	{ RENDEZVOUS_NAK_ONLINE_BUT_NOT_AVAILABLE, "Recipient away or busy" },
-	{ RENDEZVOUS_NAK_INSUFFICIENT_RESOURCES,   "Recipient had internal error" },
-	{ RENDEZVOUS_NAK_RATE_LIMITED,		   "Recipient was ratelimited" },
-	{ RENDEZVOUS_NAK_NO_DATA,		   "Recipient had nothing to send" },
-	{ RENDEZVOUS_NAK_VERSION_MISMATCH,	   "Incompatible versions" },
-	{ RENDEZVOUS_NAK_SECURITY_MISMATCH,	   "Incompatible security settings" },
-	{ RENDEZVOUS_NAK_SERVICE_SPECIFIC_REASON,  "Service-specific reject defined by client" },
+	{ RENDEZVOUS_NAK_INSUFFICIENT_RESOURCES, "Recipient had internal error" },
+	{ RENDEZVOUS_NAK_RATE_LIMITED, "Recipient was ratelimited" },
+	{ RENDEZVOUS_NAK_NO_DATA, "Recipient had nothing to send" },
+	{ RENDEZVOUS_NAK_VERSION_MISMATCH, "Incompatible versions" },
+	{ RENDEZVOUS_NAK_SECURITY_MISMATCH, "Incompatible security settings" },
+	{ RENDEZVOUS_NAK_SERVICE_SPECIFIC_REASON, "Service-specific reject defined by client" },
 	{ 0, NULL },
 };
 
@@ -221,24 +225,24 @@ static const value_string rendezvous_nak_reason_types[] = {
 #define EXTENDED_DATA_MTYPE_AUTOFFC 0xEC
 
 static const value_string extended_data_message_types[] = {
-	{EXTENDED_DATA_MTYPE_PLAIN,    "Plain text (simple) message"},
-	{EXTENDED_DATA_MTYPE_CHAT,     "Chat request message"},
-	{EXTENDED_DATA_MTYPE_FILEREQ,  "File request / file ok message"},
-	{EXTENDED_DATA_MTYPE_URL,      "URL message (0xFE formatted)"},
-	{EXTENDED_DATA_MTYPE_AUTHREQ,  "Authorization request message (0xFE formatted)"},
+	{EXTENDED_DATA_MTYPE_PLAIN, "Plain text (simple) message"},
+	{EXTENDED_DATA_MTYPE_CHAT, "Chat request message"},
+	{EXTENDED_DATA_MTYPE_FILEREQ, "File request / file ok message"},
+	{EXTENDED_DATA_MTYPE_URL, "URL message (0xFE formatted)"},
+	{EXTENDED_DATA_MTYPE_AUTHREQ, "Authorization request message (0xFE formatted)"},
 	{EXTENDED_DATA_MTYPE_AUTHDENY, "Authorization denied message (0xFE formatted)"},
-	{EXTENDED_DATA_MTYPE_AUTHOK,   "Authorization given message (empty)"},
-	{EXTENDED_DATA_MTYPE_SERVER,   "Message from OSCAR server (0xFE formatted)"},
-	{EXTENDED_DATA_MTYPE_ADDED,    "\"You-were-added\" message (0xFE formatted)"},
-	{EXTENDED_DATA_MTYPE_WWP,      "Web pager message (0xFE formatted)"},
+	{EXTENDED_DATA_MTYPE_AUTHOK, "Authorization given message (empty)"},
+	{EXTENDED_DATA_MTYPE_SERVER, "Message from OSCAR server (0xFE formatted)"},
+	{EXTENDED_DATA_MTYPE_ADDED, "\"You-were-added\" message (0xFE formatted)"},
+	{EXTENDED_DATA_MTYPE_WWP, "Web pager message (0xFE formatted)"},
 	{EXTENDED_DATA_MTYPE_EEXPRESS, "Email express message (0xFE formatted)"},
 	{EXTENDED_DATA_MTYPE_CONTACTS, "Contact list message"},
-	{EXTENDED_DATA_MTYPE_PLUGIN,   "Plugin message described by text string"},
+	{EXTENDED_DATA_MTYPE_PLUGIN, "Plugin message described by text string"},
 	{EXTENDED_DATA_MTYPE_AUTOAWAY, "Auto away message"},
 	{EXTENDED_DATA_MTYPE_AUTOBUSY, "Auto occupied message"},
-	{EXTENDED_DATA_MTYPE_AUTONA,   "Auto not available message"},
-	{EXTENDED_DATA_MTYPE_AUTODND,  "Auto do not disturb message"},
-	{EXTENDED_DATA_MTYPE_AUTOFFC,  "Auto free for chat message"},
+	{EXTENDED_DATA_MTYPE_AUTONA, "Auto not available message"},
+	{EXTENDED_DATA_MTYPE_AUTODND, "Auto do not disturb message"},
+	{EXTENDED_DATA_MTYPE_AUTOFFC, "Auto free for chat message"},
 	{ 0, NULL },
 };
 
@@ -250,7 +254,7 @@ static const value_string extended_data_message_types[] = {
 #define EVIL_ORIGIN_NONANONYMOUS 	2
 
 static const value_string evil_origins[] = {
-	{EVIL_ORIGIN_ANONYMOUS,	   "Anonymous"},
+	{EVIL_ORIGIN_ANONYMOUS, "Anonymous"},
 	{EVIL_ORIGIN_NONANONYMOUS, "Non-Anonymous"},
 	{0, NULL },
 };
@@ -479,19 +483,22 @@ dissect_aim_plugin(proto_tree *entry, tvbuff_t *tvb, int offset, e_uuid_t* out_p
 static int
 dissect_aim_rendezvous_extended_message(tvbuff_t *tvb, proto_tree *msg_tree)
 {
+	guint8 /*message_type,*/message_flags;
 	int offset = 0;
+	proto_item *ti_flags;
+	proto_tree *flags_entry;
 	guint16 text_length;
 	guint8* text;
-	static const int * flags[] = {
-		&hf_aim_rendezvous_extended_data_message_flags_normal,
-		&hf_aim_rendezvous_extended_data_message_flags_auto,
-		&hf_aim_rendezvous_extended_data_message_flags_multi,
-		NULL
-	};
 
+	/* TODO: parse and present message_type */
+	/* message_type = tvb_get_guint8(tvb, offset); */
 	proto_tree_add_item(msg_tree, hf_aim_rendezvous_extended_data_message_type, tvb, offset, 1, ENC_BIG_ENDIAN); offset+=1;
-	proto_tree_add_bitmask(msg_tree, tvb, offset, hf_aim_rendezvous_extended_data_message_flags,
-			       ett_aim_extended_data_message_flags, flags, ENC_NA);
+	message_flags = tvb_get_guint8(tvb, offset);
+	ti_flags = proto_tree_add_uint(msg_tree, hf_aim_rendezvous_extended_data_message_flags, tvb, offset, 1, message_flags);
+	flags_entry = proto_item_add_subtree(ti_flags, ett_aim_extended_data_message_flags);
+	proto_tree_add_boolean(flags_entry, hf_aim_rendezvous_extended_data_message_flags_normal, tvb, offset, 1, message_flags);
+	proto_tree_add_boolean(flags_entry, hf_aim_rendezvous_extended_data_message_flags_auto, tvb, offset, 1, message_flags);
+	proto_tree_add_boolean(flags_entry, hf_aim_rendezvous_extended_data_message_flags_multi, tvb, offset, 1, message_flags);
 	offset+=1;
 	proto_tree_add_item(msg_tree, hf_aim_rendezvous_extended_data_message_status_code, tvb, offset, 2, ENC_BIG_ENDIAN); offset+=2;
 	proto_tree_add_item(msg_tree, hf_aim_rendezvous_extended_data_message_priority_code, tvb, offset, 2, ENC_BIG_ENDIAN); offset+=2;
@@ -522,13 +529,15 @@ is_uuid_null(e_uuid_t uuid)
 }
 
 static int
-dissect_aim_tlv_value_extended_data(proto_tree *entry, guint16 valueid _U_, tvbuff_t *tvb, packet_info *pinfo _U_)
+dissect_aim_tlv_value_extended_data(proto_item *ti, guint16 valueid _U_, tvbuff_t *tvb, packet_info *pinfo _U_)
 {
 	int offset = 0;
 	guint16 length/*, protocol_version*/;
 	int start_offset;
+	proto_tree *entry;
 	e_uuid_t plugin_uuid;
 
+	entry = proto_item_add_subtree(ti, ett_aim_extended_data);
 	length = tvb_get_letohs(tvb, offset);
 	proto_tree_add_text(entry, tvb, offset, 2, "Length: %d", length); offset+=2;
 	start_offset = offset;
@@ -607,8 +616,8 @@ dissect_aim_msg_client_err(tvbuff_t *tvb, packet_info *pinfo, proto_tree *msg_tr
 		default:
 		    {
 			tvbuff_t *subtvb = tvb_new_subset_remaining(tvb, offset);
-			proto_tree *extended_tree = proto_tree_add_subtree(msg_tree, tvb, offset, -1, ett_aim_extended_data, NULL, "Extended Data");
-			dissect_aim_tlv_value_extended_data(extended_tree, 0, subtvb, pinfo);
+			proto_item *ti_extended_data = proto_tree_add_text(msg_tree, tvb, offset, -1, "Extended Data");
+			dissect_aim_tlv_value_extended_data(ti_extended_data, 0, subtvb, pinfo);
 			break;
 		    }
 		}
@@ -618,18 +627,18 @@ dissect_aim_msg_client_err(tvbuff_t *tvb, packet_info *pinfo, proto_tree *msg_tr
 }
 
 static const aim_subtype aim_fnac_family_messaging[] = {
-	{ 0x0001, "Error",			     dissect_aim_snac_error },
-	{ 0x0002, "Set ICBM Parameter",		     dissect_aim_msg_params },
-	{ 0x0003, "Reset ICBM Parameter",	     NULL },
-	{ 0x0004, "Request Parameter Info",	     NULL},
-	{ 0x0005, "Parameter Info",		     dissect_aim_msg_params },
-	{ 0x0006, "Outgoing",			     dissect_aim_msg_outgoing },
-	{ 0x0007, "Incoming",			     dissect_aim_msg_incoming },
-	{ 0x0008, "Evil Request",		     dissect_aim_msg_evil_req },
-	{ 0x0009, "Evil Response",		     dissect_aim_msg_evil_repl  },
-	{ 0x000a, "Missed Call", 		     NULL },
-	{ 0x000b, "Client Error",		     dissect_aim_msg_client_err },
-	{ 0x000c, "Acknowledge",		     dissect_aim_msg_ack },
+	{ 0x0001, "Error", dissect_aim_snac_error },
+	{ 0x0002, "Set ICBM Parameter", dissect_aim_msg_params },
+	{ 0x0003, "Reset ICBM Parameter", NULL },
+	{ 0x0004, "Request Parameter Info", NULL},
+	{ 0x0005, "Parameter Info", dissect_aim_msg_params },
+	{ 0x0006, "Outgoing", dissect_aim_msg_outgoing },
+	{ 0x0007, "Incoming", dissect_aim_msg_incoming },
+	{ 0x0008, "Evil Request", dissect_aim_msg_evil_req },
+	{ 0x0009, "Evil Response", dissect_aim_msg_evil_repl  },
+	{ 0x000a, "Missed Call", NULL },
+	{ 0x000b, "Client Error", dissect_aim_msg_client_err },
+	{ 0x000c, "Acknowledge", dissect_aim_msg_ack },
 	{ 0x0014, "Mini Typing Notifications (MTN)", dissect_aim_msg_minityping },
 	{ 0, NULL, NULL }
 };
@@ -644,150 +653,92 @@ proto_register_aim_messaging(void)
 	/* Setup list of header fields */
 	static hf_register_info hf[] = {
 		{ &hf_aim_icbm_channel,
-		  { "Channel", "aim_messaging.icbm.channel",
-		    FT_UINT16, BASE_HEX, VALS(icbm_channel_types), 0x0,
-		    NULL, HFILL }
+			{ "Channel", "aim_messaging.icbm.channel", FT_UINT16, BASE_HEX, VALS(icbm_channel_types), 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_msg_flags,
-		  { "Message Flags", "aim_messaging.icbm.flags",
-		    FT_UINT32, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Message Flags", "aim_messaging.icbm.flags", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_max_snac_size,
-		  { "Max SNAC Size", "aim_messaging.icbm.max_snac",
-		    FT_UINT16, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Max SNAC Size", "aim_messaging.icbm.max_snac", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_max_sender_warnlevel,
-		  { "Max sender warn level", "aim_messaging.icbm.max_sender_warn-level",
-		    FT_UINT16, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Max sender warn level", "aim_messaging.icbm.max_sender_warn-level", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_max_receiver_warnlevel,
-		  { "max receiver warn level", "aim_messaging.icbm.max_receiver_warnlevel",
-		    FT_UINT16, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
+			{ "max receiver warn level", "aim_messaging.icbm.max_receiver_warnlevel", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_min_msg_interval,
-		  { "Minimum message interval (milliseconds)", "aim_messaging.icbm.min_msg_interval",
-		    FT_UINT32, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Minimum message interval (milliseconds)", "aim_messaging.icbm.min_msg_interval", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_cookie,
-		  { "ICBM Cookie", "aim_messaging.icbmcookie",
-		    FT_BYTES, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
+			{ "ICBM Cookie", "aim_messaging.icbmcookie", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }
 		},
 		{ &hf_aim_message_channel_id,
-		  { "Message Channel ID", "aim_messaging.channelid",
-		    FT_UINT16, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Message Channel ID", "aim_messaging.channelid", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }
 		},
 		{ &hf_aim_icbm_evil,
-		  { "Send Evil Bit As", "aim_messaging.evilreq.origin",
-		    FT_UINT16, BASE_DEC, VALS(evil_origins), 0x0,
-		    NULL, HFILL }
+			{ "Send Evil Bit As", "aim_messaging.evilreq.origin", FT_UINT16, BASE_DEC, VALS(evil_origins), 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_evil_warn_level,
-		  { "Old warning level", "aim_messaging.evil.warn_level",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Old warning level", "aim_messaging.evil.warn_level", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_evil_new_warn_level,
-		  { "New warning level", "aim_messaging.evil.new_warn_level",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
+			{ "New warning level", "aim_messaging.evil.new_warn_level", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_notification_cookie,
-		  { "Notification Cookie", "aim_messaging.notification.cookie",
-		    FT_BYTES, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Notification Cookie", "aim_messaging.notification.cookie", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_notification_channel,
-		  { "Notification Channel", "aim_messaging.notification.channel",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Notification Channel", "aim_messaging.notification.channel", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_notification_type,
-		  { "Notification Type", "aim_messaging.notification.type",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Notification Type", "aim_messaging.notification.type", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_rendezvous_nak,
-		  { "Rendezvous NAK reason", "aim_messaging.rendezvous_nak",
-		    FT_UINT16, BASE_HEX, VALS(rendezvous_nak_reason_types), 0x0,
-		    NULL, HFILL }
+			{ "Rendezvous NAK reason", "aim_messaging.rendezvous_nak", FT_UINT16, BASE_HEX, VALS(rendezvous_nak_reason_types), 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_rendezvous_nak_length,
-		  { "Rendezvous NAK reason length", "aim_messaging.rendezvous_nak_length",
-		    FT_UINT16, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Rendezvous NAK reason length", "aim_messaging.rendezvous_nak_length", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_rendezvous_msg_type,
-		  { "Message Type", "aim_messaging.rendezvous.msg_type",
-		    FT_UINT16, BASE_HEX, VALS(rendezvous_msg_types), 0x0,
-		    NULL, HFILL }
+			{ "Message Type", "aim_messaging.rendezvous.msg_type", FT_UINT16, BASE_HEX, VALS(rendezvous_msg_types), 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_client_err_reason,
-		  { "Reason", "aim_messaging.clienterr.reason",
-		    FT_UINT16, BASE_DEC, VALS(client_err_reason_types), 0x0,
-		    NULL, HFILL }
+			{ "Reason", "aim_messaging.clienterr.reason", FT_UINT16, BASE_DEC, VALS(client_err_reason_types), 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_client_err_protocol_version,
-		  { "Version", "aim_messaging.clienterr.protocol_version",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Version", "aim_messaging.clienterr.protocol_version", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_icbm_client_err_client_caps_flags,
-		  { "Client Capabilities Flags", "aim_messaging.clienterr.client_caps_flags",
-		    FT_UINT32, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Client Capabilities Flags", "aim_messaging.clienterr.client_caps_flags", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_rendezvous_extended_data_message_type,
-		  { "Message Type", "aim_messaging.icbm.extended_data.message.type",
-		    FT_UINT8, BASE_HEX, VALS(extended_data_message_types), 0x0,
-		    NULL, HFILL }
+			{ "Message Type", "aim_messaging.icbm.extended_data.message.type", FT_UINT8, BASE_HEX, VALS(extended_data_message_types), 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_rendezvous_extended_data_message_flags,
-		  { "Message Flags", "aim_messaging.icbm.extended_data.message.flags",
-		    FT_UINT8, BASE_HEX, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Message Flags", "aim_messaging.icbm.extended_data.message.flags", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_rendezvous_extended_data_message_flags_normal,
-		  { "Normal Message", "aim_messaging.icbm.extended_data.message.flags.normal",
-		    FT_BOOLEAN, 16, TFS(&tfs_set_notset), EXTENDED_DATA_MFLAG_NORMAL,
-		    NULL, HFILL }
+			{ "Normal Message", "aim_messaging.icbm.extended_data.message.flags.normal", FT_BOOLEAN, 16, TFS(&tfs_set_notset), EXTENDED_DATA_MFLAG_NORMAL, NULL, HFILL },
 		},
 		{ &hf_aim_rendezvous_extended_data_message_flags_auto,
-		  { "Auto Message", "aim_messaging.icbm.extended_data.message.flags.auto",
-		    FT_BOOLEAN, 16, TFS(&tfs_set_notset), EXTENDED_DATA_MFLAG_AUTO,
-		    NULL, HFILL }
+			{ "Auto Message", "aim_messaging.icbm.extended_data.message.flags.auto", FT_BOOLEAN, 16, TFS(&tfs_set_notset), EXTENDED_DATA_MFLAG_AUTO, NULL, HFILL },
 		},
 		{ &hf_aim_rendezvous_extended_data_message_flags_multi,
-		  { "Multiple Recipients Message", "aim_messaging.icbm.rendezvous.extended_data.message.flags.multi",
-		    FT_BOOLEAN, 16, TFS(&tfs_set_notset), EXTENDED_DATA_MFLAG_MULTI,
-		    NULL, HFILL }
+			{ "Multiple Recipients Message", "aim_messaging.icbm.rendezvous.extended_data.message.flags.multi", FT_BOOLEAN, 16, TFS(&tfs_set_notset), EXTENDED_DATA_MFLAG_MULTI, NULL, HFILL },
 		},
 		{ &hf_aim_rendezvous_extended_data_message_status_code,
-		  { "Status Code", "aim_messaging.icbm.extended_data.message.status_code",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Status Code", "aim_messaging.icbm.extended_data.message.status_code", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_rendezvous_extended_data_message_priority_code,
-		  { "Priority Code", "aim_messaging.icbm.extended_data.message.priority_code",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Priority Code", "aim_messaging.icbm.extended_data.message.priority_code", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_aim_rendezvous_extended_data_message_text_length,
-		  { "Text Length", "aim_messaging.icbm.extended_data.message.text_length",
-		    FT_UINT16, BASE_DEC, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Text Length", "aim_messaging.icbm.extended_data.message.text_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 #if 0
 		{ &hf_aim_rendezvous_extended_data_message_text,
-		  { "Text", "aim_messaging.icbm.extended_data.message.text",
-		    FT_STRING, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL }
+			{ "Text", "aim_messaging.icbm.extended_data.message.text", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL },
 		}
 #endif
 	};
@@ -813,16 +764,3 @@ proto_reg_handoff_aim_messaging(void)
 {
 	aim_init_family(proto_aim_messaging, ett_aim_messaging, FAMILY_MESSAGING, aim_fnac_family_messaging);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

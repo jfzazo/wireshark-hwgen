@@ -6,7 +6,7 @@
 /* Input file: packet-spnego-template.c */
 
 #line 1 "../../asn1/spnego/packet-spnego-template.c"
-/* packet-spnego-template.c
+/* packet-spnego.c
  * Routines for the simple and protected GSS-API negotiation mechanism
  * as described in RFC 2478.
  * Copyright 2002, Tim Potter <tpot@samba.org>
@@ -39,15 +39,23 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
-#include <epan/expert.h>
-#include <epan/asn1.h>
-#include <epan/conversation.h>
+#include <glib.h>
+
 #include <wsutil/rc4.h>
+
+#include <epan/packet.h>
+#include <epan/asn1.h>
 #include "packet-dcerpc.h"
 #include "packet-gssapi.h"
 #include "packet-kerberos.h"
+#include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
+#include <epan/asn1.h>
+
+#include <string.h>
+
 #include "packet-ber.h"
+
 
 #define PNAME  "Simple Protected Negotiation"
 #define PSNAME "SPNEGO"
@@ -108,7 +116,7 @@ static int hf_spnego_ContextFlags_confFlag = -1;
 static int hf_spnego_ContextFlags_integFlag = -1;
 
 /*--- End of included file: packet-spnego-hf.c ---*/
-#line 75 "../../asn1/spnego/packet-spnego-template.c"
+#line 83 "../../asn1/spnego/packet-spnego-template.c"
 
 /* Global variables */
 static const char *MechType_oid;
@@ -135,10 +143,7 @@ static gint ett_spnego_NegTokenTarg = -1;
 static gint ett_spnego_InitialContextToken_U = -1;
 
 /*--- End of included file: packet-spnego-ett.c ---*/
-#line 89 "../../asn1/spnego/packet-spnego-template.c"
-
-static expert_field ei_spnego_decrypted_keytype = EI_INIT;
-static expert_field ei_spnego_unknown_header = EI_INIT;
+#line 97 "../../asn1/spnego/packet-spnego-template.c"
 
 /*
  * Unfortunately, we have to have forward declarations of thess,
@@ -554,7 +559,7 @@ dissect_spnego_InitialContextToken(gboolean implicit_tag _U_, tvbuff_t *tvb _U_,
 
 
 /*--- End of included file: packet-spnego-fn.c ---*/
-#line 106 "../../asn1/spnego/packet-spnego-template.c"
+#line 111 "../../asn1/spnego/packet-spnego-template.c"
 /*
  * This is the SPNEGO KRB5 dissector. It is not true KRB5, but some ASN.1
  * wrapped blob with an OID, USHORT token ID, and a Ticket, that is also
@@ -709,7 +714,7 @@ dissect_spnego_krb5(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		return;
 
 	    default:
-		proto_tree_add_expert_format(subtree, pinfo, &ei_spnego_unknown_header, tvb, offset, 0,
+		proto_tree_add_text(subtree, tvb, offset, 0,
 			"Unknown header (class=%d, pc=%d, tag=%d)",
 			ber_class, pc, tag);
 		goto done;
@@ -911,7 +916,7 @@ decrypt_arcfour(packet_info *pinfo,
     int conf_flag;
     int padlen = 0;
 
-    datalen = tvb_captured_length(pinfo->gssapi_encrypted_tvb);
+    datalen = tvb_length(pinfo->gssapi_encrypted_tvb);
 
     if(tvb_get_ntohs(pinfo->gssapi_wrap_tvb, 4)==0x1000){
 	conf_flag=1;
@@ -987,7 +992,7 @@ decrypt_arcfour(packet_info *pinfo,
 	datalen -= padlen;
     }
 
-    /* don't know what the checksum looks like for dce style gssapi */
+    /* dont know what the checksum looks like for dce style gssapi */
     if(pinfo->decrypt_gssapi_tvb==DECRYPT_GSSAPI_NORMAL){
 	ret = arcfour_mic_cksum(key_value, key_size,
 			    KRB5_KU_USAGE_SEAL,
@@ -1014,7 +1019,7 @@ decrypt_arcfour(packet_info *pinfo,
 #if defined(HAVE_HEIMDAL_KERBEROS) || defined(HAVE_MIT_KERBEROS)
 
 static void
-decrypt_gssapi_krb_arcfour_wrap(proto_tree *tree _U_, packet_info *pinfo, tvbuff_t *tvb, int keytype)
+decrypt_gssapi_krb_arcfour_wrap(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, int keytype)
 {
 	int ret;
 	enc_key_t *ek;
@@ -1024,10 +1029,10 @@ decrypt_gssapi_krb_arcfour_wrap(proto_tree *tree _U_, packet_info *pinfo, tvbuff
 	guint8 *cryptocopy=NULL; /* workaround for pre-0.6.1 heimdal bug */
 	guint8 *output_message_buffer;
 
-	length=tvb_captured_length(pinfo->gssapi_encrypted_tvb);
+	length=tvb_length(pinfo->gssapi_encrypted_tvb);
 	original_data=tvb_get_ptr(pinfo->gssapi_encrypted_tvb, 0, length);
 
-	/* don't do anything if we are not attempting to decrypt data */
+	/* dont do anything if we are not attempting to decrypt data */
 /*
 	if(!krb_decrypt){
 		return;
@@ -1060,10 +1065,7 @@ decrypt_gssapi_krb_arcfour_wrap(proto_tree *tree _U_, packet_info *pinfo, tvbuff
 				ek->keytype
 					    );
 		if (ret >= 0) {
-			expert_add_info_format(pinfo, NULL, &ei_spnego_decrypted_keytype,
-								   "Decrypted keytype %d in frame %u using %s",
-								   ek->keytype, pinfo->fd->num, ek->key_origin);
-
+			proto_tree_add_text(tree, NULL, 0, 0, "[Decrypted using: %s]", ek->key_origin);
 			pinfo->gssapi_decrypted_tvb=tvb_new_child_real_data(tvb,
 				output_message_buffer,
 				ret, ret);
@@ -1137,19 +1139,19 @@ decrypt_gssapi_krb_cfx_wrap(proto_tree *tree _U_,
 	int datalen;
 	tvbuff_t *next_tvb;
 
-	/* don't do anything if we are not attempting to decrypt data */
+	/* dont do anything if we are not attempting to decrypt data */
 	if(!krb_decrypt){
 		return;
 	}
 
-	datalen = tvb_captured_length(checksum_tvb) + tvb_captured_length(encrypted_tvb);
+	datalen = tvb_length(checksum_tvb) + tvb_length(encrypted_tvb);
 
 	rotated = (guint8 *)wmem_alloc(pinfo->pool, datalen);
 
 	tvb_memcpy(checksum_tvb, rotated,
-		   0, tvb_captured_length(checksum_tvb));
-	tvb_memcpy(encrypted_tvb, rotated + tvb_captured_length(checksum_tvb),
-		   0, tvb_captured_length(encrypted_tvb));
+		   0, tvb_length(checksum_tvb));
+	tvb_memcpy(encrypted_tvb, rotated + tvb_length(checksum_tvb),
+		   0, tvb_length(encrypted_tvb));
 
 	if (is_dce) {
 		rrc += ec;
@@ -1167,13 +1169,13 @@ decrypt_gssapi_krb_cfx_wrap(proto_tree *tree _U_,
 	if (output) {
 		guint8 *outdata;
 
-		outdata = (guint8 *)g_memdup(output, tvb_captured_length(encrypted_tvb));
+		outdata = (guint8 *)g_memdup(output, tvb_length(encrypted_tvb));
 		g_free(output);
 
 		pinfo->gssapi_decrypted_tvb=tvb_new_child_real_data(encrypted_tvb,
 			outdata,
-			tvb_captured_length(encrypted_tvb),
-			tvb_captured_length(encrypted_tvb));
+			tvb_length(encrypted_tvb),
+			tvb_length(encrypted_tvb));
 		add_new_data_source(pinfo, pinfo->gssapi_decrypted_tvb, "Decrypted GSS-Krb5");
 		tvb_set_free_cb(pinfo->gssapi_decrypted_tvb, g_free);
 		return;
@@ -1272,14 +1274,14 @@ dissect_spnego_krb5_wrap_base(tvbuff_t *tvb, int offset, packet_info *pinfo
 		if(!pinfo->gssapi_encrypted_tvb){
 			int len;
 			len=tvb_reported_length_remaining(tvb,offset);
-			if(len>tvb_captured_length_remaining(tvb, offset)){
+			if(len>tvb_length_remaining(tvb, offset)){
 				/* no point in trying to decrypt,
-				   we don't have the full pdu.
+				   we dont have the full pdu.
 				*/
 				return offset;
 			}
-			pinfo->gssapi_encrypted_tvb = tvb_new_subset_length(
-					tvb, offset, len);
+			pinfo->gssapi_encrypted_tvb = tvb_new_subset(
+					tvb, offset, len, len);
 		}
 
 		/* if this is KRB5 wrapped rc4-hmac */
@@ -1290,8 +1292,9 @@ dissect_spnego_krb5_wrap_base(tvbuff_t *tvb, int offset, packet_info *pinfo
 			   as well ?
 			*/
 			if(!pinfo->gssapi_wrap_tvb){
-				pinfo->gssapi_wrap_tvb = tvb_new_subset_length(
+				pinfo->gssapi_wrap_tvb = tvb_new_subset(
 					tvb, start_offset-2,
+					GSS_ARCFOUR_WRAP_TOKEN_SIZE,
 					GSS_ARCFOUR_WRAP_TOKEN_SIZE);
 			}
 #if defined(HAVE_HEIMDAL_KERBEROS) || defined(HAVE_MIT_KERBEROS)
@@ -1366,7 +1369,7 @@ dissect_spnego_krb5_getmic_base(tvbuff_t *tvb, int offset, packet_info *pinfo _U
 	 * so we need to test here if there are more bytes in our tvb or not.
 	 *  -- ronnie
 	 */
-	if (tvb_reported_length_remaining(tvb, offset)) {
+	if (tvb_length_remaining(tvb, offset)) {
 	  if (sgn_alg == KRB_SGN_ALG_HMAC) {
 	    proto_tree_add_item(tree, hf_spnego_krb5_confounder, tvb, offset, 8,
 			      ENC_NA);
@@ -1388,16 +1391,28 @@ dissect_spnego_krb5_getmic_base(tvbuff_t *tvb, int offset, packet_info *pinfo _U
 static int
 dissect_spnego_krb5_cfx_flags(tvbuff_t *tvb, int offset,
 			      proto_tree *spnego_krb5_tree,
-			      guint8 cfx_flags _U_)
+			      guint8 cfx_flags)
 {
-	static const int * flags[] = {
-		&hf_spnego_krb5_cfx_flags_04,
-		&hf_spnego_krb5_cfx_flags_02,
-		&hf_spnego_krb5_cfx_flags_01,
-		NULL
-	};
+	proto_tree *cfx_flags_tree = NULL;
+	proto_item *tf = NULL;
 
-	proto_tree_add_bitmask(spnego_krb5_tree, tvb, offset, hf_spnego_krb5_cfx_flags, ett_spnego_krb5_cfx_flags, flags, ENC_NA);
+	if (spnego_krb5_tree) {
+		tf = proto_tree_add_uint(spnego_krb5_tree,
+					 hf_spnego_krb5_cfx_flags,
+					 tvb, offset, 1, cfx_flags);
+		cfx_flags_tree = proto_item_add_subtree(tf, ett_spnego_krb5_cfx_flags);
+	}
+
+	proto_tree_add_boolean(cfx_flags_tree,
+			       hf_spnego_krb5_cfx_flags_04,
+			       tvb, offset, 1, cfx_flags);
+	proto_tree_add_boolean(cfx_flags_tree,
+			       hf_spnego_krb5_cfx_flags_02,
+			       tvb, offset, 1, cfx_flags);
+	proto_tree_add_boolean(cfx_flags_tree,
+			       hf_spnego_krb5_cfx_flags_01,
+			       tvb, offset, 1, cfx_flags);
+
 	return (offset + 1);
 }
 
@@ -1482,8 +1497,8 @@ dissect_spnego_krb5_cfx_wrap_base(tvbuff_t *tvb, int offset, packet_info *pinfo
 		inner_token_len = tvb_reported_length_remaining(tvb, offset) -
 					ec;
 
-		pinfo->gssapi_wrap_tvb = tvb_new_subset_length(tvb, offset,
-						inner_token_len);
+		pinfo->gssapi_wrap_tvb = tvb_new_subset(tvb, offset,
+						inner_token_len, inner_token_len);
 
 		offset += inner_token_len;
 
@@ -1505,9 +1520,9 @@ dissect_spnego_krb5_cfx_wrap_base(tvbuff_t *tvb, int offset, packet_info *pinfo
 		if(!pinfo->gssapi_encrypted_tvb){
 			int len;
 			len=tvb_reported_length_remaining(tvb,offset);
-			if(len>tvb_captured_length_remaining(tvb, offset)){
+			if(len>tvb_length_remaining(tvb, offset)){
 				/* no point in trying to decrypt,
-				   we don't have the full pdu.
+				   we dont have the full pdu.
 				*/
 				return offset;
 			}
@@ -1520,8 +1535,9 @@ dissect_spnego_krb5_cfx_wrap_base(tvbuff_t *tvb, int offset, packet_info *pinfo
 			   as well ?
 			*/
 			if(!pinfo->gssapi_wrap_tvb){
-				pinfo->gssapi_wrap_tvb = tvb_new_subset_length(
+				pinfo->gssapi_wrap_tvb = tvb_new_subset(
 					tvb, start_offset-2,
+					offset - (start_offset-2),
 					offset - (start_offset-2));
 			}
 		}
@@ -1529,7 +1545,7 @@ dissect_spnego_krb5_cfx_wrap_base(tvbuff_t *tvb, int offset, packet_info *pinfo
 
 #if defined(HAVE_HEIMDAL_KERBEROS) || defined(HAVE_MIT_KERBEROS)
 {
-	tvbuff_t *checksum_tvb = tvb_new_subset_length(tvb, 16, checksum_size);
+	tvbuff_t *checksum_tvb = tvb_new_subset(tvb, 16, checksum_size, checksum_size);
 
 	if (pinfo->gssapi_data_encrypted) {
 		if(pinfo->gssapi_encrypted_tvb){
@@ -1593,7 +1609,7 @@ dissect_spnego_krb5_cfx_getmic_base(tvbuff_t *tvb, int offset, packet_info *pinf
 
 	/* Checksum of plaintext padded data */
 
-	checksum_size = tvb_captured_length_remaining(tvb, offset);
+	checksum_size = tvb_length_remaining(tvb, offset);
 
 	proto_tree_add_item(tree, hf_spnego_krb5_sgn_cksum, tvb, offset,
 			    checksum_size, ENC_NA);
@@ -1938,7 +1954,7 @@ void proto_register_spnego(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-spnego-hfarr.c ---*/
-#line 1393 "../../asn1/spnego/packet-spnego-template.c"
+#line 1409 "../../asn1/spnego/packet-spnego-template.c"
 	};
 
 	/* List of subtrees */
@@ -1961,15 +1977,8 @@ void proto_register_spnego(void) {
     &ett_spnego_InitialContextToken_U,
 
 /*--- End of included file: packet-spnego-ettarr.c ---*/
-#line 1403 "../../asn1/spnego/packet-spnego-template.c"
+#line 1419 "../../asn1/spnego/packet-spnego-template.c"
 	};
-
-	static ei_register_info ei[] = {
-		{ &ei_spnego_decrypted_keytype, { "spnego.decrypted_keytype", PI_SECURITY, PI_CHAT, "Decryted keytype", EXPFILL }},
-		{ &ei_spnego_unknown_header, { "spnego.unknown_header", PI_PROTOCOL, PI_WARN, "Unknown header", EXPFILL }},
-	};
-
-	expert_module_t* expert_spnego;
 
 	/* Register protocol */
 	proto_spnego = proto_register_protocol(PNAME, PSNAME, PFNAME);
@@ -1986,8 +1995,6 @@ void proto_register_spnego(void) {
 	/* Register fields and subtrees */
 	proto_register_field_array(proto_spnego, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_spnego = expert_register_protocol(proto_spnego);
-	expert_register_field_array(expert_spnego, ei, array_length(ei));
 }
 
 

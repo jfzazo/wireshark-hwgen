@@ -31,10 +31,13 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <stdlib.h>
 
 #include <epan/packet.h>
 
+#include "packet-csn1.h"
 
 void proto_register_gmr1_rach(void);
 void proto_reg_handoff_gmr1_rach(void);
@@ -46,12 +49,9 @@ static int proto_gmr1_rach = -1;
 static gint ett_rach_msg = -1;
 static gint ett_rach_kls1 = -1;
 static gint ett_rach_kls2 = -1;
-static gint ett_rach_gmprs_type1_kls2 = -1;
-static gint ett_rach_gmprs_type2_kls2 = -1;
 static gint ett_rach_est_cause = -1;
 static gint ett_rach_dialed_num = -1;
 static gint ett_rach_gps_pos = -1;
-static gint ett_rach_gmprs_req_type = -1;
 
 /* Handoffs */
 static dissector_handle_t data_handle;
@@ -89,39 +89,20 @@ static int hf_rach_r = -1;
 static int hf_rach_o = -1;
 static int hf_rach_number_type = -1;
 
-static int hf_rach_gmprs_term_type = -1;
-static int hf_rach_gmprs_radio_prio = -1;
-static int hf_rach_gmprs_tlli = -1;
-static int hf_rach_gmprs_num_rlc_blks = -1;
-static int hf_rach_gmprs_peak_tput = -1;
-static int hf_rach_gmprs_dl_peak_tput = -1;
-static int hf_rach_gmprs_ul_peak_tput = -1;
-static int hf_rach_gmprs_rlc_mode = -1;
-static int hf_rach_gmprs_llc_mode = -1;
-static int hf_rach_gmprs_spare1 = -1;
-static int hf_rach_gmprs_spare2 = -1;
-static int hf_rach_gmprs_spare3 = -1;
-static int hf_rach_gmprs_reserved1 = -1;
-static int hf_rach_gmprs_req_type = -1;
-static int hf_rach_gmprs_req_type_pag_resp = -1;
-static int hf_rach_gmprs_chan_needed = -1;
 
-
-static const true_false_string rach_prio_tfs = {
-	"Priority Call",
-	"Normal Call"
+static const value_string rach_prio_vals[] = {
+	{ 0, "Normal Call" },
+	{ 1, "Priority Call" },
+	{ 0, NULL }
 };
 
 static const value_string rach_est_cause_vals[] = {
 	{  4, "In response to alerting" },
-	{  7, "(GmPRS) Channel Request Type 2" },
 	{  8, "Location update" },
 	{  9, "IMSI Detach" },
 	{ 10, "Supplementary Services" },
 	{ 11, "Short Message Services" },
 	{ 12, "Position Verification" },
-	{ 13, "(GmPRS) Attach/RA Update" },
-	{ 14, "(GmPRS) Packet Data Transfer" },
 	{ 15, "Emergency Call" },
 	{ 0, NULL }
 };
@@ -169,18 +150,12 @@ static const value_string rach_precorr_vals[] = {
 };
 
 static void
-dissect_gmr1_rach_kls1(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *root_tree,
-		       int *is_moc, int *is_pdt)
+dissect_gmr1_rach_kls1(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree,
+                       int *is_moc)
 {
-	proto_tree *tree = NULL;
 	proto_item *ec_item = NULL;
 	proto_tree *ec_tree = NULL;
 	guint8 ec;
-
-	/* Tree */
-	tree = proto_tree_add_subtree(
-		root_tree, tvb, 0, 2,
-		ett_rach_kls1, NULL, "Class-1 informations");
 
 	/* Priority */
 	proto_tree_add_item(tree, hf_rach_prio,
@@ -190,7 +165,6 @@ dissect_gmr1_rach_kls1(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
 	ec = (tvb_get_guint8(tvb, offset) >> 1) & 0x1f;
 
 	*is_moc = !!(ec & 0x10);
-	*is_pdt = (ec == 14);
 
 	if (ec & 0x10)
 	{
@@ -220,15 +194,8 @@ dissect_gmr1_rach_kls1(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
 		proto_tree_add_item(ec_tree, hf_rach_chan_needed,
 		                    tvb, offset, 1, ENC_BIG_ENDIAN);
 	}
-	else if (ec == 7)
-	{
-		/* Channel Request Type 2 */
-		proto_tree_add_item(tree, hf_rach_est_cause,
-		                    tvb, offset, 1, ENC_BIG_ENDIAN);
-	}
 	else
 	{
-		/* Other */
 		proto_tree_add_item(tree, hf_rach_est_cause,
 		                    tvb, offset, 1, ENC_BIG_ENDIAN);
 
@@ -250,15 +217,21 @@ dissect_gmr1_rach_kls1(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
 }
 
 
-static const true_false_string rach_gps_pos_cpi_tfs = {
-	"GPS position is current position",
-	"GPS position is old position"
+static const value_string rach_gps_pos_cpi_vals[] = {
+	{ 0, "GPS position is old position" },
+	{ 1, "GPS position is current position" },
+	{ 0, NULL }
 };
 
 static void
 rach_gps_pos_lat_fmt(gchar *s, guint32 v)
 {
-	gint32 sv = v;
+	gint32 sv;
+
+	if (v & (1<<18))
+		v |= 0xfff80000;
+
+	sv = v;
 
 	g_snprintf(s, ITEM_LABEL_LENGTH, "%.5f %s (%d)",
 	           abs(sv) / 2912.7f, sv < 0 ? "S" : "N", sv);
@@ -267,7 +240,12 @@ rach_gps_pos_lat_fmt(gchar *s, guint32 v)
 static void
 rach_gps_pos_long_fmt(gchar *s, guint32 v)
 {
-	gint32 sv = v;
+	gint32 sv;
+
+	if (v & (1<<19))
+		v |= 0xfff00000;
+
+	sv = v;
 
 	g_snprintf(s, ITEM_LABEL_LENGTH, "%.5f %s (%d)",
 	           abs(sv) / 2912.70555f, sv < 0 ? "W" : "E", sv);
@@ -280,23 +258,12 @@ rach_gps_pos_long_fmt(gchar *s, guint32 v)
 static void
 dissect_gmr1_rach_gps_pos(tvbuff_t *tvb, int offset, packet_info *pinfo _U_, proto_tree *tree)
 {
-	guint32 lat, lng;
+	guint32 lat;
 
 	/* Check for NULL */
-		/* Spec says that NULL is latitude == 0x40000 and longitude
-		 * is random. But from real capture it seems that
-		 * longitude == 0x80000 and latitude random is also NULL pos */
-
-	lat = (tvb_get_ntohl(tvb, offset) >> 12) & 0x7ffff;
-	lng = tvb_get_ntohl(tvb, offset + 1) & 0xfffff;
-
+	lat = (tvb_get_ntohl(tvb, offset) >> 4) & 0x7ffff;
 	if (lat == 0x40000) {
-		proto_tree_add_int_format(tree, hf_rach_gps_pos_lat, tvb, offset, 5, lat,
-		                          "NULL GPS Position (latitude == 0x40000)");
-		return;
-	} else if (lng == 0x80000) {
-		proto_tree_add_int_format(tree, hf_rach_gps_pos_long, tvb, offset, 5, lng,
-		                          "NULL GPS Position (longitude == 0x80000)");
+		proto_tree_add_text(tree, tvb, offset, 5, "NULL GPS Position");
 		return;
 	}
 
@@ -337,6 +304,12 @@ static const value_string rach_pd_vals[] = {
 static void
 rach_dialed_num_grp1234_fmt(gchar *s, guint32 v)
 {
+	g_snprintf(s, ITEM_LABEL_LENGTH, "%03d", v);
+}
+
+static void
+rach_dialed_num_grp5_fmt(gchar *s, guint32 v)
+{
 	if (v <= 999) {
 		g_snprintf(s, ITEM_LABEL_LENGTH, "%03d", v);
 	} else if (v == 1023) {
@@ -345,25 +318,17 @@ rach_dialed_num_grp1234_fmt(gchar *s, guint32 v)
 	} else if (v == 1022) {
 		g_snprintf(s, ITEM_LABEL_LENGTH,
 			"First two digits in the preceding group are valid, "
-			"and the third digit (i.e. 0) is padding (%d)", v);
+			"and the third digit (i.e. 0) is padding(%d)", v);
 	} else if (v == 1021) {
 		g_snprintf(s, ITEM_LABEL_LENGTH,
 			"First digit in the preceding group is valid, and "
-			"the second and third 0s are padding (%d)", v);
-	} else {
-		g_snprintf(s, ITEM_LABEL_LENGTH, "Invalid (%d)", v);
-	}
-}
-
-static void
-rach_dialed_num_grp5_fmt(gchar *s, guint32 v)
-{
-	if (v >= 1100 && v <= 1199) {
+			"the second and third 0s are padding(%d)", v);
+	} else if (v >= 1100 && v <= 1199) {
 		g_snprintf(s, ITEM_LABEL_LENGTH, "%02d (%d)", v - 1100, v);
 	} else if (v >= 1200 && v <= 1209) {
 		g_snprintf(s, ITEM_LABEL_LENGTH, "%01d (%d)", v - 1200, v);
 	} else {
-		rach_dialed_num_grp1234_fmt(s, v);
+		g_snprintf(s, ITEM_LABEL_LENGTH, "Invalid (%d)", v);
 	}
 }
 
@@ -377,19 +342,10 @@ rach_gps_timestamp_fmt(gchar *s, guint32 v)
 	}
 }
 
-static const true_false_string rach_gci_tfs = {
-	"MES is GPS capable",
-	"MES is not GPS capable"
-};
-
-static const true_false_string rach_r_tfs = {
-	"Normal case",
-	"Retry (see specs for details)"
-};
-
-static const true_false_string rach_o_tfs = {
-	"Retry after failed optimal routing attempt",
-	"Normal case"
+static const value_string rach_gci_vals[] = {
+	{ 0, "MES is not GPS capable" },
+	{ 1, "MES is GPS capable" },
+	{ 0, NULL }
 };
 
 static const value_string rach_number_type_vals[] = {
@@ -404,73 +360,11 @@ static const value_string rach_number_type_vals[] = {
 	{ 0, NULL }
 };
 
-static const value_string rach_gmprs_term_type_vals[] = {
-	{ 0x09, "Multislot class 2, Power class 1 (type C), Half Duplex, Handheld, Internal antenna, A/Gb interface, L-band" },
-	{ 0x0a, "Multislot class 3, Power class 1 (type C), Half Duplex, Handheld, Internal antenna, A/Gb interface, L-band" },
-	{ 0x0b, "Multislot class 4, Power class 1 (type C), Half Duplex, Handheld, Internal antenna, A/Gb interface, L-band" },
-	{ 0x0c, "Multislot class 1, Power class 1 (type C), Full Duplex, Handheld, Internal antenna, A/Gb interface, L-band" },
-	{ 0x0d, "Multislot class 1, Power class 9 (type D), Full Duplex, Fixed, Internal antenna, Gb interface, L-band" },
-	{ 0x0e, "Multislot class 1, Power class 9 (type D), Full Duplex, Fixed, Passive external antenna, Gb interface, L-band" },
-	{ 0x0f, "Multislot class 1, Power class 9 (type D), Full Duplex, Fixed, Active external antenna, Gb interface, L-band" },
-	{ 0x10, "Multislot class 4, Power class 1 (type E), Half Duplex, Handheld, Internal antenna, Iu-PS interface, S-band" },
-	{ 0x11, "Multislot class 5, Power class 1 (type E), Half Duplex, Handheld, Internal antenna, Iu-PS interface, S-band" },
-	{ 0x12, "Multislot class 5, Power class 1 (type E), Half Duplex, Handheld, Internal antenna, Iu-PS interface, S-band" },
-	{ 0x15, "Multislot class 3, Power class 1 (type F), Half Duplex, Handheld, Internal antenna, Iu-PS interface, S-band" },
-	{ 0x1a, "Multislot class 3, Power class 1 (type G), Half Duplex, Handheld, Internal antenna, Iu-PS interface, S-band" },
-	{ 0x1f, "Multislot class 1, Power class 2 (type H), Full Duplex, Vehicular, Internal antenna, Iu-PS interface, S-band" },
-	{ 0x20, "Multislot class 5, Power class 2 (type H), Full Duplex, Vehicular, Internal antenna, Iu-PS interface, S-band" },
-	{ 0x24, "Multislot class 1, Power class 9 (type I), Full Duplex, Fixed, Internal antenna, Iu-PS interface, S-band" },
-	{ 0x25, "Multislot class 1, Power class 9 (type I), Full Duplex, Fixed, Internal antenna, Iu-PS interface, S-band" },
-	{ 0x29, "Multislot class 3, (type J), Half Duplex, Handheld, Internal antenna, Iu-PS interface, L-band" },
-	{ 0x2e, "Multislot class 3, (type K), Half Duplex, Handheld, Internal antenna, Iu-PS interface, L-band" },
-	{ 0x33, "Multislot class 1, (type L), Full Duplex, Handheld, Internal antenna, Iu-PS interface, L-band" },
-	{ 0x38, "Multislot class 1, (type M), Full Duplex, Fixed, External antenna, Iu-PS interface, L-band" },
-	{ 0x40, "Reserved" },
-	{ 0x48, "Multislot class 1, Power class 8 (type A), Full Duplex, Fixed, Internal antenna, Gb interface, L-band" },
-	{ 0, NULL }
-};
-static value_string_ext rach_gmprs_term_type_ext_vals = VALUE_STRING_EXT_INIT(rach_gmprs_term_type_vals);
-
-static const value_string rach_gmprs_radio_prio_vals[] = {
-	{ 0, "Radio Priority 1 (1=highest, 4=lowest)" },
-	{ 1, "Radio Priority 2 (1=highest, 4=lowest)" },
-	{ 2, "Radio Priority 3 (1=highest, 4=lowest)" },
-	{ 3, "Radio Priority 4 (1=highest, 4=lowest)" },
-	{ 0, NULL }
-};
-
-static const true_false_string rach_gmprs_rlc_mode_tfs = {
-	"Unacknowledged",
-	"Acknowledged"
-};
-
-static const true_false_string rach_gmprs_llc_mode_tfs = {
-	"Data packets",
-	"SACK/ACK packets"
-};
-
-static const value_string rach_gmprs_req_type_vals[] = {
-	{ 0x04, "Suspend - In Response to Alerting for circuit switched services" },
-	{ 0x06, "Suspend - MO Call" },
-	{ 0x07, "Resume" },
-	{ 0x08, "Suspend - Location Update" },
-	{ 0x09, "Suspend - IMSI Detach" },
-	{ 0x0a, "Suspend - Supplementary Services" },
-	{ 0x0b, "Suspend - Short Message Services" },
-	{ 0x0f, "Suspend - Emergency Call" },
-	{ 0, NULL }
-};
-
-static const value_string rach_gmprs_req_type_pag_resp_vals[] = {
-	{ 0x00, "Suspend - Answer to Paging" },
-	{ 0, NULL }
-};
-
 static int
 _parse_dialed_number(gchar *s, int slen, tvbuff_t *tvb, int offset)
 {
 	guint16 grp[5];
-	int rv, i, done;
+	int rv;
 
 	grp[0] = ((tvb_get_guint8(tvb, offset+0) & 0x3f) << 4) |
 	         ((tvb_get_guint8(tvb, offset+1) & 0xf0) >> 4);
@@ -483,87 +377,40 @@ _parse_dialed_number(gchar *s, int slen, tvbuff_t *tvb, int offset)
 	grp[4] = ((tvb_get_guint8(tvb, offset+5) & 0x3f) << 5) |
 	         ((tvb_get_guint8(tvb, offset+6) & 0xf8) >> 3);
 
-	rv = 0;
-	done = 0;
+	rv = g_snprintf(s, slen, "%03d%03d%03d", grp[0], grp[1], grp[2]);
 
-	for (i=0; i<4; i++)
-	{
-		if (grp[i+1] <= 999)
-		{
-			/* All digits of group are valid */
-			rv += g_snprintf(s + rv, slen - rv, "%03d", grp[i]);
-		}
-		else if (grp[i+1] == 1023)
-		{
-			/* Last group and all digits are valid */
-			rv += g_snprintf(s + rv, slen - rv, "%03d", grp[i]);
-			done = 1;
-			break;
-		}
-		else if (grp[i+1] == 1022)
-		{
-			/* Last group and first two digits are valid */
-			rv += g_snprintf(s + rv, slen - rv, "%02d", grp[i] / 10);
-			done = 1;
-			break;
-		}
-		else if (grp[i+1] == 1021)
-		{
-			/* Last group and first digit is valid */
-			rv += g_snprintf(s + rv, slen - rv, "%01d", grp[i] / 100);
-			done = 1;
-			break;
-		}
-		else if ((i==3) && (grp[i+1] >= 1100) && (grp[i+1] <= 1209))
-		{
-			/* All digits of group are valid */
-			rv += g_snprintf(s + rv, slen - rv, "%03d", grp[i]);
-		}
-		else
-		{
-			/* Invalid */
-			return g_snprintf(s, slen, "(Invalid)");
-		}
-	}
-
-	if (!done) {
-		if (grp[4] <= 999)
-		{
-			/* All digits are valid */
-			rv += g_snprintf(s + rv, slen - rv, "%03d", grp[4]);
-		}
-		else if (grp[4] >= 1100 && grp[4] <= 1199)
-		{
-			/* Only two digits are valid */
-			rv += g_snprintf(s + rv, slen - rv, "%02d", grp[4] - 1100);
-		}
-		else if (grp[4] >= 1200 && grp[4] <= 1209)
-		{
-			/* Only one digit is valid */
-			rv += g_snprintf(s + rv, slen - rv, "%01d", grp[4] - 1200);
-		}
-		else
-		{
-			/* Invalid */
-			return g_snprintf(s, slen, "(Invalid)");
-		}
+	if (grp[4] <= 999) {
+		rv += g_snprintf(s + rv, ITEM_LABEL_LENGTH,
+		                 "%03d%03d", grp[3], grp[4]);
+	} else if (grp[4] == 1023) {
+		rv += g_snprintf(s + rv, ITEM_LABEL_LENGTH,
+		                 "%03d", grp[3]);
+	} else if (grp[4] == 1022) {
+		rv += g_snprintf(s + rv, ITEM_LABEL_LENGTH,
+		                 "%02d", grp[3] / 10);
+	} else if (grp[4] == 1021) {
+		rv += g_snprintf(s + rv, ITEM_LABEL_LENGTH,
+		                 "%01d", grp[3] / 100);
+	} else if (grp[4] >= 1100 && grp[4] <= 1199) {
+		rv += g_snprintf(s + rv, ITEM_LABEL_LENGTH,
+		                 "%03d%02d", grp[3], grp[4] - 1100);
+	} else if (grp[4] >= 1200 && grp[4] <= 1209) {
+		rv += g_snprintf(s + rv, ITEM_LABEL_LENGTH,
+		                 "%03d%01d", grp[3], grp[4] - 1200);
+	} else {
+		rv += g_snprintf(s + rv, ITEM_LABEL_LENGTH,
+		                 "%03d%03d (Invalid)", grp[3], grp[4]);
 	}
 
 	return rv;
 }
 
 static void
-dissect_gmr1_rach_kls2(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *root_tree,
-		       int is_moc)
+dissect_gmr1_rach_kls2(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree,
+                       int is_moc)
 {
-	proto_tree *tree = NULL;
-	proto_item *dialed_num_item = NULL;
+	proto_item *dialed_num_item = NULL, *gps_pos_item = NULL;
 	proto_tree *dialed_num_tree = NULL, *gps_pos_tree = NULL;
-
-	/* Tree */
-	tree = proto_tree_add_subtree(
-		root_tree, tvb, 2, 16,
-		ett_rach_kls2, NULL, "Class-2 informations");
 
 	/* MES Power Class */
 	proto_tree_add_item(tree, hf_rach_mes_pwr_class,
@@ -645,9 +492,10 @@ dissect_gmr1_rach_kls2(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
 	                    tvb, offset + 9, 1, ENC_BIG_ENDIAN);
 
 	/* GPS Position */
-	gps_pos_tree = proto_tree_add_subtree(
+	gps_pos_item = proto_tree_add_text(
 		tree, tvb, offset + 10, 5,
-		ett_rach_gps_pos, NULL, "GPS Position");
+		"GPS Position");
+	gps_pos_tree = proto_item_add_subtree(gps_pos_item, ett_rach_gps_pos);
 
 	dissect_gmr1_rach_gps_pos(tvb, offset + 10, pinfo, gps_pos_tree);
 
@@ -656,264 +504,22 @@ dissect_gmr1_rach_kls2(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
 	                    tvb, offset + 15, 1, ENC_BIG_ENDIAN);
 }
 
-static const crumb_spec_t rach_gmprs_type1_term_type_crumbs[] = {
-	{  0, 4 },
-	{ 29, 3 },
-	{  0, 0 }
-};
-
-static const crumb_spec_t rach_gmprs_num_rlc_blks_crumbs[] = {
-	{  0, 8 },
-	{ 14, 2 },
-	{  0, 0 }
-};
-
-static void
-dissect_gmprs_rach_type1_kls2(tvbuff_t *tvb, int offset,
-                              packet_info *pinfo, proto_tree *root_tree, int is_pdt)
-{
-	proto_tree *tree = NULL;
-	proto_tree *gps_pos_tree = NULL;
-	guint8 term_type;
-	int is_class_d;
-
-	/* Tree */
-	tree = proto_tree_add_subtree(
-		root_tree, tvb, 2, 16,
-		ett_rach_gmprs_type1_kls2, NULL, "GmPRS Type-1 Class-2 informations");
-
-	/* GmPRS Terminal Type */
-	proto_tree_add_split_bits_item_ret_val(
-		tree, hf_rach_gmprs_term_type,
-		tvb, offset << 3,
-		rach_gmprs_type1_term_type_crumbs,
-		NULL);
-
-	term_type = ((tvb_get_guint8(tvb, offset) >> 1) & 0x78 ) |
-	            ( tvb_get_guint8(tvb, offset + 3)   & 0x07);
-
-	is_class_d = (term_type == 0x0d) ||
-	             (term_type == 0x0e) ||
-	             (term_type == 0x0f);
-
-	/* Class D terminal ? */
-	if (is_class_d) {
-		/* DL Peak Throughput */
-		proto_tree_add_item(tree, hf_rach_gmprs_dl_peak_tput,
-		                    tvb, offset, 1, ENC_BIG_ENDIAN);
-
-		/* Reserved */
-		proto_tree_add_item(tree, hf_rach_gmprs_reserved1,
-		                    tvb, offset, 2, ENC_BIG_ENDIAN);
-	} else {
-		/* SP/HPLMN ID */
-		proto_tree_add_item(tree, hf_rach_sp_hplmn_id,
-				    tvb, offset, 3, ENC_BIG_ENDIAN);
-	}
-
-	/* Radio Priority */
-	proto_tree_add_item(tree, hf_rach_gmprs_radio_prio,
-	                    tvb, offset + 3, 1, ENC_BIG_ENDIAN);
-
-	/* Spare */
-	proto_tree_add_item(tree, hf_rach_gmprs_spare1,
-	                    tvb, offset + 3, 1, ENC_BIG_ENDIAN);
-
-	/* PD */
-	proto_tree_add_item(tree, hf_rach_pd,
-	                    tvb, offset + 3, 1, ENC_BIG_ENDIAN);
-
-	/* TLLI */
-	proto_tree_add_item(tree, hf_rach_gmprs_tlli,
-	                    tvb, offset + 4, 4, ENC_BIG_ENDIAN);
-
-	/* Is it for Packet Data Transfer ? */
-	if (is_pdt) {
-		/* Number of RLC blocks */
-		proto_tree_add_split_bits_item_ret_val(
-			tree, hf_rach_gmprs_num_rlc_blks,
-			tvb, (offset + 8) << 3,
-			rach_gmprs_num_rlc_blks_crumbs,
-			NULL);
-
-		/* (UL) Peak Throughput */
-		proto_tree_add_item(tree, is_class_d ?
-		                        hf_rach_gmprs_ul_peak_tput :
-		                        hf_rach_gmprs_peak_tput,
-		                    tvb, offset + 9, 1, ENC_BIG_ENDIAN);
-
-		/* Spare */
-		proto_tree_add_item(tree, hf_rach_gmprs_spare2,
-				    tvb, offset + 9, 1, ENC_BIG_ENDIAN);
-	} else {
-		/* GPS timestamp */
-		proto_tree_add_item(tree, hf_rach_gps_timestamp,
-		                    tvb, offset + 8, 2, ENC_BIG_ENDIAN);
-	}
-
-	/* GPS Position */
-	gps_pos_tree = proto_tree_add_subtree(
-		tree, tvb, offset + 10, 5,
-		ett_rach_gps_pos, NULL, "GPS Position");
-
-	dissect_gmr1_rach_gps_pos(tvb, offset + 10, pinfo, gps_pos_tree);
-
-	/* RLC mode */
-		/* Off-the-air data shows bit is sometimes set even
-		 * when not a PDT ... */
-	proto_tree_add_item(tree, hf_rach_gmprs_rlc_mode,
-	                    tvb, offset + 15, 1, ENC_BIG_ENDIAN);
-
-	/* LLC mode */
-		/* Off-the-air data shows bit is sometimes set even
-		 * when not a PDT ... */
-	proto_tree_add_item(tree, hf_rach_gmprs_llc_mode,
-	                    tvb, offset + 15, 1, ENC_BIG_ENDIAN);
-
-	/* Spare */
-	proto_tree_add_item(tree, hf_rach_gmprs_spare3,
-			    tvb, offset + 15, 1, ENC_BIG_ENDIAN);
-}
-
-static const crumb_spec_t rach_gmprs_type2_term_type_crumbs[] = {
-	{  0, 4 },
-	{ 64, 3 },
-	{  0, 0 }
-};
-
-static void
-dissect_gmprs_rach_type2_kls2(tvbuff_t *tvb, int offset,
-                              packet_info *pinfo, proto_tree *root_tree)
-{
-	proto_tree *tree = NULL;
-	proto_tree *gps_pos_tree = NULL;
-	guint8 req_type;
-
-	/* Tree */
-	tree = proto_tree_add_subtree(
-		root_tree, tvb, 2, 16,
-		ett_rach_gmprs_type2_kls2, NULL, "GmPRS Type-2 Class-2 informations");
-
-	/* GmPRS Terminal type */
-	proto_tree_add_split_bits_item_ret_val(
-		tree, hf_rach_gmprs_term_type,
-		tvb, offset << 3,
-		rach_gmprs_type2_term_type_crumbs,
-		NULL);
-
-	/* SP/HPLMN ID */
-	proto_tree_add_item(tree, hf_rach_sp_hplmn_id,
-			    tvb, offset, 3, ENC_BIG_ENDIAN);
-
-	/* PD */
-	proto_tree_add_item(tree, hf_rach_pd,
-	                    tvb, offset + 3, 1, ENC_BIG_ENDIAN);
-
-	/* MSC ID */
-	proto_tree_add_item(tree, hf_rach_msc_id,
-	                    tvb, offset + 3, 1, ENC_BIG_ENDIAN);
-
-	/* TLLI */
-	proto_tree_add_item(tree, hf_rach_gmprs_tlli,
-	                    tvb, offset + 4, 4, ENC_BIG_ENDIAN);
-
-	/* Request type */
-	req_type = tvb_get_guint8(tvb, offset + 8) & 0x1f;
-
-	if ((req_type & 0x1c) == 0) {
-		/* Paging response */
-		proto_item *rt_item = proto_tree_add_item(
-			tree, hf_rach_gmprs_req_type_pag_resp,
-			tvb, offset + 8, 1, ENC_BIG_ENDIAN);
-
-		proto_tree *rt_tree = proto_item_add_subtree(rt_item, ett_rach_gmprs_req_type);
-
-		col_append_str(pinfo->cinfo, COL_INFO, "Paging response ");
-
-		/* Channel Needed */
-		proto_tree_add_item(rt_tree, hf_rach_gmprs_chan_needed,
-		                    tvb, offset + 8, 1, ENC_BIG_ENDIAN);
-	} else {
-		/* Other */
-		proto_tree_add_item(tree, hf_rach_gmprs_req_type,
-				    tvb, offset + 8, 1, ENC_BIG_ENDIAN);
-
-		col_append_fstr(pinfo->cinfo, COL_INFO, "%s",
-		                val_to_str(req_type, rach_gmprs_req_type_vals, "Unknown (%u)"));
-	}
-
-	/* Software version number */
-	proto_tree_add_item(tree, hf_rach_software_version,
-	                    tvb, offset + 9, 1, ENC_BIG_ENDIAN);
-
-	/* Spare */
-	proto_tree_add_item(tree, hf_rach_spare,
-	                    tvb, offset + 9, 1, ENC_BIG_ENDIAN);
-
-	/* GPS Position */
-	gps_pos_tree = proto_tree_add_subtree(
-		tree, tvb, offset + 10, 5,
-		ett_rach_gps_pos, NULL, "GPS Position");
-
-	dissect_gmr1_rach_gps_pos(tvb, offset + 10, pinfo, gps_pos_tree);
-
-	/* GCI */
-	proto_tree_add_item(tree, hf_rach_gci,
-	                    tvb, offset + 15, 1, ENC_BIG_ENDIAN);
-
-	/* R */
-	proto_tree_add_item(tree, hf_rach_r,
-	                    tvb, offset + 15, 1, ENC_BIG_ENDIAN);
-
-	/* O */
-	proto_tree_add_item(tree, hf_rach_o,
-	                    tvb, offset + 15, 1, ENC_BIG_ENDIAN);
-}
 
 static void
 dissect_gmr1_rach(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	const int RACH_IE_CLASS1		= (1 << 0);
-	const int RACH_IE_CLASS2_GMR1		= (1 << 1);
-	const int RACH_IE_CLASS2_GMPRS_TYPE1	= (1 << 2);
-	const int RACH_IE_CLASS2_GMPRS_TYPE2	= (1 << 3);
-
-	proto_item *rach_item;
-	proto_tree *rach_tree;
-	const char *desc;
-	int len, is_moc, is_pdt, ies;
+	proto_item *rach_item = NULL, *kls1_item = NULL, *kls2_item = NULL;
+	proto_tree *rach_tree = NULL, *kls1_tree = NULL, *kls2_tree = NULL;
+	int len, is_moc;
 
 	len = tvb_length(tvb);
 
-	desc = "GMR-1 Channel Request (RACH)";
-	ies  = 0;
-
-	if (len == 18) {
-		guint8 ec = (tvb_get_guint8(tvb, 0) >> 1) & 0x1f;
-
-		ies |= RACH_IE_CLASS1;
-
-		if ((ec == 13) || (ec == 14)) {
-			desc = "GMR-1 GmPRS Channel Request Type 1 (RACH)";
-			ies |= RACH_IE_CLASS2_GMPRS_TYPE1;
-		} else if (ec == 7) {
-			desc = "GMR-1 GmPRS Channel Request Type 2 (RACH)";
-			ies |= RACH_IE_CLASS2_GMPRS_TYPE2;
-		} else if (ec == 12) {
-			/* Position verification exists in both GMR-1 and GmPRS-1
-			 * I have no idea how to differentiate them ... but from
-			 * off-the-air data, it seems it used the GMR-1 format */
-			ies |= RACH_IE_CLASS2_GMR1;
-		} else {
-			ies |= RACH_IE_CLASS2_GMR1;
-		}
-	}
-
 	rach_item = proto_tree_add_protocol_format(
-		tree, proto_gmr1_rach, tvb, 0, len, "%s", desc);
+		tree, proto_gmr1_rach, tvb, 0, len,
+		"GMR-1 Channel Request (RACH)");
 	rach_tree = proto_item_add_subtree(rach_item, ett_rach_msg);
 
-	if (!ies) {
+	if (len != 18) {
 		col_append_str(pinfo->cinfo, COL_INFO, "(Invalid)");
 		call_dissector(data_handle, tvb, pinfo, tree);
 		return;
@@ -921,17 +527,19 @@ dissect_gmr1_rach(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	col_append_str(pinfo->cinfo, COL_INFO, "(RACH) ");
 
-	if (ies & RACH_IE_CLASS1)
-		dissect_gmr1_rach_kls1(tvb, 0, pinfo, rach_tree, &is_moc, &is_pdt);
+	kls1_item = proto_tree_add_text(
+		rach_tree, tvb, 0, 2,
+		"Class-1 informations");
+	kls1_tree = proto_item_add_subtree(kls1_item, ett_rach_kls1);
 
-	if (ies & RACH_IE_CLASS2_GMR1)
-		dissect_gmr1_rach_kls2(tvb, 2, pinfo, rach_tree, is_moc);
+	dissect_gmr1_rach_kls1(tvb, 0, pinfo, kls1_tree, &is_moc);
 
-	if (ies & RACH_IE_CLASS2_GMPRS_TYPE1)
-		dissect_gmprs_rach_type1_kls2(tvb, 2, pinfo, rach_tree, is_pdt);
+	kls2_item = proto_tree_add_text(
+		rach_tree, tvb, 2, 16,
+		"Class-2 informations");
+	kls2_tree = proto_item_add_subtree(kls2_item, ett_rach_kls2);
 
-	if (ies & RACH_IE_CLASS2_GMPRS_TYPE2)
-		dissect_gmprs_rach_type2_kls2(tvb, 2, pinfo, rach_tree);
+	dissect_gmr1_rach_kls2(tvb, 2, pinfo, kls2_tree, is_moc);
 }
 
 void
@@ -940,7 +548,7 @@ proto_register_gmr1_rach(void)
 	static hf_register_info hf[] = {
 		{ &hf_rach_prio,
 		  { "Priority", "gmr1.rach.priority",
-		    FT_BOOLEAN, 8, TFS(&rach_prio_tfs), 0x01,
+		    FT_UINT8, BASE_DEC, VALS(rach_prio_vals), 0x01,
 		    NULL, HFILL }
 		},
 		{ &hf_rach_est_cause,
@@ -986,17 +594,17 @@ proto_register_gmr1_rach(void)
 		},
 		{ &hf_rach_gps_pos_cpi,
 		  { "CPI", "gmr1.rach.gps_pos.cpi",
-		    FT_BOOLEAN, 8, TFS(&rach_gps_pos_cpi_tfs), 0x80,
+		    FT_UINT8, BASE_DEC, VALS(rach_gps_pos_cpi_vals), 0x80,
 		    "Current Position Indicator", HFILL }
 		},
 		{ &hf_rach_gps_pos_lat,
 		  { "Latitude", "gmr1.rach.gps_pos.latitude",
-		    FT_INT24, BASE_CUSTOM, rach_gps_pos_lat_fmt, 0x7ffff0,
+		    FT_UINT24, BASE_CUSTOM, rach_gps_pos_lat_fmt, 0x7ffff0,
 		    NULL, HFILL }
 		},
 		{ &hf_rach_gps_pos_long,
 		  { "Longitude", "gmr1.rach.gps_pos.longitude",
-		    FT_INT24, BASE_CUSTOM, rach_gps_pos_long_fmt, 0x0fffff,
+		    FT_UINT24, BASE_CUSTOM, rach_gps_pos_long_fmt, 0x0fffff,
 		    NULL, HFILL }
 		},
 		{ &hf_rach_mes_pwr_class,
@@ -1066,17 +674,17 @@ proto_register_gmr1_rach(void)
 		},
 		{ &hf_rach_gci,
 		  { "GCI", "gmr1.rach.gci",
-		    FT_BOOLEAN, 8, TFS(&rach_gci_tfs), 0x01,
+		    FT_UINT8, BASE_DEC, VALS(rach_gci_vals), 0x01,
 		    "GPS Capability Indicator", HFILL }
 		},
 		{ &hf_rach_r,
 		  { "R", "gmr1.rach.r",
-		    FT_BOOLEAN, 8, TFS(&rach_r_tfs), 0x02,
+		    FT_UINT8, BASE_DEC, NULL, 0x02,
 		    "See GMR 04.008 10.1.8 for full description" , HFILL }
 		},
 		{ &hf_rach_o,
 		  { "O", "gmr1.rach.o",
-		    FT_BOOLEAN, 8, TFS(&rach_o_tfs), 0x04,
+		    FT_UINT8, BASE_DEC, NULL, 0x04,
 		    "See GMR 04.008 10.1.8 for full description", HFILL }
 		},
 		{ &hf_rach_number_type,
@@ -1084,98 +692,15 @@ proto_register_gmr1_rach(void)
 		    FT_UINT8, BASE_DEC, VALS(rach_number_type_vals), 0x07,
 		    "For MO Call only", HFILL }
 		},
-		{ &hf_rach_gmprs_term_type,
-		  { "GmPRS Terminal Type", "gmr1.rach.gmprs_term_type",
-		    FT_UINT8, BASE_DEC | BASE_EXT_STRING, &rach_gmprs_term_type_ext_vals, 0x00,
-		    "See GMR-1 3G 45.002 Annex C for infos", HFILL }
-		},
-		{ &hf_rach_gmprs_radio_prio,
-		  { "Radio Priority", "gmr1.rach.gmprs_radio_prio",
-		    FT_UINT8, BASE_DEC, VALS(rach_gmprs_radio_prio_vals), 0x18,
-		    "See GMPRS-1 04.060 for infos", HFILL }
-		},
-		{ &hf_rach_gmprs_tlli,
-		  { "TLLI", "gmr1.rach.gmprs_tlli",
-		    FT_UINT32, BASE_HEX, NULL, 0x00,
-		    "See GMPRS-1 04.060 for infos", HFILL }
-		},
-		{ &hf_rach_gmprs_num_rlc_blks,
-		  { "Number of RLC blocks", "gmr1.rach.gmprs_num_rlc_blks",
-		    FT_UINT16, BASE_DEC, NULL, 0x00,
-		    "See GMPRS-1 04.060 12.31 for infos", HFILL }
-		},
-		{ &hf_rach_gmprs_peak_tput,
-		  { "Peak Throughput", "gmr1.rach.gmprs_peak_tput",
-		    FT_UINT8, BASE_DEC, NULL, 0x3c,
-		    "See GMPRS-1 04.060 for infos", HFILL }
-		},
-		{ &hf_rach_gmprs_dl_peak_tput,
-		  { "DL Peak Throughput", "gmr1.rach.gmprs_dl_peak_tput",
-		    FT_UINT8, BASE_DEC, NULL, 0x0f,
-		    "See 3GPP TS 23.060 for infos", HFILL }
-		},
-		{ &hf_rach_gmprs_ul_peak_tput,
-		  { "UL Peak Throughput", "gmr1.rach.gmprs_ul_peak_tput",
-		    FT_UINT8, BASE_DEC, NULL, 0x3c,
-		    "See 3GPP TS 23.060 for infos", HFILL }
-		},
-		{ &hf_rach_gmprs_rlc_mode,
-		  { "RLC mode", "gmr1.rach.gmprs_rlc_mode",
-		    FT_BOOLEAN, 8, TFS(&rach_gmprs_rlc_mode_tfs), 0x01,
-		    NULL, HFILL }
-		},
-		{ &hf_rach_gmprs_llc_mode,
-		  { "LLC mode", "gmr1.rach.gmprs_llc_mode",
-		    FT_BOOLEAN, 8, TFS(&rach_gmprs_llc_mode_tfs), 0x02,
-		    NULL, HFILL }
-		},
-		{ &hf_rach_gmprs_spare1,
-		  { "Spare", "gmr1.rach.gmprs_spare1",
-		    FT_UINT8, BASE_DEC, NULL, 0x20,
-		    NULL, HFILL }
-		},
-		{ &hf_rach_gmprs_spare2,
-		  { "Spare", "gmr1.rach.gmprs_spare2",
-		    FT_UINT8, BASE_DEC, NULL, 0xc0,
-		    NULL, HFILL }
-		},
-		{ &hf_rach_gmprs_spare3,
-		  { "Spare", "gmr1.rach.gmprs_spare3",
-		    FT_UINT8, BASE_DEC, NULL, 0x04,
-		    NULL, HFILL }
-		},
-		{ &hf_rach_gmprs_reserved1,
-		  { "Reserved", "gmr1.rach.gmprs_reserved1",
-		    FT_UINT16, BASE_HEX, NULL, 0xffff,
-		    NULL, HFILL }
-		},
-		{ &hf_rach_gmprs_req_type,
-		  { "Request Type", "gmr1.rach.gmprs_req_type",
-		    FT_UINT8, BASE_DEC, VALS(rach_gmprs_req_type_vals), 0x1f,
-		    NULL, HFILL }
-		},
-		{ &hf_rach_gmprs_req_type_pag_resp,
-		  { "Request Type", "gmr1.rach.gmprs_req_type.pag_resp",
-		    FT_UINT8, BASE_DEC, VALS(rach_gmprs_req_type_pag_resp_vals), 0x1c,
-		    NULL, HFILL }
-		},
-		{ &hf_rach_gmprs_chan_needed,
-		  { "Channel Needed", "gmr1.rach.gmprs_chan_needed",
-		    FT_UINT8, BASE_DEC, VALS(rach_chan_needed_vals), 0x03,
-		    "Echoed from Paging Request", HFILL }
-		},
 	};
 
 	static gint *ett[] = {
 		&ett_rach_msg,
 		&ett_rach_kls1,
 		&ett_rach_kls2,
-		&ett_rach_gmprs_type1_kls2,
-		&ett_rach_gmprs_type2_kls2,
 		&ett_rach_est_cause,
 		&ett_rach_dialed_num,
 		&ett_rach_gps_pos,
-		&ett_rach_gmprs_req_type,
 	};
 
 	proto_gmr1_rach = proto_register_protocol("GEO-Mobile Radio (1) RACH", "GMR-1 RACH", "gmr1.rach");
@@ -1191,16 +716,3 @@ proto_reg_handoff_gmr1_rach(void)
 {
 	data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

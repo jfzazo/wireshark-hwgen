@@ -2,9 +2,9 @@
 # @configure_input@
 # configure options: @CONFIG_ARGS@
 
-%bcond_with    qt
 %bcond_without gtk2
 %bcond_with    gtk3
+%bcond_with    qt
 
 # Set these to 1 if you want to ensure your package includes support for them:
 %global with_adns 0
@@ -23,16 +23,16 @@
 %global use_wireshark_group 1
 
 
-Summary:	Wireshark is the world's foremost protocol analyzer
+Summary:	Network protocol analyzer
 Name:		wireshark
 Version:	@VERSION@
 Release:	1
-License:	GPLv2+
+License:	GPL+
 Group:		Applications/Internet
-Source:		https://wireshark.org/download/src/%{name}-%{version}.tar.bz2
+Source:		http://wireshark.org/download/src/%{name}-%{version}.tar.bz2
 # Or this URL for automated builds:
-#Source:	https://wireshark.org/download/automated/src/%{name}-%{version}.tar.bz2
-URL:		https://www.wireshark.org/
+#Source:	http://wireshark.org/download/automated/src/%{name}-%{version}.tar.bz2
+URL:		http://www.wireshark.org/
 Packager:	Gerald Combs <gerald[AT]wireshark.org>
 # Some distributions create a wireshark-devel package; get rid of it
 Obsoletes:	wireshark-devel
@@ -106,50 +106,19 @@ BuildRequires:	rpm >= 4.7.0
 %endif
 
 %description
-Wireshark allows you to examine protocol data stored in files or as it is
-captured from wired or wireless (WiFi or Bluetooth) networks, USB devices,
-and many other sources.  It supports dozens of protocol capture file formats
-and understands more than a thousand protocols.
-
-It has many powerful features including a rich display filter language
-and the ability to reassemble multiple protocol packets in order to, for
-example, view a complete TCP stream, save the contents of a file which was
-transferred over HTTP or CIFS, or play back an RTP audio stream.
+Wireshark is a free network protocol analyzer for Unix and Windows. It
+allows you to examine data from a live network or from a capture file
+on disk. You can interactively browse the capture data, viewing summary
+and detail information for each packet. Wireshark has several powerful
+features, including a rich display filter language and the ability to
+view the reconstructed stream of a TCP session.
 
 This package contains command-line utilities, plugins, and documentation for
-Wireshark. A Qt and a GTK+ graphical user interface are packaged separately.
-
-%if %{with qt}
-%package	qt
-Summary:	Wireshark's Qt-based GUI
-Group:		Applications/Internet
-%if 0%{?suse_version}
-Requires:	libqt4 >= @QT_MIN_VERSION@
-BuildRequires:	libqt4-devel >= @QT_MIN_VERSION@
-%else
-Requires:	qt >= @QT_MIN_VERSION@
-BuildRequires:	qt-devel >= @QT_MIN_VERSION@
-%endif
-Requires:	%{name} = %{version}-%{release}
-Requires:	xdg-utils
-Requires:	hicolor-icon-theme
-BuildRequires:	desktop-file-utils
-Requires(post):	desktop-file-utils
-Requires(post): /usr/sbin/update-alternatives
-Requires(postun): /usr/sbin/update-alternatives
-BuildRequires:	gcc-c++
-%if 0%{?suse_version}
-# Need this for SuSE's suse_update_desktop_file macro
-BuildRequires:	update-desktop-files
-%endif
-
-%description qt
-This package contains the Qt Wireshark GUI and desktop integration files.
-%endif
+Wireshark. A GTK+ and a Qt graphical user interface are packaged separately.
 
 %if %{with gtk2} || %{with gtk3}
 %package	gnome
-Summary:	Wireshark's GTK+-based GUI
+Summary:	Gnome desktop integration for Wireshark
 Group:		Applications/Internet
 %if %{with gtk3}
 Requires:	gtk3 >= @GTK3_MIN_VERSION@
@@ -183,7 +152,35 @@ Requires:	portaudio
 #Requires:	dejavu-sans-mono-fonts
 
 %description gnome
-This package contains the GTK+ Wireshark GUI and desktop integration files.
+Contains the Gnome (GTK+) Wireshark GUI and desktop integration files.
+%endif
+
+%if %{with qt}
+%package	qt
+Summary:	Qt GUI for Wireshark
+Group:		Applications/Internet
+%if 0%{?suse_version}
+Requires:	libqt4 >= @QT_MIN_VERSION@
+BuildRequires:	libqt4-devel >= @QT_MIN_VERSION@
+%else
+Requires:	qt >= @QT_MIN_VERSION@
+BuildRequires:	qt-devel >= @QT_MIN_VERSION@
+%endif
+Requires:	%{name} = %{version}-%{release}
+Requires:	xdg-utils
+Requires:	hicolor-icon-theme
+BuildRequires:	desktop-file-utils
+Requires(post):	desktop-file-utils
+Requires(post): /usr/sbin/update-alternatives
+Requires(postun): /usr/sbin/update-alternatives
+BuildRequires:	gcc-c++
+%if 0%{?suse_version}
+# Need this for SuSE's suse_update_desktop_file macro
+BuildRequires:	update-desktop-files
+%endif
+
+%description qt
+Contains the Qt Wireshark GUI and desktop integration files.
 %endif
 
 
@@ -208,21 +205,9 @@ This package contains the GTK+ Wireshark GUI and desktop integration files.
 %if %{with_portaudio}
   --with-portaudio \
 %endif
-%if %{with qt}
-  --with-qt \
-%else
-  --without-qt \
-%endif
-%if %{with gtk2}
-  --with-gtk2 \
-%else
-  --without-gtk2 \
-%endif
-%if %{with gtk3}
-  --with-gtk3 \
-%else
-  --without-gtk3 \
-%endif
+  %{?_with_gtk2} \
+  %{?_with_gtk3} \
+  %{?_with_qt} \
   --disable-warnings-as-errors
 
 # Remove rpath.  It's prohibited in Fedora[1] and anyway we don't need it (and
@@ -247,13 +232,14 @@ make DESTDIR=$RPM_BUILD_ROOT install
 	echo %{_libdir} > $RPM_BUILD_ROOT/etc/ld.so.conf.d/wireshark.conf
 %endif
 
-%if %{with qt}
+%if %{with gtk3} || %{with gtk2}
 # Change the program name for 'alternatives'
-mv %{buildroot}%{_bindir}/wireshark %{buildroot}%{_bindir}/wireshark-qt
+mv %{buildroot}%{_bindir}/wireshark %{buildroot}%{_bindir}/wireshark-gtk
 %endif
-%if %{with qt} || %{with gtk2} || %{with gtk3}
+%if %{with gtk2} || %{with gtk3} || %{with qt}
 # Create the 'alternative' file
 touch %{buildroot}%{_bindir}/wireshark
+make DESTDIR=$RPM_BUILD_ROOT install_desktop_files
 %if 0%{?suse_version}
 # SuSE's packaging conventions
 # (http://en.opensuse.org/openSUSE:Packaging_Conventions_RPM_Macros#.25suse_update_desktop_file)
@@ -262,7 +248,7 @@ touch %{buildroot}%{_bindir}/wireshark
 %else
 # Fedora's packaging guidelines (https://fedoraproject.org/wiki/Packaging:Guidelines)
 # require this (at least if desktop-file-install was not used to install it).
-desktop-file-validate %{buildroot}%{_datadir}/applications/wireshark.desktop
+desktop-file-validate %{buildroot}/usr/share/applications/wireshark.desktop
 %endif
 %endif
 
@@ -284,38 +270,39 @@ fi
 
 %postun -p /sbin/ldconfig
 
-%if %{with qt}
-%post qt
-update-desktop-database %{_datadir}/applications &> /dev/null || :
-update-mime-database %{_datadir}/mime &> /dev/null || :
-touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
+%if %{with gtk2} || %{with gtk3}
+%post gnome
+update-desktop-database &> /dev/null ||:
+update-mime-database /usr/share/mime &> /dev/null || :
+touch --no-create /usr/share/icons/hicolor &>/dev/null || :
+gtk-update-icon-cache /usr/share/icons/hicolor &>/dev/null || :
 /usr/sbin/update-alternatives --install %{_bindir}/wireshark \
-  %{name} %{_bindir}/wireshark-qt 50
+  %{name} %{_bindir}/wireshark-gtk 50
 
-%postun qt
-update-desktop-database %{_datadir}/applications &> /dev/null ||:
-update-mime-database %{_datadir}/mime &> /dev/null || :
+%postun gnome
+update-desktop-database &> /dev/null ||:
+update-mime-database /usr/share/mime &> /dev/null || :
 if [ $1 -eq 0 ] ; then
-	/usr/sbin/update-alternatives --remove %{name} %{_bindir}/wireshark-qt
+	touch --no-create /usr/share/icons/hicolor &>/dev/null || :
+	gtk-update-icon-cache /usr/share/icons/hicolor &>/dev/null || :
+	/usr/sbin/update-alternatives --remove %{name} %{_bindir}/wireshark-gtk
 fi
 %endif
 
-%if %{with gtk2} || %{with gtk3}
-%post gnome
-update-desktop-database %{_datadir}/applications &> /dev/null ||:
-update-mime-database %{_datadir}/mime &> /dev/null || :
-touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
-gtk-update-icon-cache -t %{_datadir}/icons/hicolor &>/dev/null || :
+%if %{with qt}
+%post qt
+update-desktop-database &> /dev/null ||:
+update-mime-database /usr/share/mime &> /dev/null || :
+touch --no-create /usr/share/icons/hicolor &>/dev/null || :
 /usr/sbin/update-alternatives --install %{_bindir}/wireshark \
-  %{name} %{_bindir}/wireshark-gtk 10
+  %{name} %{_bindir}/wireshark-qt 10
 
-%postun gnome
-update-desktop-database %{_datadir}/applications &> /dev/null ||:
-update-mime-database %{_datadir}/mime &> /dev/null || :
+%postun qt
+update-desktop-database &> /dev/null ||:
+update-mime-database /usr/share/mime &> /dev/null || :
 if [ $1 -eq 0 ] ; then
-	touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
-	gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
-	/usr/sbin/update-alternatives --remove %{name} %{_bindir}/wireshark-gtk
+	touch --no-create /usr/share/icons/hicolor &>/dev/null || :
+	/usr/sbin/update-alternatives --remove %{name} %{_bindir}/wireshark-qt
 fi
 %endif
 
@@ -366,49 +353,36 @@ fi
 /etc/ld.so.conf.d/wireshark.conf
 %endif
 
-%if %{with qt}
-%files qt
-%defattr(-,root,root)
-%{_datadir}/applications/wireshark.desktop
-%{_datadir}/icons/hicolor/*/apps/*
-%{_datadir}/icons/hicolor/*/mimetypes/*
-%{_datadir}/mime/packages/wireshark.xml
-%{_bindir}/wireshark-qt
-%{_mandir}/man1/wireshark.*
-%ghost %{_bindir}/wireshark
-%endif
-
 %if %{with gtk2} || %{with gtk3}
 %files gnome
 %defattr(-,root,root)
-%{_datadir}/applications/wireshark.desktop
-%{_datadir}/icons/hicolor/*/apps/*
-%{_datadir}/icons/hicolor/*/mimetypes/*
-%{_datadir}/mime/packages/wireshark.xml
+/usr/share/applications/wireshark.desktop
+/usr/share/icons/hicolor/*/apps/*
+/usr/share/icons/hicolor/*/mimetypes/*
+/usr/share/mime/packages/wireshark.xml
 %{_bindir}/wireshark-gtk
 %{_mandir}/man1/wireshark.*
 %ghost %{_bindir}/wireshark
 %endif
 
+%if %{with qt}
+%files qt
+%defattr(-,root,root)
+/usr/share/applications/wireshark.desktop
+/usr/share/icons/hicolor/*/apps/*
+/usr/share/icons/hicolor/*/mimetypes/*
+/usr/share/mime/packages/wireshark.xml
+%{_bindir}/wireshark-qt
+%{_mandir}/man1/wireshark.*
+%ghost %{_bindir}/wireshark
+%endif
+
 %changelog
-* Tue Jan 20 2015 Jeff Morriss
-- Make the license tag more specific: Wireshark is GPLv2+.
-
-* Mon Jan 12 2015 Jeff Morriss
-- Modernize the (base package) %description.
-
 * Wed Dec  3 2014 Jeff Morriss
-- Don't run gtk-update-icon-cache when uninstalling the Qt package.  But do run
+- Don't run gtk-update-icon-cache when (un)installing the Qt package.  But do run
   it when installing the gnome package.
 - Tell the loader where to find our libraries if we're being installed
   someplace other than /usr .
-- Attempt to get RPMs working with a prefix other than /usr (now that the
-  (free)desktop files are no longer always installed /usr).  Desktop
-  integration doesn't work for prefixes other than "/usr" or "/usr/local".
-
-* Fri Aug 29 2014 Gerald Combs
-- The Qt UI is now the default. Update logic and prioritization to
-  reflect this.
 
 * Mon Aug 4 2014 Jeff Morriss
 - Fix RPM builds with a prefix other than /usr: The location of

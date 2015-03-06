@@ -31,6 +31,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include <asn1.h>
@@ -109,7 +110,7 @@ static int hf_ocsp_crlNum = -1;                   /* INTEGER */
 static int hf_ocsp_crlTime = -1;                  /* GeneralizedTime */
 
 /*--- End of included file: packet-ocsp-hf.c ---*/
-#line 48 "../../asn1/ocsp/packet-ocsp-template.c"
+#line 49 "../../asn1/ocsp/packet-ocsp-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_ocsp = -1;
@@ -137,7 +138,7 @@ static gint ett_ocsp_ServiceLocator = -1;
 static gint ett_ocsp_CrlID = -1;
 
 /*--- End of included file: packet-ocsp-ett.c ---*/
-#line 52 "../../asn1/ocsp/packet-ocsp-template.c"
+#line 53 "../../asn1/ocsp/packet-ocsp-template.c"
 
 static const char *responseType_id;
 
@@ -619,59 +620,45 @@ dissect_ocsp_ReOcspNonce(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offse
 
 /*--- PDUs ---*/
 
-static int dissect_BasicOCSPResponse_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_BasicOCSPResponse_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ocsp_BasicOCSPResponse(FALSE, tvb, offset, &asn1_ctx, tree, hf_ocsp_BasicOCSPResponse_PDU);
-  return offset;
+  dissect_ocsp_BasicOCSPResponse(FALSE, tvb, 0, &asn1_ctx, tree, hf_ocsp_BasicOCSPResponse_PDU);
 }
-static int dissect_ArchiveCutoff_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ArchiveCutoff_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ocsp_ArchiveCutoff(FALSE, tvb, offset, &asn1_ctx, tree, hf_ocsp_ArchiveCutoff_PDU);
-  return offset;
+  dissect_ocsp_ArchiveCutoff(FALSE, tvb, 0, &asn1_ctx, tree, hf_ocsp_ArchiveCutoff_PDU);
 }
-static int dissect_AcceptableResponses_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_AcceptableResponses_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ocsp_AcceptableResponses(FALSE, tvb, offset, &asn1_ctx, tree, hf_ocsp_AcceptableResponses_PDU);
-  return offset;
+  dissect_ocsp_AcceptableResponses(FALSE, tvb, 0, &asn1_ctx, tree, hf_ocsp_AcceptableResponses_PDU);
 }
-static int dissect_ServiceLocator_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ServiceLocator_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ocsp_ServiceLocator(FALSE, tvb, offset, &asn1_ctx, tree, hf_ocsp_ServiceLocator_PDU);
-  return offset;
+  dissect_ocsp_ServiceLocator(FALSE, tvb, 0, &asn1_ctx, tree, hf_ocsp_ServiceLocator_PDU);
 }
-static int dissect_CrlID_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_CrlID_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ocsp_CrlID(FALSE, tvb, offset, &asn1_ctx, tree, hf_ocsp_CrlID_PDU);
-  return offset;
+  dissect_ocsp_CrlID(FALSE, tvb, 0, &asn1_ctx, tree, hf_ocsp_CrlID_PDU);
 }
-static int dissect_ReOcspNonce_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ReOcspNonce_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ocsp_ReOcspNonce(FALSE, tvb, offset, &asn1_ctx, tree, hf_ocsp_ReOcspNonce_PDU);
-  return offset;
+  dissect_ocsp_ReOcspNonce(FALSE, tvb, 0, &asn1_ctx, tree, hf_ocsp_ReOcspNonce_PDU);
 }
-static int dissect_NULL_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_NULL_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_ocsp_NULL(FALSE, tvb, offset, &asn1_ctx, tree, hf_ocsp_NULL_PDU);
-  return offset;
+  dissect_ocsp_NULL(FALSE, tvb, 0, &asn1_ctx, tree, hf_ocsp_NULL_PDU);
 }
 
 
 /*--- End of included file: packet-ocsp-fn.c ---*/
-#line 57 "../../asn1/ocsp/packet-ocsp-template.c"
+#line 58 "../../asn1/ocsp/packet-ocsp-template.c"
 
 
 static int
@@ -939,7 +926,7 @@ void proto_register_ocsp(void) {
         "GeneralizedTime", HFILL }},
 
 /*--- End of included file: packet-ocsp-hfarr.c ---*/
-#line 112 "../../asn1/ocsp/packet-ocsp-template.c"
+#line 113 "../../asn1/ocsp/packet-ocsp-template.c"
   };
 
   /* List of subtrees */
@@ -969,7 +956,7 @@ void proto_register_ocsp(void) {
     &ett_ocsp_CrlID,
 
 /*--- End of included file: packet-ocsp-ettarr.c ---*/
-#line 118 "../../asn1/ocsp/packet-ocsp-template.c"
+#line 119 "../../asn1/ocsp/packet-ocsp-template.c"
   };
 
   /* Register protocol */
@@ -995,16 +982,16 @@ void proto_reg_handoff_ocsp(void) {
 
 /*--- Included file: packet-ocsp-dis-tab.c ---*/
 #line 1 "../../asn1/ocsp/packet-ocsp-dis-tab.c"
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.1", dissect_BasicOCSPResponse_PDU, proto_ocsp, "id-pkix-ocsp-basic");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.2", dissect_ReOcspNonce_PDU, proto_ocsp, "id-pkix-ocsp-nonce");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.3", dissect_CrlID_PDU, proto_ocsp, "id-pkix-ocsp-crl");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.4", dissect_AcceptableResponses_PDU, proto_ocsp, "id-pkix-ocsp-response");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.5", dissect_NULL_PDU, proto_ocsp, "id-pkix-ocsp-nocheck");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.6", dissect_ArchiveCutoff_PDU, proto_ocsp, "id-pkix-ocsp-archive-cutoff");
-  new_register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.7", dissect_ServiceLocator_PDU, proto_ocsp, "id-pkix-ocsp-service-locator");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.1", dissect_BasicOCSPResponse_PDU, proto_ocsp, "id-pkix-ocsp-basic");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.2", dissect_ReOcspNonce_PDU, proto_ocsp, "id-pkix-ocsp-nonce");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.3", dissect_CrlID_PDU, proto_ocsp, "id-pkix-ocsp-crl");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.4", dissect_AcceptableResponses_PDU, proto_ocsp, "id-pkix-ocsp-response");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.5", dissect_NULL_PDU, proto_ocsp, "id-pkix-ocsp-nocheck");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.6", dissect_ArchiveCutoff_PDU, proto_ocsp, "id-pkix-ocsp-archive-cutoff");
+  register_ber_oid_dissector("1.3.6.1.5.5.7.48.1.7", dissect_ServiceLocator_PDU, proto_ocsp, "id-pkix-ocsp-service-locator");
 
 
 /*--- End of included file: packet-ocsp-dis-tab.c ---*/
-#line 141 "../../asn1/ocsp/packet-ocsp-template.c"
+#line 142 "../../asn1/ocsp/packet-ocsp-template.c"
 }
 

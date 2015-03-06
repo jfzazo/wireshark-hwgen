@@ -29,6 +29,8 @@
 #include "packet-rpc.h"
 #include "packet-portmap.h"
 #include <epan/ipproto.h>
+#include <epan/conversation.h>
+#include <epan/packet_info.h>
 
 /*
  * See:
@@ -232,7 +234,7 @@ dissect_dump_entry(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
 	proto_tree *tree, void* data _U_)
 {
 	int prog, version, proto, port;
-	proto_tree *subtree;
+	proto_item *ti, *subtree;
 
 	prog = tvb_get_ntohl(tvb, offset+0);
 	version = tvb_get_ntohl(tvb, offset+4);
@@ -240,9 +242,10 @@ dissect_dump_entry(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
 	port = tvb_get_ntohl(tvb, offset+12);
 	if ( tree )
 	{
-		subtree = proto_tree_add_subtree_format(tree, tvb, offset, 16,
-			ett_portmap_entry, NULL, "Map Entry: %s (%u) V%d",
+		ti = proto_tree_add_text(tree, tvb, offset, 16,
+			"Map Entry: %s (%u) V%d",
 			rpc_prog_name(prog), prog, version);
+		subtree = proto_item_add_subtree(ti, ett_portmap_entry);
 
 		proto_tree_add_uint_format_value(subtree, hf_portmap_prog, tvb,
 			offset+0, 4, prog,
@@ -386,14 +389,17 @@ static const value_string portmap2_proc_vals[] = {
 static int
 dissect_rpcb(tvbuff_t *tvb, int offset, packet_info *pinfo _U_, proto_tree *tree, void* data _U_)
 {
-	proto_item* rpcb_item;
-	proto_tree* rpcb_tree;
+	proto_item* rpcb_item = NULL;
+	proto_tree* rpcb_tree = NULL;
 	int old_offset = offset;
 	guint32 prog;
 
-	rpcb_item = proto_tree_add_item(tree, hf_portmap_rpcb, tvb,
+	if (tree) {
+		rpcb_item = proto_tree_add_item(tree, hf_portmap_rpcb, tvb,
 			offset, -1, ENC_NA);
-	rpcb_tree = proto_item_add_subtree(rpcb_item, ett_portmap_rpcb);
+		if (rpcb_item)
+			rpcb_tree = proto_item_add_subtree(rpcb_item, ett_portmap_rpcb);
+	}
 
 	prog = tvb_get_ntohl(tvb, offset);
 	if (rpcb_tree)
@@ -645,16 +651,3 @@ proto_reg_handoff_portmap(void)
 	rpc_init_proc_table(PORTMAP_PROGRAM, 4, portmap4_proc, hf_portmap_procedure_v4);
 	rpc_handle = find_dissector("rpc");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

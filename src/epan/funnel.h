@@ -27,7 +27,7 @@
 #define _FUNNEL_H
 
 #include <glib.h>
-#include <epan/stat_groups.h>
+#include "../stat_menu.h"
 #include "ws_symbol_export.h"
 
 typedef struct _funnel_progress_window_t funnel_progress_window_t ;
@@ -79,7 +79,7 @@ typedef struct _funnel_ops_t {
     gchar * (*get_filter)(void);
     void (*set_filter)(const char*);
     void (*set_color_filter_slot)(guint8 flit_nr, const gchar* filter);
-    gboolean (*open_file)(const char* fname, const char* filter, char** error);
+    gboolean (*open_file)(const char* fname, const char* filter, const char** error);
     void (*reload)(void);
     void (*apply_filter)(void);
 

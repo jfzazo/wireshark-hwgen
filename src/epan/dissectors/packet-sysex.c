@@ -21,11 +21,16 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
 #include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
+#include <epan/packet.h>
+#include <epan/reassemble.h>
+#include <epan/tfs.h>
 
 void proto_register_sysex(void);
+void proto_reg_handoff_sysex(void);
 
 /* protocols and header fields */
 static int proto_sysex = -1;
@@ -1036,7 +1041,7 @@ dissect_digitech_procedure(guint8 procedure, const gint offset,
 
             while ((count > 0) && (str_size = tvb_strsize(data_tvb, data_offset)))
             {
-                tmp_string = tvb_get_string_enc(wmem_packet_scope(), data_tvb, data_offset, str_size - 1, ENC_ASCII);
+                tmp_string = tvb_get_string(wmem_packet_scope(), data_tvb, data_offset, str_size - 1);
                 proto_tree_add_string(tree, hf_digitech_preset_name, data_tvb, data_offset, str_size, tmp_string);
                 data_offset += (gint)str_size;
                 count--;
@@ -1060,7 +1065,7 @@ dissect_digitech_procedure(guint8 procedure, const gint offset,
 
             /* Preset name (NULL-terminated) */
             str_size = tvb_strsize(data_tvb, data_offset);
-            tmp_string = tvb_get_string_enc(wmem_packet_scope(), data_tvb, data_offset, str_size - 1, ENC_ASCII);
+            tmp_string = tvb_get_string(wmem_packet_scope(), data_tvb, data_offset, str_size - 1);
             proto_tree_add_string(tree, hf_digitech_preset_name, data_tvb, data_offset, str_size, tmp_string);
             data_offset += (gint)str_size;
 
@@ -1416,6 +1421,11 @@ proto_register_sysex(void)
     expert_register_field_array(expert_sysex, ei, array_length(ei));
 
     register_dissector("sysex", dissect_sysex_command, proto_sysex);
+}
+
+void
+proto_reg_handoff_sysex(void)
+{
 }
 
 /*

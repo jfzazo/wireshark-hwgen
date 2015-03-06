@@ -23,9 +23,11 @@
 
 #include "config.h"
 
+
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/oui.h>
 #include <epan/dissectors/packet-dcerpc.h>
+#include <epan/oui.h>
 
 #include "packet-pn.h"
 
@@ -772,15 +774,17 @@ dissect_PNPTCP_DelayPDU(tvbuff_t *tvb, int offset,
 
 /* possibly dissect a PN-RT packet (frame ID must be in the appropriate range) */
 static gboolean
-dissect_PNPTCP_Data_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+dissect_PNPTCP_Data_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-    /* the tvb will NOT contain the frame_id here, so get it from dissector data! */
-    guint16     u16FrameID = GPOINTER_TO_UINT(data);
+    guint16     u16FrameID;
     proto_item *item;
     proto_tree *ptcp_tree;
     int         offset = 0;
     guint32     u32SubStart;
 
+
+    /* the tvb will NOT contain the frame_id here, so get it from our private data! */
+    u16FrameID = GPOINTER_TO_UINT(pinfo->private_data);
 
     /* frame id must be in valid range (acyclic Real-Time, PTCP) */
     /* 0x0000 - 0x007F: RTSyncPDU (with follow up) */
@@ -1081,16 +1085,3 @@ proto_reg_handoff_pn_ptcp (void)
     /* register ourself as an heuristic pn-rt payload dissector */
     heur_dissector_add("pn_rt", dissect_PNPTCP_Data_heur, proto_pn_ptcp);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

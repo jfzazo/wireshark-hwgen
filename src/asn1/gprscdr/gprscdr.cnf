@@ -24,24 +24,11 @@ ServiceContextID
 ChangeLocationV651
 CTEID
 DataVolumeMBMS
-SubscriberEquipmentNumber
-SubscriberEquipmentType
 # 6.4 If these are needed MBMS asn1 should be added.
 SGSNMBMSRecord
 GGSNMBMSRecord
 GWMBMSRecord
 ChangeOfMBMSCondition
-CNIPMulticastDistribution
-MBMS2G3GIndicator
-TMGI
-MBMSSessionIdentity
-MBMSServiceType
-MBMSUserServiceType
-MBMSServiceArea
-RequiredMBMSBearerCapabilities
-
-#.NO_EMIT
-MBMSInformation
 
 #.EXPORTS
 GPRSCallEventRecord
@@ -62,18 +49,9 @@ GPRSCallEventRecord
 GPRSRecord
 
 
-# Get the OID
-#.FN_PARS ManagementExtension/identifier FN_VARIANT = _str  VAL_PTR = &obj_id
-
 #.FN_BODY ManagementExtension/information
 
-  proto_tree *ext_tree;
-  ext_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_gprscdr_managementextension_information, NULL, "Information");
-  if (obj_id){
-	 offset=call_ber_oid_callback(obj_id, tvb, offset, actx->pinfo, ext_tree, NULL);
-  }else{
-	 proto_tree_add_expert(ext_tree, actx->pinfo, &ei_gprscdr_not_dissected, tvb, offset, -1);
-  }
+   proto_tree_add_text(tree, tvb, offset, -1, "Not dissected");
 
 #.FN_BODY TimeStamp VAL_PTR = &parameter_tvb
 /*
@@ -151,22 +129,8 @@ GPRSRecord
 	return offset;
 
  subtree = proto_item_add_subtree(actx->created_item, ett_gprscdr_plmn_id);
- dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, E212_NONE, TRUE);
+ dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, TRUE);
 
-#.FN_BODY GPRSRecord VAL_PTR = &branch_taken
-proto_item *item;
-gint branch_taken, t_offset = offset;
-gint32   tag;
-
- %(DEFAULT_BODY)s
-
- if(branch_taken == -1){
-    get_ber_identifier(tvb, t_offset, NULL, NULL, &tag);
-	item = proto_tree_add_uint(tree, hf_index, tvb, t_offset, 1, tag);
-	dissect_ber_identifier(actx->pinfo, tree, tvb, t_offset, NULL, NULL, &tag);
-	expert_add_info_format(actx->pinfo, item, &ei_gprscdr_choice_not_found,
-              "Record type(BER choice) not found: %%u", tag);
- }
 #.TYPE_ATTR
 IPBinaryAddress/iPBinV4Address TYPE = FT_IPv4  DISPLAY = BASE_NONE
 IPBinaryAddress/iPBinV6Address TYPE = FT_IPv6  DISPLAY = BASE_NONE

@@ -48,6 +48,7 @@ THE SOFTWARE.
 #include <stdlib.h>
 #include <string.h>
 #include <locale.h>
+#include <ctype.h>
 #include <glib.h>
 
 #include "lua.h"
@@ -231,7 +232,7 @@ static int getcflags (lua_State *L, int pos) {
 }
 
 static int check_eflags(lua_State *L, const int idx, const int def) {
-  int eflags = (int) luaL_optinteger (L, idx, def);
+  int eflags = luaL_optint (L, idx, def);
   if ((eflags & ~G_REGEX_MATCH_MASK) != 0) {
     return luaL_error (L, "GLib Regex match flag is invalid");
   }
@@ -259,12 +260,10 @@ static int compile_regex (lua_State *L, const TArgComp *argC, TGrgx **pud) {
 
   ud->pr = g_regex_new (argC->pattern,
         (GRegexCompileFlags)(argC->cflags | G_REGEX_RAW), (GRegexMatchFlags)0, &ud->error);
-
-  if (pud) *pud = ud;
-
   if (!ud->pr)
     return luaL_error (L, "%s (code: %d)", ud->error->message, ud->error->code);
 
+  if (pud) *pud = ud;
   return 1;
 }
 

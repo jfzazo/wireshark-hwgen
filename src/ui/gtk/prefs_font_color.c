@@ -29,14 +29,17 @@
 #include <epan/proto.h>
 #include <epan/prefs.h>
 
+#include <color.h>
 
 #include <ui/recent.h>
 #include <ui/simple_dialog.h>
 
-#include "ui/gtk/old-gtk-compat.h"
 #include "color_utils.h"
 #include "follow_tcp.h"
 #include "font_utils.h"
+#include "gui_utils.h"
+#include "keys.h"
+#include "old-gtk-compat.h"
 #include "packet_panes.h"
 #include "prefs_font_color.h"
 

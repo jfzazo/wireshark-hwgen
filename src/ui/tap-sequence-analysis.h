@@ -50,19 +50,19 @@ typedef enum seq_analysis_type_ {
 
 /** defines an entry for the graph analysis */
 typedef struct _seq_analysis_item {
-    frame_data *fd;                     /**< Holds the frame number and time information */
+    frame_data *fd;			/**< Holds the frame number and time information */
     address src_addr;
     guint16 port_src;
     address dst_addr;
     guint16 port_dst;
-    gchar *frame_label;                 /**< the label on top of the arrow */
-    gchar *time_str;                    /**< timestamp */
-    gchar *comment;                     /**< a comment that appears at the right of the graph */
-    guint16 conv_num;                   /**< the conversation number, each conversation will be colored */
-    gboolean display;                   /**< indicate if the packet is displayed or not in the graph */
-    guint src_node;                     /**< this is used by graph_analysis.c to identify the node */
-    guint dst_node;                     /**< a node is an IP address that will be displayed in columns */
-    guint16 line_style;                 /**< the arrow line width in pixels*/
+    gchar *frame_label;			/**< the label on top of the arrow */
+    gchar *time_str;   			/**< timestamp */
+    gchar *comment;			/**< a comment that appears at the right of the graph */
+    guint16 conv_num;			/**< the conversation number, each conversation will be colored */
+    gboolean display;			/**< indicate if the packet is displayed or not in the graph */
+    guint16 src_node;			/**< this is used by graph_analysis.c to identify the node */
+    guint16 dst_node;			/**< a node is an IP address that will be displayed in columns */
+    guint16 line_style;			/**< the arrow line width in pixels*/
 } seq_analysis_item_t;
 
 /** defines the graph analysis structure */
@@ -71,21 +71,11 @@ typedef struct _seq_analysis_info {
     gboolean    all_packets; /**< all packets vs only displayed */
     gboolean    any_addr;    /**< any addr (DL+net) vs net-only */
     int         nconv;       /**< number of conversations in the list */
-    GQueue*     items;       /**< list with the graph analysis items */
+    GList*      list;        /**< list with the graph analysis items */
     GHashTable *ht;          /**< hash table for retrieving graph analysis items */
     address nodes[MAX_NUM_NODES]; /**< horizontal node list */
     guint32 num_nodes;       /**< actual number of nodes */
 } seq_analysis_info_t;
-
-/** Create and initialize a seq_analysis_info_t struct
- * @return A pointer to a newly allocated seq_analysis_info_t struct.
- */
-seq_analysis_info_t *sequence_analysis_info_new(void);
-
-/** Free a seq_analysis_info_t struct.
- * @param sainfo A pointer to the seq_analysis_info_t struct to be freed.
- */
-void sequence_analysis_info_free(seq_analysis_info_t * sainfo);
 
 /** Fill in the segment list for sequence analysis
  *
@@ -93,8 +83,6 @@ void sequence_analysis_info_free(seq_analysis_info_t * sainfo);
  * @param sainfo Sequence analysis information. A valid type must be set.
  */
 void sequence_analysis_list_get(capture_file *cf, seq_analysis_info_t *sainfo);
-
-void sequence_analysis_list_sort(seq_analysis_info_t *sainfo);
 
 /** Free the segment list
  *

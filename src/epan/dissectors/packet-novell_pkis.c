@@ -29,14 +29,18 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
 #include <epan/expert.h>
+#include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/oids.h>
 #include <epan/conversation.h>
 #include <epan/asn1.h>
 
-#include "packet-per.h"
+#include <stdio.h>
+#include <string.h>
+
+#include <epan/dissectors/packet-per.h>
 #include "packet-ber.h"
 
 
@@ -77,10 +81,10 @@ static int hf_novell_pkis_integrityCategories1 = -1;  /* BIT_STRING_SIZE_64 */
 static int hf_novell_pkis_secrecySingletons1 = -1;  /* Singletons */
 static int hf_novell_pkis_integritySingletons1 = -1;  /* Singletons */
 static int hf_novell_pkis_Singletons_item = -1;   /* SingletonChoice */
-static int hf_novell_pkis_uniqueSingleton = -1;   /* INTEGER_0_9223372036854775807 */
+static int hf_novell_pkis_uniqueSingleton = -1;   /* T_uniqueSingleton */
 static int hf_novell_pkis_singletonRange = -1;    /* SingletonRange */
-static int hf_novell_pkis_singletonLowerBound = -1;  /* INTEGER_0_9223372036854775807 */
-static int hf_novell_pkis_singletonUpperBound = -1;  /* INTEGER_0_9223372036854775807 */
+static int hf_novell_pkis_singletonLowerBound = -1;  /* T_singletonLowerBound */
+static int hf_novell_pkis_singletonUpperBound = -1;  /* T_singletonUpperBound */
 static int hf_novell_pkis_singletonValue = -1;    /* BOOLEAN */
 static int hf_novell_pkis_perTransactionLimit = -1;  /* MonetaryValue */
 static int hf_novell_pkis_perCertificateLimit = -1;  /* MonetaryValue */
@@ -89,7 +93,7 @@ static int hf_novell_pkis_amount = -1;            /* INTEGER */
 static int hf_novell_pkis_amtExp10 = -1;          /* INTEGER */
 
 /*--- End of included file: packet-novell_pkis-hf.c ---*/
-#line 35 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
+#line 39 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
 
 /*--- Included file: packet-novell_pkis-ett.c ---*/
 #line 1 "../../asn1/novell_pkis/packet-novell_pkis-ett.c"
@@ -111,7 +115,7 @@ static gint ett_novell_pkis_RelianceLimits = -1;
 static gint ett_novell_pkis_MonetaryValue = -1;
 
 /*--- End of included file: packet-novell_pkis-ett.c ---*/
-#line 36 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
+#line 40 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
 
 /*--- Included file: packet-novell_pkis-fn.c ---*/
 #line 1 "../../asn1/novell_pkis/packet-novell_pkis-fn.c"
@@ -297,7 +301,27 @@ dissect_novell_pkis_BIT_STRING_SIZE_64(gboolean implicit_tag _U_, tvbuff_t *tvb 
 
 
 static int
-dissect_novell_pkis_INTEGER_0_9223372036854775807(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+dissect_novell_pkis_T_uniqueSingleton(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_ber_integer64(implicit_tag, actx, tree, tvb, offset, hf_index,
+                                                NULL);
+
+  return offset;
+}
+
+
+
+static int
+dissect_novell_pkis_T_singletonLowerBound(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_ber_integer64(implicit_tag, actx, tree, tvb, offset, hf_index,
+                                                NULL);
+
+  return offset;
+}
+
+
+
+static int
+dissect_novell_pkis_T_singletonUpperBound(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_ber_integer64(implicit_tag, actx, tree, tvb, offset, hf_index,
                                                 NULL);
 
@@ -306,8 +330,8 @@ dissect_novell_pkis_INTEGER_0_9223372036854775807(gboolean implicit_tag _U_, tvb
 
 
 static const ber_sequence_t SingletonRange_sequence[] = {
-  { &hf_novell_pkis_singletonLowerBound, BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_NOOWNTAG, dissect_novell_pkis_INTEGER_0_9223372036854775807 },
-  { &hf_novell_pkis_singletonUpperBound, BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_NOOWNTAG, dissect_novell_pkis_INTEGER_0_9223372036854775807 },
+  { &hf_novell_pkis_singletonLowerBound, BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_NOOWNTAG, dissect_novell_pkis_T_singletonLowerBound },
+  { &hf_novell_pkis_singletonUpperBound, BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_NOOWNTAG, dissect_novell_pkis_T_singletonUpperBound },
   { &hf_novell_pkis_singletonValue, BER_CLASS_UNI, BER_UNI_TAG_BOOLEAN, BER_FLAGS_NOOWNTAG, dissect_novell_pkis_BOOLEAN },
   { NULL, 0, 0, 0, NULL }
 };
@@ -328,7 +352,7 @@ static const value_string novell_pkis_SingletonChoice_vals[] = {
 };
 
 static const ber_choice_t SingletonChoice_choice[] = {
-  {   0, &hf_novell_pkis_uniqueSingleton, BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_NOOWNTAG, dissect_novell_pkis_INTEGER_0_9223372036854775807 },
+  {   0, &hf_novell_pkis_uniqueSingleton, BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_NOOWNTAG, dissect_novell_pkis_T_uniqueSingleton },
   {   1, &hf_novell_pkis_singletonRange, BER_CLASS_UNI, BER_UNI_TAG_SEQUENCE, BER_FLAGS_NOOWNTAG, dissect_novell_pkis_SingletonRange },
   { 0, NULL, 0, 0, 0, NULL }
 };
@@ -492,24 +516,20 @@ dissect_novell_pkis_RelianceLimits(gboolean implicit_tag _U_, tvbuff_t *tvb _U_,
 
 /*--- PDUs ---*/
 
-static int dissect_SecurityAttributes_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SecurityAttributes_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_novell_pkis_SecurityAttributes(FALSE, tvb, offset, &asn1_ctx, tree, hf_novell_pkis_SecurityAttributes_PDU);
-  return offset;
+  dissect_novell_pkis_SecurityAttributes(FALSE, tvb, 0, &asn1_ctx, tree, hf_novell_pkis_SecurityAttributes_PDU);
 }
-static int dissect_RelianceLimits_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_RelianceLimits_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_novell_pkis_RelianceLimits(FALSE, tvb, offset, &asn1_ctx, tree, hf_novell_pkis_RelianceLimits_PDU);
-  return offset;
+  dissect_novell_pkis_RelianceLimits(FALSE, tvb, 0, &asn1_ctx, tree, hf_novell_pkis_RelianceLimits_PDU);
 }
 
 
 /*--- End of included file: packet-novell_pkis-fn.c ---*/
-#line 37 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
+#line 41 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
 
 void proto_register_novell_pkis (void);
 void proto_reg_handoff_novell_pkis(void);
@@ -521,12 +541,12 @@ void proto_reg_handoff_novell_pkis(void)
 
 /*--- Included file: packet-novell_pkis-dis-tab.c ---*/
 #line 1 "../../asn1/novell_pkis/packet-novell_pkis-dis-tab.c"
-  new_register_ber_oid_dissector("2.16.840.1.113719.1.9.4.1", dissect_SecurityAttributes_PDU, proto_novell_pkis, "pa-sa");
-  new_register_ber_oid_dissector("2.16.840.1.113719.1.9.4.2", dissect_RelianceLimits_PDU, proto_novell_pkis, "pa-rl");
+  register_ber_oid_dissector("2.16.840.1.113719.1.9.4.1", dissect_SecurityAttributes_PDU, proto_novell_pkis, "pa-sa");
+  register_ber_oid_dissector("2.16.840.1.113719.1.9.4.2", dissect_RelianceLimits_PDU, proto_novell_pkis, "pa-rl");
 
 
 /*--- End of included file: packet-novell_pkis-dis-tab.c ---*/
-#line 46 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
+#line 50 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
 }
 
 void proto_register_novell_pkis (void)
@@ -678,7 +698,7 @@ void proto_register_novell_pkis (void)
     { &hf_novell_pkis_uniqueSingleton,
       { "uniqueSingleton", "novell_pkis.uniqueSingleton",
         FT_UINT64, BASE_DEC, NULL, 0,
-        "INTEGER_0_9223372036854775807", HFILL }},
+        NULL, HFILL }},
     { &hf_novell_pkis_singletonRange,
       { "singletonRange", "novell_pkis.singletonRange_element",
         FT_NONE, BASE_NONE, NULL, 0,
@@ -686,11 +706,11 @@ void proto_register_novell_pkis (void)
     { &hf_novell_pkis_singletonLowerBound,
       { "singletonLowerBound", "novell_pkis.singletonLowerBound",
         FT_UINT64, BASE_DEC, NULL, 0,
-        "INTEGER_0_9223372036854775807", HFILL }},
+        NULL, HFILL }},
     { &hf_novell_pkis_singletonUpperBound,
       { "singletonUpperBound", "novell_pkis.singletonUpperBound",
         FT_UINT64, BASE_DEC, NULL, 0,
-        "INTEGER_0_9223372036854775807", HFILL }},
+        NULL, HFILL }},
     { &hf_novell_pkis_singletonValue,
       { "singletonValue", "novell_pkis.singletonValue",
         FT_BOOLEAN, BASE_NONE, NULL, 0,
@@ -717,7 +737,7 @@ void proto_register_novell_pkis (void)
         "INTEGER", HFILL }},
 
 /*--- End of included file: packet-novell_pkis-hfarr.c ---*/
-#line 52 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
+#line 56 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
   };
   static gint *ett[] = {
 
@@ -741,7 +761,7 @@ void proto_register_novell_pkis (void)
     &ett_novell_pkis_MonetaryValue,
 
 /*--- End of included file: packet-novell_pkis-ettarr.c ---*/
-#line 55 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
+#line 59 "../../asn1/novell_pkis/packet-novell_pkis-template.c"
   };
 
   /* execute protocol initialization only once */

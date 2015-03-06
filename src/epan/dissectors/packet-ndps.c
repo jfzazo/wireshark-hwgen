@@ -24,11 +24,15 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/prefs.h>
 #include <epan/reassemble.h>
+#include <epan/conversation.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 #include <epan/strutil.h>
 
 #include "packet-ipx.h"
@@ -357,8 +361,6 @@ static gint ett_ndps = -1;
 static expert_field ei_ndps_problem_type = EI_INIT;
 static expert_field ei_ndps_return_code = EI_INIT;
 static expert_field ei_ndps_rpc_acc_stat = EI_INIT;
-static expert_field ei_ndps_truncated = EI_INIT;
-
 
 /* desegmentation of NDPS over TCP */
 static gboolean ndps_desegment = TRUE;
@@ -2106,103 +2108,113 @@ objectidentifier(tvbuff_t* tvb, proto_tree *ndps_tree, int foffset)
         label = try_val_to_str(label_value, object_ids_7);
         if (label==NULL)
         {
-            label = wmem_strdup(wmem_packet_scope(), "Unknown ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
             found=FALSE;
+            break;
         }
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_7, tvb, foffset, length, label_value, "%s", label);
+        aitem = proto_tree_add_none_format(ndps_tree, hf_ndps_object_ids_7, tvb, foffset, length, "%s", label);
         break;
     case 10:
         label_value = tvb_get_ntohl(tvb, foffset+6);
         label = try_val_to_str(label_value, object_ids_8);
         if (label==NULL)
         {
-            label = wmem_strdup(wmem_packet_scope(), "Unknown ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
             found=FALSE;
+            break;
         }
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_8, tvb, foffset, length, label_value, "%s", label);
+        aitem = proto_tree_add_none_format(ndps_tree, hf_ndps_object_ids_8, tvb, foffset, length, "%s", label);
         break;
     case 11:
         label_value = tvb_get_ntohl(tvb, foffset+7);
         label = try_val_to_str(label_value, object_ids_9);
         if (label==NULL)
         {
-            label = wmem_strdup(wmem_packet_scope(), "Unknown ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
             found=FALSE;
+            break;
         }
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_9, tvb, foffset, length, label_value, "%s", label);
+        aitem = proto_tree_add_none_format(ndps_tree, hf_ndps_object_ids_9, tvb, foffset, length, "%s", label);
         break;
     case 12:
         label_value = tvb_get_ntohl(tvb, foffset+8);
         label = try_val_to_str(label_value, object_ids_10);
         if (label==NULL)
         {
-            label = wmem_strdup(wmem_packet_scope(), "Unknown ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
             found=FALSE;
+            break;
         }
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_10, tvb, foffset, length, label_value, "%s", label);
+        aitem = proto_tree_add_none_format(ndps_tree, hf_ndps_object_ids_10, tvb, foffset, length, "%s", label);
         break;
     case 13:
         label_value = tvb_get_ntohl(tvb, foffset+9);
         label = try_val_to_str(label_value, object_ids_11);
         if (label==NULL)
         {
-            label = wmem_strdup(wmem_packet_scope(), "Unknown ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
             found=FALSE;
+            break;
         }
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_11, tvb, foffset, length, label_value, "%s", label);
+        aitem = proto_tree_add_none_format(ndps_tree, hf_ndps_object_ids_11, tvb, foffset, length, "%s", label);
         break;
     case 14:
         label_value = tvb_get_ntohl(tvb, foffset+10);
         label = try_val_to_str(label_value, object_ids_12);
         if (label==NULL)
         {
-            label = wmem_strdup(wmem_packet_scope(), "Unknown ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
             found=FALSE;
+            break;
         }
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_12, tvb, foffset, length, label_value, "%s", label);
+        aitem = proto_tree_add_none_format(ndps_tree, hf_ndps_object_ids_12, tvb, foffset, length, "%s", label);
         break;
     case 15:
         label_value = tvb_get_ntohl(tvb, foffset+11);
         label = try_val_to_str(label_value, object_ids_13);
         if (label==NULL)
         {
-            label = wmem_strdup(wmem_packet_scope(), "Unknown ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
             found=FALSE;
+            break;
         }
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_13, tvb, foffset, length, label_value, "%s", label);
+        aitem = proto_tree_add_none_format(ndps_tree, hf_ndps_object_ids_13, tvb, foffset, length, "%s", label);
         break;
     case 16:
         label_value = tvb_get_ntohl(tvb, foffset+12);
         label = try_val_to_str(label_value, object_ids_14);
         if (label==NULL)
         {
-            label = wmem_strdup(wmem_packet_scope(), "Unknown ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
             found=FALSE;
+            break;
         }
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_14, tvb, foffset, length, label_value, "%s", label);
+        aitem = proto_tree_add_none_format(ndps_tree, hf_ndps_object_ids_14, tvb, foffset, length, "%s", label);
         break;
     case 17:
         label_value = tvb_get_ntohl(tvb, foffset+13);
         label = try_val_to_str(label_value, object_ids_15);
         if (label==NULL)
         {
-            label = wmem_strdup(wmem_packet_scope(), "Unknown ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
             found=FALSE;
+            break;
         }
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_15, tvb, foffset, length, label_value, "%s", label);
+        aitem = proto_tree_add_none_format(ndps_tree, hf_ndps_object_ids_15, tvb, foffset, length, "%s", label);
         break;
     case 18:
         label_value = tvb_get_ntohl(tvb, foffset+14);
         label = try_val_to_str(label_value, object_ids_16);
         if (label==NULL)
         {
-            label = wmem_strdup(wmem_packet_scope(), "Unknown ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
             found=FALSE;
+            break;
         }
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_16, tvb, foffset, length, label_value, "%s", label);
+        aitem = proto_tree_add_none_format(ndps_tree, hf_ndps_object_ids_16, tvb, foffset, length, "%s", label);
         break;
     default:
-        aitem = proto_tree_add_uint_format(ndps_tree, hf_ndps_object_ids_7, tvb, foffset, length, 1, "Unknown ID");
+        aitem = proto_tree_add_text(ndps_tree, tvb, foffset, length, "Unknown ID");
         found=FALSE;
         break;
     }
@@ -2218,6 +2230,7 @@ objectidentifier(tvbuff_t* tvb, proto_tree *ndps_tree, int foffset)
         foffset += 1;
         length = tvb_get_guint8(tvb, foffset);
         foffset += 1;
+        tvb_ensure_bytes_exist(tvb, foffset, length);
         proto_tree_add_item(atree, hf_ndps_oid, tvb, foffset, length, ENC_NA);
         foffset += length;
     }
@@ -2433,14 +2446,14 @@ address_item(tvbuff_t* tvb, proto_tree *ndps_tree, int foffset)
 }
 
 static int
-credentials(tvbuff_t* tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset)
+credentials(tvbuff_t* tvb, proto_tree *ndps_tree, int foffset)
 {
     guint32     cred_type=0;
     guint32     length=0;
     guint32     number_of_items;
     guint32     ii;
     proto_tree  *atree;
-    proto_item  *aitem, *expert_item;
+    proto_item  *aitem;
 
     cred_type = tvb_get_ntohl(tvb, foffset);
     proto_tree_add_item(ndps_tree, hf_ndps_cred_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -2450,19 +2463,21 @@ credentials(tvbuff_t* tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffse
     case 0:
         foffset = ndps_string(tvb, hf_ndps_user_name, ndps_tree, foffset, NULL);
         number_of_items=tvb_get_ntohl(tvb, foffset);
-        expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_passwords, tvb, foffset, 4, number_of_items);
+        proto_tree_add_uint(ndps_tree, hf_ndps_num_passwords, tvb, foffset, 4, number_of_items);
         foffset += 4;
         for (ii = 0; ii < number_of_items; ii++ )
         {
             if (ii >= NDPS_MAX_ITEMS) {
-                expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                 break;
             }
-            atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Password %d", ii+1);
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Password %d", ii+1);
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             length = tvb_get_ntohl(tvb, foffset);
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(atree, hf_ndps_password, tvb, foffset, length, ENC_NA);
             }
             proto_item_set_end(aitem, tvb, foffset);
@@ -2474,6 +2489,7 @@ credentials(tvbuff_t* tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffse
         foffset += 4;
         if (length!=0)
         {
+            tvb_ensure_bytes_exist(tvb, foffset, length);
             proto_tree_add_item(ndps_tree, hf_ndps_certified, tvb, foffset, length, ENC_NA);
         }
         foffset += length;
@@ -2523,27 +2539,33 @@ credentials(tvbuff_t* tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffse
 
 
 static int
-event_object_set(tvbuff_t* tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset)
+event_object_set(tvbuff_t* tvb, proto_tree *ndps_tree, int foffset)
 {
     guint32     number_of_items;
     guint32     number_of_items2;
     guint32     ii;
     guint32     jj;
     guint32     object_identifier;
-    proto_tree  *atree, *btree, *ctree;
-    proto_item  *aitem, *bitem, *citem, *expert_item;
+    proto_tree  *atree;
+    proto_item  *aitem;
+    proto_tree  *btree;
+    proto_item  *bitem;
+    proto_tree  *ctree;
+    proto_item  *citem;
 
-    atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Event");
+    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Event");
+    atree = proto_item_add_subtree(aitem, ett_ndps);
     number_of_items = tvb_get_ntohl(tvb, foffset);
-    expert_item = proto_tree_add_uint(atree, hf_ndps_num_events, tvb, foffset, 4, number_of_items);
+    proto_tree_add_uint(atree, hf_ndps_num_events, tvb, foffset, 4, number_of_items);
     foffset += 4;
     for (ii = 0; ii < number_of_items; ii++ )
     {
         if (ii >= NDPS_MAX_ITEMS) {
-            expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+            proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
             break;
         }
-        btree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &bitem, "Event %u", ii+1);
+        bitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Event %u", ii+1);
+        btree = proto_item_add_subtree(bitem, ett_ndps);
         proto_tree_add_item(btree, hf_ndps_event_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
         foffset += 4;
         foffset = objectidentifier(tvb, btree, foffset);
@@ -2564,15 +2586,16 @@ event_object_set(tvbuff_t* tvb, packet_info *pinfo, proto_tree *ndps_tree, int f
 
             case 2:
                 number_of_items2 = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(btree, hf_ndps_item_count, tvb, foffset, 4, number_of_items2);
+                proto_tree_add_uint(btree, hf_ndps_item_count, tvb, foffset, 4, number_of_items2);
                 foffset += 4;
                 for (jj = 0; jj < number_of_items2; jj++ )
                 {
                     if (jj >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(btree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    ctree = proto_tree_add_subtree_format(btree, tvb, foffset, -1, ett_ndps, &citem, "Item %u", jj+1);
+                    citem = proto_tree_add_text(btree, tvb, foffset, -1, "Item %u", jj+1);
+                    ctree = proto_item_add_subtree(citem, ett_ndps);
                     foffset = objectidentifier(tvb, ctree, foffset);
                     foffset += align_4(tvb, foffset);
                     proto_item_set_end(citem, tvb, foffset);
@@ -2587,24 +2610,25 @@ event_object_set(tvbuff_t* tvb, packet_info *pinfo, proto_tree *ndps_tree, int f
 
 
 static int
-cardinal_seq(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int foffset)
+cardinal_seq(tvbuff_t* tvb, proto_tree *ndps_tree, int foffset)
 {
     guint32     number_of_items;
     guint32     length;
     guint32     ii;
     proto_tree  *atree;
-    proto_item  *aitem, *expert_item;
+    proto_item  *aitem;
 
     number_of_items = tvb_get_ntohl(tvb, foffset);
-    expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+    proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
     foffset += 4;
     for (ii = 0; ii < number_of_items; ii++ )
     {
         if (ii >= NDPS_MAX_ITEMS) {
-            expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+            proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
             break;
         }
-        atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Cardinal %u", ii+1);
+        aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Cardinal %u", ii+1);
+        atree = proto_item_add_subtree(aitem, ett_ndps);
         length = tvb_get_ntohl(tvb, foffset);
         foffset += 4;
         if (length==4)
@@ -2623,31 +2647,35 @@ cardinal_seq(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int foffs
 
 
 static int
-server_entry(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int foffset)
+server_entry(tvbuff_t* tvb, proto_tree *ndps_tree, int foffset)
 {
     char        *server_name;
     guint32     number_of_items;
     guint32     ii;
     guint32     data_type;
-    proto_tree  *atree, *btree;
-    proto_item  *aitem, *bitem, *expert_item;
+    proto_tree  *atree;
+    proto_item  *aitem;
+    proto_tree  *btree;
+    proto_item  *bitem;
 
-    atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Server Info");
+    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Server Info");
+    atree = proto_item_add_subtree(aitem, ett_ndps);
     foffset = ndps_string(tvb, hf_ndps_server_name, ndps_tree, foffset, &server_name);
     proto_item_append_text(aitem, ": %s", format_text(server_name, strlen(server_name)));
     proto_tree_add_item(atree, hf_ndps_server_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
     foffset += 4;
     foffset = print_address(tvb, atree, foffset);
     number_of_items = tvb_get_ntohl(tvb, foffset);
-    expert_item = proto_tree_add_uint(atree, hf_ndps_num_servers, tvb, foffset, 4, number_of_items);
+    proto_tree_add_uint(atree, hf_ndps_num_servers, tvb, foffset, 4, number_of_items);
     foffset += 4;
     for (ii = 0; ii < number_of_items; ii++ )
     {
         if (ii >= NDPS_MAX_ITEMS) {
-            expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+            proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
             break;
         }
-        btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Info %u", ii+1);
+        bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Info %u", ii+1);
+        btree = proto_item_add_subtree(bitem, ett_ndps);
         data_type = tvb_get_ntohl(tvb, foffset);
         proto_tree_add_item(btree, hf_ndps_data_item_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
         foffset += 4;
@@ -2684,7 +2712,7 @@ server_entry(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int foffs
 
 
 static int
-attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int foffset)
+attribute_value(tvbuff_t* tvb, proto_tree *ndps_tree, int foffset)
 {
     guint32     ii;
     guint32     jj;
@@ -2710,8 +2738,10 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
     guint32     cardinal;
     const char  *label;
     guint32     label_value;
-    proto_tree  *atree, *btree;
-    proto_item  *aitem, *bitem, *expert_item;
+    proto_tree  *atree;
+    proto_item  *aitem;
+    proto_tree  *btree;
+    proto_item  *bitem;
 
     if (global_attribute_name==NULL)
     {
@@ -2749,15 +2779,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             break;
         case 39:         /* Name or OID Seq */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Item %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Item %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = name_or_id(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
             }
@@ -2769,15 +2800,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             break;
         case 8:         /* Distinguished Name String Seq */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Name %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Name %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = ndps_string(tvb, hf_object_name, atree, foffset, NULL);
                 foffset = name_or_id(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
@@ -2836,15 +2868,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
         case 23:         /* Cardinal 64 Seq */
         case 30:         /* Real Seq */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Item %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Item %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 proto_tree_add_item(atree, hf_ndps_n64, tvb, foffset, 8, ENC_NA);
                 foffset += 8;
                 proto_item_set_end(aitem, tvb, foffset);
@@ -2876,30 +2909,32 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             break;
         case 37:         /* Object Identifier Seq */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = objectidentifier(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
             }
             break;
         case 41:         /* Relative Distinguished Name Seq */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_names, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_names, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Name %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Name %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = ndps_string(tvb, hf_object_name, atree, foffset, NULL);
                 proto_item_set_end(aitem, tvb, foffset);
             }
@@ -2956,15 +2991,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             foffset += 4;
             if (location == 0) {
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_locations, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_num_locations, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Location %u", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Location %u", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     proto_tree_add_item(atree, hf_ndps_n64, tvb, foffset, 8, ENC_NA);
                     foffset += 8;
                     proto_item_set_end(aitem, tvb, foffset);
@@ -2991,15 +3027,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             break;
         case 48:         /* Area Seq */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_areas, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_areas, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Area %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Area %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 proto_tree_add_item(atree, hf_ndps_xmin_n64, tvb, foffset, 8, ENC_NA);
                 foffset += 8;
                 proto_tree_add_item(atree, hf_ndps_xmax_n64, tvb, foffset, 8, ENC_NA);
@@ -3077,28 +3114,30 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             foffset = name_or_id(tvb, ndps_tree, foffset);
 
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_address_items, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_address_items, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Address Item %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Address Item %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = address_item(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
             }
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_events, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_events, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Event %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Event %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 proto_tree_add_item(atree, hf_ndps_event_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 foffset = objectidentifier(tvb, atree, foffset);
@@ -3114,12 +3153,12 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
                     case 2:
                         /* Number of Objects */
                         number_of_items2 = tvb_get_ntohl(tvb, foffset);
-                        expert_item = proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items2);
+                        proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items2);
                         foffset += 4;
                         for (jj = 0; jj < number_of_items2; jj++ )
                         {
                             if (jj >= NDPS_MAX_ITEMS) {
-                                expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                                proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                                 break;
                             }
                             foffset = objectidentifier(tvb, atree, foffset);
@@ -3133,15 +3172,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
 
                     case 0:
                         number_of_items2 = tvb_get_ntohl(tvb, foffset);
-                        expert_item = proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items2);
+                        proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items2);
                         foffset += 4;
                         for (jj = 0; jj < number_of_items2; jj++ )
                         {
                             if (jj >= NDPS_MAX_ITEMS) {
-                                expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                                proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                                 break;
                             }
-                            btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Object %u", jj+1);
+                            bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Object %u", jj+1);
+                            btree = proto_item_add_subtree(bitem, ett_ndps);
                             foffset = objectidentifier(tvb, btree, foffset);
                             proto_item_set_end(bitem, tvb, foffset);
                         }
@@ -3210,15 +3250,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
         case 65:         /* Job Categories */
             foffset = objectidentifier(tvb, ndps_tree, foffset);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_job_categories, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_job_categories, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Job %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Job %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -3237,15 +3278,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             foffset += 4;
             foffset = objectidentifier(tvb, ndps_tree, foffset);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_ignored_attributes, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_ignored_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Ignored Attribute %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Ignored Attribute %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 ignored_type = tvb_get_ntohl(tvb, foffset);
                 proto_tree_add_uint(atree, hf_ndps_ignored_type, tvb, foffset, 4, ignored_type);
                 foffset += 4;
@@ -3283,15 +3325,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             break;
         case 71:         /* Resource Context Seq */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_resources, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_resources, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Resource %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Resource %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 resource_type = tvb_get_ntohl(tvb, foffset);
                 proto_tree_add_uint(atree, hf_ndps_resource_type, tvb, foffset, 4, resource_type);
                 foffset += 4;
@@ -3308,15 +3351,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             break;
         case 73:         /* Page Select Seq */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_page_selects, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_page_selects, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Page Select %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Page Select %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 proto_tree_add_item(atree, hf_ndps_page_flag, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 identifier_type = tvb_get_ntohl(tvb, foffset);
@@ -3368,15 +3412,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             {
                 foffset = ndps_string(tvb, hf_ndps_tree, ndps_tree, foffset, NULL);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Item %u", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Item %u", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     proto_tree_add_item(atree, hf_ndps_page_flag, tvb, foffset, 4, ENC_BIG_ENDIAN);
                     foffset += 4;
                     identifier_type = tvb_get_ntohl(tvb, foffset);
@@ -3510,15 +3555,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             break;
         case 82:         /* Output Bins Characteristics */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_page_informations, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_page_informations, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Page Information %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Page Information %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 proto_tree_add_item(atree, hf_ndps_page_order, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 proto_tree_add_item(atree, hf_ndps_page_orientation, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -3540,15 +3586,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
         case 85:         /* Category Set */
             foffset = objectidentifier(tvb, ndps_tree, foffset);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_categories, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_categories, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Category %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Category %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -3561,15 +3608,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
                     THROW(ReportedBoundsError);
             }
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_values, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_values, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Value %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Value %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -3689,15 +3737,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             break;
         case 97:         /* Qualified Name Set */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_names, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_names, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Name %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Name %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = qualifiedname(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
             }
@@ -3715,15 +3764,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
 
                 foffset = objectidentifier(tvb, ndps_tree, foffset);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_colorants, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_num_colorants, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Colorant %u", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Colorant %u", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = name_or_id(tvb, atree, foffset);
                     proto_item_set_end(aitem, tvb, foffset);
                 }
@@ -3731,15 +3781,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             break;
         case 99:         /* Resource Printer ID */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_printer_def_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_printer_def_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Printer %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Printer %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = ndps_string(tvb, hf_ndps_printer_type, atree, foffset, NULL);
                 foffset = ndps_string(tvb, hf_ndps_printer_manuf, atree, foffset, NULL);
                 foffset = ndps_string(tvb, hf_ndps_inf_file_name, atree, foffset, NULL);
@@ -3782,15 +3833,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             break;
         case 105:         /* Print Contained Object ID Set */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = ndps_string(tvb, hf_ndps_pa_name, atree, foffset, NULL);
                 proto_tree_add_item(atree, hf_ndps_attribute_value, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
@@ -3802,6 +3854,7 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(ndps_tree, hf_ndps_octet_string, tvb, foffset, length, ENC_NA);
             }
             foffset += length;
@@ -3810,6 +3863,7 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(ndps_tree, hf_ndps_octet_string, tvb, foffset, length, ENC_NA);
             }
             foffset += length;
@@ -3822,6 +3876,7 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(ndps_tree, hf_ndps_octet_string, tvb, foffset, length, ENC_NA);
             }
             foffset += length;
@@ -3841,6 +3896,7 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(ndps_tree, hf_ndps_octet_string, tvb, foffset, length, ENC_NA);
             }
             foffset += length;
@@ -3863,6 +3919,7 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
                     foffset += 4;
                     if (length!=0)
                     {
+                        tvb_ensure_bytes_exist(tvb, foffset, length);
                         proto_tree_add_item(ndps_tree, hf_ndps_octet_string, tvb, foffset, length, ENC_NA);
                     }
                     foffset += length;
@@ -3883,15 +3940,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
                     break;
             }
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_events, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_events, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Event %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Event %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = ndps_string(tvb, hf_object_name, atree, foffset, NULL);
                 foffset = objectidentifier(tvb, atree, foffset);
                 proto_tree_add_item(atree, hf_ndps_event_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -3901,15 +3959,16 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
             foffset = objectidentifier(tvb, ndps_tree, foffset);
             foffset = qualifiedname(tvb, ndps_tree, foffset);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = objectidentifier(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
             }
@@ -3929,25 +3988,29 @@ attribute_value(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int fo
 
 
 static int
-commonarguments(tvbuff_t* tvb, packet_info* pinfo, proto_tree *ndps_tree, int foffset)
+commonarguments(tvbuff_t* tvb, proto_tree *ndps_tree, int foffset)
 {
     guint32     number_of_items;
     guint32     ii;
-    proto_tree  *atree, *btree;
-    proto_item  *aitem, *bitem, *expert_item;
+    proto_tree  *atree;
+    proto_item  *aitem;
+    proto_tree  *btree;
+    proto_item  *bitem;
 
-    atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Common Arguments");
+    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Common Arguments");
+    atree = proto_item_add_subtree(aitem, ett_ndps);
     number_of_items = tvb_get_ntohl(tvb, foffset);
-    expert_item = proto_tree_add_uint(atree, hf_ndps_num_args, tvb, foffset, 4, number_of_items);
+    proto_tree_add_uint(atree, hf_ndps_num_args, tvb, foffset, 4, number_of_items);
     foffset += 4;
     for (ii = 0; ii < number_of_items; ii++ )
     {
         if (ii >= NDPS_MAX_ITEMS) {
-            expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+            proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
             break;
         }
-        btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Argument %u", ii+1);
-        foffset = attribute_value(tvb, pinfo, btree, foffset);
+        bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Argument %u", ii+1);
+        btree = proto_item_add_subtree(bitem, ett_ndps);
+        foffset = attribute_value(tvb, btree, foffset);
         proto_item_set_end(bitem, tvb, foffset);
     }
     proto_item_set_end(aitem, tvb, foffset);
@@ -4160,7 +4223,7 @@ dissect_ndps(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree)
     ndps_packet_type = tvb_get_ntohl(tvb, 8);
     if (ndps_packet_type != 0 && ndps_packet_type != 1) {     /* Packet Type */
         col_set_str(pinfo->cinfo, COL_INFO, "(Continuation Data)");
-        proto_tree_add_bytes_format(ndps_tree, hf_ndps_data, tvb, 0, -1, NULL, "Data - (%d Bytes)", tvb_reported_length(tvb));
+        proto_tree_add_text(ndps_tree, tvb, 0, tvb_length(tvb), "Data - (%d Bytes)", tvb_length(tvb));
         return;
     }
     foffset = 0;
@@ -4260,7 +4323,7 @@ dissect_ndps(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree)
 }
 
 static guint
-get_ndps_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_ndps_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     return tvb_get_ntohs(tvb, offset +2) + 4;
 }
@@ -4497,8 +4560,14 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
     guint32             integer_type_flag;
     guint32             local_servers_type;
     gint                length_remaining;
-    proto_tree          *atree, *btree, *ctree, *dtree;
-    proto_item          *aitem, *bitem, *citem, *ditem, *expert_item;
+    proto_tree          *atree;
+    proto_item          *aitem;
+    proto_tree          *btree;
+    proto_item          *bitem;
+    proto_tree          *ctree;
+    proto_item          *citem;
+    proto_tree          *dtree;
+    proto_item          *ditem;
 
     if (!pinfo->fd->flags.visited)
     {
@@ -4532,22 +4601,23 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
         switch(ndps_func)
         {
         case 0x00000001:    /* Bind PSM */
-            foffset = credentials(tvb, pinfo, ndps_tree, foffset);
+            foffset = credentials(tvb, ndps_tree, foffset);
             break;
         case 0x00000002:    /* Bind PA */
-            foffset = credentials(tvb, pinfo, ndps_tree, foffset);
+            foffset = credentials(tvb, ndps_tree, foffset);
             proto_tree_add_item(ndps_tree, hf_ndps_retrieve_restrictions, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             number_of_items=tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_bind_security_option_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_bind_security_option_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Security %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Security %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 if (length==4)
                 {
@@ -4574,29 +4644,32 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset = ndps_string(tvb, hf_ndps_pa_name, ndps_tree, foffset, NULL);
                 proto_tree_add_item(ndps_tree, hf_sub_complete, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Transfer Method");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Transfer Method");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute %u", ii+1);
+                    bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute %u", ii+1);
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
                     foffset = objectidentifier(tvb, btree, foffset);
                     number_of_items2 = tvb_get_ntohl(tvb, foffset);
-                    expert_item = proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items2);
+                    proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items2);
                     foffset += 4;
                     for (jj = 0; jj < number_of_items2; jj++ )
                     {
                         if (jj >= NDPS_MAX_ITEMS) {
-                            expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                            proto_tree_add_text(btree, tvb, foffset, -1, "[Truncated]");
                             break;
                         }
-                        ctree = proto_tree_add_subtree_format(btree, tvb, foffset, -1, ett_ndps, &citem, "Value %u", jj+1);
-                        foffset = attribute_value(tvb, pinfo, ctree, foffset);
+                        citem = proto_tree_add_text(btree, tvb, foffset, -1, "Value %u", jj+1);
+                        ctree = proto_item_add_subtree(citem, ett_ndps);
+                        foffset = attribute_value(tvb, ctree, foffset);
                         proto_item_set_end(citem, tvb, foffset);
                     }
                     proto_tree_add_item(btree, hf_ndps_qualifier, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -4604,17 +4677,19 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                     proto_item_set_end(bitem, tvb, foffset);
                 }
                 proto_item_set_end(aitem, tvb, foffset);
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Document Content");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Document Content");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Type %u", ii+1);
+                    bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Type %u", ii+1);
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
                     foffset = objectidentifier(tvb, btree, foffset);
                     proto_item_set_end(bitem, tvb, foffset);
                 }
@@ -4623,15 +4698,16 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 doc_content = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(atree, hf_doc_content, tvb, foffset, 4, doc_content);
+                proto_tree_add_uint(atree, hf_doc_content, tvb, foffset, 4, doc_content);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Value %u", ii+1);
+                    bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Value %u", ii+1);
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
                     if (doc_content==0)
                     {
                         length = tvb_get_ntohl(tvb, foffset);
@@ -4664,29 +4740,32 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 if (align_4(tvb, foffset)>0) {
                     foffset += align_4(tvb, foffset);
                 }
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Document Type");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Document Type");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute %u", ii+1);
+                    bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute %u", ii+1);
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
                     foffset = objectidentifier(tvb, btree, foffset);
                     number_of_items2 = tvb_get_ntohl(tvb, foffset);
-                    expert_item = proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items2);
+                    proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items2);
                     foffset += 4;
                     for (jj = 0; jj < number_of_items2; jj++ )
                     {
                         if (jj >= NDPS_MAX_ITEMS) {
-                            expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                            proto_tree_add_text(btree, tvb, foffset, -1, "[Truncated]");
                             break;
                         }
-                        ctree = proto_tree_add_subtree_format(btree, tvb, foffset, -1, ett_ndps, &citem, "Value %u", jj+1);
-                        foffset = attribute_value(tvb, pinfo, ctree, foffset);
+                        citem = proto_tree_add_text(btree, tvb, foffset, -1, "Value %u", jj+1);
+                        ctree = proto_item_add_subtree(citem, ett_ndps);
+                        foffset = attribute_value(tvb, ctree, foffset);
                         proto_item_set_end(citem, tvb, foffset);
                     }
                     proto_tree_add_item(btree, hf_ndps_qualifier, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -4694,18 +4773,20 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                     proto_item_set_end(bitem, tvb, foffset);
                 }
                 proto_item_set_end(aitem, tvb, foffset);
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Document Attributes");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Document Attributes");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute %u", ii+1);
-                    foffset = attribute_value(tvb, pinfo, btree, foffset);  /* Document Attributes */
+                    bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute %u", ii+1);
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
+                    foffset = attribute_value(tvb, btree, foffset);  /* Document Attributes */
                     proto_item_set_end(bitem, tvb, foffset);
                 }
                 break;
@@ -4715,51 +4796,57 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset += 4;
                 proto_tree_add_item(ndps_tree, hf_sub_complete, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Transfer Method");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Transfer Method");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(atree, hf_ndps_num_transfer_methods, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(atree, hf_ndps_num_transfer_methods, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Method %u", ii+1);
+                    bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Method %u", ii+1);
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
                     foffset = objectidentifier(tvb, btree, foffset); /* Transfer Method */
                     proto_item_set_end(bitem, tvb, foffset);
                 }
                 proto_tree_add_item(ndps_tree, hf_doc_content, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 proto_item_set_end(aitem, tvb, foffset);
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Document Type");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Document Type");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(atree, hf_ndps_num_doc_types, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(atree, hf_ndps_num_doc_types, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Type %u", ii+1);
+                    bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Type %u", ii+1);
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
                     foffset = objectidentifier(tvb, btree, foffset); /* Document Type */
                     proto_item_set_end(bitem, tvb, foffset);
                 }
                 foffset += align_4(tvb, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Document Attributes");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Document Attributes");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute %u", ii+1);
-                    foffset = attribute_value(tvb, pinfo, btree, foffset);  /* Document Attributes */
+                    bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute %u", ii+1);
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
+                    foffset = attribute_value(tvb, btree, foffset);  /* Document Attributes */
                     proto_item_set_end(bitem, tvb, foffset);
                 }
                 proto_item_set_end(aitem, tvb, foffset);
@@ -4781,33 +4868,37 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset += 4;
             proto_tree_add_item(ndps_tree, hf_ndps_document_number, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Job Modifications");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Job Modifications");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Modification %u", ii+1);
-                foffset = attribute_value(tvb, pinfo, btree, foffset);  /* Job Modifications */
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Modification %u", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = attribute_value(tvb, btree, foffset);  /* Job Modifications */
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Document Modifications");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Document Modifications");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Modification %u", ii+1);
-                foffset = attribute_value(tvb, pinfo, btree, foffset);  /* Document Modifications */
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Modification %u", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = attribute_value(tvb, btree, foffset);  /* Document Modifications */
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
@@ -4825,11 +4916,13 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             /* Start of nameorid */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Cancel Message");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Cancel Message");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of nameorid */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Retention Period");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Retention Period");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             proto_tree_add_item(atree, hf_ndps_status_flags, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             proto_tree_add_item(atree, hf_ndps_attribute_value, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -4849,6 +4942,7 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset += 4;
                 if (length!=0)
                 {
+                    tvb_ensure_bytes_exist(tvb, foffset, length);
                     proto_tree_add_item(ndps_tree, hf_ndps_context, tvb, foffset, length, ENC_NA);
                 }
                 foffset += length;
@@ -4856,22 +4950,24 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 proto_tree_add_item(ndps_tree, hf_ndps_abort_flag, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Attribute %u", ii+1);
-                    foffset = attribute_value(tvb, pinfo, atree, foffset);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Attribute %u", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
+                    foffset = attribute_value(tvb, atree, foffset);
                     proto_item_set_end(aitem, tvb, foffset);
                 }
             }
             else                                  /* Specification */
             {
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object Class");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object Class");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = objectidentifier(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
                 foffset += 4;
@@ -4881,17 +4977,19 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset += 4;
                 if (scope!=0)    /* Scope Does not equal 0 */
                 {
-                    atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Selector Option");
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Selector Option");
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     number_of_items = tvb_get_ntohl(tvb, foffset); /* Start of NWDPSelector */
-                    expert_item = proto_tree_add_uint(atree, hf_ndps_num_options, tvb, foffset, 4, number_of_items);
+                    proto_tree_add_uint(atree, hf_ndps_num_options, tvb, foffset, 4, number_of_items);
                     foffset += 4;
                     for (ii = 0; ii < number_of_items; ii++ )
                     {
                         if (ii >= NDPS_MAX_ITEMS) {
-                            expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                            proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                             break;
                         }
-                        btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Option %u", ii+1);
+                        bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Option %u", ii+1);
+                        btree = proto_item_add_subtree(bitem, ett_ndps);
                         foffset = objectidentification(tvb, btree, foffset);
                         proto_item_set_end(bitem, tvb, foffset);
                     }
@@ -4907,14 +5005,15 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                     }
                     else
                     {
-                        atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Filter Items");
+                        aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Filter Items");
+                        atree = proto_item_add_subtree(aitem, ett_ndps);
                         number_of_items = tvb_get_ntohl(tvb, foffset);
-                        expert_item = proto_tree_add_uint(atree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+                        proto_tree_add_uint(atree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
                         foffset += 4;
                         for (ii = 0; ii < number_of_items; ii++ )
                         {
                             if (ii >= NDPS_MAX_ITEMS) {
-                                expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                                proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                                 break;
                             }
                             foffset = filteritem(tvb, ndps_tree, foffset);
@@ -4928,17 +5027,19 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                     foffset += 4; /* End of NWDPSelector  */
                 }
                 foffset += 4;   /* Don't know what this is */
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Requested Attributes");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Requested Attributes");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 number_of_items = tvb_get_ntohl(tvb, foffset); /* Start of NWDPObjectIdentifierSet */
-                expert_item = proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(atree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute %u", ii+1);
+                    bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute %u", ii+1);
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
                     foffset = objectidentifier(tvb, btree, foffset);
                     proto_item_set_end(bitem, tvb, foffset);
                 }
@@ -4949,25 +5050,27 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 }
                 proto_tree_add_item(ndps_tree, hf_ndps_operator, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
-                foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+                foffset = commonarguments(tvb, ndps_tree, foffset);
             }
             break;
         case 0x00000008:    /* Promote Job */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NWDPPrtContainedObjectId */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Job ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Job ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = ndps_string(tvb, hf_ndps_pa_name, atree, foffset, NULL);
             proto_tree_add_item(atree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NWDPPrtContainedObjectId */
             /* Start of nameorid */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of nameorid */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000009:    /* Interrupt */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -4978,7 +5081,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             if (job_type==0)
             {
                 /* Start of NWDPPrtContainedObjectId */
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Job ID");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Job ID");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = ndps_string(tvb, hf_ndps_pa_name, atree, foffset, NULL);
                 proto_tree_add_item(atree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
@@ -4990,18 +5094,20 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset = ndps_string(tvb, hf_ndps_pa_name, ndps_tree, foffset, NULL);
             }
             /* Start of nameorid */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Interrupt Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Interrupt Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of nameorid */
             /* Start of NWDPPrtContainedObjectId */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Interrupting Job");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Interrupting Job");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = ndps_string(tvb, hf_ndps_pa_name, atree, foffset, NULL);
             proto_tree_add_item(atree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NWDPPrtContainedObjectId */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x0000000a:    /* Pause */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -5012,7 +5118,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             if (job_type==0)
             {
                 /* Start of NWDPPrtContainedObjectId */
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Job ID");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Job ID");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = ndps_string(tvb, hf_ndps_pa_name, atree, foffset, NULL);
                 proto_tree_add_item(atree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
@@ -5024,102 +5131,115 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset = ndps_string(tvb, hf_ndps_pa_name, ndps_tree, foffset, NULL);
             }
             /* Start of nameorid */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Pause Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Pause Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of nameorid */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x0000000b:    /* Resume */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NWDPPrtContainedObjectId */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Job ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Job ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = ndps_string(tvb, hf_ndps_pa_name, atree, foffset, NULL);
             proto_tree_add_item(atree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NWDPPrtContainedObjectId */
             /* Start of nameorid */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Resume Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Resume Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of nameorid */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x0000000c:    /* Clean */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of nameorid */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Clean Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Clean Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of nameorid */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x0000000d:    /* Create */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object Class");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object Class");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentification(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             proto_tree_add_item(ndps_tree, hf_ndps_force, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Reference Object Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Reference Object Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentification(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* Start of AttributeSet */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object Attribute");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object Attribute");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute %u", ii+1);
-                foffset = attribute_value(tvb, pinfo, btree, foffset);  /* Object Attribute Set */
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute %u", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = attribute_value(tvb, btree, foffset);  /* Object Attribute Set */
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
             /* End of AttributeSet */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x0000000e:    /* Delete */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object Class");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object Class");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentification(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x0000000f:    /* Disable PA */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Disable PA Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Disable PA Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000010:    /* Enable PA */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Enable PA Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Enable PA Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000011:    /* Resubmit Jobs */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -5128,18 +5248,20 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset = address_item(tvb, ndps_tree, foffset);
             proto_tree_add_item(ndps_tree, hf_resubmit_op_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Resubmit Job");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Resubmit Job");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset); /* Start of ResubmitJob Set */
-            expert_item = proto_tree_add_uint(atree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
                 /* Start of NWDPPrtContainedObjectId */
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Job ID");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Job ID");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = ndps_string(tvb, hf_ndps_pa_name, btree, foffset, NULL);
                 proto_tree_add_item(btree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
@@ -5148,35 +5270,39 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 proto_tree_add_item(atree, hf_ndps_document_number, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 /* Start of AttributeSet */
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Job Attributes");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Job Attributes");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 number_of_items2 = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items2);
+                proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items2);
                 foffset += 4;
                 for (jj = 0; jj < number_of_items2; jj++ )
                 {
                     if (jj >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(btree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    ctree = proto_tree_add_subtree_format(btree, tvb, foffset, -1, ett_ndps, &citem, "Attribute %u", jj+1);
-                    foffset = attribute_value(tvb, pinfo, ctree, foffset);  /* Object Attribute Set */
+                    citem = proto_tree_add_text(btree, tvb, foffset, -1, "Attribute %u", jj+1);
+                    ctree = proto_item_add_subtree(citem, ett_ndps);
+                    foffset = attribute_value(tvb, ctree, foffset);  /* Object Attribute Set */
                     proto_item_set_end(citem, tvb, foffset);
                 }
                 proto_item_set_end(bitem, tvb, foffset);
                 /* End of AttributeSet */
                 /* Start of AttributeSet */
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Document Attributes");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Document Attributes");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 number_of_items2 = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items2);
+                proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items2);
                 foffset += 4;
                 for (jj = 0; jj < number_of_items2; jj++ )
                 {
                     if (jj >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(btree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    ctree = proto_tree_add_subtree_format(btree, tvb, foffset, -1, ett_ndps, &citem, "Attribute %u", jj+1);
-                    foffset = attribute_value(tvb, pinfo, ctree, foffset);  /* Object Attribute Set */
+                    citem = proto_tree_add_text(btree, tvb, foffset, -1, "Attribute %u", jj+1);
+                    ctree = proto_item_add_subtree(citem, ett_ndps);
+                    foffset = attribute_value(tvb, ctree, foffset);  /* Object Attribute Set */
                     proto_item_set_end(citem, tvb, foffset);
                 }
                 proto_item_set_end(bitem, tvb, foffset);
@@ -5184,38 +5310,43 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             }
             proto_item_set_end(aitem, tvb, foffset);   /* End of ResubmitJob Set */
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Resubmit Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Resubmit Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000012:    /* Set */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object Class");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object Class");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentification(tvb, atree, foffset);
             /* Start of AttributeSet */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Attribute Modifications");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Attribute Modifications");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Modification `%d", ii+1);
-                foffset = attribute_value(tvb, pinfo, btree, foffset);  /* Object Attribute Set */
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Modification %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = attribute_value(tvb, btree, foffset);  /* Object Attribute Set */
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
             /* End of AttributeSet */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000013:    /* Shutdown PA */
         case 0x0000001e:    /* Shutdown PSM */
@@ -5225,61 +5356,66 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset += 4;
             foffset = ndps_string(tvb, hf_ndps_pa_name, ndps_tree, foffset, NULL);
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Shutdown Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Shutdown Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
-            break;
+            foffset = commonarguments(tvb, ndps_tree, foffset);
         case 0x00000014:    /* Startup PA */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             foffset = ndps_string(tvb, hf_ndps_pa_name, ndps_tree, foffset, NULL);
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Startup Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Startup Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000015:    /* Reorder Job */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NWDPPrtContainedObjectId */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Job Identification");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Job Identification");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = ndps_string(tvb, hf_ndps_pa_name, atree, foffset, NULL);
             proto_tree_add_item(atree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NWDPPrtContainedObjectId */
             /* Start of NWDPPrtContainedObjectId */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Reference Job ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Reference Job ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = ndps_string(tvb, hf_ndps_pa_name, atree, foffset, NULL);
             proto_tree_add_item(atree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NWDPPrtContainedObjectId */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000016:    /* Pause PA */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Pause Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Pause Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000017:    /* Resume PA */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Resume Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Resume Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000018:    /* Transfer Data */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -5292,11 +5428,12 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of Object Identifier */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Operation ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Operation ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of Object Identifier */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x0000001a:    /* Add Event Profile */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -5311,27 +5448,30 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             proto_tree_add_item(ndps_tree, hf_ndps_language_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             foffset += align_4(tvb, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Delivery Address");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Delivery Address");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Address %u", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Address %u", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = address_item(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
-            foffset = event_object_set(tvb, pinfo, ndps_tree, foffset);
+            foffset = event_object_set(tvb, ndps_tree, foffset);
             foffset = qualifiedname(tvb, ndps_tree, foffset);
             break;
         case 0x0000001b:    /* Remove Event Profile */
@@ -5350,7 +5490,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset += 4;
             if (supplier_flag)
             {
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Supplier ID");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Supplier ID");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -5375,7 +5516,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             if (method_flag)
             {
                 /* Start of NameorID */
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = name_or_id(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
                 /* End of NameorID */
@@ -5385,11 +5527,12 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset += 4;
             if (delivery_address_flag)
             {
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Delivery Address");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Delivery Address");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = print_address(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
             }
-            foffset = event_object_set(tvb, pinfo, ndps_tree, foffset);
+            foffset = event_object_set(tvb, ndps_tree, foffset);
             break;
         case 0x0000001d:    /* List Event Profiles */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -5405,15 +5548,17 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset += 4;
                 if (profiles_choice_type==0)   /* Choice */
                 {
-                    foffset = cardinal_seq(tvb, pinfo, ndps_tree, foffset);
+                    foffset = cardinal_seq(tvb, ndps_tree, foffset);
                 }
                 else
                 {
-                    atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Consumer");
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Consumer");
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = qualifiedname(tvb, atree, foffset);
                     proto_item_set_end(aitem, tvb, foffset);
                     /* Start of NameorID */
-                    atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = name_or_id(tvb, atree, foffset);
                     /* End of NameorID */
                     proto_tree_add_item(atree, hf_ndps_language_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -5440,6 +5585,7 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset += 4;
                 if (length!=0)
                 {
+                    tvb_ensure_bytes_exist(tvb, foffset, length);
                     proto_tree_add_item(ndps_tree, hf_ndps_context, tvb, foffset, length, ENC_NA);
                 }
                 foffset += length;
@@ -5452,11 +5598,12 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Cancel Shutdown Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Cancel Shutdown Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000020:    /* Set Printer DS Information */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -5464,7 +5611,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             proto_tree_add_item(ndps_tree, hf_ndps_ds_info_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             foffset = ndps_string(tvb, hf_ndps_printer_name, ndps_tree, foffset, NULL);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "DS Object Name");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "DS Object Name");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             break;
@@ -5472,17 +5620,19 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Clean Message Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Clean Message Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            foffset = commonarguments(tvb, pinfo, ndps_tree, foffset);
+            foffset = commonarguments(tvb, ndps_tree, foffset);
             break;
         case 0x00000022:    /* Map GUID to NDS Name */
             length = tvb_get_ntohl(tvb, foffset);
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(ndps_tree, hf_ndps_guid, tvb, foffset, length, ENC_NA);
             }
             foffset += length;
@@ -5495,49 +5645,56 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset += 4;
             proto_tree_add_item(ndps_tree, hf_ndps_persistence, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Consumer Name");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Consumer Name");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             foffset = ndps_string(tvb, hf_ndps_supplier_name, ndps_tree, foffset, NULL);
             proto_tree_add_item(ndps_tree, hf_ndps_language_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             foffset += align_4(tvb, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Delivery Address");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Delivery Address");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Address %u", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Address %u", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = address_item(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
-            foffset = event_object_set(tvb, pinfo, ndps_tree, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Account");
+            foffset = event_object_set(tvb, ndps_tree, foffset);
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Account");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* Start of object identifier set */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Notify Attributes");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Notify Attributes");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute %u", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute %u", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentifier(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
             }
@@ -5560,7 +5717,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset += 4;
             if (profiles_type==0)   /* Spec */
             {
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Supplier Alias");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Supplier Alias");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = qualifiedname(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
                 profiles_choice_type = tvb_get_ntohl(tvb, foffset);
@@ -5568,15 +5726,17 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset += 4;
                 if (profiles_choice_type==0)   /* Choice */
                 {
-                    foffset = cardinal_seq(tvb, pinfo, ndps_tree, foffset);
+                    foffset = cardinal_seq(tvb, ndps_tree, foffset);
                 }
                 else
                 {
-                    atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Consumer");
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Consumer");
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = qualifiedname(tvb, atree, foffset);
                     proto_item_set_end(aitem, tvb, foffset);
                     /* Start of NameorID */
-                    atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = name_or_id(tvb, atree, foffset);
                     proto_item_set_end(aitem, tvb, foffset);
                     /* End of NameorID */
@@ -5603,6 +5763,7 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset += 4;
                 if (length!=0)
                 {
+                    tvb_ensure_bytes_exist(tvb, foffset, length);
                     proto_tree_add_item(ndps_tree, hf_ndps_context, tvb, foffset, length, ENC_NA);
                 }
                 foffset += length;
@@ -5619,19 +5780,20 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
         switch(ndps_func)
         {
         case 0x00000001:    /* Bind */
-            foffset = credentials(tvb, pinfo, ndps_tree, foffset);
+            foffset = credentials(tvb, ndps_tree, foffset);
             proto_tree_add_item(ndps_tree, hf_ndps_retrieve_restrictions, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             number_of_items=tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_bind_security_option_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_bind_security_option_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Security %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Security %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -5650,20 +5812,22 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
         case 0x00000004:    /* Enable Service */
             proto_tree_add_item(ndps_tree, hf_ndps_service_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Parameters");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Parameters");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items=tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length!=0)
                 {
+                    tvb_ensure_bytes_exist(tvb, foffset, length);
                     proto_tree_add_item(atree, hf_ndps_item_bytes, tvb, foffset, length, ENC_NA);
                 }
                 foffset += length;
@@ -5685,19 +5849,20 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
         switch(ndps_func)
         {
         case 0x00000001:    /* Bind */
-            foffset = credentials(tvb, pinfo, ndps_tree, foffset);
+            foffset = credentials(tvb, ndps_tree, foffset);
             proto_tree_add_item(ndps_tree, hf_ndps_retrieve_restrictions, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             number_of_items=tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_bind_security_option_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_bind_security_option_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Security %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Security %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -5710,7 +5875,7 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
         case 0x00000002:    /* Unbind */
             break;
         case 0x00000003:    /* Register Server */
-            foffset = server_entry(tvb, pinfo, ndps_tree, foffset);
+            foffset = server_entry(tvb, ndps_tree, foffset);
             break;
         case 0x00000004:    /* Deregister Server */
         case 0x00000006:    /* Deregister Registry */
@@ -5723,33 +5888,37 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset = print_address(tvb, ndps_tree, foffset);
             break;
         case 0x00000007:    /* Registry Update */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Add");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Add");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Entry %u", ii+1);
-                foffset = server_entry(tvb, pinfo, btree, foffset);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Entry %u", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = server_entry(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Remove");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Remove");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Entry %u", ii+1);
-                foffset = server_entry(tvb, pinfo, btree, foffset);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Entry %u", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = server_entry(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
@@ -5780,6 +5949,7 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset += 4;
                 if (length!=0)
                 {
+                    tvb_ensure_bytes_exist(tvb, foffset, length);
                     proto_tree_add_item(ndps_tree, hf_ndps_context, tvb, foffset, length, ENC_NA);
                 }
                 foffset += length;
@@ -5796,19 +5966,19 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
         switch(ndps_func)
         {
         case 0x00000001:    /* Notify Bind */
-            foffset = credentials(tvb, pinfo, ndps_tree, foffset);
+            foffset = credentials(tvb, ndps_tree, foffset);
             proto_tree_add_item(ndps_tree, hf_ndps_retrieve_restrictions, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             number_of_items=tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Security %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Security %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -5828,15 +5998,16 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset = ndps_string(tvb, hf_ndps_supplier_name, ndps_tree, foffset, NULL);
             /* Start of QualifiedName Set*/
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Supplier Alias %u", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Supplier Alias %u", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = qualifiedname(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
             }
@@ -5849,7 +6020,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
         case 0x00000005:    /* Add Profile */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Supplier Alias");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Supplier Alias");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* Start of Eventhandling */
@@ -5857,7 +6029,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset += 4;
             proto_tree_add_item(ndps_tree, hf_ndps_persistence, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Consumer Name");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Consumer Name");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             length = tvb_get_ntohl(tvb, foffset);
@@ -5870,26 +6043,29 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             proto_tree_add_item(ndps_tree, hf_ndps_language_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
             number_of_items = tvb_get_ntohl(tvb, foffset);
             proto_tree_add_uint(ndps_tree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Delivery Addresses");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Delivery Addresses");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, aitem, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Address %d", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Address %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = address_item(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
-            foffset = event_object_set(tvb, pinfo, ndps_tree, foffset);
+            foffset = event_object_set(tvb, ndps_tree, foffset);
             /* End of Eventhandling */
             break;
         case 0x00000006:    /* Remove Profile */
@@ -5908,7 +6084,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset += 4;
             if (supplier_flag)
             {
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Supplier ID");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Supplier ID");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -5933,7 +6110,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             if (method_flag)
             {
                 /* Start of NameorID */
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = name_or_id(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
                 /* End of NameorID */
@@ -5945,7 +6123,7 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             {
                 foffset = print_address(tvb, ndps_tree, foffset);
             }
-            foffset = event_object_set(tvb, pinfo, ndps_tree, foffset);
+            foffset = event_object_set(tvb, ndps_tree, foffset);
             break;
         case 0x00000008:    /* List Profiles */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -5955,7 +6133,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset += 4;
             if (profiles_type==0)   /* Spec */
             {
-                atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Supplier Alias");
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Supplier Alias");
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 foffset = qualifiedname(tvb, atree, foffset);
                 profiles_choice_type = tvb_get_ntohl(tvb, foffset);
                 proto_tree_add_uint(atree, hf_ndps_list_profiles_choice_type, tvb, foffset, 4, profiles_choice_type);
@@ -5963,15 +6142,17 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 proto_item_set_end(aitem, tvb, foffset);
                 if (profiles_choice_type==0)   /* Choice */
                 {
-                    foffset = cardinal_seq(tvb, pinfo, ndps_tree, foffset);
+                    foffset = cardinal_seq(tvb, ndps_tree, foffset);
                 }
                 else
                 {
-                    atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Consumer");
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Consumer");
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = qualifiedname(tvb, atree, foffset);
                     proto_item_set_end(aitem, tvb, foffset);
                     /* Start of NameorID */
-                    atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = name_or_id(tvb, atree, foffset);
                     /* End of NameorID */
                     proto_tree_add_item(atree, hf_ndps_language_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -5998,6 +6179,7 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset += 4;
                 if (length!=0)
                 {
+                    tvb_ensure_bytes_exist(tvb, foffset, length);
                     proto_tree_add_item(ndps_tree, hf_ndps_context, tvb, foffset, length, ENC_NA);
                 }
                 foffset += length;
@@ -6013,47 +6195,57 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             number_of_items = tvb_get_ntohl(tvb, foffset);
             proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Event Items");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Event Items");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, aitem, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Item %d", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Item %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 /* Start of ReportEventItem */
                 proto_tree_add_item(btree, hf_ndps_event_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
-                ctree = proto_tree_add_subtree(btree, tvb, foffset, -1, ett_ndps, &citem, "Containing Class");
+                citem = proto_tree_add_text(btree, tvb, foffset, -1, "Containing Class");
+                ctree = proto_item_add_subtree(citem, ett_ndps);
                 foffset = objectidentifier(tvb, ctree, foffset);
                 proto_item_set_end(citem, tvb, foffset);
-                ctree = proto_tree_add_subtree(btree, tvb, foffset, -1, ett_ndps, &citem, "Containing Object");
+                citem = proto_tree_add_text(btree, tvb, foffset, -1, "Containing Object");
+                ctree = proto_item_add_subtree(citem, ett_ndps);
                 foffset = objectidentification(tvb, ctree, foffset);
                 proto_item_set_end(citem, tvb, foffset);
-                ctree = proto_tree_add_subtree(btree, tvb, foffset, -1, ett_ndps, &citem, "Filter Class");
+                citem = proto_tree_add_text(btree, tvb, foffset, -1, "Filter Class");
+                ctree = proto_item_add_subtree(citem, ett_ndps);
                 foffset = objectidentifier(tvb, ctree, foffset);
-                ctree = proto_tree_add_subtree(btree, tvb, foffset, -1, ett_ndps, &citem, "Object Class");
+                citem = proto_tree_add_text(btree, tvb, foffset, -1, "Object Class");
+                ctree = proto_item_add_subtree(citem, ett_ndps);
                 foffset = objectidentifier(tvb, ctree, foffset);
                 proto_item_set_end(citem, tvb, foffset);
-                ctree = proto_tree_add_subtree(btree, tvb, foffset, -1, ett_ndps, &citem, "Object ID");
+                citem = proto_tree_add_text(btree, tvb, foffset, -1, "Object ID");
+                ctree = proto_item_add_subtree(citem, ett_ndps);
                 foffset = objectidentification(tvb, ctree, foffset);
                 proto_item_set_end(citem, tvb, foffset);
-                ctree = proto_tree_add_subtree(btree, tvb, foffset, -1, ett_ndps, &citem, "Event Object ID");
+                citem = proto_tree_add_text(btree, tvb, foffset, -1, "Event Object ID");
+                ctree = proto_item_add_subtree(citem, ett_ndps);
                 foffset = objectidentifier(tvb, ctree, foffset);
                 proto_item_set_end(citem, tvb, foffset);
                 /* Start of AttributeSet */
                 number_of_items = tvb_get_ntohl(tvb, foffset);
                 proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
                 foffset += 4;
-                ctree = proto_tree_add_subtree(btree, tvb, foffset, -1, ett_ndps, &citem, "Attribute Modifications");
+                citem = proto_tree_add_text(btree, tvb, foffset, -1, "Attribute Modifications");
+                ctree = proto_item_add_subtree(citem, ett_ndps);
                 for (jj = 0; jj < number_of_items; jj++ )
                 {
                     if (jj >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, citem, &ei_ndps_truncated);
+                        proto_tree_add_text(ctree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    dtree = proto_tree_add_subtree_format(ctree, tvb, foffset, -1, ett_ndps, &ditem, "Modification %d", jj+1);
-                    foffset = attribute_value(tvb, pinfo, dtree, foffset);  /* Object Attribute Set */
+                    ditem = proto_tree_add_text(ctree, tvb, foffset, -1, "Modification %d", jj+1);
+                    dtree = proto_item_add_subtree(ditem, ett_ndps);
+                    foffset = attribute_value(tvb, dtree, foffset);  /* Object Attribute Set */
                     proto_item_set_end(ditem, tvb, foffset);
                 }
                 proto_item_set_end(citem, tvb, foffset);
@@ -6070,18 +6262,20 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
         case 0x0000000b:    /* Report Notification */
             /* Start of DestinationSet */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_destinations, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_destinations, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Destination %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Destination %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 /* Start of Destination */
                 /* Start of NameorID */
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Method ID");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Method ID");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = name_or_id(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
                 /* End of NameorID */
@@ -6097,37 +6291,45 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset = ndps_string(tvb, hf_ndps_supplier_name, ndps_tree, foffset, NULL);
             proto_tree_add_item(ndps_tree, hf_ndps_event_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Containing Class");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Containing Class");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Containing Object");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Containing Object");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentification(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Filter Class");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Filter Class");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object Class");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object Class");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentification(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Event Object ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Event Object ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* Start of AttributeSet */
             number_of_items = tvb_get_ntohl(tvb, foffset);
             proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Attributes");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Attributes");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, aitem, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute %d", ii+1);
-                foffset = attribute_value(tvb, pinfo, btree, foffset);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = attribute_value(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
@@ -6135,7 +6337,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset = ndps_string(tvb, hf_ndps_message, ndps_tree, foffset, NULL);
             proto_tree_add_item(ndps_tree, hf_time, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Account");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Account");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             break;
@@ -6144,7 +6347,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             break;
         case 0x0000000d:    /* Remove Delivery Method */
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
@@ -6175,6 +6379,7 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 foffset += 4;
                 if (length!=0)
                 {
+                    tvb_ensure_bytes_exist(tvb, foffset, length);
                     proto_tree_add_item(ndps_tree, hf_ndps_context, tvb, foffset, length, ENC_NA);
                 }
                 foffset += length;
@@ -6188,7 +6393,8 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             break;
         case 0x0000000f:    /* Get Delivery Method Information */
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
@@ -6203,19 +6409,20 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
         switch(ndps_func)
         {
         case 0x00000001:    /* Bind */
-            foffset = credentials(tvb, pinfo, ndps_tree, foffset);
+            foffset = credentials(tvb, ndps_tree, foffset);
             proto_tree_add_item(ndps_tree, hf_ndps_retrieve_restrictions, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             number_of_items=tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_bind_security_option_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_bind_security_option_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Security %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Security %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -6239,15 +6446,16 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             foffset += 4;
             foffset = res_add_input_data(tvb, ndps_tree, foffset);
             number_of_items=tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Item %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Item %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length=tvb_get_ntohl(tvb, foffset);
                 length_remaining = tvb_length_remaining(tvb, foffset);
                 if(length_remaining == -1 || (guint32) length_remaining < length)
@@ -6390,25 +6598,27 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
         switch(ndps_func)
         {
         case 0x00000001:    /* Delivery Bind */
-            foffset = credentials(tvb, pinfo, ndps_tree, foffset);
+            foffset = credentials(tvb, ndps_tree, foffset);
             break;
         case 0x00000002:    /* Delivery Unbind */
             /* NoOp */
             break;
         case 0x00000003:    /* Delivery Send */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Item %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Item %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 proto_tree_add_item(atree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Supplier ID");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Supplier ID");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -6419,29 +6629,36 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 proto_tree_add_item(btree, hf_ndps_event_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Containing Class");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Containing Class");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentifier(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Containing Object");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Containing Object");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentification(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Filter Class");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Filter Class");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentifier(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Object Class");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Object Class");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentifier(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Object ID");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Object ID");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentification(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Event Object ID");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Event Object ID");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentifier(tvb, btree, foffset);
-                foffset = attribute_value(tvb, pinfo, atree, foffset);
+                foffset = attribute_value(tvb, atree, foffset);
                 foffset = ndps_string(tvb, hf_ndps_message, atree, foffset, NULL);
                 proto_tree_add_item(atree, hf_time, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Account");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Account");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = qualifiedname(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
@@ -6449,18 +6666,20 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
             break;
         case 0x00000004:    /* Delivery Send2 */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 proto_tree_add_item(atree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Supplier ID");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Supplier ID");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length==4)
@@ -6471,43 +6690,51 @@ dissect_ndps_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, g
                 proto_tree_add_item(atree, hf_ndps_event_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Containing Class");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Containing Class");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentifier(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Containing Object");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Containing Object");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentification(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Filter Class");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Filter Class");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentifier(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Object Class");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Object Class");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentifier(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Object ID");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Object ID");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentification(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Event Object ID");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Event Object ID");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentifier(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
                 /* Start of AttributeSet */
                 number_of_items = tvb_get_ntohl(tvb, foffset);
                 proto_tree_add_uint(atree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
                 foffset += 4;
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, bitem, &ei_ndps_truncated);
+                        proto_tree_add_text(btree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    foffset = attribute_value(tvb, pinfo, btree, foffset);
+                    foffset = attribute_value(tvb, btree, foffset);
                 }
                 proto_item_set_end(bitem, tvb, foffset);
                 /* End of AttributeSet */
                 foffset = ndps_string(tvb, hf_ndps_message, atree, foffset, NULL);
                 proto_tree_add_item(atree, hf_time, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Account");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Account");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = qualifiedname(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
@@ -6555,13 +6782,15 @@ ndps_error(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset
         else                /* Extended Error */
         {
             /* Start of objectidentifier */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Extended Error");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Extended Error");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of objectidentifier */
         }
         /* Start of NameorID */
-        atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Message");
+        aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Message");
+        atree = proto_item_add_subtree(aitem, ett_ndps);
         foffset = name_or_id(tvb, atree, foffset);
         proto_item_set_end(aitem, tvb, foffset);
         /* End of NameorID */
@@ -6577,13 +6806,14 @@ ndps_error(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset
         else                /* Extended Error */
         {
             /* Start of objectidentifier */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Extended Error");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Extended Error");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of objectidentifier */
         }
         foffset = objectidentification(tvb, ndps_tree, foffset);
-        foffset = attribute_value(tvb, pinfo, ndps_tree, foffset);  /* Object Attribute Set */
+        foffset = attribute_value(tvb, ndps_tree, foffset);  /* Object Attribute Set */
         proto_tree_add_item(ndps_tree, hf_ndps_lib_error, tvb, foffset, 4, ENC_BIG_ENDIAN);
         foffset += 4;
         proto_tree_add_item(ndps_tree, hf_ndps_other_error, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -6605,7 +6835,8 @@ ndps_error(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset
         else                /* Extended Error */
         {
             /* Start of objectidentifier */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Extended Error");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Extended Error");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of objectidentifier */
@@ -6623,7 +6854,8 @@ ndps_error(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset
         else                /* Extended Error */
         {
             /* Start of objectidentifier */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Extended Error");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Extended Error");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of objectidentifier */
@@ -6641,13 +6873,14 @@ ndps_error(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset
         else                /* Extended Error */
         {
             /* Start of objectidentifier */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Extended Error");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Extended Error");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of objectidentifier */
         }
         foffset = objectidentification(tvb, ndps_tree, foffset);
-        foffset = attribute_value(tvb, pinfo, ndps_tree, foffset);  /* Object Attribute Set */
+        foffset = attribute_value(tvb, ndps_tree, foffset);  /* Object Attribute Set */
         break;
     case 5:                 /* Document Access Error */
         proto_tree_add_item(ndps_tree, hf_problem_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -6660,7 +6893,8 @@ ndps_error(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset
         else                /* Extended Error */
         {
             /* Start of objectidentifier */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Extended Error");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Extended Error");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of objectidentifier */
@@ -6669,15 +6903,16 @@ ndps_error(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset
         break;
     case 6:                 /* Attribute Error */
         number_of_items = tvb_get_ntohl(tvb, foffset);
-        expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+        proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
         foffset += 4;
         for (ii = 0; ii < number_of_items; ii++ )
         {
             if (ii >= NDPS_MAX_ITEMS) {
-                expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                 break;
             }
-            atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Item %d", ii+1);
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Item %d", ii+1);
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             proto_tree_add_item(atree, hf_problem_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             if (tvb_get_ntohl(tvb, foffset-4)==0) /* Standard Error */
@@ -6688,12 +6923,13 @@ ndps_error(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset
             else                /* Extended Error */
             {
                 /* Start of objectidentifier */
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Extended Error");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Extended Error");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = objectidentifier(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
                 /* End of objectidentifier */
             }
-            foffset = attribute_value(tvb, pinfo, atree, foffset);  /* Object Attribute Set */
+            foffset = attribute_value(tvb, atree, foffset);  /* Object Attribute Set */
             proto_item_set_end(aitem, tvb, foffset);
         }
         break;
@@ -6708,7 +6944,8 @@ ndps_error(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int foffset
         else                /* Extended Error */
         {
             /* Start of objectidentifier */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Extended Error");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Extended Error");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = objectidentifier(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of objectidentifier */
@@ -6853,7 +7090,8 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
                 proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
             }
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "PSM Name");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "PSM Name");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             break;
@@ -6892,15 +7130,17 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             number_of_items = tvb_get_ntohl(tvb, foffset);
             proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object Attribute Set");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object Attribute Set");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, aitem, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute %d", ii+1);
-                foffset = attribute_value(tvb, pinfo, btree, foffset);  /* Object Attribute Set */
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = attribute_value(tvb, btree, foffset);  /* Object Attribute Set */
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
@@ -6914,17 +7154,19 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             proto_tree_add_item(ndps_tree, hf_answer_time, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Continuation Option */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Continuation Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Continuation Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items=tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_num_options, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_num_options, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Option %d", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Option %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 length=tvb_get_ntohl(tvb, foffset);
                 length_remaining = tvb_length_remaining(tvb, foffset);
                 if(length_remaining == -1 || (guint32) length_remaining < length)
@@ -6937,51 +7179,56 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             }
             proto_item_set_end(aitem, tvb, foffset);
             /* Limit Encountered Option */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Limit Encountered Option");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Limit Encountered Option");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             proto_tree_add_item(atree, hf_ndps_len, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             proto_tree_add_item(atree, hf_ndps_limit_enc, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             proto_item_set_end(aitem, tvb, foffset);
             /* Object Results Set */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object Results Set");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object Results Set");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items=tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(atree, hf_ndps_num_results, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(atree, hf_ndps_num_results, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated Result]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Results: (%d)", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Results: (%d)", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 if (ii>0) {
                     foffset += 2;
                 }
                 foffset = objectidentification(tvb, btree, foffset);
                 number_of_items2 = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(btree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items2);
+                proto_tree_add_uint(btree, hf_ndps_num_objects, tvb, foffset, 4, number_of_items2);
                 foffset += 4;
                 for (jj = 0; jj < number_of_items2; jj++ )
                 {
                     if (jj >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(btree, tvb, foffset, -1, "[Truncated Object]");
                         break;
                     }
-                    ctree = proto_tree_add_subtree_format(btree, tvb, foffset, -1, ett_ndps, &citem, "Object: (%d)", jj+1);
+                    citem = proto_tree_add_text(btree, tvb, foffset, -1, "Object: (%d)", jj+1);
+                    ctree = proto_item_add_subtree(citem, ett_ndps);
                     foffset = objectidentifier(tvb, ctree, foffset);
                     foffset += align_4(tvb, foffset);
                     number_of_items3 = tvb_get_ntohl(tvb, foffset);
-                    expert_item = proto_tree_add_uint(ctree, hf_ndps_num_values, tvb, foffset, 4, number_of_items3);
+                    proto_tree_add_uint(ctree, hf_ndps_num_values, tvb, foffset, 4, number_of_items3);
                     foffset += 4;
                     for (kk = 0; kk < number_of_items3; kk++ )
                     {
                         if (kk >= NDPS_MAX_ITEMS) {
-                            expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                            proto_tree_add_text(ctree, tvb, foffset, -1, "[Truncated Value]");
                             break;
                         }
-                        dtree = proto_tree_add_subtree_format(ctree, tvb, foffset, -1, ett_ndps, &ditem, "Value: (%d)", kk+1);
-                        foffset = attribute_value(tvb, pinfo, dtree, foffset);
+                        ditem = proto_tree_add_text(ctree, tvb, foffset, -1, "Value: (%d)", kk+1);
+                        dtree = proto_item_add_subtree(ditem, ett_ndps);
+                        foffset = attribute_value(tvb, dtree, foffset);
                         proto_item_set_end(ditem, tvb, foffset);
                     }
                     proto_tree_add_item(ctree, hf_ndps_qualifier, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -7004,7 +7251,8 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
         case 0x00000009:    /* Interrupt */
         case 0x0000000a:    /* Pause */
             /* Start of NWDPPrtContainedObjectId */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Job ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Job ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = ndps_string(tvb, hf_ndps_pa_name, atree, foffset, NULL);
             proto_tree_add_item(atree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
@@ -7014,15 +7262,17 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             number_of_items = tvb_get_ntohl(tvb, foffset);
             proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Object Attribute Set");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Object Attribute Set");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, aitem, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Attribute %d", ii+1);
-                foffset = attribute_value(tvb, pinfo, btree, foffset);  /* Object Attribute Set */
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Attribute %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = attribute_value(tvb, btree, foffset);  /* Object Attribute Set */
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
@@ -7056,23 +7306,27 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             number_of_items = tvb_get_ntohl(tvb, foffset); /* Start of ResubmitJob Set */
             proto_tree_add_uint(ndps_tree, hf_ndps_num_jobs, tvb, foffset, 4, number_of_items);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Resubmit Job");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Resubmit Job");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, aitem, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Job %d", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Job %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 /* Start of NWDPPrtContainedObjectId */
-                ctree = proto_tree_add_subtree(btree, tvb, foffset, -1, ett_ndps, &citem, "Old Job");
+                citem = proto_tree_add_text(btree, tvb, foffset, -1, "Old Job");
+                ctree = proto_item_add_subtree(citem, ett_ndps);
                 foffset = ndps_string(tvb, hf_ndps_pa_name, ctree, foffset, NULL);
                 proto_tree_add_item(ctree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 proto_item_set_end(citem, tvb, foffset);
                 /* End of NWDPPrtContainedObjectId */
                 /* Start of NWDPPrtContainedObjectId */
-                ctree = proto_tree_add_subtree(btree, tvb, foffset, -1, ett_ndps, &citem, "New Job");
+                citem = proto_tree_add_text(btree, tvb, foffset, -1, "New Job");
+                ctree = proto_item_add_subtree(citem, ett_ndps);
                 foffset = ndps_string(tvb, hf_ndps_pa_name, ctree, foffset, NULL);
                 proto_tree_add_item(ctree, hf_local_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
@@ -7082,15 +7336,17 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
                 number_of_items2 = tvb_get_ntohl(tvb, foffset);
                 proto_tree_add_uint(ctree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items2);
                 foffset += 4;
-                ctree = proto_tree_add_subtree(btree, tvb, foffset, -1, ett_ndps, &citem, "Job Status");
+                citem = proto_tree_add_text(btree, tvb, foffset, -1, "Job Status");
+                ctree = proto_item_add_subtree(citem, ett_ndps);
                 for (jj = 0; jj < number_of_items2; jj++ )
                 {
                     if (jj >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, citem, &ei_ndps_truncated);
+                        proto_tree_add_text(ctree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    dtree = proto_tree_add_subtree_format(ctree, tvb, foffset, -1, ett_ndps, &ditem, "Object %d", jj+1);
-                    foffset = attribute_value(tvb, pinfo, dtree, foffset);  /* Object Attribute Set */
+                    ditem = proto_tree_add_text(ctree, tvb, foffset, -1, "Object %d", jj+1);
+                    dtree = proto_item_add_subtree(ditem, ett_ndps);
+                    foffset = attribute_value(tvb, dtree, foffset);  /* Object Attribute Set */
                     proto_item_set_end(ditem, tvb, foffset);
                 }
                 proto_item_set_end(citem, tvb, foffset);
@@ -7106,18 +7362,20 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             break;
         case 0x00000015:    /* Reorder Job */
             /* Start of AttributeSet */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Job Status");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Job Status");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Object %d", ii+1);
-                foffset = attribute_value(tvb, pinfo, btree, foffset);  /* Object Attribute Set */
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Object %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = attribute_value(tvb, btree, foffset);  /* Object Attribute Set */
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
@@ -7130,18 +7388,20 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
         case 0x00000016:    /* Pause PA */
         case 0x00000017:    /* Resume PA */
             /* Start of AttributeSet */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Printer Status");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Printer Status");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Object %d", ii+1);
-                foffset = attribute_value(tvb, pinfo, btree, foffset);  /* Object Attribute Set */
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Object %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
+                foffset = attribute_value(tvb, btree, foffset);  /* Object Attribute Set */
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
@@ -7172,7 +7432,8 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             foffset += 4;
             proto_tree_add_item(ndps_tree, hf_ndps_persistence, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Consumer Name");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Consumer Name");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             length = tvb_get_ntohl(tvb, foffset);
             foffset += 4;
@@ -7185,31 +7446,35 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             foffset += 4;
             proto_item_set_end(aitem, tvb, foffset);
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Delivery Addresses");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Delivery Addresses");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Address %d", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Address %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = address_item(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
-            foffset = event_object_set(tvb, pinfo, ndps_tree, foffset);
+            foffset = event_object_set(tvb, ndps_tree, foffset);
             /* End of Eventhandling */
             length = tvb_get_ntohl(tvb, foffset);
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(ndps_tree, hf_ndps_continuation_option, tvb, foffset, length, ENC_NA);
             }
             foffset += length;
@@ -7219,7 +7484,8 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             }
             break;
         case 0x00000022:    /* Map GUID to NDS Name */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "NDS Printer Name");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "NDS Printer Name");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             if(error_val != 0)
@@ -7239,28 +7505,31 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             break;
         case 0x00000024:    /* ListEventProfiles2 */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_events, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_events, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Event %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Event %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 /* Start of Eventhandling2 */
                 proto_tree_add_item(atree, hf_ndps_profile_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 proto_tree_add_item(atree, hf_ndps_persistence, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Consumer Name");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Consumer Name");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = qualifiedname(tvb, btree, foffset);
                 foffset = ndps_string(tvb, hf_ndps_supplier_name, atree, foffset, NULL);
                 proto_tree_add_item(atree, hf_ndps_language_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 proto_item_set_end(bitem, tvb, foffset);
                 /* Start of NameorID */
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Method ID");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Method ID");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = name_or_id(tvb, btree, foffset);
                 foffset += align_4(tvb, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
@@ -7268,34 +7537,39 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
                 number_of_items = tvb_get_ntohl(tvb, foffset);
                 proto_tree_add_uint(atree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Delivery Addresses");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Delivery Addresses");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, bitem, &ei_ndps_truncated);
+                        proto_tree_add_text(btree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    ctree = proto_tree_add_subtree_format(btree, tvb, foffset, -1, ett_ndps, &citem, "Address %d", ii+1);
+                    citem = proto_tree_add_text(btree, tvb, foffset, -1, "Address %d", ii+1);
+                    ctree = proto_item_add_subtree(citem, ett_ndps);
                     foffset = address_item(tvb, ctree, foffset);
                     proto_item_set_end(citem, tvb, foffset);
                 }
                 proto_item_set_end(bitem, tvb, foffset);
-                foffset = event_object_set(tvb, pinfo, atree, foffset);
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Account");
+                foffset = event_object_set(tvb, atree, foffset);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Account");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = qualifiedname(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
                 /* Start of object identifier set */
-                btree = proto_tree_add_subtree(atree, tvb, foffset, -1, ett_ndps, &bitem, "Notify Attributes");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Notify Attributes");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(btree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(btree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    ctree = proto_tree_add_subtree_format(btree, tvb, foffset, -1, ett_ndps, &citem, "Attribute %d", ii+1);
+                    citem = proto_tree_add_text(btree, tvb, foffset, -1, "Attribute %d", ii+1);
+                    ctree = proto_item_add_subtree(citem, ett_ndps);
                     foffset = objectidentifier(tvb, ctree, foffset);
                     proto_item_set_end(citem, tvb, foffset);
                 }
@@ -7314,6 +7588,7 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
                 foffset += 4;
                 if (length!=0)
                 {
+                    tvb_ensure_bytes_exist(tvb, foffset, length);
                     proto_tree_add_item(ndps_tree, hf_ndps_continuation_option, tvb, foffset, length, ENC_NA);
                 }
                 foffset += length;
@@ -7339,15 +7614,16 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             break;
         case 0x00000003:    /* List Services */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_services, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_services, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Service %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Service %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 proto_tree_add_item(atree, hf_ndps_service_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
                 foffset += 4;
                 proto_tree_add_item(atree, hf_ndps_service_enabled, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -7374,19 +7650,21 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
         {
         case 0x00000001:    /* Bind */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Attribute %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Attribute %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length!=0)
                 {
+                    tvb_ensure_bytes_exist(tvb, foffset, length);
                     proto_tree_add_item(atree, hf_ndps_attribute_set, tvb, foffset, length, ENC_NA);
                 }
                 proto_item_set_end(aitem, tvb, foffset);
@@ -7405,22 +7683,24 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
         case 0x00000008:    /* List Local Servers */
         case 0x00000009:    /* List Servers */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Item %d", ii+1);
-                foffset = server_entry(tvb, pinfo, atree, foffset);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Item %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
+                foffset = server_entry(tvb, atree, foffset);
                 proto_item_set_end(aitem, tvb, foffset);
             }
             length = tvb_get_ntohl(tvb, foffset);
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(ndps_tree, hf_ndps_continuation_option, tvb, foffset, length, ENC_NA);
             }
             foffset += length;
@@ -7428,12 +7708,12 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             break;
         case 0x0000000a:    /* List Known Registries */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_item(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, ENC_BIG_ENDIAN);
+            proto_tree_add_item(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
                 aitem = proto_tree_add_item(ndps_tree, hf_ndps_client_server_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
@@ -7446,13 +7726,15 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(ndps_tree, hf_ndps_continuation_option, tvb, foffset, length, ENC_NA);
             }
             foffset += length;
             foffset = return_code(tvb, pinfo, ndps_tree, foffset);
             break;
         case 0x0000000b:    /* Get Registry NDS Object Name */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "NDS Printer Name");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "NDS Printer Name");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             foffset = return_code(tvb, pinfo, ndps_tree, foffset);
@@ -7473,19 +7755,21 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
         {
         case 0x00000001:    /* Notify Bind */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_num_attributes, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Attribute %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Attribute %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 length = tvb_get_ntohl(tvb, foffset);
                 foffset += 4;
                 if (length!=0)
                 {
+                    tvb_ensure_bytes_exist(tvb, foffset, length);
                     proto_tree_add_item(atree, hf_ndps_attribute_set, tvb, foffset, length, ENC_NA);
                 }
                 proto_item_set_end(aitem, tvb, foffset);
@@ -7497,7 +7781,7 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
         case 0x00000003:    /* Register Supplier */
             proto_tree_add_item(ndps_tree, hf_ndps_session, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            foffset = event_object_set(tvb, pinfo, ndps_tree, foffset);
+            foffset = event_object_set(tvb, ndps_tree, foffset);
             foffset = return_code(tvb, pinfo, ndps_tree, foffset);
             break;
         case 0x00000004:    /* Deregister Supplier */
@@ -7508,13 +7792,13 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
         case 0x00000005:    /* Add Profile */
             proto_tree_add_item(ndps_tree, hf_ndps_profile_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            foffset = event_object_set(tvb, pinfo, ndps_tree, foffset);
+            foffset = event_object_set(tvb, ndps_tree, foffset);
             foffset = return_code(tvb, pinfo, ndps_tree, foffset);
             break;
         case 0x00000006:    /* Remove Profile */
         case 0x00000007:    /* Modify Profile */
         case 0x00000009:    /* Report Event */
-            foffset = event_object_set(tvb, pinfo, ndps_tree, foffset);
+            foffset = event_object_set(tvb, ndps_tree, foffset);
             foffset = return_code(tvb, pinfo, ndps_tree, foffset);
             break;
         case 0x00000008:    /* List Profiles */
@@ -7526,7 +7810,8 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             foffset += 4;
             proto_tree_add_item(ndps_tree, hf_ndps_persistence, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Consumer Name");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Consumer Name");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = qualifiedname(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             length = tvb_get_ntohl(tvb, foffset);
@@ -7539,32 +7824,36 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             proto_tree_add_item(ndps_tree, hf_ndps_language_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
             foffset += 4;
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Delivery Addresses");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Delivery Addresses");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Address %d", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Address %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = address_item(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
             }
             proto_item_set_end(aitem, tvb, foffset);
-            foffset = event_object_set(tvb, pinfo, ndps_tree, foffset);
+            foffset = event_object_set(tvb, ndps_tree, foffset);
             /* End of Eventhandling */
             /* End of ProfileResultSet */
             length = tvb_get_ntohl(tvb, foffset);
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(ndps_tree, hf_ndps_continuation_option, tvb, foffset, length, ENC_NA);
             }
             foffset += length;
@@ -7584,7 +7873,8 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             break;
         case 0x0000000c:    /* Add Delivery Method */
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             proto_item_set_end(aitem, tvb, foffset);
             /* End of NameorID */
@@ -7593,18 +7883,20 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
         case 0x0000000e:    /* List Delivery Methods */
             /* Start of DeliveryMethodSet */
             number_of_items = tvb_get_ntohl(tvb, foffset);
-            expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_delivery_method_count, tvb, foffset, 4, number_of_items);
+            proto_tree_add_uint(ndps_tree, hf_ndps_delivery_method_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                    proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
                 /* Start of DeliveryMethod */
-                atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method %d", ii+1);
+                aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method %d", ii+1);
+                atree = proto_item_add_subtree(aitem, ett_ndps);
                 /* Start of NameorID */
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Method ID");
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Method ID");
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = name_or_id(tvb, btree, foffset);
                 foffset += align_4(tvb, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
@@ -7623,7 +7915,8 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
         case 0x0000000f:    /* Get Delivery Method Information */
             /* Start of DeliveryMethod */
             /* Start of NameorID */
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Method ID");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Method ID");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             foffset = name_or_id(tvb, atree, foffset);
             /* End of NameorID */
             foffset = ndps_string(tvb, hf_ndps_method_name, atree, foffset, NULL);
@@ -7636,14 +7929,16 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             number_of_items = tvb_get_ntohl(tvb, foffset);
             proto_tree_add_uint(ndps_tree, hf_ndps_delivery_add_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Delivery Addresses");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Delivery Addresses");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, aitem, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Address %d", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Address %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 foffset = address_item(tvb, btree, foffset);
                 proto_item_set_end(bitem, tvb, foffset);
             }
@@ -7677,6 +7972,7 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             foffset += 4;
             if (length!=0)
             {
+                tvb_ensure_bytes_exist(tvb, foffset, length);
                 proto_tree_add_item(ndps_tree, hf_ndps_attribute_set, tvb, foffset, length, ENC_NA);
             }
             break;
@@ -7707,15 +8003,16 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             case 1:     /* Printer Definitions */
             case 2:     /* Printer Definitions Short */
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_printer_def_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_printer_def_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Definition %d", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Definition %d", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     if (tvb_get_ntohl(tvb, foffset)==0) {  /* Offset for old type support */
                         foffset += 2;
                     }
@@ -7736,45 +8033,48 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
                 break;
             case 3:     /* Banner Page Files */
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Banner %d", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Banner %d", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = ndps_string(tvb, hf_ndps_banner_name, atree, foffset, NULL);
                     proto_item_set_end(aitem, tvb, foffset);
                 }
                 break;
             case 4:     /* Font Types */
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_font_type_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_font_type_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Font %d", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Font %d", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = ndps_string(tvb, hf_font_type_name, atree, foffset, NULL);
                     proto_item_set_end(aitem, tvb, foffset);
                 }
                 break;
             case 7:     /* Font Files */
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_font_file_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_font_file_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Font File %d", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Font File %d", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = ndps_string(tvb, hf_font_file_name, atree, foffset, NULL);
                     proto_item_set_end(aitem, tvb, foffset);
                 }
@@ -7783,15 +8083,16 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             case 12:    /* Printer Driver Files 2 */
             case 9:     /* Generic Files */
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_printer_def_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_printer_def_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "File %d", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "File %d", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = ndps_string(tvb, hf_ndps_prn_file_name, atree, foffset, NULL);
                     foffset = ndps_string(tvb, hf_ndps_prn_dir_name, atree, foffset, NULL);
                     foffset = ndps_string(tvb, hf_ndps_inf_file_name, atree, foffset, NULL);
@@ -7800,39 +8101,42 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
                 break;
             case 6:     /* Printer Definition File */
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_printer_def_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_printer_def_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Definition %d", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Definition %d", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = ndps_string(tvb, hf_ndps_prn_file_name, atree, foffset, NULL);
                     foffset = ndps_string(tvb, hf_ndps_prn_dir_name, atree, foffset, NULL);
                     foffset = ndps_string(tvb, hf_ndps_inf_file_name, atree, foffset, NULL);
                     proto_item_set_end(aitem, tvb, foffset);
                 }
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Item %d", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Item %d", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = ndps_string(tvb, hf_ndps_def_file_name, atree, foffset, NULL);
                     number_of_items2 = tvb_get_ntohl(tvb, foffset);
                     proto_tree_add_uint(atree, hf_ndps_num_win31_keys, tvb, foffset, 4, number_of_items2);
-                    btree = proto_tree_add_subtree(atree, tvb, foffset, 4, ett_ndps, &bitem, "Windows 3.1 Keys");
+                    bitem = proto_tree_add_text(atree, tvb, foffset, 4, "Windows 3.1 Keys");
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
                     foffset += 4;
                     for (jj = 0; jj < number_of_items2; jj++ )
                     {
                         if (jj >= NDPS_MAX_ITEMS) {
-                            expert_add_info(pinfo, bitem, &ei_ndps_truncated);
+                            proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                             break;
                         }
                         foffset = ndps_string(tvb, hf_ndps_windows_key, btree, foffset, NULL);
@@ -7840,12 +8144,13 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
                     proto_item_set_end(bitem, tvb, foffset);
                     number_of_items2 = tvb_get_ntohl(tvb, foffset);
                     proto_tree_add_uint(atree, hf_ndps_num_win95_keys, tvb, foffset, 4, number_of_items2);
-                    btree = proto_tree_add_subtree(atree, tvb, foffset, 4, ett_ndps, &bitem, "Windows 95 Keys");
+                    bitem = proto_tree_add_text(atree, tvb, foffset, 4, "Windows 95 Keys");
+                    btree = proto_item_add_subtree(bitem, ett_ndps);
                     foffset += 4;
                     for (jj = 0; jj < number_of_items2; jj++ )
                     {
                         if (jj >= NDPS_MAX_ITEMS) {
-                            expert_add_info(pinfo, bitem, &ei_ndps_truncated);
+                            proto_tree_add_text(btree, tvb, foffset, -1, "[Truncated]");
                             break;
                         }
                         foffset = ndps_string(tvb, hf_ndps_windows_key, btree, foffset, NULL);
@@ -7857,27 +8162,29 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             case 10:    /* Printer Definition File 2 */
                 foffset = ndps_string(tvb, hf_ndps_def_file_name, ndps_tree, foffset, NULL);
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_os_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_os_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "OS %d", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "OS %d", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     proto_tree_add_item(atree, hf_os_type, tvb, foffset, 4, ENC_BIG_ENDIAN);
                     foffset += 4;
                     number_of_items2 = tvb_get_ntohl(tvb, foffset);
-                    expert_item = proto_tree_add_uint(atree, hf_ndps_num_windows_keys, tvb, foffset, 4, number_of_items2);
+                    proto_tree_add_uint(atree, hf_ndps_num_windows_keys, tvb, foffset, 4, number_of_items2);
                     foffset += 4;
                     for (jj = 0; jj < number_of_items2; jj++ )
                     {
                         if (jj >= NDPS_MAX_ITEMS) {
-                            expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                            proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                             break;
                         }
-                        btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Key %d", jj+1);
+                        bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Key %d", jj+1);
+                        btree = proto_item_add_subtree(bitem, ett_ndps);
                         foffset = ndps_string(tvb, hf_ndps_windows_key, btree, foffset, NULL);
                         proto_item_set_end(bitem, tvb, foffset);
                     }
@@ -7888,15 +8195,16 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             case 11:    /* Printer Driver Types 2 */
             case 13:    /* Printer Driver Types Archive */
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_printer_type_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_printer_type_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Type %d", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Type %d", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     foffset = ndps_string(tvb, hf_ndps_printer_manuf, atree, foffset, NULL);
                     foffset = ndps_string(tvb, hf_ndps_printer_type, atree, foffset, NULL);
                     foffset = ndps_string(tvb, hf_ndps_prn_file_name, atree, foffset, NULL);
@@ -7910,15 +8218,16 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
                 break;
             case 14:    /* Languages Available */
                 number_of_items = tvb_get_ntohl(tvb, foffset);
-                expert_item = proto_tree_add_uint(ndps_tree, hf_ndps_language_count, tvb, foffset, 4, number_of_items);
+                proto_tree_add_uint(ndps_tree, hf_ndps_language_count, tvb, foffset, 4, number_of_items);
                 foffset += 4;
                 for (ii = 0; ii < number_of_items; ii++ )
                 {
                     if (ii >= NDPS_MAX_ITEMS) {
-                        expert_add_info(pinfo, expert_item, &ei_ndps_truncated);
+                        proto_tree_add_text(ndps_tree, tvb, foffset, -1, "[Truncated]");
                         break;
                     }
-                    atree = proto_tree_add_subtree_format(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Language %d", ii+1);
+                    aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Language %d", ii+1);
+                    atree = proto_item_add_subtree(aitem, ett_ndps);
                     proto_tree_add_item(atree, hf_ndps_language_id, tvb, foffset, 4, ENC_BIG_ENDIAN);
                     foffset += 4;
                     proto_item_set_end(aitem, tvb, foffset);
@@ -8008,14 +8317,16 @@ dissect_ndps_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ndps_tree, int
             number_of_items=tvb_get_ntohl(tvb, foffset);
             proto_tree_add_uint(ndps_tree, hf_ndps_item_count, tvb, foffset, 4, number_of_items);
             foffset += 4;
-            atree = proto_tree_add_subtree(ndps_tree, tvb, foffset, -1, ett_ndps, &aitem, "Failed Items");
+            aitem = proto_tree_add_text(ndps_tree, tvb, foffset, -1, "Failed Items");
+            atree = proto_item_add_subtree(aitem, ett_ndps);
             for (ii = 0; ii < number_of_items; ii++ )
             {
                 if (ii >= NDPS_MAX_ITEMS) {
-                    expert_add_info(pinfo, aitem, &ei_ndps_truncated);
+                    proto_tree_add_text(atree, tvb, foffset, -1, "[Truncated]");
                     break;
                 }
-                btree = proto_tree_add_subtree_format(atree, tvb, foffset, -1, ett_ndps, &bitem, "Item %d", ii+1);
+                bitem = proto_tree_add_text(atree, tvb, foffset, -1, "Item %d", ii+1);
+                btree = proto_item_add_subtree(bitem, ett_ndps);
                 length=tvb_get_ntohl(tvb, foffset);
                 length_remaining = tvb_length_remaining(tvb, foffset);
                 if(length_remaining == -1 || (guint32) length_remaining < length)
@@ -9114,7 +9425,7 @@ proto_register_ndps(void)
             NULL, 0x0, NULL, HFILL }},
 
         { &hf_ndps_data,
-          { "Data",   "ndps.data", FT_BYTES, BASE_NONE,
+          { "[Data]",   "ndps.data", FT_NONE, BASE_NONE,
             NULL, 0x0, NULL, HFILL }},
 
         { &hf_get_status_flag,
@@ -9392,52 +9703,52 @@ proto_register_ndps(void)
 
         { &hf_ndps_object_ids_7,
           { "Object ID Definition",    "ndps.objectid_def7",
-            FT_UINT32,    BASE_DEC,   NULL,
+            FT_NONE,    BASE_NONE,   NULL,
             0x0, NULL, HFILL }},
 
         { &hf_ndps_object_ids_8,
           { "Object ID Definition",    "ndps.objectid_def8",
-            FT_UINT32,    BASE_DEC,   NULL,
+            FT_NONE,    BASE_NONE,   NULL,
             0x0, NULL, HFILL }},
 
         { &hf_ndps_object_ids_9,
           { "Object ID Definition",    "ndps.objectid_def9",
-            FT_UINT32,    BASE_DEC,   NULL,
+            FT_NONE,    BASE_NONE,   NULL,
             0x0, NULL, HFILL }},
 
         { &hf_ndps_object_ids_10,
           { "Object ID Definition",    "ndps.objectid_def10",
-            FT_UINT32,    BASE_DEC,   NULL,
+            FT_NONE,    BASE_NONE,   NULL,
             0x0, NULL, HFILL }},
 
         { &hf_ndps_object_ids_11,
           { "Object ID Definition",    "ndps.objectid_def11",
-            FT_UINT32,    BASE_DEC,   NULL,
+            FT_NONE,    BASE_NONE,   NULL,
             0x0, NULL, HFILL }},
 
         { &hf_ndps_object_ids_12,
           { "Object ID Definition",    "ndps.objectid_def12",
-            FT_UINT32,    BASE_DEC,   NULL,
+            FT_NONE,    BASE_NONE,   NULL,
             0x0, NULL, HFILL }},
 
         { &hf_ndps_object_ids_13,
           { "Object ID Definition",    "ndps.objectid_def13",
-            FT_UINT32,    BASE_DEC,   NULL,
+            FT_NONE,    BASE_NONE,   NULL,
             0x0, NULL, HFILL }},
 
         { &hf_ndps_object_ids_14,
           { "Object ID Definition",    "ndps.objectid_def14",
-            FT_UINT32,    BASE_DEC,   NULL,
+            FT_NONE,    BASE_NONE,   NULL,
             0x0, NULL, HFILL }},
 
         { &hf_ndps_object_ids_15,
           { "Object ID Definition",    "ndps.objectid_def15",
-            FT_UINT32,    BASE_DEC,   NULL,
+            FT_NONE,    BASE_NONE,   NULL,
             0x0, NULL, HFILL }},
 
         { &hf_ndps_object_ids_16,
           { "Object ID Definition",    "ndps.objectid_def16",
-            FT_UINT32,    BASE_DEC,   NULL,
+            FT_NONE,    BASE_NONE,   NULL,
             0x0, NULL, HFILL }},
 
 #if 0
@@ -9493,7 +9804,6 @@ proto_register_ndps(void)
         { &ei_ndps_problem_type, { "ndps.problem_type.expert", PI_RESPONSE_CODE, PI_NOTE, "Fault", EXPFILL }},
         { &ei_ndps_return_code, { "ndps.return_code.expert", PI_RESPONSE_CODE, PI_NOTE, "Fault", EXPFILL }},
         { &ei_ndps_rpc_acc_stat, { "ndps.rpc_acc_stat.expert", PI_RESPONSE_CODE, PI_NOTE, "Fault", EXPFILL }},
-        { &ei_ndps_truncated, { "ndps.truncated", PI_PROTOCOL, PI_WARN, "Truncated", EXPFILL }},
     };
 
     module_t *ndps_module;
@@ -9546,16 +9856,3 @@ proto_reg_handoff_ndps(void)
     dissector_add_uint("tcp.port", TCP_PORT_NOTIFY_LISTENER, ndps_tcp_handle);
     ndps_data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

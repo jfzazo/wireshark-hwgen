@@ -24,9 +24,13 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/to_str.h>
-#include <epan/expert.h>
+#include <epan/conversation.h>
+#include <epan/etypes.h>
+#include "packet-fc.h"
 
 void proto_register_fcsp(void);
 
@@ -90,8 +94,6 @@ static int hf_auth_dhchap_rsp_value = -1;
 
 /* Initialize the subtree pointers */
 static gint ett_fcsp = -1;
-
-static expert_field ei_auth_fcap_undecoded = EI_INIT;
 
 static const value_string fcauth_msgcode_vals[] = {
     {FC_AUTH_MSG_AUTH_REJECT,    "AUTH_Reject"},
@@ -233,8 +235,8 @@ static void dissect_fcsp_dhchap_challenge(tvbuff_t *tvb, proto_tree *tree)
         name_len = tvb_get_ntohs(tvb, offset+2);
 
         if (name_type == FC_AUTH_NAME_TYPE_WWN) {
-            proto_tree_add_item(tree, hf_auth_responder_wwn, tvb, offset+4,
-                                  8, ENC_NA);
+            proto_tree_add_string(tree, hf_auth_responder_wwn, tvb, offset+4,
+                                  8, tvb_fcwwn_to_str(tvb, offset+4));
         }
         else {
             proto_tree_add_item(tree, hf_auth_responder_name, tvb, offset+4,
@@ -322,7 +324,8 @@ static void dissect_fcsp_auth_negotiate(tvbuff_t *tvb, proto_tree *tree)
         name_len = tvb_get_ntohs(tvb, offset+2);
 
         if (name_type == FC_AUTH_NAME_TYPE_WWN) {
-            proto_tree_add_item(tree, hf_auth_initiator_wwn, tvb, offset+4, 8, ENC_NA);
+            proto_tree_add_string(tree, hf_auth_initiator_wwn, tvb, offset+4, 8,
+                                  tvb_fcwwn_to_str(tvb, offset+4));
         }
         else {
             proto_tree_add_item(tree, hf_auth_initiator_name, tvb, offset+4,
@@ -423,7 +426,8 @@ static void dissect_fcsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         case FC_AUTH_FCPAP_INIT:
         case FC_AUTH_FCPAP_ACCEPT:
         case FC_AUTH_FCPAP_COMPLETE:
-            proto_tree_add_expert(fcsp_tree, pinfo, &ei_auth_fcap_undecoded, tvb, offset+12, -1);
+            proto_tree_add_text(fcsp_tree, tvb, offset+12, tvb_length(tvb),
+                                "FCAP Decoding Not Supported");
             break;
         default:
             break;
@@ -463,7 +467,7 @@ proto_register_fcsp(void)
 
         { &hf_auth_initiator_wwn,
           { "Initiator Name (WWN)", "fcsp.initwwn",
-            FT_FCWWN, BASE_NONE, NULL, 0x0,
+            FT_STRING, BASE_NONE, NULL, 0x0,
             NULL, HFILL}},
 
         { &hf_auth_initiator_name,
@@ -498,7 +502,7 @@ proto_register_fcsp(void)
 
         { &hf_auth_responder_wwn,
           { "Responder Name (WWN)", "fcsp.rspwwn",
-            FT_FCWWN, BASE_NONE, NULL, 0x0,
+            FT_STRING, BASE_NONE, NULL, 0x0,
             NULL, HFILL}},
 
         { &hf_auth_responder_name,
@@ -597,32 +601,13 @@ proto_register_fcsp(void)
         &ett_fcsp,
     };
 
-    static ei_register_info ei[] = {
-        { &ei_auth_fcap_undecoded, { "fcsp.fcap_undecoded", PI_UNDECODED, PI_WARN, "FCAP Decoding Not Supported", EXPFILL }},
-    };
-
-    expert_module_t* expert_fcsp;
-
     /* Register the protocol name and description */
-    proto_fcsp = proto_register_protocol("Fibre Channel Security Protocol", "FC-SP", "fcsp");
+    proto_fcsp = proto_register_protocol("Fibre Channel Security Protocol",
+                                           "FC-SP", "fcsp");
 
     register_dissector("fcsp", dissect_fcsp, proto_fcsp);
 
     proto_register_field_array(proto_fcsp, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-    expert_fcsp = expert_register_protocol(proto_fcsp);
-    expert_register_field_array(expert_fcsp, ei, array_length(ei));
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

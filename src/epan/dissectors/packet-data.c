@@ -25,10 +25,13 @@
 
 #include "config.h"
 
+#include <glib.h>
+
+#include <wsutil/md5.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/to_str.h>
-#include <wsutil/md5.h>
 #include "packet-data.h"
 
 /* proto_data cannot be static because it's referenced in the
@@ -164,16 +167,3 @@ proto_register_data(void)
 	 */
 	proto_set_cant_toggle(proto_data);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>Wireshark</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="../../image/toolbar.qrc">
+    <normaloff>:/menu/help/wsicon16.png</normaloff>:/menu/help/wsicon16.png</iconset>
+  </property>
   <property name="unifiedTitleAndToolBarOnMac">
    <bool>true</bool>
   </property>
@@ -23,10 +27,7 @@
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
-   <layout class="QVBoxLayout" name="verticalLayout">
-    <property name="spacing">
-     <number>0</number>
-    </property>
+   <layout class="QGridLayout" name="gridLayout">
     <property name="leftMargin">
      <number>0</number>
     </property>
@@ -39,7 +40,10 @@
     <property name="bottomMargin">
      <number>0</number>
     </property>
-    <item>
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <item row="0" column="0">
      <widget class="AccordionFrame" name="goToFrame">
       <layout class="QHBoxLayout" name="goToHB">
        <property name="topMargin">
@@ -85,17 +89,11 @@
       </layout>
      </widget>
     </item>
-    <item>
+    <item row="1" column="0">
      <widget class="SearchFrame" name="searchFrame" native="true"/>
     </item>
-    <item>
-     <widget class="ColumnEditorFrame" name="columnEditorFrame"/>
-    </item>
-    <item>
+    <item row="2" column="0">
      <widget class="QStackedWidget" name="mainStack">
-      <property name="enabled">
-       <bool>true</bool>
-      </property>
       <widget class="MainWelcome" name="welcomePage"/>
       <widget class="QWidget" name="packetPage"/>
      </widget>
@@ -147,7 +145,6 @@
      <addaction name="actionFileExportObjectsDICOM"/>
      <addaction name="actionFileExportObjectsHTTP"/>
      <addaction name="actionFileExportObjectsSMB"/>
-     <addaction name="actionFileExportObjectsTFTP"/>
     </widget>
     <addaction name="actionFileOpen"/>
     <addaction name="menuOpenRecentCaptureFile"/>
@@ -175,9 +172,10 @@
     <property name="title">
      <string>&amp;Capture</string>
     </property>
+    <addaction name="actionCaptureInterfaces"/>
     <addaction name="actionCaptureOptions"/>
-    <addaction name="actionCaptureStart"/>
-    <addaction name="actionCaptureStop"/>
+    <addaction name="actionStartCapture"/>
+    <addaction name="actionStopCapture"/>
     <addaction name="actionCaptureRestart"/>
     <addaction name="actionCaptureCaptureFilters"/>
     <addaction name="actionCaptureRefreshInterfaces"/>
@@ -231,70 +229,21 @@
     <property name="title">
      <string>&amp;View</string>
     </property>
-    <widget class="QMenu" name="menuZoom">
+    <widget class="QMenu" name="menuToolbars">
      <property name="title">
-      <string>&amp;Zoom</string>
+      <string>Toolbars</string>
      </property>
-     <addaction name="actionViewZoomIn"/>
-     <addaction name="actionViewZoomOut"/>
-     <addaction name="actionViewNormalSize"/>
+     <addaction name="actionViewToolbarMainToolbar"/>
+     <addaction name="actionViewToolbarDisplayFilter"/>
     </widget>
-    <widget class="QMenu" name="menuTime_Display_Format">
-     <property name="title">
-      <string>&amp;Time Display Format</string>
-     </property>
-     <addaction name="actionViewTimeDisplayFormatDateYMDandTimeOfDay"/>
-     <addaction name="actionViewTimeDisplayFormatDateYDOYandTimeOfDay"/>
-     <addaction name="actionViewTimeDisplayFormatTimeOfDay"/>
-     <addaction name="actionViewTimeDisplayFormatSecondsSinceEpoch"/>
-     <addaction name="actionViewTimeDisplayFormatSecondsSinceBeginningOfCapture"/>
-     <addaction name="actionViewTimeDisplayFormatSecondsSincePreviousCapturedPacket"/>
-     <addaction name="actionViewTimeDisplayFormatSecondsSincePreviousDisplayedPacket"/>
-     <addaction name="actionViewTimeDisplayFormatUTCDateYMDandTimeOfDay"/>
-     <addaction name="actionViewTimeDisplayFormatUTCDateYDOYandTimeOfDay"/>
-     <addaction name="actionViewTimeDisplayFormatUTCTimeOfDay"/>
-     <addaction name="separator"/>
-     <addaction name="actionViewTimeDisplayFormatPrecisionAutomatic"/>
-     <addaction name="actionViewTimeDisplayFormatPrecisionSeconds"/>
-     <addaction name="actionViewTimeDisplayFormatPrecisionDeciseconds"/>
-     <addaction name="actionViewTimeDisplayFormatPrecisionCentiseconds"/>
-     <addaction name="actionViewTimeDisplayFormatPrecisionMilliseconds"/>
-     <addaction name="actionViewTimeDisplayFormatPrecisionMicroseconds"/>
-     <addaction name="actionViewTimeDisplayFormatPrecisionNanoseconds"/>
-     <addaction name="separator"/>
-     <addaction name="actionViewTimeDisplaySecondsWithHoursAndMinutes"/>
-    </widget>
-    <widget class="QMenu" name="menuName_Resolution">
-     <property name="title">
-      <string>Name Resolution</string>
-     </property>
-     <addaction name="actionViewNameResolutionPhysical"/>
-     <addaction name="actionViewNameResolutionNetwork"/>
-     <addaction name="actionViewNameResolutionTransport"/>
-    </widget>
-    <addaction name="actionViewMainToolbar"/>
-    <addaction name="actionViewFilterToolbar"/>
-    <addaction name="actionViewWirelessToolbar"/>
-    <addaction name="actionViewStatusBar"/>
-    <addaction name="separator"/>
-    <addaction name="actionViewPacketList"/>
-    <addaction name="actionViewPacketDetails"/>
-    <addaction name="actionViewPacketBytes"/>
-    <addaction name="separator"/>
-    <addaction name="menuTime_Display_Format"/>
-    <addaction name="menuName_Resolution"/>
-    <addaction name="separator"/>
-    <addaction name="menuZoom"/>
     <addaction name="separator"/>
     <addaction name="actionViewExpandSubtrees"/>
     <addaction name="actionViewExpandAll"/>
     <addaction name="actionViewCollapseAll"/>
     <addaction name="separator"/>
-    <addaction name="actionViewColorizePacketList"/>
-    <addaction name="separator"/>
-    <addaction name="actionViewResizeColumns"/>
-    <addaction name="separator"/>
     <addaction name="actionViewReload"/>
+    <addaction name="separator"/>
+    <addaction name="menuToolbars"/>
    </widget>
    <widget class="QMenu" name="menuAnalyze">
     <property name="title">
@@ -329,25 +278,19 @@
      <addaction name="actionSCTPAnalyseThisAssociation"/>
      <addaction name="actionSCTPShowAllAssociations"/>
     </widget>
-    <widget class="QMenu" name="menuFollow">
-     <property name="title">
-      <string>Follow</string>
-     </property>
-     <addaction name="actionAnalyzeFollowTCPStream"/>
-     <addaction name="actionAnalyzeFollowUDPStream"/>
-     <addaction name="actionAnalyzeFollowSSLStream"/>
-    </widget>
-    <addaction name="actionAnalyzeDisplayFilters"/>
-    <addaction name="actionAnalyzeDisplayFilterMacros"/>
+    <addaction name="actionDisplayFilters"/>
+    <addaction name="actionDisplayFilterMacros"/>
     <addaction name="separator"/>
-    <addaction name="actionAnalyzeCreateAColumn"/>
+    <addaction name="actionApplyAsColumn"/>
     <addaction name="menuApplyAsFilter"/>
     <addaction name="menuPrepareAFilter"/>
     <addaction name="separator"/>
     <addaction name="actionAnalyzeDecodeAs"/>
     <addaction name="separator"/>
     <addaction name="menuSCTP"/>
-    <addaction name="menuFollow"/>
+    <addaction name="actionAnalyzeFollowTCPStream"/>
+    <addaction name="actionAnalyzeFollowUDPStream"/>
+    <addaction name="actionAnalyzeFollowSSLStream"/>
    </widget>
    <widget class="QMenu" name="menuStatistics">
     <property name="enabled">
@@ -419,12 +362,10 @@
      <addaction name="menu29WestQueues"/>
      <addaction name="menu29WestUIM"/>
      <addaction name="actionStatistics29WestLBTRM"/>
-     <addaction name="actionStatistics29WestLBTRU"/>
+	 <addaction name="actionStatistics29WestLBTRU"/>
     </widget>
-    <addaction name="actionStatisticsCaptureFileProperties"/>
-    <addaction name="actionStatisticsProtocolHierarchy"/>
-    <addaction name="actionStatisticsConversations"/>
-    <addaction name="actionStatisticsEndpoints"/>
+    <addaction name="actionSummary"/>
+    <addaction name="actionProtocol_Hierarchy"/>
     <addaction name="actionStatisticsPacketLen"/>
     <addaction name="actionStatisticsIOGraph"/>
     <addaction name="separator"/>
@@ -433,12 +374,9 @@
     <addaction name="actionStatisticsANCP"/>
     <addaction name="menuBACnet"/>
     <addaction name="actionStatisticsCollectd"/>
-    <addaction name="actionStatisticsDNS"/>
     <addaction name="actionStatisticsFlowGraph"/>
     <addaction name="actionStatisticsHART_IP"/>
-    <addaction name="actionStatisticsHpfeeds"/>
     <addaction name="menuHTTP"/>
-    <addaction name="actionStatisticsHTTP2"/>
     <addaction name="actionStatisticsSametime"/>
     <addaction name="menuTcpStreamGraphs"/>
    </widget>
@@ -452,19 +390,10 @@
      </property>
      <addaction name="actionTelephonyRTSPPacketCounter"/>
     </widget>
-    <widget class="QMenu" name="menuRTP">
-     <property name="title">
-      <string>RTP</string>
-     </property>
-     <addaction name="actionTelephonyRTPStreams"/>
-    </widget>
-    <addaction name="actionTelephonyVoipCalls"/>
     <addaction name="actionTelephonyISUPMessages"/>
-    <addaction name="menuRTP"/>
     <addaction name="menuRTSP"/>
     <addaction name="actionTelephonySMPPOperations"/>
     <addaction name="actionTelephonyUCPMessages"/>
-    <addaction name="actionTelephonySipFlows"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
@@ -528,12 +457,15 @@
     <string>Main Toolbar</string>
    </property>
    <property name="movable">
-    <bool>false</bool>
+    <bool>true</bool>
+   </property>
+   <property name="allowedAreas">
+    <set>Qt::BottomToolBarArea|Qt::TopToolBarArea</set>
    </property>
    <property name="iconSize">
     <size>
-     <width>32</width>
-     <height>32</height>
+     <width>24</width>
+     <height>24</height>
     </size>
    </property>
    <property name="toolButtonStyle">
@@ -545,28 +477,12 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
-   <addaction name="actionCaptureStart"/>
-   <addaction name="actionCaptureStop"/>
-   <addaction name="actionCaptureRestart"/>
-   <addaction name="actionCaptureOptions"/>
+   <addaction name="actionStartCapture"/>
+   <addaction name="actionStopCapture"/>
    <addaction name="separator"/>
    <addaction name="actionFileOpen"/>
    <addaction name="actionFileSave"/>
    <addaction name="actionFileClose"/>
-   <addaction name="separator"/>
-   <addaction name="actionEditFindPacket"/>
-   <addaction name="actionGoPreviousPacket"/>
-   <addaction name="actionGoNextPacket"/>
-   <addaction name="actionGoGoToPacket"/>
-   <addaction name="actionGoFirstPacket"/>
-   <addaction name="actionGoLastPacket"/>
-   <addaction name="separator"/>
-   <addaction name="actionViewColorizePacketList"/>
-   <addaction name="separator"/>
-   <addaction name="actionViewZoomIn"/>
-   <addaction name="actionViewZoomOut"/>
-   <addaction name="actionViewNormalSize"/>
-   <addaction name="actionViewResizeColumns"/>
   </widget>
   <widget class="MainStatusBar" name="statusBar"/>
   <widget class="QToolBar" name="displayFilterToolBar">
@@ -593,9 +509,6 @@
    <property name="shortcut">
     <string>Ctrl+O</string>
    </property>
-   <property name="iconVisibleInMenu">
-    <bool>false</bool>
-   </property>
   </action>
   <action name="actionFileQuit">
    <property name="text">
@@ -611,9 +524,26 @@
     <enum>QAction::QuitRole</enum>
    </property>
   </action>
-  <action name="actionCaptureStart">
+  <action name="actionCaptureInterfaces">
+   <property name="text">
+    <string>&amp;Interfaces...</string>
+   </property>
+   <property name="toolTip">
+    <string>Show interface details</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+I</string>
+   </property>
+  </action>
+  <action name="actionStartCapture">
    <property name="checkable">
     <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../../image/toolbar.qrc">
+     <normaloff>:/toolbar/main/capture_start_24.png</normaloff>
+     <normalon>:/toolbar/main/capture_start_active_24.png</normalon>
+     <disabledon>:/toolbar/main/capture_start_active_24.png</disabledon>:/toolbar/main/capture_start_24.png</iconset>
    </property>
    <property name="text">
     <string>&amp;Start</string>
@@ -625,7 +555,11 @@
     <string>Ctrl+E</string>
    </property>
   </action>
-  <action name="actionCaptureStop">
+  <action name="actionStopCapture">
+   <property name="icon">
+    <iconset resource="../../image/toolbar.qrc">
+     <normaloff>:/toolbar/main/capture_stop_24.png</normaloff>:/toolbar/main/capture_stop_24.png</iconset>
+   </property>
    <property name="text">
     <string>S&amp;top</string>
    </property>
@@ -641,13 +575,10 @@
     <string>Close</string>
    </property>
    <property name="toolTip">
-    <string>Close this capture file</string>
+    <string>Close the current capture file</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+W</string>
-   </property>
-   <property name="iconVisibleInMenu">
-    <bool>false</bool>
    </property>
   </action>
   <action name="actionDummyNoFilesFound">
@@ -659,6 +590,10 @@
    </property>
   </action>
   <action name="actionHelpContents">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/trolltech/styles/commonstyle/images/standardbutton-help-32.png</normaloff>:/trolltech/styles/commonstyle/images/standardbutton-help-32.png</iconset>
+   </property>
    <property name="text">
     <string>&amp;Contents</string>
    </property>
@@ -710,10 +645,6 @@
    </property>
   </action>
   <action name="actionHelpWebsite">
-   <property name="icon">
-    <iconset resource="../../image/toolbar.qrc">
-     <normaloff>:/menu/help/wsicon16.png</normaloff>:/menu/help/wsicon16.png</iconset>
-   </property>
    <property name="text">
     <string>Website</string>
    </property>
@@ -731,7 +662,7 @@
   <action name="actionHelpWiki">
    <property name="icon">
     <iconset resource="../../image/toolbar.qrc">
-     <normaloff>:/menu/help/wsicon16.png</normaloff>:/menu/help/wsicon16.png</iconset>
+     <normaloff>:/menu/help/gnome_emblem_web_16.png</normaloff>:/menu/help/gnome_emblem_web_16.png</iconset>
    </property>
    <property name="text">
     <string>Wiki</string>
@@ -746,11 +677,18 @@
    </property>
   </action>
   <action name="actionHelpAbout">
+   <property name="icon">
+    <iconset resource="../../image/toolbar.qrc">
+     <normaloff>:/menu/help/wsicon16.png</normaloff>:/menu/help/wsicon16.png</iconset>
+   </property>
    <property name="text">
     <string>&amp;About Wireshark</string>
    </property>
    <property name="menuRole">
     <enum>QAction::AboutRole</enum>
+   </property>
+   <property name="iconVisibleInMenu">
+    <bool>true</bool>
    </property>
   </action>
   <action name="actionHelpAsk">
@@ -873,20 +811,25 @@
    </property>
   </action>
   <action name="actionFileSave">
+   <property name="icon">
+    <iconset resource="../../image/toolbar.qrc">
+     <normaloff>:/toolbar/main/toolbar/toolbar_wireshark_file_24.png</normaloff>:/toolbar/main/toolbar/toolbar_wireshark_file_24.png</iconset>
+   </property>
    <property name="text">
     <string>&amp;Save</string>
    </property>
    <property name="toolTip">
-    <string>Save this capture file</string>
+    <string>Save the current file</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+S</string>
    </property>
-   <property name="iconVisibleInMenu">
-    <bool>false</bool>
-   </property>
   </action>
   <action name="actionFileSaveAs">
+   <property name="icon">
+    <iconset resource="../../image/toolbar.qrc">
+     <normaloff>:/toolbar/main/toolbar/toolbar_wireshark_file_24.png</normaloff>:/toolbar/main/toolbar/toolbar_wireshark_file_24.png</iconset>
+   </property>
    <property name="text">
     <string>Save &amp;As...</string>
    </property>
@@ -946,13 +889,10 @@
     <string>&amp;Reload</string>
    </property>
    <property name="toolTip">
-    <string>Reload this file</string>
+    <string>Reload the current file</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+R</string>
-   </property>
-   <property name="iconVisibleInMenu">
-    <bool>false</bool>
    </property>
   </action>
   <action name="actionCaptureOptions">
@@ -973,9 +913,6 @@
    </property>
   </action>
   <action name="actionCaptureCaptureFilters">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
    <property name="text">
     <string>Capture &amp;Filters...</string>
    </property>
@@ -1164,37 +1101,22 @@
     <string>... or not Selected</string>
    </property>
   </action>
-  <action name="actionAnalyzeDisplayFilters">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
+  <action name="actionDisplayFilters">
    <property name="text">
     <string>Display Filters...</string>
    </property>
   </action>
-  <action name="actionAnalyzeDisplayFilterMacros">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
+  <action name="actionDisplayFilterMacros">
    <property name="text">
     <string>Display Filter &amp;Macros...</string>
    </property>
   </action>
-  <action name="actionAnalyzeCreateAColumn">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
+  <action name="actionApplyAsColumn">
    <property name="text">
-    <string>Create a Column</string>
-   </property>
-   <property name="toolTip">
-    <string>Create a packet list column from the selected field.</string>
+    <string>Apply as Column</string>
    </property>
   </action>
   <action name="actionEditFindPacket">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
    <property name="text">
     <string>&amp;Find Packet...</string>
    </property>
@@ -1412,26 +1334,20 @@
     <enum>QAction::PreferencesRole</enum>
    </property>
   </action>
-  <action name="actionStatisticsCaptureFileProperties">
+  <action name="actionSummary">
    <property name="enabled">
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Capture File Properties</string>
-   </property>
-   <property name="toolTip">
-    <string>Capture file properties</string>
+    <string>Summary</string>
    </property>
   </action>
-  <action name="actionStatisticsProtocolHierarchy">
+  <action name="actionProtocol_Hierarchy">
    <property name="enabled">
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>&amp;Protocol Hierarchy</string>
-   </property>
-   <property name="toolTip">
-    <string>Show a summary of protocols present in the capture file.</string>
+    <string>Protocol Hierarchy</string>
    </property>
   </action>
   <action name="actionHelpMPCapinfos">
@@ -1574,36 +1490,12 @@
     <string>Collectd statistics</string>
    </property>
   </action>
-  <action name="actionStatisticsDNS">
-   <property name="text">
-    <string>DNS</string>
-   </property>
-   <property name="toolTip">
-    <string>DNS statistics</string>
-   </property>
-  </action>
   <action name="actionStatisticsHART_IP">
    <property name="text">
     <string>HART-IP</string>
    </property>
    <property name="toolTip">
     <string>HART-IP statistics</string>
-   </property>
-  </action>
-  <action name="actionStatisticsHpfeeds">
-   <property name="text">
-    <string>HPFEEDS</string>
-   </property>
-   <property name="toolTip">
-    <string>hpfeeds statistics</string>
-   </property>
-  </action>
-  <action name="actionStatisticsHTTP2">
-   <property name="text">
-    <string>HTTP2</string>
-   </property>
-   <property name="toolTip">
-    <string>HTTP2 statistics</string>
    </property>
   </action>
   <action name="actionStatisticsHTTPPacketCounter">
@@ -1787,7 +1679,7 @@
     <string>Create graphs based on display filter fields</string>
    </property>
   </action>
-  <action name="actionViewMainToolbar">
+  <action name="actionViewToolbarMainToolbar">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -1795,13 +1687,13 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>&amp;Main Toolbar</string>
+    <string>Main Toolbar</string>
    </property>
    <property name="toolTip">
-    <string>Show or hide the main toolbar</string>
+    <string>Show/hide the main toolbar</string>
    </property>
   </action>
-  <action name="actionViewFilterToolbar">
+  <action name="actionViewToolbarDisplayFilter">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -1809,441 +1701,10 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>&amp;Filter Toolbar</string>
+    <string>Display Filter</string>
    </property>
    <property name="toolTip">
-    <string>Show or hide the display filter toolbar</string>
-   </property>
-  </action>
-  <action name="actionFileExportObjectsTFTP">
-   <property name="text">
-    <string>&amp;TFTP</string>
-   </property>
-  </action>
-  <action name="actionStatisticsConversations">
-   <property name="text">
-    <string>Conversations</string>
-   </property>
-   <property name="toolTip">
-    <string>Conversations at different protocol levels</string>
-   </property>
-  </action>
-  <action name="actionStatisticsEndpoints">
-   <property name="text">
-    <string>Endpoints</string>
-   </property>
-   <property name="toolTip">
-    <string>Endpoints at different protocol levels</string>
-   </property>
-  </action>
-  <action name="actionViewColorizePacketList">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Colorize Packet List</string>
-   </property>
-   <property name="toolTip">
-    <string>Draw packets using your coloring rules</string>
-   </property>
-  </action>
-  <action name="actionViewZoomIn">
-   <property name="text">
-    <string>&amp;Zoom In</string>
-   </property>
-   <property name="toolTip">
-    <string>Enlarge the main window text</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl++</string>
-   </property>
-  </action>
-  <action name="actionViewZoomOut">
-   <property name="text">
-    <string>Zoom Out</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+-</string>
-   </property>
-  </action>
-  <action name="actionViewNormalSize">
-   <property name="text">
-    <string>Normal Size</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+0</string>
-   </property>
-  </action>
-  <action name="actionViewResizeColumns">
-   <property name="text">
-    <string>Resize Columns</string>
-   </property>
-   <property name="toolTip">
-    <string>Resize packet list columns to fit contents</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+R</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatDateYMDandTimeOfDay">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Date and Time of Day (1970-01-01 01:02:03.123456)</string>
-   </property>
-   <property name="toolTip">
-    <string>Show packet times as the date and time of day.</string>
-   </property>
-   <property name="shortcut">
-    <string>Meta+Alt+1</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatDateYDOYandTimeOfDay">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Year, Day of Year, and Time of Day (1970/001 01:02:03.123456)</string>
-   </property>
-   <property name="toolTip">
-    <string>Show packet times as the year, day of the year and time of day.</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatTimeOfDay">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Time of Day (01:02:03.123456)</string>
-   </property>
-   <property name="toolTip">
-    <string>Show packet times as the date and time of day.</string>
-   </property>
-   <property name="shortcut">
-    <string>Meta+Alt+2</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatSecondsSinceEpoch">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Seconds Since 1970-01-01</string>
-   </property>
-   <property name="toolTip">
-    <string>Show packet times as the seconds since the UNIX / POSIX epoch (1970-01-01).</string>
-   </property>
-   <property name="shortcut">
-    <string>Meta+Alt+3</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatSecondsSinceBeginningOfCapture">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Seconds Since Beginning of Capture</string>
-   </property>
-   <property name="toolTip">
-    <string>Show packet times as the date and time of day.</string>
-   </property>
-   <property name="shortcut">
-    <string>Meta+Alt+4</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatSecondsSincePreviousCapturedPacket">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Seconds Since Previous Captured Packet</string>
-   </property>
-   <property name="toolTip">
-    <string>Show packet times as the seconds since the previous captured packet.</string>
-   </property>
-   <property name="shortcut">
-    <string>Meta+Alt+5</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatSecondsSincePreviousDisplayedPacket">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Seconds Since Previous Displayed Packet</string>
-   </property>
-   <property name="toolTip">
-    <string>Show packet times as the seconds since the previous displayed packet.</string>
-   </property>
-   <property name="shortcut">
-    <string>Meta+Alt+6</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatUTCDateYMDandTimeOfDay">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>UTC Date and Time of Day (1970-01-01 01:02:03.123456)</string>
-   </property>
-   <property name="toolTip">
-    <string>Show packet times as the UTC date and time of day.</string>
-   </property>
-   <property name="shortcut">
-    <string>Meta+Alt+7</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatUTCDateYDOYandTimeOfDay">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>UTC Year, Day of Year, and Time of Day (1970/001 01:02:03.123456)</string>
-   </property>
-   <property name="toolTip">
-    <string>Show packet times as the UTC year, day of the year and time of day.</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatUTCTimeOfDay">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>UTC Time of Day (01:02:03.123456)</string>
-   </property>
-   <property name="toolTip">
-    <string>Show packet times as the UTC time of day.</string>
-   </property>
-   <property name="shortcut">
-    <string>Meta+Alt+8</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatPrecisionAutomatic">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Automatic (from capture file)</string>
-   </property>
-   <property name="toolTip">
-    <string>Use the time precision indicated in the capture file.</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatPrecisionSeconds">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Seconds</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatPrecisionDeciseconds">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Tenths of a second</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatPrecisionCentiseconds">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Hundredths of a second</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatPrecisionMilliseconds">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Milliseconds</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatPrecisionMicroseconds">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Microseconds</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplayFormatPrecisionNanoseconds">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Nanoseconds</string>
-   </property>
-  </action>
-  <action name="actionViewTimeDisplaySecondsWithHoursAndMinutes">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Display Seconds With Hours and Minutes</string>
-   </property>
-   <property name="toolTip">
-    <string>Display seconds with hours and minutes</string>
-   </property>
-  </action>
-  <action name="actionViewNameResolutionPhysical">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Resolve &amp;Physical Addresses</string>
-   </property>
-   <property name="toolTip">
-    <string>Show names for known MAC addresses. Lookups use a local database.</string>
-   </property>
-  </action>
-  <action name="actionViewNameResolutionNetwork">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Resolve &amp;Network Addresses</string>
-   </property>
-   <property name="toolTip">
-    <string>Show names for known IPv4, IPv6, and IPX addresses. Lookups can generate network traffic.</string>
-   </property>
-  </action>
-  <action name="actionViewNameResolutionTransport">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Resolve &amp;Transport Addresses</string>
-   </property>
-   <property name="toolTip">
-    <string>Show names for known TCP, UDP, and SCTP services. Lookups can generate traffic on some systems.</string>
-   </property>
-  </action>
-  <action name="actionViewWirelessToolbar">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Wire&amp;less Toolbar</string>
-   </property>
-   <property name="toolTip">
-    <string>Show or hide the wireless toolbar</string>
-   </property>
-   <property name="visible">
-    <bool>false</bool>
-   </property>
-  </action>
-  <action name="actionViewStatusBar">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>&amp;Status Bar</string>
-   </property>
-   <property name="toolTip">
-    <string>Show or hide the status bar</string>
-   </property>
-  </action>
-  <action name="actionViewPacketList">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Packet &amp;List</string>
-   </property>
-   <property name="toolTip">
-    <string>Show or hide the packet list</string>
-   </property>
-  </action>
-  <action name="actionViewPacketDetails">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Packet &amp;Details</string>
-   </property>
-   <property name="toolTip">
-    <string>Show or hide the packet details</string>
-   </property>
-  </action>
-  <action name="actionViewPacketBytes">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Packet &amp;Bytes</string>
-   </property>
-   <property name="toolTip">
-    <string>Show or hide the packet bytes</string>
-   </property>
-  </action>
-  <action name="actionFollow">
-   <property name="text">
-    <string>Follow...</string>
-   </property>
-  </action>
-  <action name="actionSCTP">
-   <property name="text">
-    <string>SCTP</string>
-   </property>
-  </action>
-  <action name="actionApply_as_Filter">
-   <property name="text">
-    <string>Apply as Filter</string>
-   </property>
-  </action>
-  <action name="actionPrepare_a_Filter">
-   <property name="text">
-    <string>Prepare a Filter</string>
-   </property>
-  </action>
-  <action name="actionCopy">
-   <property name="text">
-    <string>Copy</string>
-   </property>
-  </action>
-  <action name="actionBytes">
-   <property name="text">
-    <string>Bytes</string>
-   </property>
-  </action>
-  <action name="actionTelephonyVoipCalls">
-   <property name="text">
-    <string>&amp;VoIP Calls</string>
-   </property>
-   <property name="toolTip">
-    <string>All VoIP Calls</string>
-   </property>
-  </action>
-  <action name="actionTelephonySipFlows">
-   <property name="text">
-    <string>SIP &amp;Flows</string>
-   </property>
-   <property name="toolTip">
-    <string>SIP Flows</string>
-   </property>
-  </action>
-  <action name="actionTelephonyRTPStreams">
-   <property name="text">
-    <string>RTP Streams</string>
+    <string>Show/hide the display filter toolbar</string>
    </property>
   </action>
  </widget>
@@ -2271,12 +1732,6 @@
    <header>accordion_frame.h</header>
    <container>1</container>
   </customwidget>
-  <customwidget>
-   <class>ColumnEditorFrame</class>
-   <extends>QFrame</extends>
-   <header>column_editor_frame.h</header>
-   <container>1</container>
-  </customwidget>
  </customwidgets>
  <resources>
   <include location="../../image/toolbar.qrc"/>
@@ -2295,6 +1750,38 @@
     <hint type="destinationlabel">
      <x>408</x>
      <y>258</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>mainToolBar</sender>
+   <signal>visibilityChanged(bool)</signal>
+   <receiver>actionViewToolbarMainToolbar</receiver>
+   <slot>setChecked(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>479</x>
+     <y>39</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>displayFilterToolBar</sender>
+   <signal>visibilityChanged(bool)</signal>
+   <receiver>actionViewToolbarDisplayFilter</receiver>
+   <slot>setChecked(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>479</x>
+     <y>64</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>-1</x>
+     <y>-1</y>
     </hint>
    </hints>
   </connection>

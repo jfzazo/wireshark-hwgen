@@ -23,10 +23,14 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/asn1.h>
 #include <epan/etypes.h>
 #include <epan/expert.h>
+
+#include <stdio.h>
+#include <string.h>
 
 #include "packet-ber.h"
 #include "packet-acse.h"
@@ -104,7 +108,6 @@ static int ett_phsmeas_q = -1;
 #include "packet-sv-ett.c"
 
 static expert_field ei_sv_mal_utctime = EI_INIT;
-static expert_field ei_sv_zero_pdu = EI_INIT;
 
 #if 0
 static const value_string sv_q_validity_vals[] = {
@@ -128,7 +131,7 @@ dissect_PhsMeas1(gboolean implicit_tag, packet_info *pinfo, proto_tree *tree, tv
 	gint32 tag;
 	guint32 len;
 	proto_item *it;
-	proto_tree *subtree;
+	proto_tree *subtree = NULL;
 	gint32 value;
 	guint32 qual;
 	guint32 i;
@@ -157,7 +160,10 @@ dissect_PhsMeas1(gboolean implicit_tag, packet_info *pinfo, proto_tree *tree, tv
 		len=tvb_length_remaining(tvb, offset);
 	}
 
-	subtree = proto_tree_add_subtree(tree, tvb, offset, len, ett_phsmeas, NULL, "PhsMeas1");
+	if (tree) {
+		it = proto_tree_add_text(tree, tvb, offset, len, "PhsMeas1");
+		subtree = proto_item_add_subtree(it, ett_phsmeas);
+	}
 
 	sv_data.num_phsMeas = 0;
 	for (i = 0; i < len/8; i++) {
@@ -192,15 +198,16 @@ dissect_sv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 {
 	int offset = 0;
 	int old_offset;
-	proto_item *item;
-	proto_tree *tree;
+	proto_item *item = NULL;
+	proto_tree *tree = NULL;
 	asn1_ctx_t asn1_ctx;
 
 	asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
 
-	item = proto_tree_add_item(parent_tree, proto_sv, tvb, 0, -1, ENC_NA);
-	tree = proto_item_add_subtree(item, ett_sv);
-
+	if (parent_tree){
+		item = proto_tree_add_item(parent_tree, proto_sv, tvb, 0, -1, ENC_NA);
+		tree = proto_item_add_subtree(item, ett_sv);
+	}
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, PNAME);
 	col_clear(pinfo->cinfo, COL_INFO);
 
@@ -225,7 +232,7 @@ dissect_sv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 		old_offset = offset;
 		offset = dissect_sv_SampledValues(FALSE, tvb, offset, &asn1_ctx , tree, -1);
 		if (offset == old_offset) {
-			proto_tree_add_expert(tree, pinfo, &ei_sv_zero_pdu, tvb, offset, -1);
+			proto_tree_add_text(tree, tvb, offset, -1, "Internal error, zero-byte SV PDU");
 			break;
 		}
 	}
@@ -311,7 +318,6 @@ void proto_register_sv(void) {
 
 	static ei_register_info ei[] = {
 		{ &ei_sv_mal_utctime, { "sv.malformed.utctime", PI_MALFORMED, PI_WARN, "BER Error: malformed UTCTime encoding", EXPFILL }},
-		{ &ei_sv_zero_pdu, { "sv.zero_pdu", PI_PROTOCOL, PI_ERROR, "Internal error, zero-byte SV PDU", EXPFILL }},
 	};
 
 	expert_module_t* expert_sv;

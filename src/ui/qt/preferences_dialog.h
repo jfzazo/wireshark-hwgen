@@ -22,15 +22,13 @@
 #ifndef PREFERENCES_DIALOG_H
 #define PREFERENCES_DIALOG_H
 
-#include <config.h>
+#include "config.h"
 
 #include <glib.h>
 
 #include "color.h"
 
 #include <epan/prefs.h>
-
-#include "wireshark_application.h"
 
 #include <QDialog>
 #include <QTreeWidgetItem>
@@ -48,19 +46,8 @@ class PreferencesDialog : public QDialog
     Q_OBJECT
 
 public:
-    // This, prefsTree, and stackedWidget must all correspond to each other.
-    enum PreferencesPane {
-        ppAppearance,
-        ppLayout,
-        ppColumn,
-        ppFontAndColor,
-        ppCapture,
-        ppFilterExpressions
-    };
-
-    explicit PreferencesDialog(QWidget *parent = 0, PreferencesPane start_pane = ppAppearance);
+    explicit PreferencesDialog(QWidget *parent = 0);
     ~PreferencesDialog();
-    const QList<WiresharkApplication::AppSignal> appSignals() const { return app_signals_; }
 
 protected:
     void showEvent(QShowEvent *evt);
@@ -76,7 +63,6 @@ private:
     QString saved_string_pref_;
     QComboBox *cur_combo_box_;
     int saved_combo_idx_;
-    QList<WiresharkApplication::AppSignal> app_signals_;
 
 private slots:
     void on_prefsTree_currentItemChanged(QTreeWidgetItem *current, QTreeWidgetItem *previous);

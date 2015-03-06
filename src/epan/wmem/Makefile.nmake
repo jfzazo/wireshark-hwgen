@@ -19,7 +19,7 @@ wmem.lib: $(WMEM_OBJECTS)
 	link /lib /out:wmem.lib $(WMEM_OBJECTS)
 
 clean:
-	rm -f $(WMEM_OBJECTS) wmem.lib *.nativecodeanalysis.xml *.pdb *.sbr wmem_test.obj wmem_test.exe wmem_test.exp
+	rm -f $(WMEM_OBJECTS) wmem.lib *.pdb *.sbr wmem_test.obj wmem_test.exe wmem_test.exp
 
 distclean: clean
 
@@ -39,7 +39,7 @@ wmem_test.exe: $(WMEM_TEST_OBJ) $(WMEM_TEST_LIBS)
 
 wmem_test_install:
 	set copycmd=/y
-	if exist wmem_test.exe	xcopy wmem_test.exe	..\..\$(INSTALL_DIR) /d
+	if exist wmem_test.exe          xcopy wmem_test.exe          ..\..\$(INSTALL_DIR) /d
 
 checkapi:
 	$(PERL) ../../tools/checkAPIs.pl -g termoutput -build \

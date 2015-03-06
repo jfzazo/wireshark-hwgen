@@ -1447,7 +1447,6 @@ static void parsetypedefstruct(int pass)
 	char *field_name;
 	int fixed_array_size;
 	int is_array_of_pointers;
-	int empty_struct = 0;
 
 	ti=token_list;
 	if(strcmp(ti->str, "typedef")){
@@ -1478,11 +1477,6 @@ static void parsetypedefstruct(int pass)
 		Exit(10);
 	}
 	ti=ti->next;
-
-	/* Check if the struct is empty (search if there is no end bracket) */
-	if(strcmp(ti->str, "}") == 0){
-		empty_struct = 1;
-	}
 
 	/* search forward until the '}' so we can find the name of the struct */
 	for(tmpti=ti,level=0;tmpti;tmpti=tmpti->next){
@@ -1528,12 +1522,10 @@ static void parsetypedefstruct(int pass)
 		FPRINTF(eth_hdr, "int %s(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree, dcerpc_info *di, guint8 *drep, int hf_index, guint32 param);\n", dissectorname);
 		FPRINTF(eth_code, "\n");
 		FPRINTF(eth_code, "int\n");
-		FPRINTF(eth_code, "%s(tvbuff_t *tvb, int offset, packet_info *pinfo _U_, proto_tree *parent_tree, dcerpc_info *di _U_, guint8 *drep _U_, int hf_index, guint32 param _U_)\n", dissectorname);
+		FPRINTF(eth_code, "%s(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *parent_tree, dcerpc_info *di, guint8 *drep, int hf_index, guint32 param _U_)\n", dissectorname);
 		FPRINTF(eth_code, "{\n");
 		FPRINTF(eth_code, "    proto_item *item=NULL;\n");
-		if(!empty_struct){
-			FPRINTF(eth_code, "    proto_tree *tree=NULL;\n");
-		}
+		FPRINTF(eth_code, "    proto_tree *tree=NULL;\n");
 		FPRINTF(eth_code, "    int old_offset;\n");
 		FPRINTF(eth_code, "\n");
 		switch(alignment){
@@ -1558,9 +1550,7 @@ static void parsetypedefstruct(int pass)
 		FPRINTF(eth_code, "    old_offset=offset;\n");
 		FPRINTF(eth_code, "    if(parent_tree){\n");
 		FPRINTF(eth_code, " 	   item=proto_tree_add_item(parent_tree, hf_index, tvb, offset, -1, ENC_NA);\n");
-		if(!empty_struct){
-			FPRINTF(eth_code, " 	   tree=proto_item_add_subtree(item, ett_%s_%s);\n", ifname, struct_name);
-		}
+		FPRINTF(eth_code, " 	   tree=proto_item_add_subtree(item, ett_%s_%s);\n", ifname, struct_name);
 		FPRINTF(eth_code, "    }\n");
 		FPRINTF(eth_code, "\n");
 	}
@@ -2266,7 +2256,8 @@ static void parsetypedefunion(int pass)
 		}
 		FPRINTF(eth_code, "    old_offset=offset;\n");
 		FPRINTF(eth_code, "    if(parent_tree){\n");
-		FPRINTF(eth_code, " 	   tree=proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_%s_%s, &item, \"%s\");\n", ifname, union_name, union_name);
+		FPRINTF(eth_code, " 	   item=proto_tree_add_text(parent_tree, tvb, offset, -1, \"%s\");\n", union_name);
+		FPRINTF(eth_code, " 	   tree=proto_item_add_subtree(item, ett_%s_%s);\n", ifname, union_name);
 		FPRINTF(eth_code, "    }\n");
 		FPRINTF(eth_code, "\n");
 		switch(tag_alignment){
@@ -2710,12 +2701,12 @@ static void parsefunction(int pass)
 			}
 
 			if((pass==1)&&(bi->flags&BI_IN)){
-				FPRINTF(eth_code, " 	   offset=%s(tvb, offset, pinfo, tree, di, drep);\n", ptmpstr);
+				FPRINTF(eth_code, " 	   offset=%s(tvb, offset, pinfo, tree, drep);\n", ptmpstr);
 				FPRINTF(eth_code, " 	   offset=dissect_deferred_pointers(pinfo, tvb, offset, di, drep);\n");
 				FPRINTF(eth_code, "\n");
 			}
 			if((pass==2)&&(bi->flags&BI_OUT)){
-				FPRINTF(eth_code, " 	   offset=%s(tvb, offset, pinfo, tree, di, drep);\n", ptmpstr);
+				FPRINTF(eth_code, " 	   offset=%s(tvb, offset, pinfo, tree, drep);\n", ptmpstr);
 				FPRINTF(eth_code, " 	   offset=dissect_deferred_pointers(pinfo, tvb, offset, di, drep);\n");
 				FPRINTF(eth_code, "\n");
 			}

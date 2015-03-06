@@ -25,9 +25,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/strutil.h>
+#include <epan/in_cksum.h>
 #include "packet-llc.h"
 #include <epan/oui.h>
 
@@ -74,8 +75,6 @@ static gint ett_fdp_net = -1;
 static gint ett_fdp_tag = -1;
 static gint ett_fdp_vlanmap = -1;
 
-static expert_field ei_fdp_tlv_length = EI_INIT;
-
 #define PROTO_SHORT_NAME "FDP"
 #define PROTO_LONG_NAME "Foundry Discovery Protocol"
 
@@ -112,6 +111,7 @@ static const value_string fdp_type_vals[] = {
 static int
 dissect_tlv_header(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, int length _U_, proto_tree *tree)
 {
+	proto_item	*tlv_item;
 	proto_tree	*tlv_tree;
 	guint16		tlv_type;
 	guint16		tlv_length;
@@ -119,11 +119,12 @@ dissect_tlv_header(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, int length
 	tlv_type = tvb_get_ntohs(tvb, offset);
 	tlv_length = tvb_get_ntohs(tvb, offset + 2);
 
-	tlv_tree = proto_tree_add_subtree_format(tree, tvb, offset, 4,
-		ett_fdp_tlv_header, NULL, "Length %d, type %d = %s",
+	tlv_item = proto_tree_add_text(tree, tvb, offset, 4,
+		"Length %d, type %d = %s",
 		tlv_length, tlv_type,
 		val_to_str(tlv_type, fdp_type_vals, "Unknown (%d)"));
 
+	tlv_tree = proto_item_add_subtree(tlv_item, ett_fdp_tlv_header);
 	proto_tree_add_uint(tlv_tree, hf_fdp_tlv_type, tvb, offset, 2, tlv_type);
 	offset += 2;
 
@@ -149,7 +150,7 @@ dissect_string_tlv(tvbuff_t *tvb, packet_info *pinfo, int offset, int length, pr
 	offset += 4;
 	length -= 4;
 
-	string_value = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_ASCII);
+	string_value = tvb_get_string(wmem_packet_scope(), tvb, offset, length);
 	proto_item_append_text(string_item, ": \"%s\"",
 		format_text(string_value, strlen(string_value)));
 
@@ -283,9 +284,9 @@ dissect_fdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		ti = proto_tree_add_item(tree, proto_fdp, tvb, offset, -1, ENC_NA);
 		fdp_tree = proto_item_add_subtree(ti, ett_fdp);
 
-		proto_tree_add_item(fdp_tree, hf_fdp_version, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_item(fdp_tree, hf_fdp_version, tvb, offset, 1, ENC_NA);
 		offset += 1;
-		proto_tree_add_item(fdp_tree, hf_fdp_holdtime, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_item(fdp_tree, hf_fdp_holdtime, tvb, offset, 1, ENC_NA);
 		offset += 1;
 		proto_tree_add_item(fdp_tree, hf_fdp_checksum, tvb, offset, 2, ENC_BIG_ENDIAN);
 		offset += 2;
@@ -293,15 +294,16 @@ dissect_fdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* Decode the individual TLVs */
 		while (offset < data_length) {
 			if (data_length - offset < 4) {
-				proto_tree_add_expert_format(fdp_tree, pinfo, &ei_fdp_tlv_length, tvb, offset, 4,
-					"Too few bytes left for TLV: %u (< 4)", data_length - offset);
+				proto_tree_add_text(fdp_tree, tvb, offset, 4,
+					"Too few bytes left for TLV: %u (< 4)",
+					data_length - offset);
 				break;
 			}
 			tlv_type = tvb_get_ntohs(tvb, offset);
 			tlv_length = tvb_get_ntohs(tvb, offset + 2);
 
 			if ((tlv_length < 4) || (tlv_length > (data_length - offset))) {
-				proto_tree_add_expert_format(fdp_tree, pinfo, &ei_fdp_tlv_length, tvb, offset, 0,
+				proto_tree_add_text(fdp_tree, tvb, offset, 0,
 					"TLV with invalid length: %u", tlv_length);
 				break;
 			}
@@ -346,7 +348,7 @@ proto_register_fdp(void)
 			0x0, NULL, HFILL }},
 
 		{ &hf_fdp_holdtime,
-		{ "Holdtime",	"fdp.holdtime", FT_UINT8, BASE_DEC, NULL,
+		{ "Holdtime",	"fdp.holdtime", FT_UINT16, BASE_DEC, NULL,
 			0x0, NULL, HFILL }},
 
 		{ &hf_fdp_checksum,
@@ -427,7 +429,7 @@ proto_register_fdp(void)
 		{ "Unknown",	"fdp.tag.unknown", FT_BYTES, BASE_NONE, NULL,
 			0x0, NULL, HFILL }},
 
-	};
+        };
 	static gint *ett[] = {
 		&ett_fdp,
 		&ett_fdp_tlv_header,
@@ -438,18 +440,10 @@ proto_register_fdp(void)
 		&ett_fdp_vlanmap,
 	};
 
-	static ei_register_info ei[] = {
-		{ &ei_fdp_tlv_length, { "fdp.tlv.length.invalid", PI_MALFORMED, PI_ERROR, "Invalid length", EXPFILL }},
-	};
-
-	expert_module_t* expert_fdp;
-
-	proto_fdp = proto_register_protocol(PROTO_LONG_NAME, PROTO_SHORT_NAME, "fdp");
-
-	proto_register_field_array(proto_fdp, hf, array_length(hf));
+        proto_fdp = proto_register_protocol(PROTO_LONG_NAME,
+	    PROTO_SHORT_NAME, "fdp");
+        proto_register_field_array(proto_fdp, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
-	expert_fdp = expert_register_protocol(proto_fdp);
-	expert_register_field_array(expert_fdp, ei, array_length(ei));
 }
 
 void
@@ -473,16 +467,3 @@ proto_register_foundry_oui(void)
 
 	llc_add_oui(OUI_FOUNDRY, "llc.foundry_pid", "LLC Foundry OUI PID", hf);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

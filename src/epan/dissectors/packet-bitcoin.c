@@ -28,6 +28,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/prefs.h>
@@ -385,8 +387,7 @@ static expert_field ei_bitcoin_command_unknown = EI_INIT;
 static gboolean bitcoin_desegment  = TRUE;
 
 static guint
-get_bitcoin_pdu_length(packet_info *pinfo _U_, tvbuff_t *tvb,
-                       int offset, void *data _U_)
+get_bitcoin_pdu_length(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   guint32 length;
   length = BITCOIN_HEADER_LENGTH;
@@ -675,7 +676,8 @@ dissect_bitcoin_msg_inv(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
   {
     proto_tree *subtree;
 
-    subtree = proto_tree_add_subtree(tree, tvb, offset, 36, ett_inv_list, NULL, "Inventory vector");
+    ti = proto_tree_add_text(tree, tvb, offset, 36, "Inventory vector");
+    subtree = proto_item_add_subtree(ti, ett_inv_list);
 
     proto_tree_add_item(subtree, &hfi_msg_inv_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -712,7 +714,8 @@ dissect_bitcoin_msg_getdata(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
   {
     proto_tree *subtree;
 
-    subtree = proto_tree_add_subtree(tree, tvb, offset, 36, ett_getdata_list, NULL, "Inventory vector");
+    ti = proto_tree_add_text(tree, tvb, offset, 36, "Inventory vector");
+    subtree = proto_item_add_subtree(ti, ett_getdata_list);
 
     proto_tree_add_item(subtree, &hfi_msg_getdata_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -1297,7 +1300,7 @@ proto_register_bitcoin(void)
 void
 proto_reg_handoff_bitcoin(void)
 {
-  dissector_add_for_decode_as("tcp.port", bitcoin_handle);
+  dissector_add_handle("tcp.port", bitcoin_handle);  /* for 'decode-as' */
 
   heur_dissector_add( "tcp", dissect_bitcoin_heur, hfi_bitcoin->id);
 }

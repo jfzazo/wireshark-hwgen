@@ -24,10 +24,14 @@
 
 #include "config.h"
 
+#include <string.h>
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/exceptions.h>
+#include <epan/wmem/wmem.h>
 #include <epan/prefs.h>
+#include <epan/strutil.h>
 #include <epan/show_exception.h>
 #include <epan/to_str.h>
 
@@ -63,35 +67,6 @@ static int hf_nbns_name_flags_prm = -1;
 static int hf_nbns_nb_flags = -1;
 static int hf_nbns_nb_flags_group = -1;
 static int hf_nbns_nb_flags_ont = -1;
-static int hf_nbns_name = -1;
-static int hf_nbns_type = -1;
-static int hf_nbns_class = -1;
-
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_nbns_num_alignment_errors = -1;
-static int hf_nbns_data = -1;
-static int hf_nbns_unit_id = -1;
-static int hf_nbns_num_command_blocks = -1;
-static int hf_nbns_num_retransmits = -1;
-static int hf_nbns_period_of_statistics = -1;
-static int hf_nbns_addr = -1;
-static int hf_nbns_test_result = -1;
-static int hf_nbns_num_pending_sessions = -1;
-static int hf_nbns_num_no_resource_conditions = -1;
-static int hf_nbns_session_data_packet_size = -1;
-static int hf_nbns_version_number = -1;
-static int hf_nbns_max_num_pending_sessions = -1;
-static int hf_nbns_num_collisions = -1;
-static int hf_nbns_num_good_sends = -1;
-static int hf_nbns_num_send_aborts = -1;
-static int hf_nbns_number_of_names = -1;
-static int hf_nbns_num_crcs = -1;
-static int hf_nbns_num_good_receives = -1;
-static int hf_nbns_max_total_sessions_possible = -1;
-static int hf_nbns_jumpers = -1;
-static int hf_nbns_netbios_name = -1;
-static int hf_nbns_ttl = -1;
-static int hf_nbns_data_length = -1;
 
 static gint ett_nbns = -1;
 static gint ett_nbns_qd = -1;
@@ -101,8 +76,6 @@ static gint ett_nbns_name_flags = -1;
 static gint ett_nbns_rr = -1;
 static gint ett_nbns_qry = -1;
 static gint ett_nbns_ans = -1;
-
-static expert_field ei_nbns_incomplete_entry = EI_INIT;
 
 static int proto_nbdgm = -1;
 static int hf_nbdgm_type = -1;
@@ -115,8 +88,6 @@ static int hf_nbdgm_src_port = -1;
 static int hf_nbdgm_datagram_length = -1;
 static int hf_nbdgm_packet_offset = -1;
 static int hf_nbdgm_error_code = -1;
-static int hf_nbdgm_source_name = -1;
-static int hf_nbdgm_destination_name = -1;
 
 static gint ett_nbdgm = -1;
 
@@ -129,9 +100,6 @@ static int hf_nbss_cifs_length = -1;
 static int hf_nbss_error_code = -1;
 static int hf_nbss_retarget_ip_address = -1;
 static int hf_nbss_retarget_port = -1;
-static int hf_nbss_continuation_data = -1;
-static int hf_nbss_called_name = -1;
-static int hf_nbss_calling_name = -1;
 
 static gint ett_nbss = -1;
 static gint ett_nbss_flags = -1;
@@ -148,25 +116,25 @@ static gboolean nbss_desegment = TRUE;
    http://discuss.microsoft.com/SCRIPTS/WA-MSD.EXE?A2=ind9811A&L=cifs&P=R386
 
    for information on the fourth. */
-#define UDP_PORT_NBNS   137
-#define UDP_PORT_NBDGM  138
-#define TCP_PORT_NBSS   139
-#define TCP_PORT_CIFS   445
+#define UDP_PORT_NBNS	137
+#define UDP_PORT_NBDGM	138
+#define TCP_PORT_NBSS	139
+#define TCP_PORT_CIFS	445
 
 /* Packet structure taken from RFC 1002. See also RFC 1001.
  * Opcode, flags, and rcode treated as "flags", similarly to DNS,
  * to make it easier to lift the dissection code from "packet-dns.c". */
 
 /* Offsets of fields in the NBNS header. */
-#define NBNS_ID         0
-#define NBNS_FLAGS      2
-#define NBNS_QUEST      4
-#define NBNS_ANS        6
-#define NBNS_AUTH       8
-#define NBNS_ADD        10
+#define	NBNS_ID		0
+#define	NBNS_FLAGS	2
+#define	NBNS_QUEST	4
+#define	NBNS_ANS	6
+#define	NBNS_AUTH	8
+#define	NBNS_ADD	10
 
 /* Length of NBNS header. */
-#define NBNS_HDRLEN     12
+#define	NBNS_HDRLEN	12
 
 /* type values  */
 #define T_NB            32              /* NetBIOS name service RR */
@@ -175,7 +143,7 @@ static gboolean nbss_desegment = TRUE;
 /* Bit fields in the flags */
 #define F_RESPONSE      (1<<15)         /* packet is response */
 #define F_OPCODE        (0xF<<11)       /* query opcode */
-#define OPCODE_SHIFT    11
+#define OPCODE_SHIFT	11
 #define F_AUTHORITATIVE (1<<10)         /* response is authoritative */
 #define F_TRUNCATED     (1<<9)          /* response is truncated */
 #define F_RECDESIRED    (1<<8)          /* recursion desired */
@@ -263,33 +231,33 @@ static const value_string rcode_vals[] = {
 /* Values for the "NB_FLAGS" field of RR data.  From RFC 1001 and 1002,
  * except for NB_FLAGS_ONT_H_NODE, which was discovered by looking at
  * packet traces. */
-#define NB_FLAGS_ONT            (3<<(15-2))     /* bits for node type */
-#define NB_FLAGS_ONT_B_NODE     (0<<(15-2))     /* B-mode node */
-#define NB_FLAGS_ONT_P_NODE     (1<<(15-2))     /* P-mode node */
-#define NB_FLAGS_ONT_M_NODE     (2<<(15-2))     /* M-mode node */
-#define NB_FLAGS_ONT_H_NODE     (3<<(15-2))     /* H-mode node */
+#define	NB_FLAGS_ONT		(3<<(15-2))	/* bits for node type */
+#define	NB_FLAGS_ONT_B_NODE	(0<<(15-2))	/* B-mode node */
+#define	NB_FLAGS_ONT_P_NODE	(1<<(15-2))	/* P-mode node */
+#define	NB_FLAGS_ONT_M_NODE	(2<<(15-2))	/* M-mode node */
+#define	NB_FLAGS_ONT_H_NODE	(3<<(15-2))	/* H-mode node */
 
-#define NB_FLAGS_G              (1<<(15-0))     /* group name */
+#define	NB_FLAGS_G		(1<<(15-0))	/* group name */
 
 /* Values for the "NAME_FLAGS" field of a NODE_NAME entry in T_NBSTAT
  * RR data.  From RFC 1001 and 1002; as I remember, the "NAME_FLAGS"
  * field doesn't include any special values for H-mode nodes, even
  * though one can register them (if so, perhaps that was done to
  * avoid surprising clients that don't know about H-mode nodes). */
-#define NAME_FLAGS_PRM          (1<<(15-6))     /* name is permanent node name */
+#define	NAME_FLAGS_PRM		(1<<(15-6))	/* name is permanent node name */
 
-#define NAME_FLAGS_ACT          (1<<(15-5))     /* name is active */
+#define	NAME_FLAGS_ACT		(1<<(15-5))	/* name is active */
 
-#define NAME_FLAGS_CNF          (1<<(15-4))     /* name is in conflict */
+#define	NAME_FLAGS_CNF		(1<<(15-4))	/* name is in conflict */
 
-#define NAME_FLAGS_DRG          (1<<(15-3))     /* name is being deregistered */
+#define	NAME_FLAGS_DRG		(1<<(15-3))	/* name is being deregistered */
 
-#define NAME_FLAGS_ONT          (3<<(15-2))     /* bits for node type */
-#define NAME_FLAGS_ONT_B_NODE   (0<<(15-2))     /* B-mode node */
-#define NAME_FLAGS_ONT_P_NODE   (1<<(15-2))     /* P-mode node */
-#define NAME_FLAGS_ONT_M_NODE   (2<<(15-2))     /* M-mode node */
+#define	NAME_FLAGS_ONT		(3<<(15-2))	/* bits for node type */
+#define	NAME_FLAGS_ONT_B_NODE	(0<<(15-2))	/* B-mode node */
+#define	NAME_FLAGS_ONT_P_NODE	(1<<(15-2))	/* P-mode node */
+#define	NAME_FLAGS_ONT_M_NODE	(2<<(15-2))	/* M-mode node */
 
-#define NAME_FLAGS_G            (1<<(15-0))     /* group name */
+#define	NAME_FLAGS_G		(1<<(15-0))	/* group name */
 
 static const value_string name_flags_ont_vals[] = {
     { NAME_FLAGS_ONT_B_NODE, "B-node" },
@@ -306,35 +274,46 @@ static const value_string nb_flags_ont_vals[] = {
     { 0,                   NULL     }
 };
 
-static const value_string nb_type_name_vals[] = {
-    { T_NB,     "NB" },
-    { T_NBSTAT, "NBSTAT" },
-    { 0,        NULL     }
-};
+static const char *
+nbns_type_name (int type)
+{
+    switch (type) {
+    case T_NB:
+        return "NB";
+    case T_NBSTAT:
+        return "NBSTAT";
+    }
+
+    return "unknown";
+}
 
 #define NBNAME_BUF_LEN 128
 
-static void
-add_rr_to_tree(proto_tree *rr_tree, tvbuff_t *tvb, int offset,
-               const char *name, int namelen,
-               int type, int class_val,
-               guint ttl, gushort data_len)
+static proto_tree *
+add_rr_to_tree(proto_item *trr, int rr_type, tvbuff_t *tvb, int offset,
+	       const char *name, int namelen,
+	       const char *type_name, const char *class_description,
+	       guint ttl, gushort data_len)
 {
-    proto_tree_add_string(rr_tree, hf_nbns_name, tvb, offset+1, namelen-1, name);
+    proto_tree *rr_tree;
+
+    rr_tree = proto_item_add_subtree(trr, rr_type);
+    proto_tree_add_text(rr_tree, tvb, offset+1, namelen-1, "Name: %s", name);
     offset += namelen;
-    proto_tree_add_uint(rr_tree, hf_nbns_type, tvb, offset, 2, type);
+    proto_tree_add_text(rr_tree, tvb, offset, 2, "Type: %s", type_name);
     offset += 2;
-    proto_tree_add_uint(rr_tree, hf_nbns_class, tvb, offset, 2, class_val);
+    proto_tree_add_text(rr_tree, tvb, offset, 2, "Class: %s", class_description);
     offset += 2;
-    proto_tree_add_uint_format_value(rr_tree, hf_nbns_ttl, tvb, offset, 4, ttl, "%s",
-                        time_secs_to_str(wmem_packet_scope(), ttl));
+    proto_tree_add_text(rr_tree, tvb, offset, 4, "Time to live: %s",
+                        time_secs_to_ep_str(ttl));
     offset += 4;
-    proto_tree_add_uint(rr_tree, hf_nbns_data_length, tvb, offset, 2, data_len);
+    proto_tree_add_text(rr_tree, tvb, offset, 2, "Data length: %u", data_len);
+    return rr_tree;
 }
 
 static int
 get_nbns_name(tvbuff_t *tvb, int offset, int nbns_data_offset,
-              char *name_ret, int name_ret_len, int *name_type_ret)
+	      char *name_ret, int name_ret_len, int *name_type_ret)
 {
     int           name_len;
     const guchar *name;
@@ -360,9 +339,9 @@ get_nbns_name(tvbuff_t *tvb, int offset, int nbns_data_offset,
          * turn into one character in the decoded name. */
         cname = *pname;
         if (cname == '\0')
-            break;              /* no more characters */
+            break;		/* no more characters */
         if (cname == '.')
-            break;              /* scope ID follows */
+            break;		/* scope ID follows */
         if (cname < 'A' || cname > 'Z') {
             /* Not legal. */
             nbname = "Illegal NetBIOS name (1st character not between A and Z in first-level encoding)";
@@ -429,8 +408,8 @@ bad:
 
 static int
 get_nbns_name_type_class(tvbuff_t *tvb, int offset, int nbns_data_offset,
-                         char *name_ret, int *name_len_ret, int *name_type_ret,
-                         int *type_ret, int *class_ret)
+			 char *name_ret, int *name_len_ret, int *name_type_ret,
+			 int *type_ret, int *class_ret)
 {
     int name_len;
     int type;
@@ -454,13 +433,14 @@ get_nbns_name_type_class(tvbuff_t *tvb, int offset, int nbns_data_offset,
 
 static void
 add_name_and_type(proto_tree *tree, tvbuff_t *tvb, int offset, int len,
-                  int hf_tag, const char *name, int name_type)
+		  const char *tag, const char *name, int name_type)
 {
     if (name_type != -1) {
-        proto_tree_add_string_format_value(tree, hf_tag, tvb, offset, len, name, "%s (%s)",
-                            name, netbios_name_type_descr(name_type));
+        proto_tree_add_text(tree, tvb, offset, len, "%s: %s (%s)",
+                            tag, name, netbios_name_type_descr(name_type));
     } else {
-        proto_tree_add_string(tree, hf_tag, tvb, offset, len, name);
+        proto_tree_add_text(tree, tvb, offset, len, "%s: %s",
+                            tag, name);
     }
 }
 
@@ -468,7 +448,7 @@ add_name_and_type(proto_tree *tree, tvbuff_t *tvb, int offset, int len,
 
 static int
 dissect_nbns_query(tvbuff_t *tvb, int offset, int nbns_data_offset,
-                   column_info *cinfo, proto_tree *nbns_tree)
+		   column_info *cinfo, proto_tree *nbns_tree)
 {
     int         len;
     char       *name;
@@ -480,6 +460,7 @@ dissect_nbns_query(tvbuff_t *tvb, int offset, int nbns_data_offset,
     int         data_offset;
     int         data_start;
     proto_tree *q_tree;
+    proto_item *tq;
 
     name = (char *)wmem_alloc(wmem_packet_scope(), MAX_NAME_LEN);
     data_start = data_offset = offset;
@@ -489,24 +470,26 @@ dissect_nbns_query(tvbuff_t *tvb, int offset, int nbns_data_offset,
                                    &name_len, &name_type, &type, &dns_class);
     data_offset += len;
 
-    type_name = val_to_str_const(type, nb_type_name_vals, "Unknown");
+    type_name = nbns_type_name(type);
 
     if (cinfo != NULL)
         col_append_fstr(cinfo, COL_INFO, " %s %s", type_name, name);
 
     if (nbns_tree != NULL) {
-        q_tree = proto_tree_add_subtree_format(nbns_tree, tvb, offset, len,
-                                 ett_nbns_qd, NULL, "%s: type %s, class %s",  name, type_name,
-                                 val_to_str_const(dns_class, dns_classes, "Unknown"));
+        tq = proto_tree_add_text(nbns_tree, tvb, offset, len,
+                                 "%s: type %s, class %s",  name, type_name,
+                                 dns_class_name(dns_class));
+        q_tree = proto_item_add_subtree(tq, ett_nbns_qd);
 
-        add_name_and_type(q_tree, tvb, offset, name_len, hf_nbns_name, name,
+        add_name_and_type(q_tree, tvb, offset, name_len, "Name", name,
                           name_type);
         offset += name_len;
 
-        proto_tree_add_uint(q_tree, hf_nbns_type, tvb, offset, 2, type);
+        proto_tree_add_text(q_tree, tvb, offset, 2, "Type: %s", type_name);
         offset += 2;
 
-        proto_tree_add_uint(q_tree, hf_nbns_class, tvb, offset, 2, dns_class);
+        proto_tree_add_text(q_tree, tvb, offset, 2, "Class: %s",
+                            dns_class_name(dns_class));
         /*offset += 2;*/
     }
 
@@ -514,48 +497,21 @@ dissect_nbns_query(tvbuff_t *tvb, int offset, int nbns_data_offset,
 }
 
 static void
-nbns_add_nbns_flags(column_info *cinfo, proto_tree *nbns_tree, tvbuff_t *tvb, int offset, int is_wack)
+nbns_add_nbns_flags(column_info *cinfo, proto_tree *nbns_tree, tvbuff_t *tvb, int offset,
+		    gushort flags, int is_wack)
 {
-    guint16     opcode, flag;
+    char       *buf;
+    guint16     opcode;
+    proto_tree *field_tree;
     proto_item *tf;
-    static const int * req_flags[] = {
-        &hf_nbns_flags_response,
-        &hf_nbns_flags_opcode,
-        &hf_nbns_flags_truncated,
-        &hf_nbns_flags_recdesired,
-        &hf_nbns_flags_broadcast,
-        NULL
-    };
 
-    static const int * resp_flags[] = {
-        &hf_nbns_flags_response,
-        &hf_nbns_flags_opcode,
-        &hf_nbns_flags_authoritative,
-        &hf_nbns_flags_truncated,
-        &hf_nbns_flags_recdesired,
-        &hf_nbns_flags_recavail,
-        &hf_nbns_flags_broadcast,
-        &hf_nbns_flags_rcode,
-        NULL
-    };
+#define MAX_BUF_SIZE (128+1)
 
-    static const int * resp_wack_flags[] = {
-        &hf_nbns_flags_response,
-        &hf_nbns_flags_opcode,
-        &hf_nbns_flags_authoritative,
-        &hf_nbns_flags_truncated,
-        &hf_nbns_flags_recdesired,
-        &hf_nbns_flags_recavail,
-        &hf_nbns_flags_broadcast,
-        NULL
-    };
-
-    flag = tvb_get_ntohs(tvb, offset);
     if (cinfo) {
-        if (flag & F_RESPONSE && !is_wack) {
-            if ((flag & F_RCODE))
+        if (flags & F_RESPONSE && !is_wack) {
+            if ((flags & F_RCODE))
                 col_append_fstr(cinfo, COL_INFO, ", %s",
-                                val_to_str_const(flag & F_RCODE, rcode_vals,
+                                val_to_str_const(flags & F_RCODE, rcode_vals,
                                                  "Unknown error"));
         }
     }
@@ -563,80 +519,100 @@ nbns_add_nbns_flags(column_info *cinfo, proto_tree *nbns_tree, tvbuff_t *tvb, in
     if (!nbns_tree)
         return;
 
-    opcode = (guint16) ((flag & F_OPCODE) >> OPCODE_SHIFT);
-    if (flag & F_RESPONSE) {
-        if (!is_wack) {
-            tf = proto_tree_add_bitmask(nbns_tree, tvb, offset, hf_nbns_flags, ett_nbns_flags, resp_flags, ENC_BIG_ENDIAN);
-        } else {
-            tf = proto_tree_add_bitmask(nbns_tree, tvb, offset, hf_nbns_flags, ett_nbns_flags, resp_wack_flags, ENC_BIG_ENDIAN);
-        }
-    } else {
-        tf = proto_tree_add_bitmask(nbns_tree, tvb, offset, hf_nbns_flags, ett_nbns_flags, req_flags, ENC_BIG_ENDIAN);
+    buf = (char *)wmem_alloc(wmem_packet_scope(), MAX_BUF_SIZE);
+    opcode = (guint16) ((flags & F_OPCODE) >> OPCODE_SHIFT);
+    g_snprintf(buf, MAX_BUF_SIZE, "%s", val_to_str_const(opcode, opcode_vals, "Unknown operation"));
+    if (flags & F_RESPONSE && !is_wack) {
+        g_strlcat(buf, " response", MAX_BUF_SIZE);
+        g_strlcat(buf, ", ", MAX_BUF_SIZE);
+        g_strlcat(buf, val_to_str_const(flags & F_RCODE, rcode_vals, "Unknown error"), MAX_BUF_SIZE);
+        buf[MAX_BUF_SIZE-1] = '\0';
     }
-
-    proto_item_append_text(tf, " (%s)", val_to_str_const(opcode, opcode_vals, "Unknown operation"));
-    if (flag & F_RESPONSE && !is_wack) {
-        proto_item_append_text(tf, " response, %s", val_to_str_const(flag & F_RCODE, rcode_vals, "Unknown error"));
+    tf = proto_tree_add_uint_format_value(nbns_tree, hf_nbns_flags,
+                                    tvb, offset, 2, flags, "0x%04x (%s)", flags, buf);
+    field_tree = proto_item_add_subtree(tf, ett_nbns_flags);
+    proto_tree_add_item(field_tree, hf_nbns_flags_response,
+                        tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(field_tree, hf_nbns_flags_opcode,
+                        tvb, offset, 2, ENC_BIG_ENDIAN);
+    if (flags & F_RESPONSE) {
+        proto_tree_add_item(field_tree, hf_nbns_flags_authoritative,
+                            tvb, offset, 2, ENC_BIG_ENDIAN);
+    }
+    proto_tree_add_item(field_tree, hf_nbns_flags_truncated,
+                        tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(field_tree, hf_nbns_flags_recdesired,
+                        tvb, offset, 2, ENC_BIG_ENDIAN);
+    if (flags & F_RESPONSE) {
+        proto_tree_add_item(field_tree, hf_nbns_flags_recavail,
+                            tvb, offset, 2, ENC_BIG_ENDIAN);
+    }
+    proto_tree_add_item(field_tree, hf_nbns_flags_broadcast,
+                        tvb, offset, 2, ENC_BIG_ENDIAN);
+    if (flags & F_RESPONSE && !is_wack) {
+        proto_tree_add_item(field_tree, hf_nbns_flags_rcode,
+                            tvb, offset, 2, ENC_BIG_ENDIAN);
     }
 }
 
 static void
 nbns_add_nb_flags(proto_tree *rr_tree, tvbuff_t *tvb, int offset)
 {
+    proto_tree *field_tree;
     proto_item *tf;
-    gushort flag;
-    static const int * flags[] = {
-        &hf_nbns_nb_flags_group,
-        &hf_nbns_nb_flags_ont,
-        NULL
-    };
+    gushort flags;
 
-    tf = proto_tree_add_bitmask(rr_tree, tvb, offset, hf_nbns_nb_flags, ett_nbns_nb_flags, flags, ENC_BIG_ENDIAN);
+    if (!rr_tree)
+        return;
 
-    flag = tvb_get_ntohs(tvb, offset);
+    flags = tvb_get_ntohs(tvb, offset);
+    tf = proto_tree_add_item(rr_tree, hf_nbns_nb_flags, tvb, offset, 2, ENC_BIG_ENDIAN);
+    field_tree = proto_item_add_subtree(tf, ett_nbns_nb_flags);
+    proto_tree_add_item(field_tree, hf_nbns_nb_flags_group, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(field_tree, hf_nbns_nb_flags_ont, tvb, offset, 2, ENC_BIG_ENDIAN);
+
     proto_item_append_text(tf, "(%s, %s",
-                val_to_str_const(flag & NB_FLAGS_ONT, nb_flags_ont_vals, "Unknown"),
-                (flag & NB_FLAGS_G) ? "group" : "unique");
+                val_to_str_const(flags & NB_FLAGS_ONT, nb_flags_ont_vals, "Unknown"),
+                (flags & NB_FLAGS_G) ? "group" : "unique");
 }
 
 static void
 nbns_add_name_flags(proto_tree *rr_tree, tvbuff_t *tvb, int offset)
 {
+    proto_item *field_tree;
     proto_item *tf;
-    gushort    flag;
-    static const int * flags[] = {
-        &hf_nbns_name_flags_group,
-        &hf_nbns_name_flags_ont,
-        &hf_nbns_name_flags_drg,
-        &hf_nbns_name_flags_cnf,
-        &hf_nbns_name_flags_act,
-        &hf_nbns_name_flags_prm,
-        NULL
-    };
+    gushort    flags;
 
     if (!rr_tree)
         return;
 
-    flag = tvb_get_ntohs(tvb, offset);
-    tf = proto_tree_add_bitmask(rr_tree, tvb, offset, hf_nbns_name_flags, ett_nbns_name_flags, flags, ENC_BIG_ENDIAN);
+    flags = tvb_get_ntohs(tvb, offset);
+    tf = proto_tree_add_item(rr_tree, hf_nbns_name_flags, tvb, offset, 2, ENC_BIG_ENDIAN);
+    field_tree = proto_item_add_subtree(tf, ett_nbns_name_flags);
+    proto_tree_add_item(field_tree, hf_nbns_name_flags_group, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(field_tree, hf_nbns_name_flags_ont, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(field_tree, hf_nbns_name_flags_drg, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(field_tree, hf_nbns_name_flags_cnf, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(field_tree, hf_nbns_name_flags_act, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(field_tree, hf_nbns_name_flags_prm, tvb, offset, 2, ENC_BIG_ENDIAN);
 
     proto_item_append_text(tf, "(%s, %s",
-                val_to_str_const(flag & NAME_FLAGS_ONT, name_flags_ont_vals, "Unknown"),
-                (flag & NAME_FLAGS_G) ? "group" : "unique");
-    if (flag & NAME_FLAGS_DRG)
+                val_to_str_const(flags & NAME_FLAGS_ONT, name_flags_ont_vals, "Unknown"),
+                (flags & NAME_FLAGS_G) ? "group" : "unique");
+    if (flags & NAME_FLAGS_DRG)
         proto_item_append_text(tf, ", being deregistered");
-    if (flag & NAME_FLAGS_CNF)
+    if (flags & NAME_FLAGS_CNF)
         proto_item_append_text(tf, ", in conflict");
-    if (flag & NAME_FLAGS_ACT)
+    if (flags & NAME_FLAGS_ACT)
         proto_item_append_text(tf, ", active");
-    if (flag & NAME_FLAGS_PRM)
+    if (flags & NAME_FLAGS_PRM)
         proto_item_append_text(tf, ", permanent node name");
     proto_item_append_text(tf, ")");
 }
 
 static int
-dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data_offset,
-                    column_info *cinfo, proto_tree *nbns_tree, int opcode)
+dissect_nbns_answer(tvbuff_t *tvb, int offset, int nbns_data_offset,
+		    column_info *cinfo, proto_tree *nbns_tree, int opcode)
 {
     int         len;
     char       *name;
@@ -649,7 +625,9 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
     int         cur_offset;
     guint       ttl;
     gushort     data_len;
+    gushort     flags;
     proto_tree *rr_tree = NULL;
+    proto_item *trr;
     char       *name_str;
     guint       num_names;
     char       *nbname;
@@ -665,8 +643,8 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
                                         &name_len, &name_type, &type, &dns_class);
     cur_offset  += len;
 
-    type_name  = val_to_str_const(type, nb_type_name_vals, "Unknown");
-    class_name = val_to_str_const(dns_class, dns_classes, "Unknown");
+    type_name  = nbns_type_name(type);
+    class_name = dns_class_name(dns_class);
 
     ttl = tvb_get_ntohl(tvb, cur_offset);
     cur_offset  += 4;
@@ -676,7 +654,7 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
 
     /* XXX: This code should be simplified */
     switch (type) {
-    case T_NB:          /* "NB" record */
+    case T_NB: 		/* "NB" record */
         if (cinfo != NULL) {
             if (opcode != OPCODE_WACK) {
                 col_append_fstr(cinfo, COL_INFO, " %s %s",
@@ -686,15 +664,15 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
         }
 
         if (nbns_tree) {
-            rr_tree = proto_tree_add_subtree_format(nbns_tree, tvb, offset,
+            trr = proto_tree_add_text(nbns_tree, tvb, offset,
                                       (cur_offset - offset) + data_len,
-                                      ett_nbns_rr, NULL, "%s: type %s, class %s",
+                                      "%s: type %s, class %s",
                                       name, type_name, class_name);
             g_strlcat(name, " (", MAX_NAME_LEN);
             g_strlcat(name, netbios_name_type_descr(name_type), MAX_NAME_LEN);
             g_strlcat(name, ")", MAX_NAME_LEN);
-            add_rr_to_tree(rr_tree, tvb, offset, name,
-                                 name_len, type, dns_class, ttl, data_len);
+            rr_tree = add_rr_to_tree(trr, ett_nbns_rr, tvb, offset, name,
+                                 name_len, type_name, dns_class_name(dns_class), ttl, data_len);
         }
         while (data_len > 0) {
             if (opcode == OPCODE_WACK) {
@@ -702,15 +680,19 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
                  * same type of RR data as other T_NB
                  * responses.  */
                 if (data_len < 2) {
-                    proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+                    proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                        data_len, "(incomplete entry)");
                     break;
                 }
-                nbns_add_nbns_flags(cinfo, rr_tree, tvb, cur_offset, 1);
+                flags = tvb_get_ntohs(tvb, cur_offset);
+                nbns_add_nbns_flags(cinfo, rr_tree, tvb, cur_offset,
+				    flags, 1);
                 cur_offset += 2;
                 data_len   -= 2;
             } else {
                 if (data_len < 2) {
-                    proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+                    proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                        data_len, "(incomplete entry)");
                     break;
                 }
                 nbns_add_nb_flags(rr_tree, tvb, cur_offset);
@@ -718,41 +700,47 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
                 data_len   -= 2;
 
                 if (data_len < 4) {
-                    proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+                    proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                        data_len, "(incomplete entry)");
                     break;
                 }
-                proto_tree_add_item(rr_tree, hf_nbns_addr, tvb, cur_offset, 4, ENC_BIG_ENDIAN);
+                proto_tree_add_text(rr_tree, tvb, cur_offset, 4,
+				    "Addr: %s",
+				    tvb_ip_to_str(tvb, cur_offset));
                 cur_offset += 4;
                 data_len   -= 4;
             }
         }
         break;
 
-    case T_NBSTAT:      /* "NBSTAT" record */
+    case T_NBSTAT: 	/* "NBSTAT" record */
         if (cinfo != NULL)
             col_append_fstr(cinfo, COL_INFO, " %s", type_name);
 
         if (nbns_tree) {
-            rr_tree = proto_tree_add_subtree_format(nbns_tree, tvb, offset,
+            trr = proto_tree_add_text(nbns_tree, tvb, offset,
                                       (cur_offset - offset) + data_len,
-                                      ett_nbns_rr, NULL, "%s: type %s, class %s",
+                                      "%s: type %s, class %s",
                                       name, type_name, class_name);
-            add_rr_to_tree(rr_tree, tvb, offset, name,
-                                     name_len, type, dns_class, ttl, data_len);
+            rr_tree = add_rr_to_tree(trr, ett_nbns_rr, tvb, offset, name,
+                                     name_len, type_name, dns_class_name(dns_class), ttl, data_len);
         }
 
         if (data_len < 1) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
 
         num_names = tvb_get_guint8(tvb, cur_offset);
-        proto_tree_add_item(rr_tree, hf_nbns_number_of_names, tvb, cur_offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_text(rr_tree, tvb, cur_offset, 1,
+                            "Number of names: %u", num_names);
         cur_offset += 1;
 
         while (num_names != 0) {
             if (data_len < NETBIOS_NAME_LEN) {
-                proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+                proto_tree_add_text(rr_tree, tvb, cur_offset,
+				    data_len, "(incomplete entry)");
                 goto out;
             }
             if (rr_tree) {
@@ -760,8 +748,8 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
                            NETBIOS_NAME_LEN);
                 name_type = process_netbios_name(nbname,
                                                  name_str, name_len);
-                proto_tree_add_string_format_value(rr_tree, hf_nbns_netbios_name, tvb, cur_offset,
-                                    NETBIOS_NAME_LEN, name_str, "%s<%02x> (%s)",
+                proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                    NETBIOS_NAME_LEN, "Name: %s<%02x> (%s)",
                                     name_str, name_type,
                                     netbios_name_type_descr(name_type));
             }
@@ -769,7 +757,8 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
             data_len   -= NETBIOS_NAME_LEN;
 
             if (data_len < 2) {
-                proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+                proto_tree_add_text(rr_tree, tvb, cur_offset,
+				    data_len, "(incomplete entry)");
                 goto out;
             }
             if (rr_tree) {
@@ -782,164 +771,230 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
         }
 
         if (data_len < 6) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
 
-        proto_tree_add_item(rr_tree, hf_nbns_unit_id, tvb, cur_offset, 6, ENC_NA);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 6,
+                                "Unit ID: %s",
+                                tvb_ether_to_str(tvb, cur_offset));
+        }
         cur_offset += 6;
         data_len   -= 6;
 
         if (data_len < 1) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
 
-        proto_tree_add_item(rr_tree, hf_nbns_jumpers, tvb, cur_offset, 1, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 1,
+                                "Jumpers: 0x%x", tvb_get_guint8(tvb, cur_offset));
+        }
         cur_offset += 1;
         data_len   -= 1;
 
         if (data_len < 1) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_test_result, tvb, cur_offset, 1, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 1,
+                                "Test result: 0x%x", tvb_get_guint8(tvb, cur_offset));
+        }
         cur_offset += 1;
         data_len   -= 1;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_version_number, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Version number: 0x%x", tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_period_of_statistics, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Period of statistics: 0x%x",
+                                tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-           proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_num_crcs, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Number of CRCs: %u", tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_num_alignment_errors, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Number of alignment errors: %u",
+                                tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_num_collisions, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Number of collisions: %u", tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_num_send_aborts, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Number of send aborts: %u", tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 4) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_num_good_sends, tvb, cur_offset, 4, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 4,
+                                "Number of good sends: %u", tvb_get_ntohl(tvb, cur_offset));
+        }
         cur_offset += 4;
         data_len   -= 4;
 
         if (data_len < 4) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_num_good_receives, tvb, cur_offset, 4, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 4,
+                                "Number of good receives: %u",
+                                tvb_get_ntohl(tvb, cur_offset));
+        }
         cur_offset += 4;
         data_len   -= 4;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_num_retransmits, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Number of retransmits: %u", tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_num_no_resource_conditions, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Number of no resource conditions: %u",
+                                tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_num_command_blocks, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Number of command blocks: %u",
+                                tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_num_pending_sessions, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Number of pending sessions: %u",
+                                tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_max_num_pending_sessions, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Max number of pending sessions: %u",
+                                tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_max_total_sessions_possible, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Max total sessions possible: %u",
+                                tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         data_len   -= 2;
 
         if (data_len < 2) {
-            proto_tree_add_expert(rr_tree, pinfo, &ei_nbns_incomplete_entry, tvb, cur_offset, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset,
+                                data_len, "(incomplete entry)");
             break;
         }
-
-        proto_tree_add_item(rr_tree, hf_nbns_session_data_packet_size, tvb, cur_offset, 2, ENC_BIG_ENDIAN);
+        if (rr_tree) {
+            proto_tree_add_text(rr_tree, tvb, cur_offset, 2,
+                                "Session data packet size: %u",
+                                tvb_get_ntohs(tvb, cur_offset));
+        }
         cur_offset += 2;
         /*data_len -= 2;*/
     out:
@@ -950,13 +1005,13 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
             col_append_fstr(cinfo, COL_INFO, " %s", type_name);
 
         if (nbns_tree) {
-            rr_tree = proto_tree_add_subtree_format(nbns_tree, tvb, offset,
+            trr = proto_tree_add_text(nbns_tree, tvb, offset,
                                       (cur_offset - offset) + data_len,
-                                      ett_nbns_rr, NULL, "%s: type %s, class %s",
+                                      "%s: type %s, class %s",
                                       name, type_name, class_name);
-            add_rr_to_tree(rr_tree, tvb, offset, name,
-                                     name_len, type, dns_class, ttl, data_len);
-            proto_tree_add_item(rr_tree, hf_nbns_data, tvb, cur_offset, data_len, ENC_NA);
+            rr_tree = add_rr_to_tree(trr, ett_nbns_rr, tvb, offset, name,
+                                     name_len, type_name, dns_class_name(dns_class), ttl, data_len);
+            proto_tree_add_text(rr_tree, tvb, cur_offset, data_len, "Data");
         }
         cur_offset += data_len;
         break;
@@ -967,57 +1022,61 @@ dissect_nbns_answer(tvbuff_t *tvb, packet_info *pinfo, int offset, int nbns_data
 
 static int
 dissect_query_records(tvbuff_t *tvb, int cur_off, int nbns_data_offset,
-                      int count, column_info *cinfo, proto_tree *nbns_tree)
+		      int count, column_info *cinfo, proto_tree *nbns_tree)
 {
     int         start_off, add_off;
-    proto_tree *qatree;
-    proto_item *ti;
+    proto_tree *qatree = NULL;
+    proto_item *ti     = NULL;
 
     start_off = cur_off;
-    qatree = proto_tree_add_subtree(nbns_tree, tvb, start_off, -1, ett_nbns_qry, &ti, "Queries");
-
+    if (nbns_tree != NULL) {
+        ti = proto_tree_add_text(nbns_tree, tvb, start_off, -1, "Queries");
+        qatree = proto_item_add_subtree(ti, ett_nbns_qry);
+    }
     while (count-- > 0) {
         add_off = dissect_nbns_query(tvb, cur_off, nbns_data_offset,
                                      cinfo, qatree);
         cur_off += add_off;
     }
-
-    proto_item_set_len(ti, cur_off - start_off);
+    if (ti != NULL)
+        proto_item_set_len(ti, cur_off - start_off);
 
     return cur_off - start_off;
 }
 
 static int
-dissect_answer_records(tvbuff_t *tvb, packet_info *pinfo, int cur_off, int nbns_data_offset,
-                       int count, column_info *cinfo, proto_tree *nbns_tree,
-                       int opcode, const char *name)
+dissect_answer_records(tvbuff_t *tvb, int cur_off, int nbns_data_offset,
+		       int count, column_info *cinfo, proto_tree *nbns_tree,
+		       int opcode, const char *name)
 {
     int         start_off, add_off;
-    proto_tree *qatree;
-    proto_item *ti;
+    proto_tree *qatree = NULL;
+    proto_item *ti     = NULL;
 
     start_off = cur_off;
-    qatree = proto_tree_add_subtree(nbns_tree, tvb, start_off, -1, ett_nbns_ans, &ti, name);
-
+    if (nbns_tree != NULL) {
+        ti = proto_tree_add_text(nbns_tree, tvb, start_off, -1, "%s", name);
+        qatree = proto_item_add_subtree(ti, ett_nbns_ans);
+    }
     while (count-- > 0) {
-        add_off = dissect_nbns_answer(tvb, pinfo, cur_off, nbns_data_offset,
+        add_off = dissect_nbns_answer(tvb, cur_off, nbns_data_offset,
                                       cinfo, qatree, opcode);
         cur_off += add_off;
     }
-
-    proto_item_set_len(ti, cur_off - start_off);
+    if (ti != NULL)
+        proto_item_set_len(ti, cur_off - start_off);
     return cur_off - start_off;
 }
 
 static void
 dissect_nbns(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-    int          offset    = 0;
-    int          nbns_data_offset;
-    proto_tree  *nbns_tree = NULL;
-    proto_item  *ti;
-    guint16      id, flags, opcode, quest, ans, auth, add;
-    int          cur_off;
+    int		 offset    = 0;
+    int		 nbns_data_offset;
+    proto_tree	*nbns_tree = NULL;
+    proto_item	*ti;
+    guint16	 id, flags, opcode, quest, ans, auth, add;
+    int		 cur_off;
 
     nbns_data_offset = offset;
 
@@ -1042,7 +1101,8 @@ dissect_nbns(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                             offset + NBNS_ID, 2, id);
     }
 
-    nbns_add_nbns_flags(pinfo->cinfo, nbns_tree, tvb, offset + NBNS_FLAGS, 0);
+    nbns_add_nbns_flags(pinfo->cinfo, nbns_tree, tvb, offset + NBNS_FLAGS,
+                        flags, 0);
 
     quest = tvb_get_ntohs(tvb, offset + NBNS_QUEST);
     if (tree) {
@@ -1080,7 +1140,7 @@ dissect_nbns(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         /* If this is a request, don't add information about the
            answers to the summary, just add information about the
            queries. */
-        cur_off += dissect_answer_records(tvb, pinfo, cur_off,
+        cur_off += dissect_answer_records(tvb, cur_off,
                                           nbns_data_offset, ans,
                                           ((flags & F_RESPONSE) ? pinfo->cinfo : NULL), nbns_tree,
                                           opcode, "Answers");
@@ -1089,66 +1149,48 @@ dissect_nbns(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     /* Don't add information about the authoritative name
        servers, or the additional records, to the summary. */
     if (auth > 0)
-        cur_off += dissect_answer_records(tvb, pinfo, cur_off,
+        cur_off += dissect_answer_records(tvb, cur_off,
                                           nbns_data_offset,
                                           auth, NULL, nbns_tree, opcode,
                                           "Authoritative nameservers");
 
     if (add > 0)
-        /*cur_off += */dissect_answer_records(tvb, pinfo, cur_off,
+        /*cur_off += */dissect_answer_records(tvb, cur_off,
                                               nbns_data_offset,
                                               add, NULL, nbns_tree, opcode,
                                               "Additional records");
 }
 
-static heur_dissector_list_t netbios_heur_subdissector_list;
-
-static dissector_handle_t data_handle;
-
-static void
-dissect_netbios_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
-{
-	heur_dtbl_entry_t *hdtbl_entry;
-
-	/*
-	 * Try the heuristic dissectors for NetBIOS; if none of them
-	 * accept the packet, dissect it as data.
-	 */
-	if (!dissector_try_heuristic(netbios_heur_subdissector_list,
-				    tvb, pinfo, tree, &hdtbl_entry, NULL))
-		call_dissector(data_handle,tvb, pinfo, tree);
-}
-
 /* NetBIOS datagram packet, from RFC 1002, page 32 */
 struct nbdgm_header {
-    guint8              msg_type;
+    guint8		msg_type;
     struct {
-        guint8  more;
-        guint8  first;
-        guint8  node_type;
+        guint8	more;
+        guint8	first;
+        guint8	node_type;
     } flags;
-    guint16             dgm_id;
-    guint32             src_ip;
-    guint16             src_port;
+    guint16		dgm_id;
+    guint32		src_ip;
+    guint16		src_port;
 
     /* For packets with data */
-    guint16             dgm_length;
-    guint16             pkt_offset;
+    guint16		dgm_length;
+    guint16		pkt_offset;
 
     /* For error packets */
-    guint8              error_code;
+    guint8		error_code;
 };
 
 /*
  * NBDS message types.
  */
-#define NBDS_DIRECT_UNIQUE      0x10
-#define NBDS_DIRECT_GROUP       0x11
-#define NBDS_BROADCAST          0x12
-#define NBDS_ERROR              0x13
-#define NBDS_QUERY_REQUEST      0x14
-#define NBDS_POS_QUERY_RESPONSE 0x15
-#define NBDS_NEG_QUERY_RESPONSE 0x16
+#define NBDS_DIRECT_UNIQUE	0x10
+#define NBDS_DIRECT_GROUP	0x11
+#define NBDS_BROADCAST		0x12
+#define NBDS_ERROR		0x13
+#define NBDS_QUERY_REQUEST	0x14
+#define NBDS_POS_QUERY_RESPONSE	0x15
+#define NBDS_NEG_QUERY_RESPONSE	0x16
 
 static const value_string nbds_msgtype_vals[] = {
     { NBDS_DIRECT_UNIQUE,      "Direct_unique datagram" },
@@ -1180,11 +1222,11 @@ static void
 dissect_nbdgm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     int                  offset     = 0;
-    proto_tree          *nbdgm_tree = NULL;
-    proto_item          *ti         = NULL;
+    proto_tree		*nbdgm_tree = NULL;
+    proto_item		*ti         = NULL;
     struct nbdgm_header  header;
     int                  flags;
-    tvbuff_t            *next_tvb;
+    tvbuff_t		*next_tvb;
 
     char *name;
     int name_type;
@@ -1257,15 +1299,15 @@ dissect_nbdgm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                                              tvb, offset, 2, header.dgm_length,
                                              "%u bytes", header.dgm_length);
         }
+        offset += 2;
 
         if (tree) {
-            header.pkt_offset = tvb_get_ntohs(tvb, offset+2);
+            header.pkt_offset = tvb_get_ntohs(tvb, offset);
             proto_tree_add_uint_format_value(nbdgm_tree, hf_nbdgm_packet_offset,
                                              tvb, offset, 2, header.pkt_offset,
                                              "%u bytes", header.pkt_offset);
         }
-
-        offset += 4;
+        offset += 2;
 
         name = (char *)wmem_alloc(wmem_packet_scope(), MAX_NAME_LEN);
 
@@ -1274,7 +1316,7 @@ dissect_nbdgm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         if (tree) {
             add_name_and_type(nbdgm_tree, tvb, offset, len,
-                              hf_nbdgm_source_name, name, name_type);
+                              "Source name", name, name_type);
         }
         offset += len;
 
@@ -1283,7 +1325,7 @@ dissect_nbdgm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         if (tree) {
             add_name_and_type(nbdgm_tree, tvb, offset, len,
-                              hf_nbdgm_destination_name, name, name_type);
+                              "Destination name", name, name_type);
         }
         offset += len;
 
@@ -1304,7 +1346,7 @@ dissect_nbdgm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     case NBDS_ERROR:
         if (tree) {
             proto_tree_add_item(nbdgm_tree, hf_nbdgm_error_code, tvb, offset,
-                                1, ENC_BIG_ENDIAN);
+                                1, ENC_NA);
         }
         offset += 1;
         if (ti != NULL)
@@ -1321,7 +1363,7 @@ dissect_nbdgm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         if (tree) {
             add_name_and_type(nbdgm_tree, tvb, offset, len,
-                              hf_nbdgm_destination_name, name, name_type);
+                              "Destination name", name, name_type);
         }
         offset += len;
         if (ti != NULL)
@@ -1333,12 +1375,12 @@ dissect_nbdgm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 /*
  * NetBIOS Session Service message types (RFC 1002).
  */
-#define SESSION_MESSAGE                 0x00
-#define SESSION_REQUEST                 0x81
-#define POSITIVE_SESSION_RESPONSE       0x82
-#define NEGATIVE_SESSION_RESPONSE       0x83
-#define RETARGET_SESSION_RESPONSE       0x84
-#define SESSION_KEEP_ALIVE              0x85
+#define	SESSION_MESSAGE			0x00
+#define	SESSION_REQUEST			0x81
+#define	POSITIVE_SESSION_RESPONSE	0x82
+#define	NEGATIVE_SESSION_RESPONSE	0x83
+#define	RETARGET_SESSION_RESPONSE	0x84
+#define	SESSION_KEEP_ALIVE		0x85
 
 static const value_string message_types[] = {
     { SESSION_MESSAGE,           "Session message" },
@@ -1353,7 +1395,7 @@ static const value_string message_types[] = {
 /*
  * NetBIOS Session Service flags.
  */
-#define NBSS_FLAGS_E                    0x1
+#define	NBSS_FLAGS_E			0x1
 
 static const value_string nbss_error_codes[] = {
     { 0x80, "Not listening on called name" },
@@ -1385,19 +1427,18 @@ dissect_nbss_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     int          offset = 0;
     proto_tree   *nbss_tree = NULL;
     proto_item   *ti        = NULL;
-    guint8        msg_type;
-    guint8        flags;
+    proto_tree   *field_tree;
+    proto_item   *tf;
+    guint8	  msg_type;
+    guint8	  flags;
     guint32       length;
     int           len;
-    char         *name;
+    char	 *name;
     int           name_type;
     guint8        error_code;
     tvbuff_t     *next_tvb;
     const char   *saved_proto;
-    static const int * nbss_flags[] = {
-        &hf_nbss_flags_e,
-        NULL
-    };
+    void	 *pd_save;
 
     name = (char *)wmem_alloc(wmem_packet_scope(), MAX_NAME_LEN);
 
@@ -1406,7 +1447,7 @@ dissect_nbss_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     ti = proto_tree_add_item(tree, proto_nbss, tvb, offset, -1, ENC_NA);
     nbss_tree = proto_item_add_subtree(ti, ett_nbss);
 
-    proto_tree_add_item(nbss_tree, hf_nbss_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(nbss_tree, hf_nbss_type, tvb, offset, 1, ENC_NA);
 
     offset += 1;
 
@@ -1415,7 +1456,11 @@ dissect_nbss_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         offset += 3;
     } else {
         flags = tvb_get_guint8(tvb, offset);
-        proto_tree_add_bitmask(nbss_tree, tvb, offset, hf_nbss_flags, ett_nbss_flags, nbss_flags, ENC_BIG_ENDIAN);
+        if (tree) {
+            tf = proto_tree_add_uint(nbss_tree, hf_nbss_flags, tvb, offset, 1, flags);
+            field_tree = proto_item_add_subtree(tf, ett_nbss_flags);
+            proto_tree_add_item(field_tree, hf_nbss_flags_e, tvb, offset, 1, ENC_BIG_ENDIAN);
+        }
 
         length = tvb_get_ntohs(tvb, offset + 1);
         if (flags & NBSS_FLAGS_E)
@@ -1430,8 +1475,8 @@ dissect_nbss_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     case SESSION_REQUEST:
         len = get_nbns_name(tvb, offset, offset, name, MAX_NAME_LEN, &name_type);
         if (tree)
-            add_name_and_type(nbss_tree, tvb, offset, len,
-                              hf_nbss_called_name, name, name_type);
+	    add_name_and_type(nbss_tree, tvb, offset, len,
+                              "Called name", name, name_type);
         offset += len;
 
         col_append_fstr(pinfo->cinfo, COL_INFO, ", to %s ", name);
@@ -1439,8 +1484,8 @@ dissect_nbss_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         len = get_nbns_name(tvb, offset, offset, name, MAX_NAME_LEN, &name_type);
 
         if (tree)
-            add_name_and_type(nbss_tree, tvb, offset, len,
-                              hf_nbss_calling_name, name, name_type);
+	    add_name_and_type(nbss_tree, tvb, offset, len,
+                              "Calling name", name, name_type);
 
         col_append_fstr(pinfo->cinfo, COL_INFO, "from %s", name);
 
@@ -1449,8 +1494,8 @@ dissect_nbss_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     case NEGATIVE_SESSION_RESPONSE:
         error_code = tvb_get_guint8(tvb, offset);
         if (tree)
-            proto_tree_add_uint(nbss_tree, hf_nbss_error_code, tvb, offset, 1,
-                                error_code);
+	    proto_tree_add_uint(nbss_tree, hf_nbss_error_code, tvb, offset, 1,
+	                        error_code);
 
         col_append_fstr(pinfo->cinfo, COL_INFO, ", %s",
                         val_to_str(error_code, nbss_error_codes, "Unknown (%x)"));
@@ -1459,14 +1504,14 @@ dissect_nbss_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     case RETARGET_SESSION_RESPONSE:
         if (tree)
-            proto_tree_add_item(nbss_tree, hf_nbss_retarget_ip_address,
-                                tvb, offset, 4, ENC_BIG_ENDIAN);
+	    proto_tree_add_item(nbss_tree, hf_nbss_retarget_ip_address,
+	                        tvb, offset, 4, ENC_BIG_ENDIAN);
 
         offset += 4;
 
         if (tree)
-            proto_tree_add_item(nbss_tree, hf_nbss_retarget_port,
-                                tvb, offset, 2, ENC_BIG_ENDIAN);
+	    proto_tree_add_item(nbss_tree, hf_nbss_retarget_port,
+	                        tvb, offset, 2, ENC_BIG_ENDIAN);
 
         break;
 
@@ -1491,12 +1536,18 @@ dissect_nbss_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
          * data.
          */
         saved_proto = pinfo->current_proto;
+        pd_save = pinfo->private_data;
         TRY {
-            dissect_netbios_payload(next_tvb, pinfo, tree);
+	    dissect_netbios_payload(next_tvb, pinfo, tree);
         }
         CATCH_NONFATAL_ERRORS {
+	    /*  Restore the private_data structure in case one of the
+	     *  called dissectors modified it (and, due to the exception,
+	     *  was unable to restore it).
+	     */
+	    pinfo->private_data = pd_save;
             show_exception(tvb, pinfo, tree, EXCEPT_CODE, GET_MESSAGE);
-            pinfo->current_proto = saved_proto;
+	    pinfo->current_proto = saved_proto;
         }
         ENDTRY;
         break;
@@ -1518,7 +1569,7 @@ dissect_continuation_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     if (tree) {
         ti = proto_tree_add_item(tree, proto_nbss, tvb, 0, -1, ENC_NA);
         nbss_tree = proto_item_add_subtree(ti, ett_nbss);
-        proto_tree_add_item(nbss_tree, hf_nbss_continuation_data, tvb, 0, -1, ENC_NA);
+        proto_tree_add_text(nbss_tree, tvb, 0, -1, "Continuation data");
     }
 
     return tvb_length(tvb);
@@ -1532,9 +1583,9 @@ dissect_nbss(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
     guint           length_remaining;
     guint           plen;
     int             max_data;
-    guint8          msg_type;
-    guint8          flags;
-    guint32         length;
+    guint8	    msg_type;
+    guint8	    flags;
+    guint32	    length;
     gboolean        is_cifs;
     tvbuff_t       *next_tvb;
 
@@ -1821,237 +1872,179 @@ proto_register_nbt(void)
 
     static hf_register_info hf_nbns[] = {
         { &hf_nbns_flags,
-          { "Flags",            "nbns.flags",
+          { "Flags",		"nbns.flags",
             FT_UINT16, BASE_HEX, NULL, 0x0,
             NULL, HFILL }},
         { &hf_nbns_flags_response,
-          { "Response",         "nbns.flags.response",
+          { "Response",		"nbns.flags.response",
             FT_BOOLEAN, 16, TFS(&tfs_flags_response), F_RESPONSE,
             "Is the message a response?", HFILL }},
         { &hf_nbns_flags_opcode,
-          { "Opcode",           "nbns.flags.opcode",
+          { "Opcode",		"nbns.flags.opcode",
             FT_UINT16, BASE_DEC, VALS(opcode_vals), F_OPCODE,
             "Operation code", HFILL }},
         { &hf_nbns_flags_authoritative,
-          { "Authoritative",    "nbns.flags.authoritative",
+          { "Authoritative",	"nbns.flags.authoritative",
             FT_BOOLEAN, 16, TFS(&tfs_flags_authoritative), F_AUTHORITATIVE,
             "Is the server is an authority for the domain?", HFILL }},
         { &hf_nbns_flags_truncated,
-          { "Truncated",        "nbns.flags.truncated",
+          { "Truncated",	"nbns.flags.truncated",
             FT_BOOLEAN, 16, TFS(&tfs_flags_truncated), F_TRUNCATED,
             "Is the message truncated?", HFILL }},
         { &hf_nbns_flags_recdesired,
-          { "Recursion desired",        "nbns.flags.recdesired",
+          { "Recursion desired",	"nbns.flags.recdesired",
             FT_BOOLEAN, 16, TFS(&tfs_flags_recdesired), F_RECDESIRED,
             "Do query recursively?", HFILL }},
         { &hf_nbns_flags_recavail,
-          { "Recursion available",      "nbns.flags.recavail",
+          { "Recursion available",	"nbns.flags.recavail",
             FT_BOOLEAN, 16, TFS(&tfs_flags_recavail), F_RECAVAIL,
             "Can the server do recursive queries?", HFILL }},
         { &hf_nbns_flags_broadcast,
-          { "Broadcast",                "nbns.flags.broadcast",
+          { "Broadcast",		"nbns.flags.broadcast",
             FT_BOOLEAN, 16, TFS(&tfs_flags_broadcast), F_BROADCAST,
             "Is this a broadcast packet?", HFILL }},
         { &hf_nbns_flags_rcode,
-          { "Reply code",               "nbns.flags.rcode",
+          { "Reply code",		"nbns.flags.rcode",
             FT_UINT16, BASE_DEC, VALS(rcode_vals), F_RCODE,
             NULL, HFILL }},
         { &hf_nbns_transaction_id,
-          { "Transaction ID",           "nbns.id",
+          { "Transaction ID",      	"nbns.id",
             FT_UINT16, BASE_HEX, NULL, 0x0,
             "Identification of transaction", HFILL }},
         { &hf_nbns_count_questions,
-          { "Questions",                "nbns.count.queries",
+          { "Questions",		"nbns.count.queries",
             FT_UINT16, BASE_DEC, NULL, 0x0,
             "Number of queries in packet", HFILL }},
         { &hf_nbns_count_answers,
-          { "Answer RRs",               "nbns.count.answers",
+          { "Answer RRs",		"nbns.count.answers",
             FT_UINT16, BASE_DEC, NULL, 0x0,
             "Number of answers in packet", HFILL }},
         { &hf_nbns_count_auth_rr,
-          { "Authority RRs",            "nbns.count.auth_rr",
+          { "Authority RRs",       	"nbns.count.auth_rr",
             FT_UINT16, BASE_DEC, NULL, 0x0,
             "Number of authoritative records in packet", HFILL }},
         { &hf_nbns_count_add_rr,
-          { "Additional RRs",           "nbns.count.add_rr",
+          { "Additional RRs",      	"nbns.count.add_rr",
             FT_UINT16, BASE_DEC, NULL, 0x0,
             "Number of additional records in packet", HFILL }},
         { &hf_nbns_name_flags,
-          { "Name flags",       "nbns.name_flags",
+          { "Name flags",      	"nbns.name_flags",
             FT_UINT16, BASE_HEX, NULL, 0x0,
             NULL, HFILL }},
         { &hf_nbns_name_flags_group,
-          { "Name type",        "nbns.name_flags.group",
+          { "Name type",      	"nbns.name_flags.group",
             FT_BOOLEAN, 16, TFS(&tfs_group_unique_name), NAME_FLAGS_G,
             NULL, HFILL }},
         { &hf_nbns_name_flags_ont,
-          { "ONT",              "nbns.name_flags.ont",
+          { "ONT",      	"nbns.name_flags.ont",
             FT_UINT16, BASE_DEC, VALS(name_flags_ont_vals), NAME_FLAGS_ONT,
             NULL, HFILL }},
         { &hf_nbns_name_flags_drg,
-          { "Name is being deregistered",       "nbns.name_flags.drg",
+          { "Name is being deregistered",      	"nbns.name_flags.drg",
             FT_BOOLEAN, 16, TFS(&tfs_yes_no), NAME_FLAGS_DRG,
             NULL, HFILL }},
         { &hf_nbns_name_flags_cnf,
-          { "Name is in conflict",              "nbns.name_flags.cnf",
+          { "Name is in conflict",      	"nbns.name_flags.cnf",
             FT_BOOLEAN, 16, TFS(&tfs_yes_no), NAME_FLAGS_CNF,
             NULL, HFILL }},
         { &hf_nbns_name_flags_act,
-          { "Name is active",           "nbns.name_flags.act",
+          { "Name is active",      	"nbns.name_flags.act",
             FT_BOOLEAN, 16, TFS(&tfs_yes_no), NAME_FLAGS_ACT,
             NULL, HFILL }},
         { &hf_nbns_name_flags_prm,
-          { "Permanent node name",              "nbns.name_flags.prm",
+          { "Permanent node name",      	"nbns.name_flags.prm",
             FT_BOOLEAN, 16, TFS(&tfs_yes_no), NAME_FLAGS_PRM,
             NULL, HFILL }},
         { &hf_nbns_nb_flags,
-          { "Name flags",       "nbns.nb_flags",
+          { "Name flags",      	"nbns.nb_flags",
             FT_UINT16, BASE_HEX, NULL, 0x0,
             NULL, HFILL }},
         { &hf_nbns_nb_flags_group,
-          { "Name type",        "nbns.nb_flags.group",
+          { "Name type",      	"nbns.nb_flags.group",
             FT_BOOLEAN, 16, TFS(&tfs_group_unique_name), NB_FLAGS_G,
             NULL, HFILL }},
         { &hf_nbns_nb_flags_ont,
-          { "ONT",              "nbns.nb_flags.ont",
+          { "ONT",      	"nbns.nb_flags.ont",
             FT_UINT16, BASE_DEC, VALS(nb_flags_ont_vals), NB_FLAGS_ONT,
             NULL, HFILL }},
-        { &hf_nbns_type,
-          { "Type",              "nbns.type",
-            FT_UINT16, BASE_DEC, VALS(nb_type_name_vals), 0x0,
-            NULL, HFILL }},
-        { &hf_nbns_class,
-          { "Class",              "nbns.class",
-            FT_UINT16, BASE_DEC, VALS(dns_classes), 0x0,
-            NULL, HFILL }},
-        { &hf_nbns_name,
-          { "Name",            "nbns.name",
-            FT_STRING, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
-      /* Generated from convert_proto_tree_add_text.pl */
-      { &hf_nbns_addr, { "Addr", "nbns.addr", FT_IPv4, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_number_of_names, { "Number of names", "nbns.number_of_names", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_unit_id, { "Unit ID", "nbns.unit_id", FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_jumpers, { "Jumpers", "nbns.jumpers", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_test_result, { "Test result", "nbns.test_result", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_version_number, { "Version number", "nbns.version_number", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_period_of_statistics, { "Period of statistics", "nbns.period_of_statistics", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_num_crcs, { "Number of CRCs", "nbns.num_crcs", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_num_alignment_errors, { "Number of alignment errors", "nbns.num_alignment_errors", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_num_collisions, { "Number of collisions", "nbns.num_collisions", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_num_send_aborts, { "Number of send aborts", "nbns.num_send_aborts", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_num_good_sends, { "Number of good sends", "nbns.num_good_sends", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_num_good_receives, { "Number of good receives", "nbns.num_good_receives", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_num_retransmits, { "Number of retransmits", "nbns.numretransmits", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_num_no_resource_conditions, { "Number of no resource conditions", "nbns.num_no_resource_conditions", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_num_command_blocks, { "Number of command blocks", "nbns.numcommand_blocks", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_num_pending_sessions, { "Number of pending sessions", "nbns.numpending_sessions", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_max_num_pending_sessions, { "Max number of pending sessions", "nbns.max_num_pending_sessions", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_max_total_sessions_possible, { "Max total sessions possible", "nbns.max_total_sessions_possible", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_session_data_packet_size, { "Session data packet size", "nbns.session_data_packet_size", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_data, { "Data", "nbns.data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_netbios_name, { "Name", "nbns.netbios_name", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_ttl, { "Time to live", "nbns.ttl", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_nbns_data_length, { "Data length", "nbns.data_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
     };
 
     static hf_register_info hf_nbdgm[] = {
         { &hf_nbdgm_type,
-          { "Message Type",             "nbdgm.type",
+          { "Message Type",		"nbdgm.type",
             FT_UINT8, BASE_DEC, VALS(nbds_msgtype_vals), 0x0,
             "NBDGM message type", HFILL }},
         { &hf_nbdgm_fragment,
-          { "More fragments follow",    "nbdgm.next",
+          { "More fragments follow",	"nbdgm.next",
             FT_BOOLEAN, BASE_NONE, TFS(&tfs_yes_no), 0x0,
             "TRUE if more fragments follow", HFILL }},
         { &hf_nbdgm_first,
-          { "This is first fragment",   "nbdgm.first",
+          { "This is first fragment",	"nbdgm.first",
             FT_BOOLEAN, BASE_NONE, TFS(&tfs_yes_no), 0x0,
             "TRUE if first fragment", HFILL }},
         { &hf_nbdgm_node_type,
-          { "Node Type",                "nbdgm.node_type",
+          { "Node Type",		"nbdgm.node_type",
             FT_UINT8, BASE_DEC, VALS(node_type_vals), 0x0,
             NULL, HFILL }},
         { &hf_nbdgm_datagram_id,
-          { "Datagram ID",              "nbdgm.dgram_id",
+          { "Datagram ID",		"nbdgm.dgram_id",
             FT_UINT16, BASE_HEX, NULL, 0x0,
             "Datagram identifier", HFILL }},
         { &hf_nbdgm_src_ip,
-          { "Source IP",                "nbdgm.src.ip",
+          { "Source IP",		"nbdgm.src.ip",
             FT_IPv4, BASE_NONE, NULL, 0x0,
             "Source IPv4 address", HFILL }},
         { &hf_nbdgm_src_port,
-          { "Source Port",              "nbdgm.src.port",
+          { "Source Port",		"nbdgm.src.port",
             FT_UINT16, BASE_DEC, NULL, 0x0,
             NULL, HFILL }},
         { &hf_nbdgm_datagram_length,
-          { "Datagram length",          "nbdgm.dgram_len",
+          { "Datagram length",		"nbdgm.dgram_len",
             FT_UINT16, BASE_DEC, NULL, 0x0,
             NULL, HFILL }},
         { &hf_nbdgm_packet_offset,
-          { "Packet offset",            "nbdgm.pkt_offset",
+          { "Packet offset",		"nbdgm.pkt_offset",
             FT_UINT16, BASE_DEC, NULL, 0x0,
             NULL, HFILL }},
         { &hf_nbdgm_error_code,
-          { "Error code",               "nbdgm.error_code",
+          { "Error code",		"nbdgm.error_code",
             FT_UINT8, BASE_HEX, VALS(nbds_error_codes), 0x0,
-            NULL, HFILL }},
-        { &hf_nbdgm_source_name,
-          { "Source name",            "nbdgm.source_name",
-            FT_STRING, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-        { &hf_nbdgm_destination_name,
-          { "Destination name",            "nbdgm.destination_name",
-            FT_STRING, BASE_NONE, NULL, 0x0,
             NULL, HFILL }},
     };
 
     static hf_register_info hf_nbss[] = {
         { &hf_nbss_type,
-          { "Message Type",             "nbss.type",
+          { "Message Type",		"nbss.type",
             FT_UINT8, BASE_HEX, VALS(message_types), 0x0,
             "NBSS message type", HFILL }},
         { &hf_nbss_flags,
-          { "Flags",            "nbss.flags",
+          { "Flags",		"nbss.flags",
             FT_UINT8, BASE_HEX, NULL, 0x0,
             "NBSS message flags", HFILL }},
         { &hf_nbss_flags_e,
-          { "Extend",           "nbss.flags.e",
+          { "Extend",		"nbss.flags.e",
             FT_BOOLEAN, 8, TFS(&tfs_nbss_flags_e), NBSS_FLAGS_E,
             NULL, HFILL }},
         { &hf_nbss_length,
-          { "Length",           "nbss.length",
+          { "Length",		"nbss.length",
             FT_UINT24, BASE_DEC, NULL, 0x0,
             "Length of trailer (payload) following this field in bytes", HFILL }},
         { &hf_nbss_cifs_length,
-          { "Length",           "nbss.length",
+          { "Length",		"nbss.length",
             FT_UINT24, BASE_DEC, NULL, 0x0,
             "Length trailer (payload) following this field in bytes", HFILL }},
         { &hf_nbss_error_code,
-          { "Error code",       "nbss.error_code",
+          { "Error code",	"nbss.error_code",
             FT_UINT8, BASE_HEX, VALS(nbss_error_codes), 0x0,
             NULL, HFILL }},
         { &hf_nbss_retarget_ip_address,
-          { "Retarget IP address",      "nbss.retarget_ip_address",
+          { "Retarget IP address",	"nbss.retarget_ip_address",
             FT_IPv4, BASE_NONE, NULL, 0x0,
             NULL, HFILL }},
         { &hf_nbss_retarget_port,
-          { "Retarget port",    "nbss.retarget_port",
+          { "Retarget port",	"nbss.retarget_port",
             FT_UINT16, BASE_DEC, NULL, 0x0,
             NULL, HFILL }},
-        { &hf_nbss_continuation_data,
-          { "Continuation data", "nbss.continuation_data",
-             FT_BYTES, BASE_NONE, NULL, 0x0,
-             NULL, HFILL }},
-        { &hf_nbss_called_name,
-          { "Called name", "nbss.called_name",
-             FT_STRING, BASE_NONE, NULL, 0x0,
-             NULL, HFILL }},
-        { &hf_nbss_calling_name,
-          { "Calling name", "nbss.calling_name",
-             FT_STRING, BASE_NONE, NULL, 0x0,
-             NULL, HFILL }},
     };
     static gint *ett[] = {
         &ett_nbns,
@@ -2066,18 +2059,10 @@ proto_register_nbt(void)
         &ett_nbss,
         &ett_nbss_flags,
     };
-
-    static ei_register_info ei[] = {
-        { &ei_nbns_incomplete_entry, { "nbns.incomplete_entry", PI_MALFORMED, PI_ERROR, "incomplete entry", EXPFILL }},
-    };
-
     module_t *nbss_module;
-    expert_module_t* expert_nbns;
 
     proto_nbns = proto_register_protocol("NetBIOS Name Service", "NBNS", "nbns");
     proto_register_field_array(proto_nbns, hf_nbns, array_length(hf_nbns));
-    expert_nbns = expert_register_protocol(proto_nbns);
-    expert_register_field_array(expert_nbns, ei, array_length(ei));
 
     proto_nbdgm = proto_register_protocol("NetBIOS Datagram Service",
                                           "NBDS", "nbdgm");
@@ -2112,20 +2097,4 @@ proto_reg_handoff_nbt(void)
     nbss_handle  = new_create_dissector_handle(dissect_nbss, proto_nbss);
     dissector_add_uint("tcp.port", TCP_PORT_NBSS, nbss_handle);
     dissector_add_uint("tcp.port", TCP_PORT_CIFS, nbss_handle);
-
-    netbios_heur_subdissector_list = find_heur_dissector_list("netbios");
-    data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

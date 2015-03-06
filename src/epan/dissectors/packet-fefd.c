@@ -25,7 +25,10 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <epan/strutil.h>
 
+#include <epan/oui.h>
+#include <epan/nlpid.h>
 
 void proto_register_fefd(void);
 void proto_reg_handoff_fefd(void);
@@ -43,9 +46,6 @@ static int hf_fefd_flags_rsy = -1;
 static int hf_fefd_checksum = -1;
 static int hf_fefd_tlvtype = -1;
 static int hf_fefd_tlvlength = -1;
-static int hf_fefd_device_id = -1;
-static int hf_fefd_sent_through_interface = -1;
-static int hf_fefd_data = -1;
 
 static gint ett_fefd = -1;
 static gint ett_fefd_flags = -1;
@@ -94,6 +94,7 @@ dissect_fefd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     int         offset    = 0;
     guint16     type;
     guint16     length;
+    proto_item *tlvi;
     proto_tree *tlv_tree;
     int         real_length;
 
@@ -127,9 +128,10 @@ dissect_fefd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         length = tvb_get_ntohs(tvb, offset + TLV_LENGTH);
         if (length < 4) {
             if (tree) {
-                tlv_tree = proto_tree_add_subtree_format(fefd_tree, tvb, offset, 4,  /* XXX - expert info? */
-                                           ett_fefd_tlv, NULL, "TLV with invalid length %u (< 4)",
+                tlvi = proto_tree_add_text(fefd_tree, tvb, offset, 4,
+                                           "TLV with invalid length %u (< 4)",
                                            length);
+                tlv_tree = proto_item_add_subtree(tlvi, ett_fefd_tlv);
                 proto_tree_add_uint(tlv_tree, hf_fefd_tlvtype, tvb,
                                     offset + TLV_TYPE, 2, type);
                 proto_tree_add_uint(tlv_tree, hf_fefd_tlvlength, tvb,
@@ -150,15 +152,17 @@ dissect_fefd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                                                           length - 4));
 
             if (tree) {
-                tlv_tree = proto_tree_add_subtree_format(fefd_tree, tvb, offset,
-                                           length, ett_fefd_tlv, NULL, "Device ID: %s",
+                tlvi = proto_tree_add_text(fefd_tree, tvb, offset,
+                                           length, "Device ID: %s",
                                            tvb_format_stringzpad(tvb, offset + 4, length - 4));
+                tlv_tree = proto_item_add_subtree(tlvi, ett_fefd_tlv);
                 proto_tree_add_uint(tlv_tree, hf_fefd_tlvtype, tvb,
                                     offset + TLV_TYPE, 2, type);
                 proto_tree_add_uint(tlv_tree, hf_fefd_tlvlength, tvb,
                                     offset + TLV_LENGTH, 2, length);
-                proto_tree_add_item(tlv_tree, hf_fefd_device_id, tvb, offset + 4,
-                                    length - 4, ENC_NA|ENC_ASCII);
+                proto_tree_add_text(tlv_tree, tvb, offset + 4,
+                                    length - 4, "Device ID: %s",
+                                    tvb_format_stringzpad(tvb, offset + 4, length - 4));
             }
             offset += length;
             break;
@@ -180,15 +184,18 @@ dissect_fefd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                                     tvb_format_stringzpad(tvb, offset + 4, real_length - 4));
 
             if (tree) {
-                tlv_tree = proto_tree_add_subtree_format(fefd_tree, tvb, offset,
-                                           real_length, ett_fefd_tlv, NULL, "Port ID: %s",
+                tlvi = proto_tree_add_text(fefd_tree, tvb, offset,
+                                           real_length, "Port ID: %s",
                                            tvb_format_text(tvb, offset + 4, real_length - 4));
+                tlv_tree = proto_item_add_subtree(tlvi, ett_fefd_tlv);
                 proto_tree_add_uint(tlv_tree, hf_fefd_tlvtype, tvb,
                                     offset + TLV_TYPE, 2, type);
                 proto_tree_add_uint(tlv_tree, hf_fefd_tlvlength, tvb,
                                     offset + TLV_LENGTH, 2, length);
-                proto_tree_add_item(tlv_tree, hf_fefd_sent_through_interface, tvb, offset + 4,
-                                    real_length - 4, ENC_NA|ENC_ASCII);
+                proto_tree_add_text(tlv_tree, tvb, offset + 4,
+                                    real_length - 4,
+                                    "Sent through Interface: %s",
+                                    tvb_format_text(tvb, offset + 4, real_length - 4));
             }
             offset += real_length;
             break;
@@ -199,17 +206,18 @@ dissect_fefd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         case TYPE_DEVICE_NAME:
         case TYPE_SEQUENCE_NUMBER:
         default:
-            tlv_tree = proto_tree_add_subtree_format(fefd_tree, tvb, offset,
-                                       length, ett_fefd_tlv, NULL, "Type: %s, length: %u",
+            tlvi = proto_tree_add_text(fefd_tree, tvb, offset,
+                                       length, "Type: %s, length: %u",
                                        val_to_str(type, type_vals, "Unknown (0x%04x)"),
                                        length);
+            tlv_tree = proto_item_add_subtree(tlvi, ett_fefd_tlv);
             proto_tree_add_uint(tlv_tree, hf_fefd_tlvtype, tvb,
                                 offset + TLV_TYPE, 2, type);
             proto_tree_add_uint(tlv_tree, hf_fefd_tlvlength, tvb,
                                 offset + TLV_LENGTH, 2, length);
             if (length > 4) {
-                proto_tree_add_item(tlv_tree, hf_fefd_data, tvb, offset + 4,
-                                    length - 4, ENC_NA);
+                proto_tree_add_text(tlv_tree, tvb, offset + 4,
+                                    length - 4, "Data");
             } else {
                 return;
             }
@@ -254,21 +262,8 @@ proto_register_fefd(void)
 
         { &hf_fefd_tlvlength,
           { "Length",           "fefd.tlv.len", FT_UINT16, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_fefd_device_id,
-          { "Device ID",           "fefd.device_id", FT_STRINGZ, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_fefd_sent_through_interface,
-          { "Sent through Interface",  "fefd.sent_through_interface", FT_STRING, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_fefd_data,
-          { "Data",  "fefd.data", FT_BYTES, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
+            NULL, HFILL }}
     };
-
     static gint *ett[] = {
         &ett_fefd,
         &ett_fefd_flags,
@@ -289,16 +284,3 @@ proto_reg_handoff_fefd(void)
     fefd_handle = create_dissector_handle(dissect_fefd, proto_fefd);
     dissector_add_uint("llc.force10_pid", 0x0111, fefd_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

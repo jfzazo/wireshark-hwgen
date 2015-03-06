@@ -39,15 +39,19 @@
 
 #include "config.h"
 
+#include <string.h>
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/prefs.h>
 #include <epan/tap.h>
 #include <epan/strutil.h>
+#include <epan/wmem/wmem.h>
 #include <epan/expert.h>
+#include <epan/tfs.h>
 #include <epan/to_str.h>
 
+#include "packet-mtp3.h"
 #include "packet-rtp.h"
 #include "packet-bssap.h"
 #include "packet-ansi_a.h"
@@ -147,6 +151,12 @@ static const true_false_string tfs_reserved_private_long_code =
 {
     "Reserved",
     "Private long code"
+};
+
+static const true_false_string tfs_ansi_a_ti_flag =
+{
+    "allocated by receiver",
+    "allocated by sender"
 };
 
 static const true_false_string tfs_a2p_bearer_form_format_bearer_addr_flag =
@@ -2004,6 +2014,7 @@ elem_is95_chan_id(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guint
     guint8      chan_num;
     guint32     value;
     guint32     curr_offset;
+    proto_item  *item;
     proto_tree  *subtree;
 
     curr_offset = offset;
@@ -2029,9 +2040,12 @@ elem_is95_chan_id(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guint
         chan_num = 0;
         do
         {
-            subtree =
-                proto_tree_add_subtree_format(tree, tvb, curr_offset, 4,
-                    ett_chan_list, NULL, "Channel [%u]", chan_num + 1);
+            item =
+                proto_tree_add_text(tree, tvb, curr_offset, 4,
+                    "Channel [%u]",
+                    chan_num + 1);
+
+            subtree = proto_item_add_subtree(item, ett_chan_list);
 
             proto_tree_add_item(subtree, hf_ansi_a_is95_chan_id_walsh_code_chan_idx, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
 
@@ -2117,13 +2131,15 @@ elem_enc_info(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guint32 o
 
         oct = tvb_get_guint8(tvb, curr_offset);
 
-        subtree =
-            proto_tree_add_subtree_format(tree,
-                tvb, curr_offset, -1, ett_ansi_enc_info, &item,
+        item =
+            proto_tree_add_text(tree,
+                tvb, curr_offset, -1,
                 "Encryption Info [%u]: %s (%u)",
                 num_recs + 1,
                 val_to_str_const((oct & 0x7c) >> 2, ansi_a_enc_info_ident_vals, "Reserved"),
                 (oct & 0x7c) >> 2);
+
+        subtree = proto_item_add_subtree(item, ett_ansi_enc_info);
 
         proto_tree_add_item(subtree, hf_ansi_a_extension_8_80, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(subtree, hf_ansi_a_enc_info_enc_parm_id, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
@@ -2338,9 +2354,12 @@ elem_cm_info_type_2(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, gui
         num_bands = 0;
         do
         {
-            subtree =
-                proto_tree_add_subtree_format(tree, tvb, curr_offset, band_class_entry_len,
-                    ett_cm2_band_class, NULL, "Band Class Entry [%u]", num_bands + 1);
+            item =
+                proto_tree_add_text(tree, tvb, curr_offset, band_class_entry_len,
+                    "Band Class Entry [%u]",
+                    num_bands + 1);
+
+            subtree = proto_item_add_subtree(item, ett_cm2_band_class);
 
             proto_tree_add_item(subtree, hf_ansi_a_reserved_bits_8_e0, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
             proto_tree_add_item(subtree, hf_ansi_a_scm_band_class_entry_band_class, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
@@ -2937,9 +2956,12 @@ elem_cell_id_list(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 o
 
     do
     {
-        subtree =
-            proto_tree_add_subtree_format(tree, tvb, curr_offset, -1,
-                ett_cell_list, &item, "Cell [%u]", num_cells + 1);
+        item =
+            proto_tree_add_text(tree, tvb, curr_offset, -1,
+                "Cell [%u]",
+                num_cells + 1);
+
+        subtree = proto_item_add_subtree(item, ett_cell_list);
 
         consumed =
             elem_cell_id_aux(tvb, pinfo, subtree, curr_offset, len - (curr_offset - offset), oct, item);
@@ -3109,9 +3131,12 @@ elem_downlink_re_aux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint3
     {
         SHORT_DATA_CHECK(len - (curr_offset - offset), (guint32) 3 + ANSI_A_CELL_ID_LEN(disc));
 
-        subtree =
-            proto_tree_add_subtree_format(tree, tvb, curr_offset, -1,
-                ett_cell_list, &item, "Cell [%u]", curr_cell + 1);
+        item =
+            proto_tree_add_text(tree, tvb, curr_offset, -1,
+                "Cell [%u]",
+                curr_cell + 1);
+
+        subtree = proto_item_add_subtree(item, ett_cell_list);
 
         consumed =
             elem_cell_id_aux(tvb, pinfo, subtree, curr_offset, len - (curr_offset - offset), disc, item);
@@ -3174,10 +3199,12 @@ elem_downlink_re_list(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint
 
     while ((len - (curr_offset - offset)) > 0)
     {
-        subtree =
-            proto_tree_add_subtree_format(tree, tvb, curr_offset, -1,
-                ett_re_list, &item, "Environment [%u]",
+        item =
+            proto_tree_add_text(tree, tvb, curr_offset, -1,
+                "Environment [%u]",
                 num_envs + 1);
+
+        subtree = proto_item_add_subtree(item, ett_re_list);
 
         proto_tree_add_item(subtree, hf_ansi_a_downlink_re_entry_env_len, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
 
@@ -3289,9 +3316,11 @@ elem_ho_pow_lev(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 off
 
     curr_offset++;
 
-    subtree =
-        proto_tree_add_subtree_format(tree, tvb, curr_offset, -1,
-            ett_cell_list, &item, "Cell [1]");
+    item =
+        proto_tree_add_text(tree, tvb, curr_offset, -1,
+            "Cell [1]");
+
+    subtree = proto_item_add_subtree(item, ett_cell_list);
 
     consumed =
         elem_cell_id_aux(tvb, pinfo, subtree, curr_offset, len - (curr_offset - offset), 0x7, item);
@@ -3309,9 +3338,12 @@ elem_ho_pow_lev(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 off
 
         curr_offset++;
 
-        subtree =
-            proto_tree_add_subtree_format(tree, tvb, curr_offset, -1,
-                ett_cell_list, &item, "Cell [%u]", num_cells + 1);
+        item =
+            proto_tree_add_text(tree, tvb, curr_offset, -1,
+                "Cell [%u]",
+                num_cells + 1);
+
+        subtree = proto_item_add_subtree(item, ett_cell_list);
 
         consumed =
             elem_cell_id_aux(tvb, pinfo, subtree, curr_offset, len - (curr_offset - offset), 0x2, item);
@@ -3417,6 +3449,7 @@ elem_is2000_chan_id(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, gui
     guint32     value;
     guint32     pilot_pn;
     guint32     curr_offset;
+    proto_item  *item;
     proto_tree  *subtree;
     const gchar *str;
 
@@ -3442,8 +3475,10 @@ elem_is2000_chan_id(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, gui
 
     do
     {
-        subtree = proto_tree_add_subtree_format(tree, tvb, curr_offset, 6,
-                ett_chan_list, NULL, "Channel [%u]", chan_num + 1);
+        item = proto_tree_add_text(tree, tvb, curr_offset, 6,
+                "Channel [%u]", chan_num + 1);
+
+        subtree = proto_item_add_subtree(item, ett_chan_list);
 
         oct = tvb_get_guint8(tvb, curr_offset);
 
@@ -3686,7 +3721,7 @@ elem_l3_info(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset
     /*
      * dissect the embedded DTAP message
      */
-    l3_tvb = tvb_new_subset_length(tvb, curr_offset, len);
+    l3_tvb = tvb_new_subset(tvb, curr_offset, len, len);
 
     call_dissector(dtap_handle, l3_tvb, pinfo, data_p->g_tree);
 
@@ -4627,10 +4662,12 @@ elem_so_list(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset
     {
         guint16         value;
 
-        subtree =
-            proto_tree_add_subtree_format(tree, tvb, curr_offset, 3,
-                ett_so_list, &item, "Service Option [%u]",
+        item =
+            proto_tree_add_text(tree, tvb, curr_offset, 3,
+                "Service Option [%u]",
                 inst + 1);
+
+        subtree = proto_item_add_subtree(item, ett_so_list);
 
         proto_tree_add_item(tree, hf_ansi_a_reserved_bits_8_c0, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(tree, hf_ansi_a_so_list_sr_id, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
@@ -4722,6 +4759,7 @@ elem_adds_user_part(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32
     guint8      oct;
     guint32     curr_offset;
     tvbuff_t    *adds_tvb;
+    proto_item  *item;
     proto_tree  *subtree;
 
     curr_offset = offset;
@@ -4736,19 +4774,20 @@ elem_adds_user_part(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32
 
     curr_offset++;
 
-    subtree = proto_tree_add_subtree(tree, tvb, curr_offset, len - 1, ett_adds_user_part, NULL, "Application Data Message");
+    item = proto_tree_add_text(tree, tvb, curr_offset, len - 1, "Application Data Message");
+    subtree = proto_item_add_subtree(item, ett_adds_user_part);
 
     switch (oct & 0x3f)
     {
     case ADDS_APP_SMS:
-        adds_tvb = tvb_new_subset_length(tvb, curr_offset, len - 1);
+        adds_tvb = tvb_new_subset(tvb, curr_offset, len - 1, len - 1);
 
         dissector_try_uint(is637_dissector_table, 0, adds_tvb, pinfo, data_p->g_tree);
         curr_offset += (len - 1);
         break;
 
     case ADDS_APP_OTA:
-        adds_tvb = tvb_new_subset_length(tvb, curr_offset, len - 1);
+        adds_tvb = tvb_new_subset(tvb, curr_offset, len - 1, len - 1);
 
         dissector_try_uint(is683_dissector_table, data_p->is_reverse, adds_tvb, pinfo, data_p->g_tree);
 
@@ -4756,7 +4795,7 @@ elem_adds_user_part(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32
         break;
 
     case ADDS_APP_PDS:
-        adds_tvb = tvb_new_subset_length(tvb, curr_offset, len - 1);
+        adds_tvb = tvb_new_subset(tvb, curr_offset, len - 1, len - 1);
 
         dissector_try_uint(is801_dissector_table, data_p->is_reverse, adds_tvb, pinfo, data_p->g_tree);
 
@@ -4848,6 +4887,7 @@ elem_is2000_scr(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guint32
     guint32     curr_offset, saved_offset;
     guint32     value;
     guint       is2000_portion_len;
+    proto_item  *item;
     proto_tree  *scr_subtree, *subtree;
     const gchar *str = NULL;
 
@@ -4866,8 +4906,9 @@ elem_is2000_scr(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guint32
 
     saved_offset = curr_offset;
 
-    scr_subtree = proto_tree_add_subtree(tree, tvb, curr_offset, is2000_portion_len,
-            ett_scr, NULL, "IS-2000 Service Configuration Record Content");
+    item = proto_tree_add_text(tree, tvb, curr_offset, is2000_portion_len,
+            "IS-2000 Service Configuration Record Content");
+    scr_subtree = proto_item_add_subtree(item, ett_scr);
 
     proto_tree_add_item(scr_subtree, hf_ansi_a_is2000_scr_for_mux_option, tvb, curr_offset, 2, ENC_BIG_ENDIAN);
     curr_offset += 2;
@@ -4889,9 +4930,10 @@ elem_is2000_scr(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guint32
     {
         oct = tvb_get_guint8(tvb, curr_offset);
 
-        subtree = proto_tree_add_subtree_format(scr_subtree, tvb,
+        item = proto_tree_add_text(scr_subtree, tvb,
                 curr_offset, oct /* !!! oct already includes the length octet itself */,
-                ett_scr_socr, NULL, "Service option connection record [%u]", ii+1);
+                "Service option connection record [%u]", ii+1);
+        subtree = proto_item_add_subtree(item, ett_scr_socr);
         curr_offset += 1;
 
         proto_tree_add_item(subtree, hf_ansi_a_is2000_scr_socr_soc_ref, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
@@ -5200,9 +5242,11 @@ elem_is2000_mob_cap(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, gui
     {
         SHORT_DATA_CHECK(len - (curr_offset - offset), oct_len);
 
-        subtree =
-            proto_tree_add_subtree(tree, tvb, curr_offset, oct_len,
-                ett_is2000_mob_cap_fch_info, NULL, "FCH Information");
+        item =
+            proto_tree_add_text(tree, tvb, curr_offset, oct_len,
+                "FCH Information");
+
+        subtree = proto_item_add_subtree(item, ett_is2000_mob_cap_fch_info);
 
         content_fill_aux(tvb, subtree, curr_offset, oct_len, fill_bits,
             hf_ansi_a_is2000_mob_cap_fch_info_content,
@@ -5231,8 +5275,8 @@ elem_is2000_mob_cap(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, gui
     {
         SHORT_DATA_CHECK(len - (curr_offset - offset), oct_len);
 
-        subtree = proto_tree_add_subtree(tree, tvb, curr_offset, oct_len,
-                     ett_is2000_mob_cap_dcch_info, NULL, "DCCH Information");
+        item = proto_tree_add_text(tree, tvb, curr_offset, oct_len, "DCCH Information");
+        subtree = proto_item_add_subtree(item, ett_is2000_mob_cap_dcch_info);
 
         content_fill_aux(tvb, subtree, curr_offset, oct_len, fill_bits,
             hf_ansi_a_is2000_mob_cap_dcch_info_content,
@@ -5263,8 +5307,8 @@ elem_is2000_mob_cap(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, gui
     {
         SHORT_DATA_CHECK(len - (curr_offset - offset), oct_len);
 
-        subtree = proto_tree_add_subtree(tree, tvb, curr_offset, oct_len,
-                    ett_is2000_mob_cap_for_pdch_info, NULL, "FOR_PDCH Information");
+        item = proto_tree_add_text(tree, tvb, curr_offset, oct_len, "FOR_PDCH Information");
+        subtree = proto_item_add_subtree(item, ett_is2000_mob_cap_for_pdch_info);
 
         content_fill_aux(tvb, subtree, curr_offset, oct_len, fill_bits,
             hf_ansi_a_is2000_mob_cap_for_pdch_info_content,
@@ -5295,8 +5339,9 @@ elem_is2000_mob_cap(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, gui
     {
         SHORT_DATA_CHECK(len - (curr_offset - offset), oct_len);
 
-        subtree = proto_tree_add_subtree(tree, tvb, curr_offset, oct_len,
-            ett_is2000_mob_cap_rev_pdch_info, NULL, "REV_PDCH Information");
+        item = proto_tree_add_text(tree, tvb, curr_offset, oct_len, "REV_PDCH Information");
+
+        subtree = proto_item_add_subtree(item, ett_is2000_mob_cap_rev_pdch_info);
 
         content_fill_aux(tvb, subtree, curr_offset, oct_len, fill_bits,
             hf_ansi_a_is2000_mob_cap_rev_pdch_info_content,
@@ -5531,13 +5576,14 @@ elem_fwd_ms_info_recs(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, g
             ett_elem_idx = ett_ansi_fwd_ms_info_rec[idx];
         }
 
-        subtree =
-            proto_tree_add_subtree_format(tree, tvb, curr_offset, -1,
-                ett_elem_idx, &item,
+        item =
+            proto_tree_add_text(tree, tvb, curr_offset, -1,
                 "Information Record Type [%u]: (%u) %s",
                 num_recs + 1,
                 rec_type,
                 str);
+
+        subtree = proto_item_add_subtree(item, ett_elem_idx);
 
         curr_offset++;
 
@@ -5713,7 +5759,7 @@ elem_rev_ms_info_recs(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, g
     guint32     curr_offset, saved_offset, saved_offset2;
     const gchar *str;
     gint        ett_elem_idx, idx, i;
-    proto_item  *item, *item2;
+    proto_item  *item;
     proto_tree  *subtree, *subtree2;
     guint8      *poctets;
 
@@ -5739,13 +5785,14 @@ elem_rev_ms_info_recs(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, g
             ett_elem_idx = ett_ansi_rev_ms_info_rec[idx];
         }
 
-        subtree =
-            proto_tree_add_subtree_format(tree, tvb, curr_offset, -1,
-                ett_elem_idx, &item,
+        item =
+            proto_tree_add_text(tree, tvb, curr_offset, -1,
                 "Information Record Type [%u]: (%u) %s",
                 num_recs + 1,
                 rec_type,
                 str);
+
+        subtree = proto_item_add_subtree(item, ett_elem_idx);
 
         curr_offset++;
 
@@ -5864,8 +5911,10 @@ elem_rev_ms_info_recs(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, g
 
                 while ((oct_len - (curr_offset - saved_offset2)) > 2)
                 {
-                    subtree2 = proto_tree_add_subtree_format(subtree, tvb, curr_offset, 3,
-                            ett_so_list, &item2, "Service Option [%u]", i + 1);
+                    item = proto_tree_add_text(subtree, tvb, curr_offset, 3,
+                            "Service Option [%u]", i + 1);
+
+                    subtree2 = proto_item_add_subtree(item, ett_so_list);
 
                     proto_tree_add_item(subtree2, hf_ansi_a_reserved_bits_8_fc, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
                     proto_tree_add_item(subtree2, hf_ansi_a_rev_ms_info_rec_so_info_fwd_support, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
@@ -5882,7 +5931,7 @@ elem_rev_ms_info_recs(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, g
                         "%s",
                         str);
 
-                    proto_item_append_text(item2, " - (%u) %s", value, str);
+                    proto_item_append_text(item, " - (%u) %s", value, str);
 
                     i++;
                     curr_offset += 2;
@@ -6878,8 +6927,10 @@ elem_a2p_bearer_format(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guin
     {
         orig_offset = curr_offset;
 
-        subtree = proto_tree_add_subtree_format(tree, tvb, curr_offset, -1,
-                ett_bearer_list, &item, "Bearer Format [%u]", num_bearers + 1);
+        item = proto_tree_add_text(tree, tvb, curr_offset, -1,
+                "Bearer Format [%u]", num_bearers + 1);
+
+        subtree = proto_item_add_subtree(item, ett_bearer_list);
 
         proto_tree_add_item(subtree, hf_ansi_a_a2p_bearer_form_format_len, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
         curr_offset++;
@@ -7446,11 +7497,13 @@ elem_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, elem_idx_t idx, gu
 
         parm_len = tvb_get_guint8(tvb, curr_offset + 1);
 
-        subtree =
-            proto_tree_add_subtree_format(tree, tvb, curr_offset, parm_len + 2,
-                ett_ansi_elem_1[idx], &data_p->elem_item, "%s%s",
+        data_p->elem_item =
+            proto_tree_add_text(tree, tvb, curr_offset, parm_len + 2,
+                "%s%s",
                 ansi_a_elem_1_strings[idx].strptr,
                 (name_add == NULL) || (name_add[0] == '\0') ? "" : name_add);
+
+        subtree = proto_item_add_subtree(data_p->elem_item, ett_ansi_elem_1[idx]);
 
         proto_tree_add_uint(subtree, hf_ansi_a_elem_id, tvb, curr_offset, 1, oct);
 
@@ -7508,12 +7561,14 @@ elem_tv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, elem_idx_t idx, gui
     {
         dec_idx = ansi_a_elem_1_strings[idx].dec_index;
 
-        subtree =
-            proto_tree_add_subtree_format(tree,
+        data_p->elem_item =
+            proto_tree_add_text(tree,
                 tvb, curr_offset, -1,
-                ett_ansi_elem_1[idx], &data_p->elem_item, "%s%s",
+                "%s%s",
                 ansi_a_elem_1_strings[idx].strptr,
                 (name_add == NULL) || (name_add[0] == '\0') ? "" : name_add);
+
+        subtree = proto_item_add_subtree(data_p->elem_item, ett_ansi_elem_1[idx]);
 
         proto_tree_add_uint(subtree, hf_ansi_a_elem_id, tvb, curr_offset, 1, oct);
 
@@ -7603,11 +7658,13 @@ elem_lv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, elem_idx_t idx, gui
 
     parm_len = tvb_get_guint8(tvb, curr_offset);
 
-    subtree =
-        proto_tree_add_subtree_format(tree, tvb, curr_offset, parm_len + 1,
-            ett_ansi_elem_1[idx], &data_p->elem_item, "%s%s",
+    data_p->elem_item =
+        proto_tree_add_text(tree, tvb, curr_offset, parm_len + 1,
+            "%s%s",
             ansi_a_elem_1_strings[idx].strptr,
             (name_add == NULL) || (name_add[0] == '\0') ? "" : name_add);
+
+    subtree = proto_item_add_subtree(data_p->elem_item, ett_ansi_elem_1[idx]);
 
     proto_tree_add_uint(subtree, hf_ansi_a_length, tvb,
         curr_offset, 1, parm_len);
@@ -7822,6 +7879,7 @@ dtap_cm_srvc_req(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 of
     guint       curr_len;
     guint8      oct;
     proto_tree  *subtree;
+    proto_item  *item;
 
     curr_offset = offset;
     curr_len = len;
@@ -7830,8 +7888,9 @@ dtap_cm_srvc_req(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 of
      * special dissection for CM Service Type
      */
     oct = tvb_get_guint8(tvb, curr_offset);
-    subtree = proto_tree_add_subtree_format(tree, tvb, curr_offset, 1, ett_cm_srvc_type, NULL,
+    item = proto_tree_add_text(tree, tvb, curr_offset, 1,
             "CM Service Type: %s", val_to_str_const(oct & 0x0f, dtap_cm_service_type_vals, "Unknown"));
+    subtree = proto_item_add_subtree(item, ett_cm_srvc_type);
 
     proto_tree_add_item(subtree, hf_ansi_a_elem_id_f0, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
     proto_tree_add_item(subtree, hf_ansi_a_cm_svrc_type, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
@@ -10781,7 +10840,7 @@ proto_register_ansi_a(void)
         },
         { &hf_ansi_a_ti_flag,
             { "Transaction Identifier (TI) Flag", "ansi_a_bsmap.ti.flag",
-            FT_BOOLEAN, 8, TFS(&tfs_allocated_by_receiver_sender), 0x80,
+            FT_BOOLEAN, 8, TFS(&tfs_ansi_a_ti_flag), 0x80,
             NULL, HFILL }
         },
         { &hf_ansi_a_ti_ti,

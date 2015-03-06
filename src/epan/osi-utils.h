@@ -49,21 +49,8 @@ gchar*     print_nsap_net ( const guint8 *, int );
 void       print_nsap_net_buf( const guint8 *, int, gchar *, int);
 gchar*     print_area     ( const guint8 *, int );
 void       print_area_buf ( const guint8 *, int, gchar *, int);
-gchar*     print_system_id(wmem_allocator_t *, const guint8 *, int );
+gchar*     print_system_id( const guint8 *, int );
 gchar*     tvb_print_system_id( tvbuff_t *, const gint, int );
 void       print_system_id_buf( const guint8 *, int, gchar *, int);
 
 #endif /* __OSI_UTILS_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

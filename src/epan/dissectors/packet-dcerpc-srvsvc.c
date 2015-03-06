@@ -2467,7 +2467,8 @@ srvsvc_dissect_NetCharDevInfo(tvbuff_t *tvb _U_, int offset _U_, packet_info *pi
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetCharDevInfo, &item, "srvsvc_NetCharDevInfo");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetCharDevInfo");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetCharDevInfo);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -2538,7 +2539,8 @@ srvsvc_dissect_NetCharDevCtr(tvbuff_t *tvb _U_, int offset _U_, packet_info *pin
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetCharDevCtr, &item, "srvsvc_NetCharDevCtr");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetCharDevCtr");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetCharDevCtr);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -2879,7 +2881,8 @@ srvsvc_dissect_NetCharDevQInfo(tvbuff_t *tvb _U_, int offset _U_, packet_info *p
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetCharDevQInfo, &item, "srvsvc_NetCharDevQInfo");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetCharDevQInfo");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetCharDevQInfo);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -2950,7 +2953,8 @@ srvsvc_dissect_NetCharDevQCtr(tvbuff_t *tvb _U_, int offset _U_, packet_info *pi
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetCharDevQCtr, &item, "srvsvc_NetCharDevQCtr");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetCharDevQCtr");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetCharDevQCtr);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -3305,7 +3309,8 @@ srvsvc_dissect_NetConnCtr(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo 
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetConnCtr, &item, "srvsvc_NetConnCtr");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetConnCtr");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetConnCtr);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -3638,7 +3643,8 @@ srvsvc_dissect_NetFileInfo(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetFileInfo, &item, "srvsvc_NetFileInfo");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetFileInfo");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetFileInfo);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -3709,7 +3715,8 @@ srvsvc_dissect_NetFileCtr(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo 
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetFileCtr, &item, "srvsvc_NetFileCtr");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetFileCtr");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetFileCtr);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -4712,7 +4719,8 @@ srvsvc_dissect_NetSessCtr(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo 
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetSessCtr, &item, "srvsvc_NetSessCtr");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetSessCtr");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetSessCtr);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -6383,7 +6391,8 @@ srvsvc_dissect_NetShareInfo(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinf
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetShareInfo, &item, "srvsvc_NetShareInfo");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetShareInfo");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetShareInfo);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -6622,7 +6631,8 @@ srvsvc_dissect_NetShareCtr(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetShareCtr, &item, "srvsvc_NetShareCtr");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetShareCtr");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetShareCtr);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -12113,7 +12123,8 @@ srvsvc_dissect_NetSrvInfo(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo 
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetSrvInfo, &item, "srvsvc_NetSrvInfo");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetSrvInfo");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetSrvInfo);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -13618,7 +13629,8 @@ srvsvc_dissect_NetTransportCtr(tvbuff_t *tvb _U_, int offset _U_, packet_info *p
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetTransportCtr, &item, "srvsvc_NetTransportCtr");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetTransportCtr");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetTransportCtr);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -13856,7 +13868,8 @@ srvsvc_dissect_NetTransportInfo(tvbuff_t *tvb _U_, int offset _U_, packet_info *
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_srvsvc_srvsvc_NetTransportInfo, &item, "srvsvc_NetTransportInfo");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "srvsvc_NetTransportInfo");
+		tree = proto_item_add_subtree(item, ett_srvsvc_srvsvc_NetTransportInfo);
 	}
 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &level);

@@ -27,18 +27,24 @@
 #include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
+#include <epan/epan.h>
 #include <epan/value_string.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-smb.h>
 
 #include "ui/simple_dialog.h"
+#include "../file.h"
+#include "../globals.h"
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/service_response_time_table.h"
 #include "ui/gtk/tap_param_dlg.h"
+#include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtksmbstat(void);
 
@@ -175,9 +181,7 @@ gtk_smbstat_init(const char *opt_arg, void *userdata _U_)
 
 	init_srt_table(&ss->smb_srt_table, 256, vbox, "smb.cmd");
 	for(i=0;i<256;i++){
-		gchar* tmp_str = val_to_str_ext_wmem(NULL, i, &smb_cmd_vals_ext, "Unknown(0x%02x)");
-		init_srt_table_row(&ss->smb_srt_table, i, tmp_str);
-		wmem_free(NULL, tmp_str);
+		init_srt_table_row(&ss->smb_srt_table, i, val_to_str_ext(i, &smb_cmd_vals_ext, "Unknown(0x%02x)"));
 	}
 
 
@@ -185,9 +189,7 @@ gtk_smbstat_init(const char *opt_arg, void *userdata _U_)
 	gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
 	init_srt_table(&ss->trans2_srt_table, 256, vbox, "smb.trans2.cmd");
 	for(i=0;i<256;i++){
-		gchar* tmp_str = val_to_str_ext_wmem(NULL, i, &trans2_cmd_vals_ext, "Unknown(0x%02x)");
-		init_srt_table_row(&ss->trans2_srt_table, i, tmp_str);
-		wmem_free(NULL, tmp_str);
+		init_srt_table_row(&ss->trans2_srt_table, i, val_to_str_ext(i, &trans2_cmd_vals_ext, "Unknown(0x%02x)"));
 	}
 
 
@@ -195,9 +197,7 @@ gtk_smbstat_init(const char *opt_arg, void *userdata _U_)
 	gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
 	init_srt_table(&ss->nt_trans_srt_table, 256, vbox, "smb.nt.function");
 	for(i=0;i<256;i++){
-		gchar* tmp_str = val_to_str_ext_wmem(NULL, i, &nt_cmd_vals_ext, "Unknown(0x%02x)");
-		init_srt_table_row(&ss->nt_trans_srt_table, i, tmp_str);
-		wmem_free(NULL, tmp_str);
+		init_srt_table_row(&ss->nt_trans_srt_table, i, val_to_str_ext(i, &nt_cmd_vals_ext, "Unknown(0x%02x)"));
 	}
 
 
@@ -227,7 +227,7 @@ gtk_smbstat_init(const char *opt_arg, void *userdata _U_)
 }
 
 static tap_param smb_stat_params[] = {
-	{ PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+	{ PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg smb_stat_dlg = {

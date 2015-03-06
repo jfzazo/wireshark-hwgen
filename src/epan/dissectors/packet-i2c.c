@@ -24,7 +24,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/exceptions.h>
 #include <epan/prefs.h>
 #include <wiretap/wtap.h>
 
@@ -96,7 +99,7 @@ capture_i2c(union wtap_pseudo_header *pseudo_header, packet_counts *ld)
 }
 
 static const char *
-i2c_get_event_desc(guint32 event)
+i2c_get_event_desc(int event)
 {
 	const char *desc;
 
@@ -185,53 +188,67 @@ static void
 dissect_i2c(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	proto_item *ti;
-	proto_tree *i2c_tree;
-	guint8      is_event;
-	guint8      bus, addr;
-	guint32     flags;
-
-	flags = pinfo->pseudo_header->i2c.flags;
-
-	bus = pinfo->pseudo_header->i2c.bus;
-	col_add_fstr(pinfo->cinfo, COL_DEF_SRC, "I2C-%d", bus);
+	proto_tree *i2c_tree = NULL;
+	int is_event, bus, flags, addr, len;
 
 	is_event = pinfo->pseudo_header->i2c.is_event;
+	flags = pinfo->pseudo_header->i2c.flags;
+	bus = pinfo->pseudo_header->i2c.bus;
+	len = tvb_length(tvb);
 	if (is_event) {
 		addr = 0;
-		col_set_str(pinfo->cinfo, COL_PROTOCOL, "I2C Event");
-		col_add_fstr(pinfo->cinfo, COL_DEF_DST, "----");
-		col_add_fstr(pinfo->cinfo, COL_INFO, "%s",
-				i2c_get_event_desc(flags));
 	} else {
+		if (len == 0) {
+			THROW(ReportedBoundsError);
+		}
 		/* Report 7-bit hardware address */
 		addr = tvb_get_guint8(tvb, 0) >> 1;
-		col_add_fstr(pinfo->cinfo, COL_PROTOCOL, "I2C %s",
-				(flags & I2C_FLAG_RD) ? "Read" : "Write");
-		col_add_fstr(pinfo->cinfo, COL_DEF_DST, "0x%02x", addr);
-		col_add_fstr(pinfo->cinfo, COL_INFO, "I2C %s, %d bytes",
-					(flags & I2C_FLAG_RD) ? "Read" : "Write", tvb_captured_length(tvb));
 	}
 
 	pinfo->ptype = PT_I2C;
 
-	ti = proto_tree_add_protocol_format(tree, proto_i2c, tvb, 0, -1,
-			"Inter-Integrated Circuit (%s)",
-			is_event ? "Event" : "Data");
+	if (is_event)
+		col_set_str(pinfo->cinfo, COL_PROTOCOL, "I2C Event");
+	else
+		col_add_fstr(pinfo->cinfo, COL_PROTOCOL, "I2C %s",
+				(flags & I2C_FLAG_RD) ? "Read" : "Write");
 
-	i2c_tree = proto_item_add_subtree(ti, ett_i2c);
-	proto_tree_add_uint_format(i2c_tree, hf_i2c_bus, tvb, 0, 0, bus,
-			"Bus: I2C-%d", bus);
+	col_add_fstr(pinfo->cinfo, COL_DEF_SRC, "I2C-%d", bus);
 
-	if (is_event) {
-		proto_tree_add_uint_format_value(i2c_tree, hf_i2c_event, tvb, 0, 0,
-				flags, "%s (0x%08x)",
-				i2c_get_event_desc(flags), flags);
-	} else {
-		proto_tree_add_uint_format_value(i2c_tree, hf_i2c_addr, tvb, 0, 1,
-				addr, "0x%02x%s", addr, addr ? "" : " (General Call)");
-		proto_tree_add_uint_format_value(i2c_tree, hf_i2c_flags, tvb, 0, 0,
-				flags, "0x%08x", flags);
+	if (is_event)
+		col_add_fstr(pinfo->cinfo, COL_DEF_DST, "----");
+	else
+		col_add_fstr(pinfo->cinfo, COL_DEF_DST, "0x%02x", addr);
 
+	if (is_event)
+		col_add_fstr(pinfo->cinfo, COL_INFO, "%s",
+				i2c_get_event_desc(flags));
+	else
+		col_add_fstr(pinfo->cinfo, COL_INFO, "I2C %s, %d bytes",
+					(flags & I2C_FLAG_RD) ? "Read" : "Write", len);
+
+	if (tree) {
+		ti = proto_tree_add_protocol_format(tree, proto_i2c, tvb, 0, -1,
+					"Inter-Integrated Circuit (%s)",
+					is_event ? "Event" : "Data");
+
+		i2c_tree = proto_item_add_subtree(ti, ett_i2c);
+		proto_tree_add_uint_format(i2c_tree, hf_i2c_bus, tvb, 0, 0, bus,
+				"Bus: I2C-%d", bus);
+
+		if (is_event) {
+			proto_tree_add_uint_format_value(i2c_tree, hf_i2c_event, tvb, 0, 0,
+					flags, "%s (0x%08x)",
+					i2c_get_event_desc(flags), flags);
+		} else {
+			proto_tree_add_uint_format_value(i2c_tree, hf_i2c_addr, tvb, 0, 1,
+					addr, "0x%02x%s", addr, addr ? "" : " (General Call)");
+			proto_tree_add_uint_format_value(i2c_tree, hf_i2c_flags, tvb, 0, 0,
+					flags, "0x%08x", flags);
+		}
+	}
+
+	if (!is_event) {
 		if (sub_check[sub_selected] && sub_check[sub_selected](pinfo)) {
 			call_dissector(sub_handles[sub_selected], tvb, pinfo, tree);
 		} else {
@@ -244,8 +261,8 @@ void
 proto_register_i2c(void)
 {
 	static hf_register_info hf[] = {
-		{ &hf_i2c_bus,   { "Bus ID", "i2c.bus", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
-		{ &hf_i2c_addr,  { "Target address", "i2c.addr", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
+		{ &hf_i2c_bus, { "Bus ID", "i2c.bus", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
+		{ &hf_i2c_addr, { "Target address", "i2c.addr", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
 		{ &hf_i2c_event, { "Event", "i2c.event", FT_UINT32, BASE_HEX, NULL, 0, NULL, HFILL }},
 		{ &hf_i2c_flags, { "Flags", "i2c.flags", FT_UINT32, BASE_HEX, NULL, 0, NULL, HFILL }},
 	};
@@ -266,7 +283,7 @@ proto_register_i2c(void)
 
 	m = prefs_register_protocol(proto_i2c, NULL);
 	prefs_register_enum_preference(m, "type", "Bus/Data type",
-			"How the I2C messages are interpreted",
+         "How the I2C messages are interpreted",
 			&sub_selected, sub_enum_vals, FALSE);
 }
 
@@ -281,16 +298,3 @@ proto_reg_handoff_i2c(void)
 	i2c_handle = create_dissector_handle(dissect_i2c, proto_i2c);
 	dissector_add_uint("wtap_encap", WTAP_ENCAP_I2C, i2c_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

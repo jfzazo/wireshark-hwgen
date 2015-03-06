@@ -47,11 +47,13 @@
 
 #include <string.h>
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/to_str.h>
+#include <epan/wmem/wmem.h>
+#include <epan/dissectors/packet-dcerpc.h>
 #include <epan/expert.h>
 #include <epan/dissector_filters.h>
-#include <epan/dissectors/packet-dcerpc.h>
 
 #include "packet-pn.h"
 
@@ -679,7 +681,6 @@ static expert_field ei_pn_io_error_code2 = EI_INIT;
 static expert_field ei_pn_io_ar_info_not_found = EI_INIT;
 static expert_field ei_pn_io_iocr_type = EI_INIT;
 static expert_field ei_pn_io_frame_id = EI_INIT;
-static expert_field ei_pn_io_nr_of_tx_port_groups = EI_INIT;
 
 static e_uuid_t uuid_pn_io_device = { 0xDEA00001, 0x6C97, 0x11D1, { 0x82, 0x71, 0x00, 0xA0, 0x24, 0x42, 0xDF, 0x7D } };
 static guint16  ver_pn_io_device = 1;
@@ -2588,7 +2589,7 @@ static const value_string pn_io_profidrive_format_vals[] = {
 };
 
 
-static int
+int
 dissect_profidrive_value(tvbuff_t *tvb, gint offset, packet_info *pinfo,
                          proto_tree *tree, guint8 *drep, guint8 format_val)
 {
@@ -2660,23 +2661,20 @@ static void
 pnio_ar_info(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, pnio_ar_t *ar)
 {
     p_add_proto_data(wmem_file_scope(), pinfo, proto_pn_io, 0, ar );
-    p_add_proto_data(pinfo->pool, pinfo, proto_pn_io, 0, GUINT_TO_POINTER(10));
+    pinfo->profinet_type = 10;
 
     if (tree) {
         proto_item *item;
         proto_item *sub_item;
         proto_tree *sub_tree;
-        address   controllermac_addr, devicemac_addr;
 
-        SET_ADDRESS(&controllermac_addr, AT_ETHER, 6, ar->controllermac);
-        SET_ADDRESS(&devicemac_addr, AT_ETHER, 6, ar->devicemac);
-
-        sub_tree = proto_tree_add_subtree_format(tree, tvb, 0, 0, ett_pn_io_ar_info, &sub_item,
+        sub_item = proto_tree_add_text(tree, tvb, 0, 0,
             "ARUUID:%s ContrMAC:%s ContrAlRef:0x%x DevMAC:%s DevAlRef:0x%x InCR:0x%x OutCR=0x%x",
-            guid_to_str(wmem_packet_scope(), (const e_guid_t*) &ar->aruuid),
-            address_to_str(wmem_packet_scope(), &controllermac_addr), ar->controlleralarmref,
-            address_to_str(wmem_packet_scope(), &devicemac_addr), ar->devicealarmref,
+            guid_to_ep_str((const e_guid_t*) &ar->aruuid),
+            ether_to_str((const guint8 *)ar->controllermac), ar->controlleralarmref,
+            ether_to_str((const guint8 *)ar->devicemac), ar->devicealarmref,
             ar->inputframeid, ar->outputframeid);
+        sub_tree = proto_item_add_subtree(sub_item, ett_pn_io_ar_info);
         PROTO_ITEM_SET_GENERATED(sub_item);
 
         item = proto_tree_add_guid(sub_tree, hf_pn_io_ar_uuid, tvb, 0, 0, (e_guid_t *) &ar->aruuid);
@@ -4291,7 +4289,7 @@ dissect_PDPortData_Adjust_block(tvbuff_t *tvb, int offset,
 
     u16BodyLength -= 6;
 
-    new_tvb = tvb_new_subset_length(tvb, offset, u16BodyLength);
+    new_tvb = tvb_new_subset(tvb, offset, u16BodyLength, u16BodyLength);
     dissect_blocks(new_tvb, 0, pinfo, tree, drep);
     offset += u16BodyLength;
 
@@ -4331,7 +4329,7 @@ dissect_PDPortData_Check_block(tvbuff_t *tvb, int offset,
 
     u16BodyLength -= 6;
 
-    new_tvb = tvb_new_subset_length(tvb, offset, u16BodyLength);
+    new_tvb = tvb_new_subset(tvb, offset, u16BodyLength, u16BodyLength);
     dissect_blocks(new_tvb, 0, pinfo, tree, drep);
     offset += u16BodyLength;
 
@@ -5962,12 +5960,10 @@ dissect_PDIRFrameData_block(tvbuff_t *tvb, int offset,
         offset = dissect_dcerpc_uint8(tvb, offset, pinfo, sub_tree, drep,
                              hf_pn_io_frame_details_reserved, &u8FrameDetails);
         /* TxPortGroup */
-        u8NumberOfTxPortGroups = tvb_get_guint8(tvb, offset);
-        sub_item = proto_tree_add_uint(ir_frame_data_tree, hf_pn_io_nr_of_tx_port_groups,
-                             tvb, offset, 1, u8NumberOfTxPortGroups);
-        offset++;
+        offset = dissect_dcerpc_uint8(tvb, offset, pinfo, ir_frame_data_tree, drep,
+                             hf_pn_io_nr_of_tx_port_groups, &u8NumberOfTxPortGroups);
         if ((u8NumberOfTxPortGroups > 21) || ((u8NumberOfTxPortGroups & 0x1) !=1)) {
-            expert_add_info(pinfo, sub_item, &ei_pn_io_nr_of_tx_port_groups);
+            proto_tree_add_text(ir_frame_data_tree, tvb, offset -1, 1, "Not allowed value of NumberOfTxPortGroups");
         }
 
         /* TxPortArray */
@@ -6364,7 +6360,7 @@ dissect_ARData_block(tvbuff_t *tvb, int offset,
             u32ARDataStart = offset;
             offset = dissect_dcerpc_uuid_t(tvb, offset, pinfo, ar_tree, drep,
                             hf_pn_io_ar_uuid, &aruuid);
-            proto_item_append_text(ar_item, "ARUUID:%s", guid_to_str(wmem_packet_scope(), (const e_guid_t*) &aruuid));
+            proto_item_append_text(ar_item, "ARUUID:%s", guid_to_ep_str((const e_guid_t*) &aruuid));
             offset = dissect_dcerpc_uint16(tvb, offset, pinfo, ar_tree, drep,
                         hf_pn_io_ar_type, &u16ARType);
             offset = dissect_ARProperties(tvb, offset, pinfo, ar_tree, item, drep);
@@ -6482,7 +6478,7 @@ dissect_ARData_block(tvbuff_t *tvb, int offset,
             u32ARDataStart = offset;
             /*ARUUID */
             offset = dissect_dcerpc_uuid_t(tvb, offset, pinfo, ar_tree, drep, hf_pn_io_ar_uuid, &aruuid);
-            proto_item_append_text(ar_item, "ARUUID:%s", guid_to_str(wmem_packet_scope(), (const e_guid_t*) &aruuid));
+            proto_item_append_text(ar_item, "ARUUID:%s", guid_to_ep_str((const e_guid_t*) &aruuid));
             /* CMInitiatorObjectUUID */
             offset = dissect_dcerpc_uuid_t(tvb, offset, pinfo, ar_tree, drep, hf_pn_io_cminitiator_objectuuid, &uuid);
             /* ParameterServerObjectUUID */
@@ -6667,8 +6663,8 @@ dissect_LogData_block(tvbuff_t *tvb, int offset,
     guint64  u64LocaltimeStamp;
     e_uuid_t aruuid;
     guint32  u32EntryDetail;
-    dcerpc_info        di; /* fake dcerpc_info struct */
-    dcerpc_call_value  call_data;
+	dcerpc_info        di; /* fake dcerpc_info struct */
+	dcerpc_call_value  call_data;
 
     if (u8BlockVersionHigh != 1 || u8BlockVersionLow != 0) {
         expert_add_info_format(pinfo, item, &ei_pn_io_block_version,
@@ -6676,10 +6672,10 @@ dissect_LogData_block(tvbuff_t *tvb, int offset,
         return offset;
     }
 
-    di.conformant_run = 0;
-    /* we need di->call_data->flags.NDR64 == 0 */
+	di.conformant_run = 0;
+	/* we need di->call_data->flags.NDR64 == 0 */
     call_data.flags = 0;
-    di.call_data = &call_data;
+	di.call_data = &call_data;
     di.dcerpc_procedure_name = "";
 
     /* ActualLocalTimeStamp */
@@ -6801,7 +6797,7 @@ dissect_PDInterfaceFSUDataAdjust_block(tvbuff_t *tvb, int offset,
     u16BodyLength -= 2;
 
     /* sub blocks */
-    new_tvb = tvb_new_subset_length(tvb, offset, u16BodyLength);
+    new_tvb = tvb_new_subset(tvb, offset, u16BodyLength, u16BodyLength);
     dissect_blocks(new_tvb, 0, pinfo, tree, drep);
     offset += u16BodyLength;
 
@@ -6830,7 +6826,7 @@ dissect_ARFSUDataAdjust_block(tvbuff_t *tvb, int offset,
     u16BodyLength -= 2;
 
     /* sub blocks */
-    new_tvb = tvb_new_subset_length(tvb, offset, u16BodyLength);
+    new_tvb = tvb_new_subset(tvb, offset, u16BodyLength, u16BodyLength);
     dissect_blocks(new_tvb, 0, pinfo, tree, drep);
     offset += u16BodyLength;
 
@@ -7516,7 +7512,7 @@ dissect_PDSubFrameBlock_block(tvbuff_t *tvb, int offset,
     u16RemainingLength = u16BodyLength - 8;
     while (u16RemainingLength >= 4)
     {
-        guint8 Position,
+        guint8 Position, 
                DataLength;
         sub_item = proto_tree_add_item(tree, hf_pn_io_subframe_data, tvb, offset, 4, ENC_BIG_ENDIAN);
         sub_tree = proto_item_add_subtree(sub_item, ett_pn_io_subframe_data);
@@ -8061,7 +8057,7 @@ dissect_MultipleBlockHeader_block(tvbuff_t *tvb, int offset,
     proto_item_append_text(item, ": Api:0x%x Slot:%u Subslot:0x%x",
         u32Api, u16SlotNr, u16SubslotNr);
 
-    new_tvb = tvb_new_subset_length(tvb, offset, u16BodyLength-10);
+    new_tvb = tvb_new_subset(tvb, offset, u16BodyLength-10, u16BodyLength-10);
     offset = dissect_blocks(new_tvb, 0, pinfo, tree, drep);
 
     /*offset += u16BodyLength;*/
@@ -9170,7 +9166,7 @@ dissect_IODWriteReq(tvbuff_t *tvb, int offset,
             offset = dissect_IODWriteReq(tvb, offset, pinfo, tree, drep, ar);
         }
     } else {
-        tvbuff_t *new_tvb = tvb_new_subset_length(tvb, offset, u32RecDataLen);
+        tvbuff_t *new_tvb = tvb_new_subset(tvb, offset, u32RecDataLen, u32RecDataLen);
         /* RecordDataWrite */
         offset += dissect_RecordDataWrite(new_tvb, 0, pinfo, tree, drep, u16Index, u32RecDataLen);
 
@@ -9423,13 +9419,12 @@ dissect_PNIO_RTA(tvbuff_t *tvb, int offset,
 /* possibly dissect a PN-IO related PN-RT packet */
 static gboolean
 dissect_PNIO_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-    void *data)
+    void *data _U_)
 {
     guint8   drep_data = 0;
     guint8  *drep      = &drep_data;
     guint8   u8CBAVersion;
-    /* the sub tvb will NOT contain the frame_id here! */
-    guint16  u16FrameID = GPOINTER_TO_UINT(data);
+    guint16  u16FrameID;
     heur_dtbl_entry_t *hdtbl_entry;
 
     /*
@@ -9439,6 +9434,9 @@ dissect_PNIO_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      */
     if (dissector_try_heuristic(heur_pn_subdissector_list, tvb, pinfo, tree, &hdtbl_entry, NULL))
         return TRUE;
+
+    /* the sub tvb will NOT contain the frame_id here! */
+    u16FrameID = GPOINTER_TO_UINT(pinfo->private_data);
 
     u8CBAVersion = tvb_get_guint8 (tvb, 0);
 
@@ -9496,35 +9494,26 @@ dissect_PNIO_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 static gboolean
 pn_io_ar_conv_valid(packet_info *pinfo)
 {
-    void* profinet_type = p_get_proto_data(pinfo->pool, pinfo, proto_pn_io, 0);
-
-    return ((profinet_type != NULL) && (GPOINTER_TO_UINT(profinet_type) == 10));
+    return (pinfo->profinet_type == 10);
 }
 
 static const gchar *
 pn_io_ar_conv_filter(packet_info *pinfo)
 {
     pnio_ar_t *ar = (pnio_ar_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_pn_io, 0);
-    void* profinet_type = p_get_proto_data(pinfo->pool, pinfo, proto_pn_io, 0);
-    char      *buf, *guid_str;
-    address   controllermac_addr, devicemac_addr;
+    char      *buf;
 
-    if ((profinet_type == NULL) || (GPOINTER_TO_UINT(profinet_type) != 10) || (ar == NULL)) {
+    if ((pinfo->profinet_type != 10) || (ar == NULL)) {
         return NULL;
     }
 
-    SET_ADDRESS(&controllermac_addr, AT_ETHER, 6, ar->controllermac);
-    SET_ADDRESS(&devicemac_addr, AT_ETHER, 6, ar->devicemac);
-
-    guid_str = guid_to_str(wmem_packet_scope(), (const e_guid_t*) &ar->aruuid);
     buf = g_strdup_printf(
         "pn_io.ar_uuid == %s || "                                   /* ARUUID */
         "(pn_io.alarm_src_endpoint == 0x%x && eth.src == %s) || "   /* Alarm CR (contr -> dev) */
         "(pn_io.alarm_src_endpoint == 0x%x && eth.src == %s)",      /* Alarm CR (dev -> contr) */
-        guid_str,
-        ar->controlleralarmref, address_to_str(wmem_packet_scope(), &controllermac_addr),
-        ar->devicealarmref, address_to_str(wmem_packet_scope(), &devicemac_addr));
-    wmem_free(NULL, guid_str);
+        guid_to_ep_str((const e_guid_t*) &ar->aruuid),
+        ar->controlleralarmref, ether_to_str((const guint8 *)ar->controllermac),
+        ar->devicealarmref, ether_to_str((const guint8 *)ar->devicemac));
     return buf;
 }
 
@@ -9532,20 +9521,11 @@ static const gchar *
 pn_io_ar_conv_data_filter(packet_info *pinfo)
 {
     pnio_ar_t *ar = (pnio_ar_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_pn_io, 0);
-    void* profinet_type = p_get_proto_data(pinfo->pool, pinfo, proto_pn_io, 0);
-    char      *buf, *controllermac_str, *devicemac_str, *guid_str;
-    address   controllermac_addr, devicemac_addr;
+    char      *buf;
 
-    if ((profinet_type == NULL) || (GPOINTER_TO_UINT(profinet_type) != 10) || (ar == NULL)) {
+    if ((pinfo->profinet_type != 10) || (ar == NULL)) {
         return NULL;
     }
-
-    SET_ADDRESS(&controllermac_addr, AT_ETHER, 6, ar->controllermac);
-    SET_ADDRESS(&devicemac_addr, AT_ETHER, 6, ar->devicemac);
-
-    controllermac_str = address_to_str(wmem_packet_scope(), &controllermac_addr);
-    devicemac_str = address_to_str(wmem_packet_scope(), &devicemac_addr);
-    guid_str = guid_to_str(wmem_packet_scope(), (const e_guid_t*) &ar->aruuid);
     if (ar->arType == 0x0010) /* IOCARSingle using RT_CLASS_3 */
     {
         buf = g_strdup_printf(
@@ -9553,10 +9533,10 @@ pn_io_ar_conv_data_filter(packet_info *pinfo)
             "(pn_rt.frame_id == 0x%x) || (pn_rt.frame_id == 0x%x) || "
             "(pn_io.alarm_src_endpoint == 0x%x && eth.src == %s) || "           /* Alarm CR (contr -> dev) */
             "(pn_io.alarm_src_endpoint == 0x%x && eth.src == %s)",              /* Alarm CR (dev -> contr) */
-            guid_str,
+            guid_to_ep_str((const e_guid_t*) &ar->aruuid),
             ar->inputframeid, ar->outputframeid,
-            ar->controlleralarmref, controllermac_str,
-            ar->devicealarmref, devicemac_str);
+            ar->controlleralarmref, ether_to_str((const guint8 *)ar->controllermac),
+            ar->devicealarmref, ether_to_str((const guint8 *)ar->devicemac));
     }
     else
     {
@@ -9566,11 +9546,11 @@ pn_io_ar_conv_data_filter(packet_info *pinfo)
             "(pn_rt.frame_id == 0x%x && eth.src == %s && eth.dst == %s) || "    /* Output CR && contr MAC -> dev MAC */
             "(pn_io.alarm_src_endpoint == 0x%x && eth.src == %s) || "           /* Alarm CR (contr -> dev) */
             "(pn_io.alarm_src_endpoint == 0x%x && eth.src == %s)",              /* Alarm CR (dev -> contr) */
-            guid_str,
-            ar->inputframeid, devicemac_str, controllermac_str,
-            ar->outputframeid, controllermac_str, devicemac_str,
-            ar->controlleralarmref, controllermac_str,
-            ar->devicealarmref, devicemac_str);
+            guid_to_ep_str((const e_guid_t*) &ar->aruuid),
+            ar->inputframeid, ether_to_str((const guint8 *)ar->devicemac), ether_to_str((const guint8 *)ar->controllermac),
+            ar->outputframeid, ether_to_str((const guint8 *)ar->controllermac), ether_to_str((const guint8 *)ar->devicemac),
+            ar->controlleralarmref, ether_to_str((const guint8 *)ar->controllermac),
+            ar->devicealarmref, ether_to_str((const guint8 *)ar->devicemac));
     }
     return buf;
 }
@@ -12053,7 +12033,6 @@ proto_register_pn_io (void)
         { &ei_pn_io_frame_id, { "pn_io.frame_id.changed", PI_UNDECODED, PI_WARN, "FrameID changed", EXPFILL }},
         { &ei_pn_io_iocr_type, { "pn_io.iocr_type.unknown", PI_UNDECODED, PI_WARN, "IOCRType undecoded!", EXPFILL }},
         { &ei_pn_io_localalarmref, { "pn_io.localalarmref.changed", PI_UNDECODED, PI_WARN, "AlarmCRBlockReq: local alarm ref changed", EXPFILL }},
-        { &ei_pn_io_nr_of_tx_port_groups, { "pn_io.nr_of_tx_port_groups.not_allowed", PI_PROTOCOL, PI_WARN, "Not allowed value of NumberOfTxPortGroups", EXPFILL }},
     };
 
     expert_module_t* expert_pn_io;
@@ -12066,7 +12045,7 @@ proto_register_pn_io (void)
 
     /* subdissector code */
     new_register_dissector("pn_io", dissect_PNIO_heur, proto_pn_io);
-    heur_pn_subdissector_list = register_heur_dissector_list("pn_io");
+    register_heur_dissector_list("pn_io", &heur_pn_subdissector_list);
 
     register_init_routine(pnio_reinit);
 
@@ -12085,16 +12064,3 @@ proto_reg_handoff_pn_io (void)
 
     heur_dissector_add("pn_rt", dissect_PNIO_heur, proto_pn_io);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

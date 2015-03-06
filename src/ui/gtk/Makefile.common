@@ -120,6 +120,7 @@ WIRESHARK_GTK_SRC = \
 	proto_tree_model.c \
 	range_utils.c	\
 	rtp_player.c	\
+	rtp_stream.c	\
 	sctp_byte_graph_dlg.c	\
 	sctp_error_dlg.c	\
 	sctp_graph_dlg.c	\
@@ -132,8 +133,8 @@ WIRESHARK_GTK_SRC = \
 	text_page_utils.c	\
 	time_shift_dlg.c	\
 	uat_gui.c	\
+	voip_calls.c	\
 	webbrowser.c	\
-	extcap_gtk.c	\
 	$(WIRESHARK_CUSTOM_GTK_SRC)
 
 about_dlg.c main_welcome.c: wssplash.h remote_icons.h
@@ -153,6 +154,21 @@ WIRESHARK_TAP_SRC = \
 	camel_counter.c	\
 	camel_srt.c	\
 	compare_stat.c	\
+	conversations_eth.c	\
+	conversations_fc.c	\
+	conversations_fddi.c	\
+	conversations_ip.c	\
+	conversations_ipv6.c	\
+	conversations_ipx.c	\
+	conversations_jxta.c		\
+	conversations_ncp.c     \
+	conversations_rsvp.c	\
+	conversations_sctp.c	\
+	conversations_tcpip.c	\
+	conversations_tr.c	\
+	conversations_udpip.c	\
+	conversations_usb.c	\
+	conversations_wlan.c	\
 	dcerpc_stat.c	\
 	diameter_stat.c	\
 	expert_comp_dlg.c     \
@@ -166,6 +182,21 @@ WIRESHARK_TAP_SRC = \
 	gtp_stat.c	\
 	h225_counter.c	\
 	h225_ras_srt.c	\
+	hostlist_eth.c	\
+	hostlist_fc.c	\
+	hostlist_fddi.c \
+	hostlist_ip.c	\
+	hostlist_ipv6.c	\
+	hostlist_ipx.c	\
+	hostlist_jxta.c	\
+	hostlist_ncp.c	\
+	hostlist_rsvp.c \
+	hostlist_sctp.c	\
+	hostlist_tcpip.c \
+	hostlist_tr.c	\
+	hostlist_udpip.c \
+	hostlist_usb.c \
+	hostlist_wlan.c \
 	iax2_analysis.c	\
 	io_stat.c	\
 	lbm_stream_dlg.c	\
@@ -300,10 +331,10 @@ noinst_HEADERS = \
 	remote_icons.h	\
 	rtp_player.h	\
 	rtp_stream_dlg.h \
+	sat.h		\
 	sctp_stat_gtk.h	\
 	service_response_time_table.h	\
 	time_shift_dlg.h	\
-	simple_dialog.h	\
 	stock_icons.h	\
 	summary_dlg.h   \
 	supported_protos_dlg.h   \
@@ -311,10 +342,10 @@ noinst_HEADERS = \
 	text_page_utils.h	\
 	toolbar_icons.h	\
 	uat_gui.h \
+	voip_calls.h	\
 	voip_calls_dlg.h \
 	webbrowser.h	\
 	wsiconcap.h \
 	wsicon.h \
 	wssplash.h \
-	extcap_gtk.h \
 	$(WIRESHARK_CUSTOM_HDRS)

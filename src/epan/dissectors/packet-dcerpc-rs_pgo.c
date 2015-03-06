@@ -27,6 +27,7 @@
 #include "config.h"
 
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "packet-dcerpc.h"
 #include "packet-dcerpc-dce122.h"
@@ -140,7 +141,8 @@ dissect_error_status_t (tvbuff_t * tvb, int offset,
     return offset;
   }
 
-  tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_error_status_t, &item, "error_status_t");
+  item = proto_tree_add_text (parent_tree, tvb, offset, -1, "error_status_t");
+  tree = proto_item_add_subtree (item, ett_error_status_t);
 
   offset =
     dissect_ndr_uint32 (tvb, offset, pinfo, tree, di, drep, hf_error_status_t,
@@ -179,8 +181,9 @@ dissect    sec_rgy_pname const signed32        sec_rgy_pname_t_size  = 257; * In
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_sec_rgy_pname_t, &item, "sec_rgy_pname_t");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1, "sec_rgy_pname_t");
+      tree = proto_item_add_subtree (item, ett_sec_rgy_pname_t);
     }
 
   offset = dissect_ndr_uint32 (tvb, offset, pinfo, tree, di, drep,
@@ -195,7 +198,7 @@ dissect    sec_rgy_pname const signed32        sec_rgy_pname_t_size  = 257; * In
       if (string_size > 1)
         {
           col_append_fstr (pinfo->cinfo, COL_INFO, " Principal:%s",
-                             tvb_get_string_enc(wmem_packet_scope(), tvb, offset, string_size, ENC_ASCII));
+                             tvb_get_string(wmem_packet_scope(), tvb, offset, string_size));
         }
       offset += string_size;
     }
@@ -237,9 +240,10 @@ dissect_sec_rgy_pgo_flags_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-                             ett_sec_rgy_pgo_flags_t, &item, "sec_rgy_pgo_flags_t ");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1,
+                             "sec_rgy_pgo_flags_t ");
+      tree = proto_item_add_subtree (item, ett_sec_rgy_pgo_flags_t);
     }
 
   offset =
@@ -335,8 +339,9 @@ dissect_rs_cache_data_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_rs_cache_data_t, &item, "rs_cache_data_t");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1, "rs_cache_data_t");
+      tree = proto_item_add_subtree (item, ett_rs_cache_data_t);
     }
 
 
@@ -387,8 +392,9 @@ dissect_sec_rgy_name_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_sec_rgy_name_t, &item, "sec_rgy_name_t");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1, "sec_rgy_name_t");
+      tree = proto_item_add_subtree (item, ett_sec_rgy_name_t);
     }
 
   offset =
@@ -404,7 +410,7 @@ dissect_sec_rgy_name_t (tvbuff_t * tvb, int offset,
       if (string_size > 1)
         {
           col_append_fstr (pinfo->cinfo, COL_INFO, " Principal:%s",
-                             tvb_get_string_enc(wmem_packet_scope(), tvb, offset, string_size, ENC_ASCII));
+                             tvb_get_string (wmem_packet_scope(), tvb, offset, string_size));
         }
       offset += string_size;
     }
@@ -443,8 +449,9 @@ dissect_sec_rgy_domain_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_sec_rgy_domain_t, &item, "sec_rgy_domain_t");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1, "sec_rgy_domain_t");
+      tree = proto_item_add_subtree (item, ett_sec_rgy_domain_t);
     }
 
 
@@ -491,9 +498,10 @@ dissect_sec_rgy_pgo_item_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-                             ett_sec_rgy_pgo_item_t, &item, " sec_rgy_pgo_item_t ");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1,
+                             " sec_rgy_pgo_item_t ");
+      tree = proto_item_add_subtree (item, ett_sec_rgy_pgo_item_t);
     }
 
   offset =
@@ -552,9 +560,10 @@ dissect_sec_rgy_cursor_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-                             ett_sec_rgy_cursor_t, &item, " sec_rgy_cursor_t ");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1,
+                             " sec_rgy_cursor_t ");
+      tree = proto_item_add_subtree (item, ett_sec_rgy_cursor_t);
     }
 
   offset =
@@ -606,8 +615,9 @@ dissect_rs_pgo_query_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_rs_pgo_query_t, &item, "rs_pgo_query_t ");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1, "rs_pgo_query_t ");
+      tree = proto_item_add_subtree (item, ett_rs_pgo_query_t);
     }
   offset =
     dissect_ndr_uint8 (tvb, offset, pinfo, tree, di, drep, hf_rs_pgo_query_t,
@@ -668,9 +678,10 @@ dissect_rs_pgo_id_key_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-                             ett_rs_pgo_id_key_t, &item, "rs_pgo_id_key_t ");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1,
+                             "rs_pgo_id_key_t ");
+      tree = proto_item_add_subtree (item, ett_rs_pgo_id_key_t);
     }
 
   offset =
@@ -714,9 +725,10 @@ dissect_rs_pgo_result_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-                             ett_rs_pgo_result_t, &item, "rs_pgo_result_t ");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1,
+                             "rs_pgo_result_t ");
+      tree = proto_item_add_subtree (item, ett_rs_pgo_result_t);
     }
 
   offset = dissect_sec_rgy_name_t (tvb, offset, pinfo, tree, di, drep);
@@ -758,9 +770,10 @@ r
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-                             ett_rs_pgo_unix_num_key_t, &item, " rs_pgo_unix_num_key_t ");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1,
+                             " rs_pgo_unix_num_key_t ");
+      tree = proto_item_add_subtree (item, ett_rs_pgo_unix_num_key_t);
     }
 
   offset =
@@ -824,9 +837,10 @@ dissect_rs_pgo_query_key_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree =
-        proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-                             ett_rs_pgo_query_key_t, &item, "rs_pgo_query_key_t ");
+      item =
+        proto_tree_add_text (parent_tree, tvb, offset, -1,
+                             "rs_pgo_query_key_t ");
+      tree = proto_item_add_subtree (item, ett_rs_pgo_query_key_t);
     }
   offset =
     dissect_ndr_uint16 (tvb, offset, pinfo, tree, di, drep, hf_rs_pgo_query_key_t,
@@ -895,8 +909,9 @@ dissect_rs_pgo_query_result_t (tvbuff_t * tvb, int offset,
 
   if (parent_tree)
     {
-      tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1,
-                                  ett_rs_pgo_query_result_t, &item, "rs_pgo_query_result_t");
+      item = proto_tree_add_text (parent_tree, tvb, offset, -1,
+                                  "rs_pgo_query_result_t");
+      tree = proto_item_add_subtree (item, ett_rs_pgo_query_result_t);
     }
 
   offset =
@@ -1610,16 +1625,3 @@ proto_reg_handoff_rs_pgo (void)
   dcerpc_init_uuid (proto_rs_pgo, ett_rs_pgo, &uuid_rs_pgo, ver_rs_pgo,
                     rs_pgo_dissectors, hf_rs_pgo_opnum);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

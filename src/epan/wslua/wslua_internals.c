@@ -7,6 +7,8 @@
  *
  * (c) 2013, Hadriel Kaplan <hadrielk@yahoo.com>
  *
+ * $Id: wslua_internals.c 47885 2013-02-25 22:05:28Z hadrielk $
+ *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
  * Copyright 1998 Gerald Combs
@@ -52,7 +54,7 @@ WSLUA_API gboolean wslua_toboolean(lua_State* L, int n) {
     if ( lua_isboolean(L,n) ||  lua_isnil(L,n)  || lua_gettop(L) < n ) {
         val = lua_toboolean(L,n);
     } else if ( lua_type(L,n) == LUA_TNUMBER ) {
-        int num = (int)luaL_checkinteger(L,n);
+        int num = luaL_checkint(L,n);
         val = num != 0 ? TRUE : FALSE;
     } else {
         luaL_argerror(L,n,"must be a boolean or number");
@@ -61,7 +63,7 @@ WSLUA_API gboolean wslua_toboolean(lua_State* L, int n) {
     return val;
 }
 
-/* like luaL_checkinteger, except for booleans - this does not coerce other types */
+/* like luaL_checkint, except for booleans - this does not coerce other types */
 WSLUA_API gboolean wslua_checkboolean(lua_State* L, int n) {
 
     if (!lua_isboolean(L,n) ) {

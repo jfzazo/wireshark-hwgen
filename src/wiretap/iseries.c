@@ -150,9 +150,11 @@ Number  S/R  Length    Timer                        MAC Address   MAC Address   
 
 #include "config.h"
 #include "wtap-int.h"
+#include <wsutil/buffer.h>
 #include "iseries.h"
 #include "file_wrappers.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -191,9 +193,10 @@ static int iseries_UNICODE_to_ASCII (guint8 * buf, guint bytes);
 static gboolean iseries_parse_hex_string (const char * ascii, guint8 * buf,
                                           size_t len);
 
-wtap_open_return_val
+int
 iseries_open (wtap * wth, int *err, gchar ** err_info)
 {
+  int  bytes_read;
   gint offset;
   char magic[ISERIES_LINE_LENGTH];
   char unicodemagic[] =
@@ -206,23 +209,26 @@ iseries_open (wtap * wth, int *err, gchar ** err_info)
    * Check that file starts with a valid iSeries COMMS TRACE header
    * by scanning for it in the first line
    */
-  if (!wtap_read_bytes (wth->fh, &magic, sizeof magic, err, err_info))
+  errno = WTAP_ERR_CANT_READ;
+  bytes_read = file_read (&magic, sizeof magic, wth->fh);
+  if (bytes_read != sizeof magic)
     {
-      if (*err != WTAP_ERR_SHORT_READ)
-        return WTAP_OPEN_ERROR;
-      return WTAP_OPEN_NOT_MINE;
+      *err = file_error (wth->fh, err_info);
+      if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
+        return -1;
+      return 0;
     }
 
   /*
    * Check if this is a UNICODE formatted file by scanning for the magic string
    */
   offset=0;
-  while ((unsigned int)offset < (ISERIES_LINE_LENGTH - (sizeof unicodemagic)))
+  while ((unsigned)offset < (ISERIES_LINE_LENGTH - (sizeof unicodemagic)))
     {
       if (memcmp (magic + offset, unicodemagic, sizeof unicodemagic) == 0) {
         if (file_seek (wth->fh, 0, SEEK_SET, err) == -1)
           {
-            return WTAP_OPEN_NOT_MINE;
+            return 0;
           }
         /*
          * Do some basic sanity checking to ensure we can handle the
@@ -231,9 +237,9 @@ iseries_open (wtap * wth, int *err, gchar ** err_info)
         if (!iseries_check_file_type (wth, err, err_info, ISERIES_FORMAT_UNICODE))
           {
             if (*err == 0)
-              return WTAP_OPEN_NOT_MINE;
+              return 0;
             else
-              return WTAP_OPEN_ERROR;
+              return -1;
           }
 
         wth->file_encap        = WTAP_ENCAP_ETHERNET;
@@ -241,13 +247,13 @@ iseries_open (wtap * wth, int *err, gchar ** err_info)
         wth->snapshot_length   = 0;
         wth->subtype_read      = iseries_read;
         wth->subtype_seek_read = iseries_seek_read;
-        wth->file_tsprec       = WTAP_TSPREC_USEC;
+        wth->tsprecision       = WTAP_FILE_TSPREC_USEC;
 
         if (file_seek (wth->fh, 0, SEEK_SET, err) == -1)
           {
-            return WTAP_OPEN_NOT_MINE;
+            return 0;
           }
-        return WTAP_OPEN_MINE;
+        return 1;
       }
       offset += 1;
     }
@@ -262,7 +268,7 @@ iseries_open (wtap * wth, int *err, gchar ** err_info)
           {
             if (file_seek (wth->fh, 0, SEEK_SET, err) == -1)
               {
-                return WTAP_OPEN_NOT_MINE;
+                return 0;
               }
             /*
              * Do some basic sanity checking to ensure we can handle the
@@ -271,9 +277,9 @@ iseries_open (wtap * wth, int *err, gchar ** err_info)
             if (!iseries_check_file_type (wth, err, err_info, ISERIES_FORMAT_ASCII))
               {
                 if (*err == 0)
-                  return WTAP_OPEN_NOT_MINE;
+                  return 0;
                 else
-                  return WTAP_OPEN_ERROR;
+                  return -1;
               }
 
             wth->file_encap        = WTAP_ENCAP_ETHERNET;
@@ -281,19 +287,19 @@ iseries_open (wtap * wth, int *err, gchar ** err_info)
             wth->snapshot_length   = 0;
             wth->subtype_read      = iseries_read;
             wth->subtype_seek_read = iseries_seek_read;
-            wth->file_tsprec       = WTAP_TSPREC_USEC;
+            wth->tsprecision       = WTAP_FILE_TSPREC_USEC;
 
             if (file_seek (wth->fh, 0, SEEK_SET, err) == -1)
               {
-                return WTAP_OPEN_NOT_MINE;
+                return 0;
               }
-            return WTAP_OPEN_MINE;
+            return 1;
           }
         offset += 1;
       }
 
     /* Neither ASCII or UNICODE so not supported */
-    return WTAP_OPEN_NOT_MINE;
+    return 0;
     }
 
 /*
@@ -829,9 +835,9 @@ iseries_parse_packet (wtap * wth, FILE_T fh, struct wtap_pkthdr *phdr,
   phdr->caplen = ((guint32) strlen (ascii_buf))/2;
 
   /* Make sure we have enough room for the packet. */
-  ws_buffer_assure_space (buf, ISERIES_MAX_PACKET_LEN);
+  buffer_assure_space (buf, ISERIES_MAX_PACKET_LEN);
   /* Convert ascii data to binary and return in the frame buffer */
-  iseries_parse_hex_string (ascii_buf, ws_buffer_start_ptr (buf), strlen (ascii_buf));
+  iseries_parse_hex_string (ascii_buf, buffer_start_ptr (buf), strlen (ascii_buf));
 
   /* free buffer allocs and return */
   *err = 0;

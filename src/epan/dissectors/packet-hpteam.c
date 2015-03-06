@@ -24,10 +24,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/to_str.h>
 #include <epan/oui.h>
-#include "packet-llc.h"
+#include <packet-llc.h>
 
 void proto_register_hpteam(void);
 void proto_reg_handoff_hpteam(void);
@@ -89,7 +91,7 @@ dissect_hpteam(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "HP NIC Team");
 	col_add_fstr(pinfo->cinfo, COL_INFO, "HP NIC Teaming Heartbeat; Port MAC = %s",
-	    address_to_str(wmem_packet_scope(), &pinfo->dl_src));
+	    ep_address_to_str(&pinfo->dl_src));
 
 	if (tree) { /* we are being asked for details */
 		proto_item *hpteam_item;
@@ -138,16 +140,3 @@ void proto_reg_handoff_hpteam(void)
 	/* Register dissector to key off of known PID / OUI combination */
 	dissector_add_uint("llc.hpteam_pid", 0x0002, hpteam_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -22,11 +22,8 @@
 #include "io_graph_dialog.h"
 #include "ui_io_graph_dialog.h"
 
-#include <epan/stat_tap_ui.h>
 #include "epan/stats_tree_priv.h"
 #include "epan/uat-int.h"
-
-#include "ui/utf8_entities.h"
 
 #include "qt_ui_utils.h"
 #include "tango_colors.h"
@@ -52,12 +49,10 @@
 // - You can't manually set a graph color other than manually editing the io_graphs
 //   UAT. We should add a "graph color" preference.
 // - We retap and redraw more than we should.
+// - We don't use scroll bars. Should we?
+// - We should automatically scroll during live captures.
 // - Smoothing doesn't seem to match GTK+
-
-// To do:
-// - Use scroll bars?
-// - Scroll during live captures
-// - Set ticks per pixel (e.g. pressing "2" sets 2 tpp).
+// - We don't register a tap listener ("-z io,stat", bottom of gtk/io_stat.c)
 
 const int name_col_    = 0;
 const int dfilter_col_ = 1;
@@ -148,8 +143,7 @@ static uat_field_t io_graph_fields[] = {
     UAT_END_FIELDS
 };
 
-static void* io_graph_copy_cb(void* dst_ptr, const void* src_ptr, size_t len) {
-    Q_UNUSED(len);
+static void* io_graph_copy_cb(void* dst_ptr, const void* src_ptr, size_t len _U_) {
     io_graph_settings_t* dst = (io_graph_settings_t *)dst_ptr;
     const io_graph_settings_t* src = (const io_graph_settings_t *)src_ptr;
 
@@ -178,9 +172,10 @@ static void io_graph_free_cb(void* p) {
 
 Q_DECLARE_METATYPE(IOGraph *)
 
-IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf) :
-    WiresharkDialog(parent, cf),
+IOGraphDialog::IOGraphDialog(QWidget *parent, capture_file *cf) :
+    QDialog(parent),
     ui(new Ui::IOGraphDialog),
+    cap_file_(cf),
     name_line_edit_(NULL),
     dfilter_line_edit_(NULL),
     yfield_line_edit_(NULL),
@@ -199,7 +194,6 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf) :
     auto_axes_(true)
 {
     ui->setupUi(this);
-    setWindowSubtitle(tr("IO Graphs"));
     setAttribute(Qt::WA_DeleteOnClose, true);
     QCustomPlot *iop = ui->ioPlot;
 
@@ -248,10 +242,17 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf) :
     iop->setMouseTracking(true);
     iop->setEnabled(true);
 
+    QString dlg_title = tr("Wireshark IO Graphs: ");
+    if (cap_file_) {
+        dlg_title += cf_get_display_name(cap_file_);
+    } else {
+        dlg_title += tr("No Capture Data");
+    }
+    setWindowTitle(dlg_title);
     QCPPlotTitle *title = new QCPPlotTitle(iop);
     iop->plotLayout()->insertRow(0);
     iop->plotLayout()->addElement(0, 0, title);
-    title->setText(tr("Wireshark IO Graphs: %1").arg(cap_file_.fileTitle()));
+    title->setText(dlg_title);
 
     tracer_ = new QCPItemTracer(iop);
     iop->addItem(tracer_);
@@ -336,7 +337,6 @@ void IOGraphDialog::addGraph(bool checked, QString name, QString dfilter, int co
     ti->setData(sma_period_col_, Qt::UserRole, moving_average);
 
     connect(this, SIGNAL(recalcGraphData(capture_file *)), iog, SLOT(recalcGraphData(capture_file *)));
-    connect(&cap_file_, SIGNAL(captureFileClosing()), iog, SLOT(captureFileClosing()));
     connect(iog, SIGNAL(requestRetap()), this, SLOT(scheduleRetap()));
     connect(iog, SIGNAL(requestRecalc()), this, SLOT(scheduleRecalc()));
     connect(iog, SIGNAL(requestReplot()), this, SLOT(scheduleReplot()));
@@ -436,8 +436,11 @@ void IOGraphDialog::syncGraphSettings(QTreeWidgetItem *item)
     }
 }
 
-void IOGraphDialog::updateWidgets()
+void IOGraphDialog::setCaptureFile(capture_file *cf)
 {
+    if (!cf) { // We only want to know when the file closes.
+        cap_file_ = NULL;
+    }
 }
 
 void IOGraphDialog::scheduleReplot(bool now)
@@ -559,11 +562,8 @@ void IOGraphDialog::reject()
                 io_graph_free_cb(&iogs);
             }
         }
-        char* err = NULL;
-        if (!uat_save(iog_uat_, &err)) {
-            /* XXX - report this error */
-            g_free(err);
-        }
+        const char* err = NULL;
+        uat_save(iog_uat_, &err);
     }
 
     QDialog::reject();
@@ -821,7 +821,7 @@ void IOGraphDialog::mouseMoved(QMouseEvent *event)
             if (interval_packet > 0) {
                 packet_num_ = (guint32) interval_packet;
                 msg = tr("%1 %2")
-                        .arg(!file_closed_ ? tr("Click to select packet") : tr("Packet"))
+                        .arg(cap_file_ ? tr("Click to select packet") : tr("Packet"))
                         .arg(packet_num_);
                 val = " = " + QString::number(tracer_->position->value(), 'g', 4);
             }
@@ -943,15 +943,15 @@ void IOGraphDialog::updateStatistics()
 {
     if (!isVisible()) return;
 
-    if (need_retap_ && !file_closed_) {
+    if (need_retap_) {
         need_retap_ = false;
-        cap_file_.retapPackets();
+        cf_retap_packets(cap_file_);
         ui->ioPlot->setFocus();
     } else {
-        if (need_recalc_ && !file_closed_) {
+        if (need_recalc_) {
             need_recalc_ = false;
             need_replot_ = true;
-            emit recalcGraphData(cap_file_.capFile());
+            emit recalcGraphData(cap_file_);
             if (!tracer_->graph()) {
                 if (base_graph_ && base_graph_->data()->size() > 0) {
                     tracer_->setGraph(base_graph_);
@@ -1076,12 +1076,10 @@ void IOGraphDialog::loadProfileGraphs()
                        io_graph_free_cb,
                        NULL,
                        io_graph_fields);
-    char* err = NULL;
-    if (!uat_load(iog_uat_, &err)) {
-        /* XXX - report the error */
-        g_free(err);
-    }
+    const char* err = NULL;
+    uat_load(iog_uat_, &err);
 }
+
 
 // Slots
 
@@ -1428,7 +1426,7 @@ void IOGraphDialog::on_actionMoveDown1_triggered()
 
 void IOGraphDialog::on_actionGoToPacket_triggered()
 {
-    if (tracer_->visible() && !file_closed_ && packet_num_ > 0) {
+    if (tracer_->visible() && cap_file_ && packet_num_ > 0) {
         emit goToPacket(packet_num_);
     }
 }
@@ -1474,10 +1472,10 @@ void IOGraphDialog::on_buttonBox_accepted()
             .arg(jpeg_filter);
 
     QString save_file = path.canonicalPath();
-    if (!file_closed_) {
-        save_file += QString("/%1").arg(cap_file_.fileTitle());
+    if (cap_file_) {
+        save_file += QString("/%1").arg(cf_get_display_name(cap_file_));
     }
-    file_name = QFileDialog::getSaveFileName(this, wsApp->windowTitleString(tr("Save Graph As" UTF8_HORIZONTAL_ELLIPSIS)),
+    file_name = QFileDialog::getSaveFileName(this, tr("Wireshark: Save Graph As..."),
                                              save_file, filter, &extension);
 
     if (file_name.length() > 0) {
@@ -1553,12 +1551,10 @@ void IOGraph::setFilter(const QString &filter)
     if (!full_filter.isEmpty()) {
         dfilter_t *dfilter;
         bool status;
-        gchar *err_msg;
-        status = dfilter_compile(full_filter.toUtf8().constData(), &dfilter, &err_msg);
+        status = dfilter_compile(full_filter.toUtf8().constData(), &dfilter);
         dfilter_free(dfilter);
         if (!status) {
-            config_err_ = QString::fromUtf8(err_msg);
-            g_free(err_msg);
+            config_err_ = dfilter_error_msg;
             filter_ = full_filter;
             return;
         }
@@ -1917,12 +1913,8 @@ void IOGraph::recalcGraphData(capture_file *cap_file)
         }
 //        qDebug() << "=rgd i" << i << ts << val;
     }
+//    qDebug() << "=rgd" << num_items_ << hf_index_;
     emit requestReplot();
-}
-
-void IOGraph::captureFileClosing()
-{
-    remove_tap_listener(this);
 }
 
 void IOGraph::setInterval(int interval)
@@ -2158,31 +2150,6 @@ void IOGraph::tapDraw(void *iog_ptr)
     if (iog->bars_) {
 //        qDebug() << "=tapDraw b" << iog->name_ << iog->bars_->data()->keys().size();
     }
-}
-
-// Stat command + args
-
-static void
-io_graph_init(const char *, void*) {
-    wsApp->emitStatCommandSignal("IOGraph", NULL, NULL);
-}
-
-static stat_tap_ui io_stat_ui = {
-    REGISTER_STAT_GROUP_GENERIC,
-    NULL,
-    "io,stat",
-    io_graph_init,
-    -1,
-    0,
-    NULL
-};
-
-extern "C" {
-void
-register_tap_listener_qt_iostat(void)
-{
-    register_stat_tap_ui(&io_stat_ui, NULL);
-}
 }
 
 /*

@@ -29,7 +29,7 @@
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
-#include "packet-tcp.h"
+#include "epan/dissectors/packet-tcp.h"
 
 void proto_register_hdfsdata(void);
 void proto_reg_handoff_hdfsdata(void);
@@ -115,7 +115,7 @@ static dissector_handle_t hdfsdata_handle;
    value is the first byte of the vint/vlong
    returns the total number of bytes (1 to 9) */
 static int
-decode_vint_size (gint8 value) {
+decode_vint_size (char value) {
   if (value >= -112) {
     return 1;
   } else if (value < -120) {
@@ -381,7 +381,7 @@ dissect_write_response(tvbuff_t *tvb, proto_tree *hdfsdata_tree, int offset)
 
 /* determine PDU length of protocol  */
 static guint
-get_hdfsdata_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_hdfsdata_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   /* get data packet len, add FIRST_READ_FRAGMENT_LEN for first fragment (before len),
      SECOND_READ_FRAGMENT_LEN for second fragment (incl len), subtract 4 for length itself. */
@@ -803,7 +803,7 @@ proto_reg_handoff_hdfsdata(void)
     static guint saved_tcp_port;
 
     if (!initialized) {
-        dissector_add_for_decode_as("tcp.port", hdfsdata_handle);
+        dissector_add_handle("tcp.port", hdfsdata_handle);  /* for "decode as" */
         initialized = TRUE;
     } else if (saved_tcp_port != 0) {
         dissector_delete_uint("tcp.port", saved_tcp_port, hdfsdata_handle);

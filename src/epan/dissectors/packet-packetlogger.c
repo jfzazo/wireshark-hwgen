@@ -27,8 +27,6 @@
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 
-#include "packet-bluetooth.h"
-
 void proto_register_packetlogger(void);
 void proto_reg_handoff_packetlogger(void);
 
@@ -52,8 +50,6 @@ static dissector_handle_t data_handle;
 #define PKT_HCI_EVENT       0x01
 #define PKT_SENT_ACL_DATA   0x02
 #define PKT_RECV_ACL_DATA   0x03
-#define PKT_LMP_SEND        0x0A
-#define PKT_LMP_RECV        0x0B
 #define PKT_POWER           0xFB
 #define PKT_NOTE            0xFC
 #define PKT_NEW_CONTROLLER  0xFE
@@ -63,25 +59,19 @@ static const value_string type_vals[] = {
   { PKT_HCI_EVENT,       "HCI Event"       },
   { PKT_SENT_ACL_DATA,   "Sent ACL Data"   },
   { PKT_RECV_ACL_DATA,   "Recv ACL Data"   },
-  { PKT_LMP_SEND,        "Sent LMP Data"   },
-  { PKT_LMP_RECV,        "Recv LMP Data"   },
   { PKT_POWER,           "Power"           },
   { PKT_NOTE,            "Note"            },
   { PKT_NEW_CONTROLLER,  "New Controller"  },
   { 0, NULL }
 };
 
-static int dissect_packetlogger(tvbuff_t *tvb, packet_info *pinfo,
-        proto_tree *tree, void *data)
+static void dissect_packetlogger (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-  proto_tree        *packetlogger_tree = NULL;
-  tvbuff_t          *next_tvb;
-  proto_item        *ti = NULL;
-  guint8             pl_type;
-  gint               len;
-  bluetooth_data_t  *bluetooth_data;
-
-  bluetooth_data = (bluetooth_data_t *) data;
+  proto_tree *packetlogger_tree = NULL;
+  tvbuff_t   *next_tvb;
+  proto_item *ti = NULL;
+  guint8      pl_type;
+  gint        len;
 
   col_set_str (pinfo->cinfo, COL_PROTOCOL, PSNAME);
   col_clear (pinfo->cinfo, COL_INFO);
@@ -94,7 +84,7 @@ static int dissect_packetlogger(tvbuff_t *tvb, packet_info *pinfo,
   proto_item_append_text (ti, " %s", val_to_str (pl_type, type_vals, "Unknown 0x%02x"));
 
   len = tvb_length_remaining (tvb, 1);
-  next_tvb = tvb_new_subset_remaining (tvb, 1);
+  next_tvb = tvb_new_subset (tvb, 1, len, len);
 
   if (pl_type <= PKT_RECV_ACL_DATA) {
     /* HCI H1 packages */
@@ -128,8 +118,7 @@ static int dissect_packetlogger(tvbuff_t *tvb, packet_info *pinfo,
     proto_item_set_len (ti, 1);
 
     col_add_fstr (pinfo->cinfo, COL_INFO, "%s", val_to_str(pl_type, type_vals, "Unknown 0x%02x"));
-    if (!dissector_try_uint_new(hci_h1_table, pinfo->pseudo_header->bthci.channel,
-            next_tvb, pinfo, tree, TRUE, bluetooth_data)) {
+    if (!dissector_try_uint (hci_h1_table, pinfo->pseudo_header->bthci.channel, next_tvb, pinfo, tree)) {
       call_dissector (data_handle, next_tvb, pinfo, tree);
     }
   } else {
@@ -147,8 +136,6 @@ static int dissect_packetlogger(tvbuff_t *tvb, packet_info *pinfo,
       break;
     }
   }
-
-  return tvb_captured_length(tvb);
 }
 
 void proto_register_packetlogger (void)
@@ -166,7 +153,7 @@ void proto_register_packetlogger (void)
 
   proto_packetlogger = proto_register_protocol (PNAME, PSNAME, PFNAME);
 
-  packetlogger_handle = new_register_dissector (PFNAME, dissect_packetlogger, proto_packetlogger);
+  packetlogger_handle = register_dissector (PFNAME, dissect_packetlogger, proto_packetlogger);
 
   proto_register_field_array (proto_packetlogger, hf, array_length (hf));
   proto_register_subtree_array (ett, array_length (ett));
@@ -176,7 +163,7 @@ void proto_reg_handoff_packetlogger (void)
 {
   hci_h1_table = find_dissector_table("hci_h1.type");
   data_handle = find_dissector("data");
-  dissector_add_uint ("bluetooth.encap", WTAP_ENCAP_PACKETLOGGER, packetlogger_handle);
+  dissector_add_uint ("wtap_encap", WTAP_ENCAP_PACKETLOGGER, packetlogger_handle);
 }
 
 /*

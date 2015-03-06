@@ -37,6 +37,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 extern gint proto_mac_header_generic_decoder;
@@ -379,7 +380,7 @@ static const value_string ai_msgs[] =
 };
 
 
-static void dissect_mac_header_type_2_decoder(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
+void dissect_mac_header_type_2_decoder(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	gint tvb_len, offset = 0;
 	guint cii_bit, first_byte, fb_type, mimo_type;
@@ -1368,16 +1369,3 @@ void proto_register_mac_header_type_2(void)
 
 	register_dissector("mac_header_type_2_handler", dissect_mac_header_type_2_decoder, -1);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

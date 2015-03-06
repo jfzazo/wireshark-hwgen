@@ -32,6 +32,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
 
@@ -261,7 +263,7 @@ void dissect_pw_cesopsn( tvbuff_t * tvb_original
 			{
 				tvbuff_t* tvb;
 				proto_item* item2;
-				tvb = tvb_new_subset_length(tvb_original, 0, PWC_SIZEOF_CW);
+				tvb = tvb_new_subset(tvb_original, 0, PWC_SIZEOF_CW, PWC_SIZEOF_CW);
 				item2 = proto_tree_add_item(tree2, hf_cw, tvb, 0, -1, ENC_NA);
 				pwc_item_append_cw(item2,tvb_get_ntohl(tvb, 0),FALSE);
 				{
@@ -337,7 +339,7 @@ void dissect_pw_cesopsn( tvbuff_t * tvb_original
 			{
 				proto_item* item2;
 				tvbuff_t* tvb;
-				tvb = tvb_new_subset_length(tvb_original, PWC_SIZEOF_CW, payload_size);
+				tvb = tvb_new_subset(tvb_original, PWC_SIZEOF_CW, payload_size, payload_size);
 				item2 = proto_tree_add_item(tree2, hf_payload, tvb, 0, -1, ENC_NA);
 				pwc_item_append_text_n_items(item2,(int)payload_size,"octet");
 				if (properties & PWC_PAY_SIZE_BAD)
@@ -454,21 +456,7 @@ void proto_reg_handoff_pw_cesopsn(void)
 {
 	data_handle = find_dissector("data");
 	pw_padding_handle = find_dissector("pw_padding");
-	/* For Decode As */
-	dissector_add_for_decode_as("mpls.label", find_dissector("pw_cesopsn_mpls"));
-	dissector_add_for_decode_as("udp.port", find_dissector("pw_cesopsn_udp"));
+	dissector_add_uint("mpls.label", MPLS_LABEL_INVALID, find_dissector("pw_cesopsn_mpls"));
+	dissector_add_handle("udp.port", find_dissector("pw_cesopsn_udp")); /* For Decode-As */
 	return;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

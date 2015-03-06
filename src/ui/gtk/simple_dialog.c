@@ -21,18 +21,20 @@
  */
 
 #include "config.h"
+#include <stdio.h>
 
 #include <gtk/gtk.h>
 
-#include "epan/strutil.h"
+#include <epan/strutil.h>
 
-#include "simple_dialog.h"
+#include "ui/simple_dialog.h"
 
-#include "gtkglobals.h"
-#include "dlg_utils.h"
-#include "gui_utils.h"
-#include "stock_icons.h"
+#include "ui/gtk/gtkglobals.h"
+#include "ui/gtk/dlg_utils.h"
+#include "ui/gtk/gui_utils.h"
+#include "ui/gtk/stock_icons.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 static void simple_dialog_cancel_cb(GtkWidget *, gpointer);
 
@@ -296,7 +298,7 @@ display_queued_messages(void)
  * ...        : Argument list for msg_format
  */
 
-static gpointer
+gpointer
 vsimple_dialog(ESD_TYPE_E type, gint btn_mask, const gchar *msg_format, va_list ap)
 {
   gchar            *message;

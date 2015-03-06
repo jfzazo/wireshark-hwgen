@@ -27,6 +27,8 @@
  */
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
@@ -66,8 +68,6 @@ static int hf_bfcp_supp_prim = -1;
 static int hf_bfcp_user_disp_name = -1;
 static int hf_bfcp_user_uri = -1;
 static int hf_bfcp_req_by_id = -1;
-static int hf_bfcp_padding = -1;
-static int hf_bfcp_error_specific_details = -1;
 
 /* Initialize subtree pointers */
 static gint ett_bfcp = -1;
@@ -240,13 +240,13 @@ dissect_bfcp_attributes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 			offset++;
 			if(length>3){
 				/* We have Error Specific Details */
-				proto_tree_add_item(bfcp_attr_tree, hf_bfcp_error_specific_details, tvb, offset, length-3, ENC_NA);
+				proto_tree_add_text(bfcp_attr_tree, tvb, offset, length-3, "Error Specific Details");
 			}
 			offset = offset + length-3;
 			pad_len = length & 0x03;
 			if(pad_len != 0){
 				pad_len = 4 - pad_len;
-				proto_tree_add_item(bfcp_attr_tree, hf_bfcp_padding, tvb, offset, pad_len, ENC_NA);
+				proto_tree_add_text(bfcp_attr_tree, tvb, offset, pad_len, "Padding");
 			}
 			offset = offset + pad_len;
 			break;
@@ -256,7 +256,7 @@ dissect_bfcp_attributes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 			pad_len = length & 0x03;
 			if(pad_len != 0){
 				pad_len = 4 - pad_len;
-				proto_tree_add_item(bfcp_attr_tree, hf_bfcp_padding, tvb, offset, pad_len, ENC_NA);
+				proto_tree_add_text(bfcp_attr_tree, tvb, offset, pad_len, "Padding");
 			}
 			offset = offset + pad_len;
 			break;
@@ -266,7 +266,7 @@ dissect_bfcp_attributes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 			pad_len = length & 0x03;
 			if(pad_len != 0){
 				pad_len = 4 - pad_len;
-				proto_tree_add_item(bfcp_attr_tree, hf_bfcp_padding, tvb, offset, pad_len, ENC_NA);
+				proto_tree_add_text(bfcp_attr_tree, tvb, offset, pad_len, "Padding");
 			}
 			offset = offset + pad_len;
 			break;
@@ -276,7 +276,7 @@ dissect_bfcp_attributes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 			pad_len = length & 0x03;
 			if(pad_len != 0){
 				pad_len = 4 - pad_len;
-				proto_tree_add_item(bfcp_attr_tree, hf_bfcp_padding, tvb, offset, pad_len, ENC_NA);
+				proto_tree_add_text(bfcp_attr_tree, tvb, offset, pad_len, "Padding");
 			}
 			offset = offset + pad_len;
 			break;
@@ -289,7 +289,7 @@ dissect_bfcp_attributes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 			pad_len = length & 0x03;
 			if(pad_len != 0){
 				pad_len = 4 - pad_len;
-				proto_tree_add_item(bfcp_attr_tree, hf_bfcp_padding, tvb, offset, pad_len, ENC_NA);
+				proto_tree_add_text(bfcp_attr_tree, tvb, offset, pad_len, "Padding");
 			}
 			offset = offset + pad_len;
 			break;
@@ -302,7 +302,7 @@ dissect_bfcp_attributes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 			pad_len = length & 0x03;
 			if(pad_len != 0){
 				pad_len = 4 - pad_len;
-				proto_tree_add_item(bfcp_attr_tree, hf_bfcp_padding, tvb, offset, pad_len, ENC_NA);
+				proto_tree_add_text(bfcp_attr_tree, tvb, offset, pad_len, "Padding");
 			}
 			offset = offset + pad_len;
 			break;
@@ -312,7 +312,7 @@ dissect_bfcp_attributes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 			pad_len = length & 0x03;
 			if(pad_len != 0){
 				pad_len = 4 - pad_len;
-				proto_tree_add_item(bfcp_attr_tree, hf_bfcp_padding, tvb, offset, pad_len, ENC_NA);
+				proto_tree_add_text(bfcp_attr_tree, tvb, offset, pad_len, "Padding");
 			}
 			offset = offset + pad_len;
 			break;
@@ -322,7 +322,7 @@ dissect_bfcp_attributes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 			pad_len = length & 0x03;
 			if(pad_len != 0){
 				pad_len = 4 - pad_len;
-				proto_tree_add_item(bfcp_attr_tree, hf_bfcp_padding, tvb, offset, pad_len, ENC_NA);
+				proto_tree_add_text(bfcp_attr_tree, tvb, offset, pad_len, "Padding");
 			}
 			offset = offset + pad_len;
 			break;
@@ -654,18 +654,6 @@ void proto_register_bfcp(void)
 			  FT_UINT16, BASE_DEC, NULL, 0x0,
 			  NULL, HFILL }
 		},
-		{
-			&hf_bfcp_padding,
-			{ "Padding", "bfcp.padding",
-			  FT_BYTES, BASE_NONE, NULL, 0x0,
-			  NULL, HFILL }
-		},
-		{
-			&hf_bfcp_error_specific_details,
-			{ "Error Specific Details", "bfcp.error_specific_details",
-			  FT_BYTES, BASE_NONE, NULL, 0x0,
-			  NULL, HFILL }
-		},
 	};
 
 	static gint *ett[] = {
@@ -711,8 +699,8 @@ void proto_reg_handoff_bfcp(void)
 	{
 		heur_dissector_add("tcp", dissect_bfcp_heur, proto_bfcp);
 		heur_dissector_add("udp", dissect_bfcp_heur, proto_bfcp);
-		dissector_add_for_decode_as("tcp.port", bfcp_handle);
-		dissector_add_for_decode_as("udp.port", bfcp_handle);
+		dissector_add_handle("tcp.port", bfcp_handle);
+		dissector_add_handle("udp.port", bfcp_handle);
 		prefs_initialized = TRUE;
 	}
 
@@ -722,16 +710,3 @@ void proto_reg_handoff_bfcp(void)
 	heur_dissector_set_enabled("udp", dissect_bfcp_heur, proto_bfcp,
 				   bfcp_enable_heuristic_dissection);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

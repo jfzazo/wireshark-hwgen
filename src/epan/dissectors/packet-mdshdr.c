@@ -23,8 +23,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/etypes.h>
+#include <etypes.h>
 #include <epan/prefs.h>
 #include "packet-fc.h"
 
@@ -88,7 +90,6 @@ static int hf_mdshdr_dstidx = -1;
 static int hf_mdshdr_srcidx = -1;
 static int hf_mdshdr_vsan = -1;
 static int hf_mdshdr_eof = -1;
-static int hf_mdshdr_no_trailer = -1;
 static int hf_mdshdr_span = -1;
 static int hf_mdshdr_fccrc = -1;
 
@@ -99,7 +100,7 @@ static gint ett_mdshdr_trlr = -1;
 
 static dissector_handle_t data_handle, fc_dissector_handle;
 
-static gboolean decode_if_zero_etype = FALSE;
+static gboolean decode_if_zero_etype = TRUE;
 
 static const value_string sof_vals[] = {
     {MDSHDR_SOFc1,               "SOFc1"},
@@ -134,7 +135,7 @@ dissect_mdshdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 
 /* Set up structures needed to add the protocol subtree and manage it */
-    proto_item *ti_main;
+    proto_item *ti_main, *ti_hdr, *ti_trlr;
     proto_item *hidden_item;
     proto_tree *mdshdr_tree_main, *mdshdr_tree_hdr, *mdshdr_tree_trlr;
     int         offset        = 0;
@@ -191,9 +192,10 @@ dissect_mdshdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         mdshdr_tree_main = proto_item_add_subtree(ti_main, ett_mdshdr);
 
         /* Add Header part as subtree first */
-        mdshdr_tree_hdr = proto_tree_add_subtree(mdshdr_tree_main, tvb, MDSHDR_VER_OFFSET,
-                                     MDSHDR_HEADER_SIZE, ett_mdshdr_hdr, NULL, "MDS Header");
+        ti_hdr = proto_tree_add_text(mdshdr_tree_main, tvb, MDSHDR_VER_OFFSET,
+                                     MDSHDR_HEADER_SIZE, "MDS Header");
 
+        mdshdr_tree_hdr = proto_item_add_subtree(ti_hdr, ett_mdshdr_hdr);
         hidden_item = proto_tree_add_item(mdshdr_tree_hdr, hf_mdshdr_sof, tvb, MDSHDR_SOF_OFFSET,
                                           MDSHDR_SIZE_BYTE, ENC_BIG_ENDIAN);
         PROTO_ITEM_SET_HIDDEN(hidden_item);
@@ -213,9 +215,10 @@ dissect_mdshdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         /* Add Mdshdr Trailer part */
         if (tvb_length(tvb) >= MDSHDR_HEADER_SIZE + pktlen
             && 0 != trailer_start) {
-            mdshdr_tree_trlr = proto_tree_add_subtree(mdshdr_tree_main, tvb, trailer_start,
+            ti_trlr = proto_tree_add_text(mdshdr_tree_main, tvb, trailer_start,
                                           MDSHDR_TRAILER_SIZE,
-                                          ett_mdshdr_trlr, NULL, "MDS Trailer");
+                                          "MDS Trailer");
+            mdshdr_tree_trlr = proto_item_add_subtree(ti_trlr, ett_mdshdr_trlr);
 
             proto_tree_add_item(mdshdr_tree_trlr, hf_mdshdr_eof, tvb,
                                 trailer_start, MDSHDR_SIZE_BYTE, ENC_BIG_ENDIAN);
@@ -223,13 +226,13 @@ dissect_mdshdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                                 trailer_start+2, MDSHDR_SIZE_INT32, ENC_BIG_ENDIAN);
         }
         else {
-            proto_tree_add_item(mdshdr_tree_main, hf_mdshdr_no_trailer, tvb, 0, 0, ENC_NA);
+            proto_tree_add_text(mdshdr_tree_main, tvb, 0, 0, "MDS Trailer: Not Found");
         }
     }
 
     if (tvb_length(tvb) >= MDSHDR_HEADER_SIZE + pktlen
         && 0 != pktlen /*if something wrong*/) {
-        next_tvb = tvb_new_subset_length(tvb, MDSHDR_HEADER_SIZE, pktlen);
+        next_tvb = tvb_new_subset(tvb, MDSHDR_HEADER_SIZE, pktlen, pktlen);
         /* XXX what to do with the rest of this frame? --ArtemTamazov */
     }
     else {
@@ -269,9 +272,6 @@ proto_register_mdshdr(void)
 
         { &hf_mdshdr_eof,
           {"EOF", "mdshdr.eof", FT_UINT8, BASE_DEC, VALS(eof_vals), 0x0, NULL, HFILL}},
-
-        { &hf_mdshdr_no_trailer,
-          {"MDS Trailer: Not Found", "mdshdr.no_trailer", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL}},
 
         { &hf_mdshdr_span,
           {"SPAN Frame", "mdshdr.span", FT_UINT16, BASE_DEC, NULL, 0xF000, NULL, HFILL}},
@@ -352,16 +352,3 @@ proto_reg_handoff_mdshdr(void)
         }
     }
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

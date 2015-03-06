@@ -32,7 +32,11 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+
+#include <stdio.h>
+#include <string.h>
 #include <epan/strutil.h>
 #include <epan/asn1.h>
 #include <epan/sctpppids.h>
@@ -98,7 +102,7 @@ typedef enum _ProtocolIE_ID_enum {
 } ProtocolIE_ID_enum;
 
 /*--- End of included file: packet-sbc-ap-val.h ---*/
-#line 51 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
+#line 55 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
 
 /* Initialize the protocol and registered fields */
 static int proto_sbc_ap = -1;
@@ -163,7 +167,7 @@ static int hf_sbc_ap_successfulOutcome_value = -1;  /* SuccessfulOutcome_value *
 static int hf_sbc_ap_unsuccessfulOutcome_value = -1;  /* UnsuccessfulOutcome_value */
 
 /*--- End of included file: packet-sbc-ap-hf.c ---*/
-#line 56 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
+#line 60 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
 
 /* Initialize the subtree pointers */
 static int ett_sbc_ap = -1;
@@ -196,7 +200,7 @@ static gint ett_sbc_ap_SuccessfulOutcome = -1;
 static gint ett_sbc_ap_UnsuccessfulOutcome = -1;
 
 /*--- End of included file: packet-sbc-ap-ett.c ---*/
-#line 61 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
+#line 65 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
 
 enum{
 	INITIATING_MESSAGE,
@@ -559,7 +563,7 @@ dissect_sbc_ap_PLMNidentity(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx 
 
 	if (!parameter_tvb)
 		return offset;
-	dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, tree, 0, E212_NONE, FALSE);
+	dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, tree, 0, FALSE);
 
 
   return offset;
@@ -1125,42 +1129,42 @@ static int dissect_SBC_AP_PDU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, pro
 
 
 /*--- End of included file: packet-sbc-ap-fn.c ---*/
-#line 88 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
+#line 92 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sbc_ap_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sbc_ap_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 /* Currently not used
 static int dissect_ProtocolIEFieldPairFirstValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sbc_ap_ies_p1_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sbc_ap_ies_p1_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_ProtocolIEFieldPairSecondValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sbc_ap_ies_p2_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sbc_ap_ies_p2_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 */
 
 static int dissect_ProtocolExtensionFieldExtensionValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sbc_ap_extension_dissector_table, ProtocolExtensionID, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sbc_ap_extension_dissector_table, ProtocolExtensionID, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_InitiatingMessageValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sbc_ap_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sbc_ap_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_SuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sbc_ap_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sbc_ap_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sbc_ap_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sbc_ap_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 
@@ -1412,7 +1416,7 @@ void proto_register_sbc_ap(void) {
         "UnsuccessfulOutcome_value", HFILL }},
 
 /*--- End of included file: packet-sbc-ap-hfarr.c ---*/
-#line 150 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
+#line 154 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
   };
 
   /* List of subtrees */
@@ -1446,7 +1450,7 @@ void proto_register_sbc_ap(void) {
     &ett_sbc_ap_UnsuccessfulOutcome,
 
 /*--- End of included file: packet-sbc-ap-ettarr.c ---*/
-#line 156 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
+#line 160 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
   };
 
 
@@ -1504,7 +1508,7 @@ proto_reg_handoff_sbc_ap(void)
 
 
 /*--- End of included file: packet-sbc-ap-dis-tab.c ---*/
-#line 189 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
+#line 193 "../../asn1/sbc-ap/packet-sbc-ap-template.c"
 	} else {
 		if (SctpPort != 0) {
 			dissector_delete_uint("sctp.port", SctpPort, sbc_ap_handle);

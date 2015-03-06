@@ -9,19 +9,21 @@ void register_all_tap_listeners(void) {
     {extern void register_tap_listener_camelsrt (void); register_tap_listener_camelsrt ();}
     {extern void register_tap_listener_comparestat (void); register_tap_listener_comparestat ();}
     {extern void register_tap_listener_dcerpcstat (void); register_tap_listener_dcerpcstat ();}
-    {extern void register_tap_listener_dhcpstat (void); register_tap_listener_dhcpstat ();}
     {extern void register_tap_listener_diameteravp (void); register_tap_listener_diameteravp ();}
     {extern void register_tap_listener_expert_info (void); register_tap_listener_expert_info ();}
     {extern void register_tap_listener_follow (void); register_tap_listener_follow ();}
-    {extern void register_tap_listener_funnel (void); register_tap_listener_funnel ();}
     {extern void register_tap_listener_gsm_astat (void); register_tap_listener_gsm_astat ();}
+    {extern void register_tap_listener_gtkdhcpstat (void); register_tap_listener_gtkdhcpstat ();}
+    {extern void register_tap_listener_gtkfunnel (void); register_tap_listener_gtkfunnel ();}
+    {extern void register_tap_listener_gtkhttpstat (void); register_tap_listener_gtkhttpstat ();}
+    {extern void register_tap_listener_gtkrtspstat (void); register_tap_listener_gtkrtspstat ();}
     {extern void register_tap_listener_h225counter (void); register_tap_listener_h225counter ();}
     {extern void register_tap_listener_h225rassrt (void); register_tap_listener_h225rassrt ();}
     {extern void register_tap_listener_hosts (void); register_tap_listener_hosts ();}
-    {extern void register_tap_listener_httpstat (void); register_tap_listener_httpstat ();}
     {extern void register_tap_listener_icmpstat (void); register_tap_listener_icmpstat ();}
     {extern void register_tap_listener_icmpv6stat (void); register_tap_listener_icmpv6stat ();}
     {extern void register_tap_listener_iostat (void); register_tap_listener_iostat ();}
+    {extern void register_tap_listener_iousers (void); register_tap_listener_iousers ();}
     {extern void register_tap_listener_mac_lte_stat (void); register_tap_listener_mac_lte_stat ();}
     {extern void register_tap_listener_megacostat (void); register_tap_listener_megacostat ();}
     {extern void register_tap_listener_mgcpstat (void); register_tap_listener_mgcpstat ();}
@@ -32,7 +34,6 @@ void register_all_tap_listeners(void) {
     {extern void register_tap_listener_rpcprogs (void); register_tap_listener_rpcprogs ();}
     {extern void register_tap_listener_rpcstat (void); register_tap_listener_rpcstat ();}
     {extern void register_tap_listener_rtp_streams (void); register_tap_listener_rtp_streams ();}
-    {extern void register_tap_listener_rtspstat (void); register_tap_listener_rtspstat ();}
     {extern void register_tap_listener_scsistat (void); register_tap_listener_scsistat ();}
     {extern void register_tap_listener_sctpstat (void); register_tap_listener_sctpstat ();}
     {extern void register_tap_listener_sipstat (void); register_tap_listener_sipstat ();}

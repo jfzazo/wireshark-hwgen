@@ -25,8 +25,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/conversation.h>
+#include <epan/wmem/wmem.h>
 #include <epan/prefs.h>
 #include <wsutil/str_util.h>
 
@@ -47,8 +50,6 @@ static int hf_exec_stderr_port = -1;
 static int hf_exec_username    = -1;
 static int hf_exec_password    = -1;
 static int hf_exec_command     = -1;
-static int hf_exec_client_server_data = -1;
-static int hf_exec_server_client_data = -1;
 
 /* Initialize the subtree pointers */
 static gint ett_exec = -1;
@@ -223,7 +224,7 @@ dissect_exec(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	if(hash_info->state == WAIT_FOR_STDERR_PORT
 	&& tvb_length_remaining(tvb, offset)){
-		field_stringz = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &length, ENC_ASCII);
+		field_stringz = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &length);
 
 		/* Check if this looks like the stderr_port field.
 		 * It is optional, so it may only be 1 character long
@@ -246,7 +247,7 @@ dissect_exec(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	if(hash_info->state == WAIT_FOR_USERNAME
 	&& tvb_length_remaining(tvb, offset)){
-		field_stringz = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &length, ENC_ASCII);
+		field_stringz = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &length);
 
 		/* Check if this looks like the username field */
 		if(length != 1 && length <= EXEC_USERNAME_LEN
@@ -274,7 +275,7 @@ dissect_exec(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	if(hash_info->state == WAIT_FOR_PASSWORD
 	&& tvb_length_remaining(tvb, offset)){
-		field_stringz = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &length, ENC_ASCII);
+		field_stringz = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &length);
 
 		/* Check if this looks like the password field */
 		if(length != 1 && length <= EXEC_PASSWORD_LEN
@@ -297,7 +298,7 @@ dissect_exec(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 	if(hash_info->state == WAIT_FOR_COMMAND
 	&& tvb_length_remaining(tvb, offset)){
-		field_stringz = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &length, ENC_ASCII);
+		field_stringz = tvb_get_stringz(wmem_packet_scope(), tvb, offset, &length);
 
 		/* Check if this looks like the command field */
 		if(length != 1 && length <= EXEC_COMMAND_LEN
@@ -323,13 +324,13 @@ dissect_exec(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		if(pinfo->destport == EXEC_PORT){
 			/* Packet going to the server */
 			/* offset = 0 since the whole packet is data */
-			proto_tree_add_item(exec_tree, hf_exec_client_server_data, tvb, 0, -1, ENC_NA);
+			proto_tree_add_text(exec_tree, tvb, 0, -1, "Client -> Server Data");
 
 			col_append_str(pinfo->cinfo, COL_INFO, "Client -> Server data");
 		} else {
 			/* This packet must be going back to the client */
 			/* offset = 0 since the whole packet is data */
-			proto_tree_add_item(exec_tree, hf_exec_server_client_data, tvb, 0, -1, ENC_NA);
+			proto_tree_add_text(exec_tree, tvb, 0, -1, "Server -> Client Data");
 
 			col_append_str(pinfo->cinfo, COL_INFO, "Server -> Client Data");
 		}
@@ -360,15 +361,7 @@ proto_register_exec(void)
 
 	{ &hf_exec_command, { "Command to execute", "exec.command",
 		FT_STRINGZ, BASE_NONE, NULL, 0,
-		"Command client is requesting the server to run.", HFILL } },
-
-	{ &hf_exec_client_server_data, { "Client -> Server Data", "exec.client_server_data",
-		FT_BYTES, BASE_NONE, NULL, 0,
-		NULL, HFILL } },
-
-	{ &hf_exec_server_client_data, { "Server -> Client Data", "exec.server_client_data",
-		FT_BYTES, BASE_NONE, NULL, 0,
-		NULL, HFILL } },
+		"Command client is requesting the server to run.", HFILL } }
 
 	};
 
@@ -409,16 +402,3 @@ proto_reg_handoff_exec(void)
 	exec_handle = create_dissector_handle(dissect_exec, proto_exec);
 	dissector_add_uint("tcp.port", EXEC_PORT, exec_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

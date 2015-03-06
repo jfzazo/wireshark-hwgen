@@ -24,6 +24,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/to_str.h>
@@ -168,7 +170,7 @@ get_next_fcip_header_offset (tvbuff_t *tvb, packet_info *pinfo, gint offset)
      * c)  Replication of encapsulation word 0 in word 1 (1 test);
      * d)  Reserved field and its ones complement (2 tests);
      * e)  Flags field and its ones complement (2 tests);
-     *    f)  CRC field is equal to zero (1 test); (DON'T DO THIS TEST!)
+     *    f)  CRC field is equal to zero (1 test); (DONT DO THIS TEST!)
      * g)  SOF fields and ones complement fields (4 tests);
      * h)  Format and values of FC header (1 test);
      * i)  CRC of FC Frame (2 tests);
@@ -268,7 +270,7 @@ NXT_BYTE: while (bytes_remaining) {
 
 
         /* Test f
-         * We don't test this since some implementations actually provide
+         * We dont test this since some implementations actually provide
          * a CRC here.
          */
 
@@ -349,7 +351,8 @@ static void
 dissect_fcip_sf (tvbuff_t *tvb, proto_tree *tree, gint offset)
 {
     if (tree) {
-        proto_tree_add_item (tree, hf_fcip_src_wwn, tvb, offset, 8, ENC_NA);
+        proto_tree_add_string (tree, hf_fcip_src_wwn, tvb, offset, 8,
+                               tvb_fcwwn_to_str (tvb, offset));
         proto_tree_add_item (tree, hf_fcip_src_entity_id, tvb, offset+8, 8,
                               ENC_NA);
         proto_tree_add_item (tree, hf_fcip_conn_nonce, tvb, offset+16, 8,
@@ -357,7 +360,8 @@ dissect_fcip_sf (tvbuff_t *tvb, proto_tree *tree, gint offset)
         /* XXX - break out these flags */
         proto_tree_add_item (tree, hf_fcip_conn_flags, tvb, offset+24, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item (tree, hf_fcip_conn_code, tvb, offset+26, 2, ENC_BIG_ENDIAN);
-        proto_tree_add_item (tree, hf_fcip_dst_wwn, tvb, offset+30, 8, ENC_NA);
+        proto_tree_add_string (tree, hf_fcip_dst_wwn, tvb, offset+30, 8,
+                               tvb_fcwwn_to_str (tvb, offset+30));
         proto_tree_add_item (tree, hf_fcip_katov, tvb, offset+38, 4, ENC_BIG_ENDIAN);
     }
 }
@@ -593,10 +597,10 @@ proto_register_fcip (void)
           {"Pflags (1's Complement)", "fcip.pflagsc", FT_UINT8, BASE_HEX,
            NULL, 0x0, NULL, HFILL}},
         { &hf_fcip_src_wwn,
-          {"Source Fabric WWN", "fcip.srcwwn", FT_FCWWN, BASE_NONE,
+          {"Source Fabric WWN", "fcip.srcwwn", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL}},
         { &hf_fcip_dst_wwn,
-          {"Destination Fabric WWN", "fcip.dstwwn", FT_FCWWN, BASE_NONE,
+          {"Destination Fabric WWN", "fcip.dstwwn", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL}},
         { &hf_fcip_src_entity_id,
           {"FC/FCIP Entity Id", "fcip.srcid", FT_BYTES, BASE_NONE,
@@ -651,21 +655,8 @@ proto_reg_handoff_fcip (void)
     heur_dissector_add("tcp", dissect_fcip_heur, proto_fcip);
 
     fcip_handle = create_dissector_handle(dissect_fcip_handle, proto_fcip);
-    dissector_add_for_decode_as("tcp.port", fcip_handle);
+    dissector_add_handle("tcp.port", fcip_handle);
 
     data_handle = find_dissector("data");
     fc_handle   = find_dissector("fc");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -26,8 +26,9 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/to_str.h>
 #include <epan/sminmpec.h>
 
@@ -131,8 +132,6 @@ static gint ett_mip_flags = -1;
 static gint ett_mip_ext = -1;
 static gint ett_mip_exts = -1;
 static gint ett_mip_pmipv4_ext = -1;
-
-static expert_field ei_mip_data_not_dissected = EI_INIT;
 
 /* Port used for Mobile IP */
 #define UDP_PORT_MIP    434
@@ -489,7 +488,7 @@ dissect_mip_priv_ext_3gpp2(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
     proto_tree_add_item(tree, hf_mip_nvse_3gpp2_type17_sec_dns, tvb, offset, 4, ENC_BIG_ENDIAN);
     break;
   default:
-    proto_tree_add_expert(tree, pinfo, &ei_mip_data_not_dissected, tvb, offset, -1);
+    proto_tree_add_text(tree, tvb, offset, -1, " Data not dissected yet");
     break;
   }
 
@@ -500,13 +499,18 @@ dissect_mip_priv_ext_3gpp2(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
 static void
 dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info *pinfo)
 {
+  proto_item   *ti;
   proto_tree   *exts_tree=NULL;
   proto_tree   *ext_tree;
+  proto_tree   *tf;
+  proto_tree   *ext_flags_tree;
+  proto_tree   *tp;
   proto_tree   *pmipv4_tree;
   gint          ext_len;
   guint8        ext_type;
   guint8        ext_subtype=0;
   guint8        pmipv4skipext_subscriberid_type;
+  guint16       flags;
   gint          hdrLen;
   guint32       cvse_vendor_id;
   guint16       cvse_3gpp2_type;
@@ -517,7 +521,8 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
   if (!tree) return;
 
   /* Add our tree, if we have extensions */
-  exts_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_mip_exts, NULL, "Extensions");
+  ti = proto_tree_add_text(tree, tvb, offset, -1, "Extensions");
+  exts_tree = proto_item_add_subtree(ti, ett_mip_exts);
 
   /* And, handle each extension */
   while (tvb_reported_length_remaining(tvb, offset) > 0) {
@@ -546,10 +551,11 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
       hdrLen = 2;
     }
 
-    ext_tree = proto_tree_add_subtree_format(exts_tree, tvb, offset, ext_len + hdrLen,
-                 ett_mip_ext, NULL, "Extension: %s",
+    ti = proto_tree_add_text(exts_tree, tvb, offset, ext_len + hdrLen,
+                 "Extension: %s",
                  val_to_str(ext_type, mip_ext_types,
                             "Unknown Extension %u"));
+    ext_tree = proto_item_add_subtree(ti, ett_mip_ext);
 
     proto_tree_add_uint(ext_tree, hf_mip_ext_type, tvb, offset, 1, ext_type);
     offset++;
@@ -590,20 +596,17 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
                           ext_len - 4, ENC_NA);
 
       break;
-    case REV_SUPP_EXT:      /* RFC 3543 */
-      {
+        case REV_SUPP_EXT:      /* RFC 3543 */
       /* flags */
-      static const int * flags[] = {
-        &hf_mip_rext_i,
-        &hf_mip_rext_reserved,
-        NULL
-      };
+      flags = tvb_get_ntohs(tvb, offset);
+      tf = proto_tree_add_uint(ext_tree, hf_mip_rext_flags, tvb, offset, 2, flags);
+      ext_flags_tree = proto_item_add_subtree(tf, ett_mip_flags);
+      proto_tree_add_boolean(ext_flags_tree, hf_mip_rext_i, tvb, offset, 2, flags);
 
-      proto_tree_add_bitmask(ext_tree, tvb, offset, hf_mip_rext_flags, ett_mip_flags, flags, ENC_BIG_ENDIAN);
-
+      /* reserved */
+      proto_tree_add_uint(ext_flags_tree, hf_mip_rext_reserved, tvb, offset, 2, flags);
       /* registration revocation timestamp */
       proto_tree_add_item(ext_tree, hf_mip_rext_tstamp, tvb, offset + 2, 4, ENC_BIG_ENDIAN);
-      }
       break;
     case DYN_HA_EXT:      /* RFC 4433 */
       /* subtype */
@@ -619,14 +622,6 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
       proto_tree_add_item(ext_tree, hf_mip_mstrext_text, tvb, offset + 1, ext_len-1, ENC_ASCII|ENC_NA);
       break;
     case UDP_TUN_REQ_EXT:   /* RFC 3519 */
-      {
-      static const int * flags[] = {
-        &hf_mip_utrqext_f,
-        &hf_mip_utrqext_r,
-        &hf_mip_utrqext_reserved2,
-        NULL
-      };
-
       /* sub-type */
       proto_tree_add_item(ext_tree, hf_mip_utrqext_stype, tvb, offset, 1, ENC_BIG_ENDIAN);
 
@@ -634,22 +629,21 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
       proto_tree_add_item(ext_tree, hf_mip_utrqext_reserved1, tvb, offset + 1, 1, ENC_BIG_ENDIAN);
 
       /* flags */
-      proto_tree_add_bitmask(ext_tree, tvb, offset + 2, hf_mip_utrqext_flags, ett_mip_flags, flags, ENC_BIG_ENDIAN);
+      flags = tvb_get_guint8(tvb, offset + 2);
+      tf = proto_tree_add_uint(ext_tree, hf_mip_utrqext_flags, tvb, offset + 2, 1, flags);
+      ext_flags_tree = proto_item_add_subtree(tf, ett_mip_flags);
+      proto_tree_add_boolean(ext_flags_tree, hf_mip_utrqext_f, tvb, offset + 2, 1, flags);
+      proto_tree_add_boolean(ext_flags_tree, hf_mip_utrqext_r, tvb, offset + 2, 1, flags);
 
+      /* reserved 2 */
+      proto_tree_add_uint(ext_flags_tree, hf_mip_utrqext_reserved2, tvb, offset + 2, 1, flags);
       /* encapsulation */
       proto_tree_add_item(ext_tree, hf_mip_utrqext_encap_type, tvb, offset + 3, 1, ENC_BIG_ENDIAN);
 
       /* reserved 3 */
       proto_tree_add_item(ext_tree, hf_mip_utrqext_reserved3, tvb, offset + 4, 2, ENC_BIG_ENDIAN);
-      }
       break;
     case UDP_TUN_REP_EXT:   /* RFC 3519 */
-      {
-      static const int * flags[] = {
-        &hf_mip_utrpext_f,
-        &hf_mip_utrpext_reserved,
-        NULL
-      };
       /* sub-type */
       proto_tree_add_item(ext_tree, hf_mip_utrpext_stype, tvb, offset, 1, ENC_BIG_ENDIAN);
 
@@ -657,11 +651,16 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
       proto_tree_add_item(ext_tree, hf_mip_utrpext_code, tvb, offset + 1, 1, ENC_BIG_ENDIAN);
 
       /* flags */
-      proto_tree_add_bitmask(ext_tree, tvb, offset + 2, hf_mip_utrpext_flags, ett_mip_flags, flags, ENC_BIG_ENDIAN);
+      flags = tvb_get_ntohs(tvb, offset+2);
+      tf = proto_tree_add_uint(ext_tree, hf_mip_utrpext_flags, tvb, offset + 2, 2, flags);
+      ext_flags_tree = proto_item_add_subtree(tf, ett_mip_flags);
+      proto_tree_add_boolean(ext_flags_tree, hf_mip_utrpext_f, tvb, offset + 2, 2, flags);
+
+      /* reserved */
+      proto_tree_add_uint(ext_flags_tree, hf_mip_utrpext_reserved, tvb, offset + 2, 2, flags);
 
       /* keepalive interval */
       proto_tree_add_item(ext_tree, hf_mip_utrpext_keepalive, tvb, offset + 4, 2, ENC_BIG_ENDIAN);
-      }
       break;
     case PMIPv4_NON_SKIP_EXT:   /* draft-leung-mip4-proxy-mode */
       /* sub-type */
@@ -678,9 +677,10 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
     case PMIPv4_SKIP_EXT:   /* draft-leung-mip4-proxy-mode */
       /* sub-type */
       ext_subtype = tvb_get_guint8(tvb, offset);
-      pmipv4_tree = proto_tree_add_subtree_format(ext_tree, tvb, offset, ext_len,
-                   ett_mip_pmipv4_ext, NULL, "PMIPv4 Sub-Type: %s",
+      tp = proto_tree_add_text(ext_tree, tvb, offset, ext_len,
+                   "PMIPv4 Sub-Type: %s",
                    val_to_str(ext_subtype, mip_pmipv4skipext_stypes, "Unknown Sub-Type %u"));
+      pmipv4_tree = proto_item_add_subtree(tp, ett_mip_pmipv4_ext);
       proto_tree_add_uint(pmipv4_tree, hf_mip_pmipv4skipext_stype, tvb, offset, 1, ext_subtype);
 
       if (ext_subtype == PMIPv4_SKIPEXT_STYPE_INTERFACE_ID) {
@@ -725,9 +725,7 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
         cvse_3gpp2_type = tvb_get_ntohs(tvb, cvse_local_offset);
         /* XXX: THE3GPP2 CVSE type is followed by a 2 byte length field ? - No ?*/
         /*  ... */
-        /* THE3GPP2 CVSE Value http://www.3gpp2.org/public_html/X/VSA-VSE.cfm X.S0011
-         * http://www.3gpp2.org/Public_html/specs/X.S0011-002-E_v1.0_091116.pdf Chapter 4.1.4 GRE CVSE
-         */
+        /* THE3GPP2 CVSE Value */
        if(cvse_3gpp2_type == GRE_KEY_EXT){
            proto_tree_add_item(ext_tree, hf_mip_cvse_3gpp2_grekey, tvb, cvse_local_offset + 2, ext_len - 6, ENC_BIG_ENDIAN);
        }
@@ -754,7 +752,7 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
           proto_tree_add_item(ext_tree, hf_mip_nvse_vendor_org_id, tvb, nvse_local_offset, 4, ENC_BIG_ENDIAN);
           nvse_local_offset+=4;
 
-          next_tvb = tvb_new_subset_length(tvb, nvse_local_offset, ext_len-6);
+          next_tvb = tvb_new_subset(tvb, nvse_local_offset, ext_len-6, ext_len-6);
           if (!dissector_try_uint(mip_nvse_ext_dissector_table, nvse_vendor_org_id, next_tvb, pinfo, ext_tree)){
 
               /*Vendor NVSE Type*/
@@ -786,7 +784,10 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   /* Set up structures we will need to add the protocol subtree and manage it */
   proto_item    *ti;
   proto_tree    *mip_tree=NULL;
+  proto_item    *tf;
+  proto_tree    *flags_tree;
   guint8         type;
+  guint16        flags;
   gint           offset=0;
   tvbuff_t      *next_tvb;
 
@@ -805,18 +806,6 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                tvb_ip_to_str(tvb, 12));
 
     if (tree) {
-      static const int * flags[] = {
-        &hf_mip_s,
-        &hf_mip_b,
-        &hf_mip_d,
-        &hf_mip_m,
-        &hf_mip_g,
-        &hf_mip_v,
-        &hf_mip_t,
-        &hf_mip_x,
-        NULL
-      };
-
       ti = proto_tree_add_item(tree, proto_mip, tvb, offset, -1, ENC_NA);
       mip_tree = proto_item_add_subtree(ti, ett_mip);
 
@@ -825,7 +814,17 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       offset++;
 
       /* flags */
-      proto_tree_add_bitmask(mip_tree, tvb, offset, hf_mip_flags, ett_mip_flags, flags, ENC_BIG_ENDIAN);
+      flags = tvb_get_guint8(tvb, offset);
+      tf = proto_tree_add_uint(mip_tree, hf_mip_flags, tvb, offset, 1, flags);
+      flags_tree = proto_item_add_subtree(tf, ett_mip_flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_s, tvb, offset, 1, flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_b, tvb, offset, 1, flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_d, tvb, offset, 1, flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_m, tvb, offset, 1, flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_g, tvb, offset, 1, flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_v, tvb, offset, 1, flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_t, tvb, offset, 1, flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_x, tvb, offset, 1, flags);
       offset++;
 
       /* lifetime */
@@ -924,13 +923,6 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                tvb_ip_to_str(tvb, 12));
 
     if (tree) {
-      static const int * mip_flags[] = {
-        &hf_mip_rev_a,
-        &hf_mip_rev_i,
-        &hf_mip_rev_reserved2,
-        NULL
-      };
-
       ti = proto_tree_add_item(tree, proto_mip, tvb, offset, -1, ENC_NA);
       mip_tree = proto_item_add_subtree(ti, ett_mip);
 
@@ -943,7 +935,14 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       offset++;
 
       /* flags */
-      proto_tree_add_bitmask(mip_tree, tvb, offset, hf_mip_flags2, ett_mip_flags, mip_flags, ENC_BIG_ENDIAN);
+      flags = tvb_get_ntohs(tvb, offset);
+      tf = proto_tree_add_uint(mip_tree, hf_mip_flags2, tvb, offset, 2, flags);
+      flags_tree = proto_item_add_subtree(tf, ett_mip_flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_rev_a, tvb, offset, 2, flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_rev_i, tvb, offset, 2, flags);
+
+      /* reserved */
+      proto_tree_add_uint(flags_tree, hf_mip_rev_reserved2, tvb, offset, 2, flags);
       offset += 2;
 
       /* home address */
@@ -968,12 +967,6 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                tvb_ip_to_str(tvb, 4));
 
     if (tree) {
-      static const int * mip_flags[] = {
-        &hf_mip_ack_i,
-        &hf_mip_ack_reserved2,
-        NULL
-      };
-
       ti = proto_tree_add_item(tree, proto_mip, tvb, offset, -1, ENC_NA);
       mip_tree = proto_item_add_subtree(ti, ett_mip);
 
@@ -986,7 +979,13 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       offset++;
 
       /* flags */
-      proto_tree_add_bitmask(mip_tree, tvb, offset, hf_mip_flags2, ett_mip_flags, mip_flags, ENC_BIG_ENDIAN);
+      flags = tvb_get_ntohs(tvb, offset);
+      tf = proto_tree_add_uint(mip_tree, hf_mip_flags2, tvb, offset, 2, flags);
+      flags_tree = proto_item_add_subtree(tf, ett_mip_flags);
+      proto_tree_add_boolean(flags_tree, hf_mip_ack_i, tvb, offset, 2, flags);
+
+      /* reserved */
+      proto_tree_add_uint(flags_tree, hf_mip_ack_reserved2, tvb, offset, 2, flags);
       offset += 2;
 
       /* home address */
@@ -1024,6 +1023,7 @@ void proto_register_mip(void)
     },
     { &hf_mip_s,
       {"Simultaneous Bindings",           "mip.s",
+
        FT_BOOLEAN, 8, NULL, 128,
        "Simultaneous Bindings Allowed", HFILL }
     },
@@ -1168,12 +1168,11 @@ void proto_register_mip(void)
         FT_BOOLEAN, 16, NULL, 16384,
         "Inform Mobile Node", HFILL }
     },
-
     { &hf_mip_rev_reserved2,
       { "Reserved",                 "mip.rev.reserved2",
         FT_UINT16, BASE_HEX, NULL, 0x3fff,
-        NULL, HFILL}},
-
+        NULL, HFILL}
+    },
     { &hf_mip_hda,
       { "Home Domain Address",      "mip.rev.hda",
         FT_IPv4, BASE_NONE, NULL, 0,
@@ -1202,8 +1201,8 @@ void proto_register_mip(void)
     { &hf_mip_ack_reserved2,
       { "Reserved",                 "mip.ack.reserved2",
         FT_UINT16, BASE_HEX, NULL, 0x7fff,
-        NULL, HFILL}},
-
+        NULL, HFILL}
+    },
     { &hf_mip_dhaext_stype,
       { "DynHA Ext SubType",        "mip.ext.dynha.subtype",
         FT_UINT8, BASE_DEC, VALS(mip_dhaext_stypes), 0,
@@ -1455,12 +1454,6 @@ void proto_register_mip(void)
     &ett_mip_pmipv4_ext,
   };
 
-  static ei_register_info ei[] = {
-    { &ei_mip_data_not_dissected, { "mip.data_not_dissected", PI_UNDECODED, PI_WARN, "Data not dissected yet", EXPFILL }},
-  };
-
-  expert_module_t* expert_mip;
-
   /* Register the protocol name and description */
   proto_mip = proto_register_protocol("Mobile IP", "Mobile IP", "mip");
 
@@ -1470,8 +1463,6 @@ void proto_register_mip(void)
   /* Required function calls to register the header fields and subtrees used */
   proto_register_field_array(proto_mip, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
-  expert_mip = expert_register_protocol(proto_mip);
-  expert_register_field_array(expert_mip, ei, array_length(ei));
 
   mip_nvse_ext_dissector_table = register_dissector_table("mip.nvse_ext",
     "MIP Normal Vendor/Organization Specific Extension", FT_UINT32, BASE_DEC);

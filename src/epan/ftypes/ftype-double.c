@@ -47,7 +47,7 @@ value_get_floating(fvalue_t *fv)
 }
 
 static gboolean
-val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, gchar **err_msg)
+val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_, LogFunc logfunc)
 {
 	char    *endptr = NULL;
 
@@ -55,23 +55,19 @@ val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_,
 
 	if (endptr == s || *endptr != '\0') {
 		/* This isn't a valid number. */
-		if (err_msg != NULL)
-			*err_msg = g_strdup_printf("\"%s\" is not a valid number.", s);
+		logfunc("\"%s\" is not a valid number.", s);
 		return FALSE;
 	}
 	if (errno == ERANGE) {
 		if (fv->value.floating == 0) {
-			if (err_msg != NULL)
-				*err_msg = g_strdup_printf("\"%s\" causes floating-point underflow.", s);
+			logfunc("\"%s\" causes floating-point underflow.", s);
 		}
 		else if (fv->value.floating == HUGE_VAL) {
-			if (err_msg != NULL)
-				*err_msg = g_strdup_printf("\"%s\" causes floating-point overflow.", s);
+			logfunc("\"%s\" causes floating-point overflow.", s);
 		}
 		else {
-			if (err_msg != NULL)
-				*err_msg = g_strdup_printf("\"%s\" is not a valid floating-point number.",
-				    s);
+			logfunc("\"%s\" is not a valid floating-point number.",
+			    s);
 		}
 		return FALSE;
 	}
@@ -80,7 +76,7 @@ val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_,
 }
 
 static int
-float_val_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_, int field_display _U_)
+float_val_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_)
 {
 	/*
 	 * 1 character for a sign.
@@ -93,13 +89,13 @@ float_val_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_, int field_display _U_)
 }
 
 static void
-float_val_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, int field_display _U_, char *buf)
+float_val_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, char *buf)
 {
 	sprintf(buf, "%." G_STRINGIFY(FLT_DIG) "g", fv->value.floating);
 }
 
 static int
-double_val_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_, int field_display _U_)
+double_val_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_)
 {
 	/*
 	 * 1 character for a sign.
@@ -111,7 +107,7 @@ double_val_repr_len(fvalue_t *fv _U_, ftrepr_t rtype _U_, int field_display _U_)
 }
 
 static void
-double_val_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, int field_display _U_, char *buf)
+double_val_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, char *buf)
 {
 	sprintf(buf, "%." G_STRINGIFY(DBL_DIG) "g", fv->value.floating);
 }

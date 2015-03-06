@@ -23,23 +23,29 @@
 #include "config.h"
 
 #include <string.h>
+#include <ctype.h>
 
 #include <gtk/gtk.h>
 
+#include <epan/proto.h>
+#include <epan/dfilter/dfilter.h>
 #include <epan/strutil.h>
 #include <epan/prefs.h>
 
 #include "../globals.h"
+#include "ui/alert_box.h"
 #include "ui/main_statusbar.h"
 
-#include "ui/gtk/old-gtk-compat.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/find_dlg.h"
 #include "ui/gtk/filter_dlg.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/stock_icons.h"
+#include "ui/gtk/prefs_dlg.h"
+#include "ui/gtk/keys.h"
 #include "ui/gtk/help_dlg.h"
 #include "ui/gtk/filter_autocomplete.h"
+#include "ui/gtk/old-gtk-compat.h"
 
 /* Capture callback data keys */
 #define E_FIND_FILT_KEY       "find_filter_te"
@@ -626,12 +632,9 @@ find_frame_ok_cb(GtkWidget *ok_bt _U_, gpointer parent_w)
     /*
      * Display filter search - try to compile the filter.
      */
-    gchar *err_msg;
-
-    if (!dfilter_compile(filter_text, &sfcode, &err_msg)) {
+    if (!dfilter_compile(filter_text, &sfcode)) {
       /* The attempt failed; report an error. */
-      bad_dfilter_alert_box(GTK_WIDGET(parent_w), filter_text, err_msg);
-      g_free(err_msg);
+      bad_dfilter_alert_box(GTK_WIDGET(parent_w), filter_text);
       return;
     }
 
@@ -755,7 +758,7 @@ find_previous_next(GtkWidget *w, gpointer d, search_direction dir)
       }
       g_free(string);
     } else {
-      if (!dfilter_compile(cfile.sfilter, &sfcode, NULL)) {
+      if (!dfilter_compile(cfile.sfilter, &sfcode)) {
 	/*
 	 * XXX - this shouldn't happen, as we've already successfully
 	 * translated the string once.

@@ -78,17 +78,6 @@ crc32_ccitt_tvb_offset_seed(tvbuff_t *tvb, guint offset, guint len,
 	return ( crc32_ccitt_seed(buf, len, seed) );
 }
 
-guint32
-crc32c_tvb_offset_calculate(tvbuff_t *tvb, guint offset, guint len, guint32 seed)
-{
-	const guint8* buf;
-
-	tvb_ensure_bytes_exist(tvb, offset, len);  /* len == -1 not allowed */
-	buf = tvb_get_ptr(tvb, offset, len);
-
-	return ( crc32c_calculate(buf, len, seed) );
-}
-
 /*
  * IEEE 802.x version (Ethernet and 802.11, at least) - byte-swap
  * the result of "crc32()".
@@ -113,7 +102,7 @@ crc32_802_tvb(tvbuff_t *tvb, guint len)
 
 guint32
 crc32_mpeg2_tvb_offset_seed(tvbuff_t *tvb, guint offset,
-			    guint len, guint32 seed)
+                                       guint len, guint32 seed)
 {
 	const guint8* buf;
 
@@ -126,41 +115,28 @@ crc32_mpeg2_tvb_offset_seed(tvbuff_t *tvb, guint offset,
 guint32
 crc32_mpeg2_tvb(tvbuff_t *tvb, guint len)
 {
-	return ( crc32_mpeg2_tvb_offset_seed(tvb, 0, len, CRC32_MPEG2_SEED) );
+    return ( crc32_mpeg2_tvb_offset_seed(tvb, 0, len, CRC32_MPEG2_SEED) );
 }
 
 guint32
 crc32_mpeg2_tvb_offset(tvbuff_t *tvb, guint offset, guint len)
 {
-	return ( crc32_mpeg2_tvb_offset_seed(tvb, offset, len, CRC32_MPEG2_SEED) );
+    return ( crc32_mpeg2_tvb_offset_seed(tvb, offset, len, CRC32_MPEG2_SEED) );
 }
 
 guint32
 crc32_mpeg2_tvb_seed(tvbuff_t *tvb, guint len, guint32 seed)
 {
-	return ( crc32_mpeg2_tvb_offset_seed(tvb, 0, len, seed) );
+    return ( crc32_mpeg2_tvb_offset_seed(tvb, 0, len, seed) );
 }
 
 guint32 crc32_0x0AA725CF_tvb_offset_seed(tvbuff_t *tvb,
-					 guint offset, guint len, guint32 seed)
+                                            guint offset, guint len, guint32 seed)
 {
-	const guint8 *buf;
+    const guint8 *buf;
 
-	tvb_ensure_bytes_exist(tvb, offset, len);  /* len == -1 not allowed */
-	buf = tvb_get_ptr(tvb, offset, len);
+    tvb_ensure_bytes_exist(tvb, offset, len);  /* len == -1 not allowed */
+    buf = tvb_get_ptr(tvb, offset, len);
 
-	return crc32_0x0AA725CF_seed(buf, len, seed);
+    return crc32_0x0AA725CF_seed(buf, len, seed);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -31,10 +31,14 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/asn1.h>
 #include <epan/etypes.h>
 #include <epan/expert.h>
+
+#include <stdio.h>
+#include <string.h>
 
 #include "packet-ber.h"
 #include "packet-acse.h"
@@ -120,7 +124,7 @@ static int hf_sv_seqData = -1;                    /* Data */
 static int hf_sv_smpMod = -1;                     /* T_smpMod */
 
 /*--- End of included file: packet-sv-hf.c ---*/
-#line 98 "../../asn1/sv/packet-sv-template.c"
+#line 102 "../../asn1/sv/packet-sv-template.c"
 
 /* Initialize the subtree pointers */
 static int ett_sv = -1;
@@ -136,10 +140,9 @@ static gint ett_sv_SEQUENCE_OF_ASDU = -1;
 static gint ett_sv_ASDU = -1;
 
 /*--- End of included file: packet-sv-ett.c ---*/
-#line 105 "../../asn1/sv/packet-sv-template.c"
+#line 109 "../../asn1/sv/packet-sv-template.c"
 
 static expert_field ei_sv_mal_utctime = EI_INIT;
-static expert_field ei_sv_zero_pdu = EI_INIT;
 
 #if 0
 static const value_string sv_q_validity_vals[] = {
@@ -163,7 +166,7 @@ dissect_PhsMeas1(gboolean implicit_tag, packet_info *pinfo, proto_tree *tree, tv
 	gint32 tag;
 	guint32 len;
 	proto_item *it;
-	proto_tree *subtree;
+	proto_tree *subtree = NULL;
 	gint32 value;
 	guint32 qual;
 	guint32 i;
@@ -192,7 +195,10 @@ dissect_PhsMeas1(gboolean implicit_tag, packet_info *pinfo, proto_tree *tree, tv
 		len=tvb_length_remaining(tvb, offset);
 	}
 
-	subtree = proto_tree_add_subtree(tree, tvb, offset, len, ett_phsmeas, NULL, "PhsMeas1");
+	if (tree) {
+		it = proto_tree_add_text(tree, tvb, offset, len, "PhsMeas1");
+		subtree = proto_item_add_subtree(it, ett_phsmeas);
+	}
 
 	sv_data.num_phsMeas = 0;
 	for (i = 0; i < len/8; i++) {
@@ -298,7 +304,7 @@ dissect_sv_UtcTime(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_,
 	ts.secs = seconds;
 	ts.nsecs = nanoseconds;
 
-	ptime = abs_time_to_str(wmem_packet_scope(), &ts, ABSOLUTE_TIME_UTC, TRUE);
+	ptime = abs_time_to_ep_str(&ts, ABSOLUTE_TIME_UTC, TRUE);
 
 	if(hf_index >= 0)
 	{
@@ -432,7 +438,7 @@ dissect_sv_SampledValues(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offse
 
 
 /*--- End of included file: packet-sv-fn.c ---*/
-#line 186 "../../asn1/sv/packet-sv-template.c"
+#line 192 "../../asn1/sv/packet-sv-template.c"
 
 /*
 * Dissect SV PDUs inside a PPDU.
@@ -442,15 +448,16 @@ dissect_sv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 {
 	int offset = 0;
 	int old_offset;
-	proto_item *item;
-	proto_tree *tree;
+	proto_item *item = NULL;
+	proto_tree *tree = NULL;
 	asn1_ctx_t asn1_ctx;
 
 	asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
 
-	item = proto_tree_add_item(parent_tree, proto_sv, tvb, 0, -1, ENC_NA);
-	tree = proto_item_add_subtree(item, ett_sv);
-
+	if (parent_tree){
+		item = proto_tree_add_item(parent_tree, proto_sv, tvb, 0, -1, ENC_NA);
+		tree = proto_item_add_subtree(item, ett_sv);
+	}
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, PNAME);
 	col_clear(pinfo->cinfo, COL_INFO);
 
@@ -475,7 +482,7 @@ dissect_sv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 		old_offset = offset;
 		offset = dissect_sv_SampledValues(FALSE, tvb, offset, &asn1_ctx , tree, -1);
 		if (offset == old_offset) {
-			proto_tree_add_expert(tree, pinfo, &ei_sv_zero_pdu, tvb, offset, -1);
+			proto_tree_add_text(tree, tvb, offset, -1, "Internal error, zero-byte SV PDU");
 			break;
 		}
 	}
@@ -605,7 +612,7 @@ void proto_register_sv(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-sv-hfarr.c ---*/
-#line 302 "../../asn1/sv/packet-sv-template.c"
+#line 309 "../../asn1/sv/packet-sv-template.c"
 	};
 
 	/* List of subtrees */
@@ -622,12 +629,11 @@ void proto_register_sv(void) {
     &ett_sv_ASDU,
 
 /*--- End of included file: packet-sv-ettarr.c ---*/
-#line 310 "../../asn1/sv/packet-sv-template.c"
+#line 317 "../../asn1/sv/packet-sv-template.c"
 	};
 
 	static ei_register_info ei[] = {
 		{ &ei_sv_mal_utctime, { "sv.malformed.utctime", PI_MALFORMED, PI_WARN, "BER Error: malformed UTCTime encoding", EXPFILL }},
-		{ &ei_sv_zero_pdu, { "sv.zero_pdu", PI_PROTOCOL, PI_ERROR, "Internal error, zero-byte SV PDU", EXPFILL }},
 	};
 
 	expert_module_t* expert_sv;

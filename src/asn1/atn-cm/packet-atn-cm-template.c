@@ -45,11 +45,13 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/conversation.h>
-#include "packet-ber.h"
-#include "packet-per.h"
+#include <epan/dissectors/packet-ber.h>
+#include <epan/dissectors/packet-per.h>
+
 #include "packet-atn-ulcs.h"
 
 #define ATN_CM_PROTO "ICAO Doc9705 CM"
@@ -73,10 +75,19 @@ dissect_atn_cm(
 		void *data _U_)
 {
 		int 	type;
+		proto_item *ti;
 		proto_tree *sub_tree;
 
-		sub_tree = proto_tree_add_subtree(
-			tree, tvb, 0, -1, ett_atn_cm, NULL, ATN_CM_PROTO);
+		ti = proto_tree_add_text(
+			tree,
+			tvb,
+			0,
+			tvb_reported_length_remaining(tvb, 0) ,
+			ATN_CM_PROTO);
+
+		sub_tree = proto_item_add_subtree(
+			ti,
+			ett_atn_cm);
 
 		/* ti = proto_tree_add_item(tree, proto_atn_cm, tvb, 0, 0 , ENC_NA); */
 		/* sub_tree = proto_item_add_subtree(ti, ett_atn_cm_pdu); */
@@ -89,13 +100,13 @@ dissect_atn_cm(
 						dissect_CMGroundMessage_PDU(
 							tvb,
 							pinfo,
-							sub_tree, NULL);
+							sub_tree);
 						break;
 				case dm:
 						dissect_CMAircraftMessage_PDU(
 							tvb,
 							pinfo,
-							sub_tree, NULL);
+							sub_tree);
 						break;
 				default:
 						break;
@@ -124,7 +135,7 @@ dissect_atn_cm_heur(
 								dissect_CMGroundMessage_PDU(
 									tvb,
 									pinfo,
-									NULL, NULL);
+									NULL);
 								/* no exception thrown: looks like it is a CM PDU */
 								is_atn_cm = TRUE; }
 						CATCH_ALL {
@@ -136,7 +147,7 @@ dissect_atn_cm_heur(
 								dissect_CMAircraftMessage_PDU(
 										tvb,
 										pinfo,
-										NULL, NULL);
+										NULL);
 								/* no exception thrown: looks like it is a CM PDU */
 								is_atn_cm = TRUE;}
 						CATCH_ALL {

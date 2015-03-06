@@ -40,6 +40,7 @@
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/strutil.h>
 #include <epan/expert.h>
 
 
@@ -175,7 +176,6 @@ static int hf_evrc_toc_frame_type_low = -1;
 static int hf_evrc_b_toc_frame_type_high = -1;
 static int hf_evrc_b_toc_frame_type_low = -1;
 static int hf_evrc_padding = -1;
-static int hf_evrc_speech_data = -1;
 static int hf_evrc_legacy_toc_fe_ind = -1;
 static int hf_evrc_legacy_toc_reduc_rate = -1;
 static int hf_evrc_legacy_toc_frame_type = -1;
@@ -270,8 +270,10 @@ dissect_evrc_aux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, evrc_varia
         while (further_entries && (frame_count < sizeof(speech_data_len)) &&
             ((len - offset) > 0))
         {
-            toc_tree =
-                proto_tree_add_subtree_format(evrc_tree, tvb, offset, 1, ett_toc, NULL, "ToC [%u]", frame_count+1);
+            item =
+                proto_tree_add_text(evrc_tree, tvb, offset, 1, "ToC [%u]", frame_count+1);
+
+            toc_tree = proto_item_add_subtree(item, ett_toc);
 
             proto_tree_add_item(toc_tree, hf_evrc_legacy_toc_fe_ind, tvb, offset, 1, ENC_BIG_ENDIAN);
             proto_tree_add_item(toc_tree, hf_evrc_legacy_toc_reduc_rate, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -354,9 +356,11 @@ dissect_evrc_aux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, evrc_varia
         offset++;
         saved_offset = offset;
 
-        toc_tree =
-            proto_tree_add_subtree_format(evrc_tree, tvb, offset, -1, ett_toc, &item, "ToC - %u frame%s",
+        item =
+            proto_tree_add_text(evrc_tree, tvb, offset, -1, "ToC - %u frame%s",
                 frame_count, plurality(frame_count, "", "s"));
+
+        toc_tree = proto_item_add_subtree(item, ett_toc);
 
         i = 0;
         while ((i < frame_count) &&
@@ -396,7 +400,7 @@ dissect_evrc_aux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, evrc_varia
     while ((i < frame_count) &&
         ((len - offset) >= speech_data_len[i]))
     {
-        proto_tree_add_bytes_format(evrc_tree, hf_evrc_speech_data, tvb, offset, speech_data_len[i], NULL, "Speech Data [%u]", i+1);
+        proto_tree_add_text(evrc_tree, tvb, offset, speech_data_len[i], "Speech Data [%u]", i+1);
 
         offset += speech_data_len[i];
         i++;
@@ -529,11 +533,6 @@ proto_register_evrc(void)
             { "Padding",                "evrc.padding",
             FT_UINT8, BASE_DEC, NULL, 0x0f,
             "Padding bits", HFILL }
-        },
-        { &hf_evrc_speech_data,
-            { "Speech data",                "evrc.speech_data",
-            FT_BYTES, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }
         },
         { &hf_evrc_legacy_toc_fe_ind,
             { "ToC Further Entries Indicator",  "evrc.legacy.toc.further_entries_ind",

@@ -23,6 +23,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
@@ -61,7 +62,8 @@ const char *x509af_get_last_algorithm_id(void) {
 static int
 dissect_pkix_crl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *data _U_)
 {
-	proto_tree *tree;
+	proto_item *item=NULL;
+	proto_tree *tree=NULL;
 	asn1_ctx_t asn1_ctx;
 	asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
 
@@ -70,7 +72,10 @@ dissect_pkix_crl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, voi
 	col_set_str(pinfo->cinfo, COL_INFO, "Certificate Revocation List");
 
 
-	tree=proto_tree_add_subtree(parent_tree, tvb, 0, -1, ett_pkix_crl, NULL, "Certificate Revocation List");
+	if(parent_tree){
+		item=proto_tree_add_text(parent_tree, tvb, 0, -1, "Certificate Revocation List");
+		tree = proto_item_add_subtree(item, ett_pkix_crl);
+	}
 
 	return dissect_x509af_CertificateList(FALSE, tvb, 0, &asn1_ctx, tree, -1);
 }
@@ -105,9 +110,9 @@ void proto_register_x509af(void) {
   proto_register_subtree_array(ett, array_length(ett));
 
 
-  new_register_ber_syntax_dissector("Certificate", proto_x509af, dissect_x509af_Certificate_PDU);
-  new_register_ber_syntax_dissector("CertificateList", proto_x509af, dissect_CertificateList_PDU);
-  new_register_ber_syntax_dissector("CrossCertificatePair", proto_x509af, dissect_CertificatePair_PDU);
+  register_ber_syntax_dissector("Certificate", proto_x509af, dissect_x509af_Certificate_PDU);
+  register_ber_syntax_dissector("CertificateList", proto_x509af, dissect_CertificateList_PDU);
+  register_ber_syntax_dissector("CrossCertificatePair", proto_x509af, dissect_CertificatePair_PDU);
 
   register_ber_oid_syntax(".cer", NULL, "Certificate");
   register_ber_oid_syntax(".crt", NULL, "Certificate");
@@ -124,8 +129,8 @@ void proto_reg_handoff_x509af(void) {
 
 #include "packet-x509af-dis-tab.c"
 
-	/*XXX these should really go to a better place but since
-	  I have not that ITU standard, I'll put it here for the time
+	/*XXX these should really go to a better place but since that
+	  I have not that ITU standard, ill put it here for the time
 	  being.
 	  Only implemented those algorithms that take no parameters
 	  for the time being,   ronnie
@@ -155,15 +160,15 @@ void proto_reg_handoff_x509af(void) {
 
 	/* these will generally be encoded as ";binary" in LDAP */
 
-	new_register_ldap_name_dissector("cACertificate", dissect_x509af_Certificate_PDU, proto_x509af);
-	new_register_ldap_name_dissector("userCertificate", dissect_x509af_Certificate_PDU, proto_x509af);
+	register_ldap_name_dissector("cACertificate", dissect_x509af_Certificate_PDU, proto_x509af);
+	register_ldap_name_dissector("userCertificate", dissect_x509af_Certificate_PDU, proto_x509af);
 
-	new_register_ldap_name_dissector("certificateRevocationList", dissect_CertificateList_PDU, proto_x509af);
-	new_register_ldap_name_dissector("crl", dissect_CertificateList_PDU, proto_x509af);
+	register_ldap_name_dissector("certificateRevocationList", dissect_CertificateList_PDU, proto_x509af);
+	register_ldap_name_dissector("crl", dissect_CertificateList_PDU, proto_x509af);
 
-	new_register_ldap_name_dissector("authorityRevocationList", dissect_CertificateList_PDU, proto_x509af);
-	new_register_ldap_name_dissector("arl", dissect_CertificateList_PDU, proto_x509af);
+	register_ldap_name_dissector("authorityRevocationList", dissect_CertificateList_PDU, proto_x509af);
+	register_ldap_name_dissector("arl", dissect_CertificateList_PDU, proto_x509af);
 
-	new_register_ldap_name_dissector("crossCertificatePair", dissect_CertificatePair_PDU, proto_x509af);
+	register_ldap_name_dissector("crossCertificatePair", dissect_CertificatePair_PDU, proto_x509af);
 }
 

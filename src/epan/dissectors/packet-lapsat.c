@@ -33,8 +33,11 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/reassemble.h>
+#include <epan/wmem/wmem.h>
+
 void proto_register_lapsat(void);
 void proto_reg_handoff_lapsat(void);
 
@@ -76,7 +79,6 @@ static int hf_lapsat_payload_last_nibble = -1;
 
 static int hf_lapsat_len = -1;
 
-static int hf_lapsat_fragment_data = -1;
 static int hf_lapsat_fragments = -1;
 static int hf_lapsat_fragment = -1;
 static int hf_lapsat_fragment_overlap = -1;
@@ -556,7 +558,7 @@ dissect_lapsat(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		} else {
 			/* No, just add infos */
 			col_append_str(pinfo->cinfo, COL_INFO, " (Fragment)");
-			proto_tree_add_item(lapsat_tree, hf_lapsat_fragment_data, payload, 0, -1, ENC_NA);
+			proto_tree_add_text(lapsat_tree, payload, 0, -1, "Fragment Data");
 		}
 
 		/* Now reset fragmentation information in pinfo */
@@ -685,11 +687,6 @@ proto_register_lapsat(void)
 		},
 
 		/* Fragment reassembly */
-		{ &hf_lapsat_fragment_data,
-		  { "Fragment Data", "lapsat.fragment_data",
-		    FT_BYTES, BASE_NONE, NULL, 0x00,
-		    NULL, HFILL }
-		},
 		{ &hf_lapsat_fragments,
 		  { "Message fragments", "lapsat.fragments",
 		    FT_NONE, BASE_NONE, NULL, 0x00,
@@ -768,16 +765,3 @@ proto_reg_handoff_lapsat(void)
 {
 	data_handle = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

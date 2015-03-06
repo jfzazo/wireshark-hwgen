@@ -11,8 +11,8 @@ include Makefile.common
 CFLAGS= $(WARNINGS_ARE_ERRORS) $(STANDARD_CFLAGS) \
 	/I. /I.. /I../.. $(GLIB_CFLAGS) \
 	$(ZLIB_CFLAGS) -DWS_BUILD_DLL\
-	$(GNUTLS_CFLAGS) $(KFW_CFLAGS) \
-	$(AIRPCAP_CFLAGS) $(GEOIP_CFLAGS) \
+	$(GNUTLS_CFLAGS) $(NETTLE_CFLAGS) \
+	$(KFW_CFLAGS) $(AIRPCAP_CFLAGS) $(GEOIP_CFLAGS) \
 	/I$(PCAP_DIR)\include
 
 .c.obj::
@@ -65,20 +65,38 @@ packet-rrc.obj : packet-rrc.c
 # pass only the first few names in the list to the shell, for some
 # reason.
 #
-# Therefore, we use a script to generate the register.c file.
+# Therefore, we have a script to generate the register.c file.
+# The shell script runs slowly, as multiple greps and seds are run
+# for each input file; this is especially slow on Windows.  Therefore,
+# if Python is present (as indicated by PYTHON being defined), we run
+# a faster Python script to do that work instead.
+#
 # The first argument is the directory in which the source files live.
 # The second argument is "dissectors", to indicate that we should build
 # a register.c file for libwireshark.
 # All subsequent arguments are the files to scan.
 #
 
-register.c: $(ALL_DISSECTORS_SRC) Makefile.common ..\..\tools\make-dissector-reg.py
-	@echo Making register.c
+register.c: $(ALL_DISSECTORS_SRC) Makefile.common ..\..\tools\make-dissector-reg.py ..\..\tools\make-dissector-reg
+!IFDEF PYTHON
+	@echo Making register.c (using python)
 	@$(PYTHON) "../../tools/make-dissector-reg.py" . dissectors $(ALL_DISSECTORS_SRC)
+!ELSE
+	@echo Making register.c (using sh)
+	@$(SH) ../../tools/make-dissector-reg . dissectors $(ALL_DISSECTORS_SRC)
+!ENDIF
 
 packet-ncp2222.c: ..\..\tools/ncp2222.py
+!IFDEF PYTHON
 	@echo Making packet-ncp2222.c
 	$(PYTHON) "../../tools/ncp2222.py" -o packet-ncp2222.c
+!ELSE
+	@echo Faking packet-ncp2222.c...
+	@echo Python is required to build the NCP disector
+	@echo Hiding packet-ncp.c...
+	mv packet-ncp.c packet-ncp.c.save
+	touch packet-ncp.c $@
+!ENDIF
 
 packet-ncp2222.obj: packet-ncp2222.inc
 
@@ -89,7 +107,7 @@ x11-dissector: ..\..\tools/process-x11-fields.pl x11-fields ..\..\tools/process-
 	$(PERL) ../../tools/process-x11-xcb.pl
 
 clean:
-	rm -f dissectors.lib *.nativecodeanalysis.xml *.pdb *.sbr register.c-tmp register-cache.pkl \
+	rm -f dissectors.lib *.pdb *.sbr register.c-tmp register-cache.pkl \
 		$(DISSECTOR_OBJECTS) $(DISSECTOR_SUPPORT_OBJECTS)
 
 distclean: clean

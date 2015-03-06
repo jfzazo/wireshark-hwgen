@@ -27,31 +27,35 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/conversation.h>
+#include <epan/tap.h>
 #include "packet-scsi.h"
+#include "packet-fc.h"
 #include "packet-scsi-smc.h"
 
 void proto_register_scsi_smc(void);
+void proto_reg_handoff_scsi_smc(void);
 
-static int proto_scsi_smc                       = -1;
-int hf_scsi_smc_opcode                          = -1;
-static int hf_scsi_smc_mta                      = -1;
-static int hf_scsi_smc_sa                       = -1;
-static int hf_scsi_smc_da                       = -1;
-static int hf_scsi_smc_fda                      = -1;
-static int hf_scsi_smc_sda                      = -1;
-static int hf_scsi_smc_medium_flags             = -1;
-static int hf_scsi_smc_inv1                     = -1;
-static int hf_scsi_smc_inv2                     = -1;
-static int hf_scsi_smc_range_flags              = -1;
-static int hf_scsi_smc_fast                     = -1;
-static int hf_scsi_smc_range                    = -1;
-/* static int hf_scsi_smc_sea                   = -1; */
-static int hf_scsi_smc_num_elements             = -1;
-static int hf_scsi_smc_invert                   = -1;
-static int hf_scsi_smc_ea                       = -1;
-static int hf_scsi_smc_action_code              = -1;
+static int proto_scsi_smc			= -1;
+int hf_scsi_smc_opcode				= -1;
+static int hf_scsi_smc_mta			= -1;
+static int hf_scsi_smc_sa			= -1;
+static int hf_scsi_smc_da			= -1;
+static int hf_scsi_smc_fda			= -1;
+static int hf_scsi_smc_sda			= -1;
+static int hf_scsi_smc_medium_flags		= -1;
+static int hf_scsi_smc_inv1			= -1;
+static int hf_scsi_smc_inv2			= -1;
+static int hf_scsi_smc_range_flags		= -1;
+static int hf_scsi_smc_fast			= -1;
+static int hf_scsi_smc_range			= -1;
+/* static int hf_scsi_smc_sea			= -1; */
+static int hf_scsi_smc_num_elements		= -1;
+static int hf_scsi_smc_invert			= -1;
+static int hf_scsi_smc_ea			= -1;
+static int hf_scsi_smc_action_code		= -1;
 /* Generated from convert_proto_tree_add_text.pl */
 static int hf_scsi_smc_allocation_length = -1;
 static int hf_scsi_smc_first_element_address_reported = -1;
@@ -93,9 +97,9 @@ static int hf_scsi_smc_primary_vol_seq_num = -1;
 static int hf_scsi_smc_alternate_vol_tag_id = -1;
 static int hf_scsi_smc_alternate_vol_seq_num = -1;
 
-static gint ett_scsi_exchange_medium            = -1;
-static gint ett_scsi_range                      = -1;
-static gint ett_scsi_move                       = -1;
+static gint ett_scsi_exchange_medium		= -1;
+static gint ett_scsi_range			= -1;
+static gint ett_scsi_move			= -1;
 
 static void
 dissect_smc_exchangemedium (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
@@ -105,7 +109,7 @@ dissect_smc_exchangemedium (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
     static const int *exchg_fields[] = {
         &hf_scsi_smc_inv1,
         &hf_scsi_smc_inv2,
-        NULL
+	NULL
     };
 
     if (!tree)
@@ -130,7 +134,7 @@ dissect_smc_position_to_element (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tr
 {
     static const int *pte_fields[] = {
         &hf_scsi_smc_invert,
-        NULL
+	NULL
     };
 
     if (!tree)
@@ -168,7 +172,7 @@ dissect_smc_initialize_element_status_with_range (tvbuff_t *tvb, packet_info *pi
     static const int *range_fields[] = {
         &hf_scsi_smc_fast,
         &hf_scsi_smc_range,
-        NULL
+	NULL
     };
 
     if (!tree)
@@ -206,7 +210,7 @@ dissect_smc_movemedium (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 {
     static const int *move_fields[] = {
         &hf_scsi_smc_invert,
-        NULL
+	NULL
     };
 
     if (!tree)
@@ -263,7 +267,7 @@ dissect_scsi_smc_volume_tag (tvbuff_t *tvb, packet_info *pinfo _U_,
     tvb_memcpy (tvb, (guint8 *)volid, offset, 32);
     p = &volid[32];
     for (;;) {
-        *p = '\0';
+    	*p = '\0';
         if (p == volid)
             break;
         if (*(p - 1) != ' ')
@@ -339,7 +343,7 @@ dissect_scsi_smc_element (tvbuff_t *tvb, packet_info *pinfo _U_,
     case DT_ELEM:
         flags = tvb_get_guint8 (tvb, offset);
         if (flags & LU_VALID) {
-            proto_tree_add_item(tree, hf_scsi_smc_lun, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tree, hf_scsi_smc_lun, tvb, offset, 1, ENC_NA);
         }
         proto_tree_add_item(tree, hf_scsi_smc_not_bus, tvb, offset, 1, ENC_NA);
         proto_tree_add_item(tree, hf_scsi_smc_id_valid, tvb, offset, 1, ENC_NA);
@@ -347,7 +351,7 @@ dissect_scsi_smc_element (tvbuff_t *tvb, packet_info *pinfo _U_,
 
         offset += 1;
         if (flags & ID_VALID) {
-            proto_tree_add_item(tree, hf_scsi_smc_scsi_bus_address, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tree, hf_scsi_smc_scsi_bus_address, tvb, offset, 1, ENC_NA);
         }
         offset += 1;
         offset += 1; /* reserved */
@@ -393,13 +397,13 @@ dissect_scsi_smc_element (tvbuff_t *tvb, packet_info *pinfo _U_,
 
     if (elem_bytecnt < 1)
         return;
-    proto_tree_add_item(tree, hf_scsi_smc_code_set, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_scsi_smc_code_set, tvb, offset, 1, ENC_NA);
     offset += 1;
     elem_bytecnt -= 1;
 
     if (elem_bytecnt < 1)
         return;
-    proto_tree_add_item(tree, hf_scsi_smc_identifier_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_scsi_smc_identifier_type, tvb, offset, 1, ENC_NA);
     offset += 1;
     elem_bytecnt -= 1;
 
@@ -411,7 +415,7 @@ dissect_scsi_smc_element (tvbuff_t *tvb, packet_info *pinfo _U_,
     if (elem_bytecnt < 1)
         return;
     ident_len = tvb_get_guint8 (tvb, offset);
-    proto_tree_add_item(tree, hf_scsi_smc_identifier_length, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_scsi_smc_identifier_length, tvb, offset, 1, ENC_NA);
     offset += 1;
     elem_bytecnt -= 1;
 
@@ -442,8 +446,8 @@ dissect_scsi_smc_elements (tvbuff_t *tvb, packet_info *pinfo,
         if (elem_bytecnt > desc_bytecnt)
             elem_bytecnt = desc_bytecnt;
 
-        if (elem_bytecnt < 2)
-            break;
+	if (elem_bytecnt < 2)
+	    break;
 
         dissect_scsi_smc_element (tvb, pinfo, tree, offset, elem_bytecnt,
                                    elem_type, voltag_flags);
@@ -469,7 +473,7 @@ dissect_smc_readelementstatus (tvbuff_t *tvb, packet_info *pinfo,
 
     if (isreq && iscdb) {
         proto_tree_add_item(tree, hf_scsi_smc_voltag, tvb, offset, 1, ENC_NA);
-        proto_tree_add_item(tree, hf_scsi_smc_element_type_code_0F, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(tree, hf_scsi_smc_element_type_code_0F, tvb, offset, 1, ENC_NA);
         proto_tree_add_item(tree, hf_scsi_smc_starting_element_address, tvb, offset+1, 2, ENC_BIG_ENDIAN);
         proto_tree_add_item(tree, hf_scsi_smc_number_of_elements, tvb, offset+3, 2, ENC_BIG_ENDIAN);
         proto_tree_add_item(tree, hf_scsi_smc_curdata, tvb, offset+4, 1, ENC_NA);
@@ -491,7 +495,7 @@ dissect_smc_readelementstatus (tvbuff_t *tvb, packet_info *pinfo,
             if (bytecnt < 1)
                 break;
             elem_type = tvb_get_guint8 (tvb, offset);
-            proto_tree_add_item(tree, hf_scsi_smc_element_type_code, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tree, hf_scsi_smc_element_type_code, tvb, offset, 1, ENC_NA);
             offset += 1;
             bytecnt -= 1;
 
@@ -873,32 +877,32 @@ proto_register_scsi_smc(void)
            FT_UINT16, BASE_DEC, NULL, 0x0,
            NULL, HFILL}
         },
-        { &hf_scsi_smc_medium_flags,
+	{ &hf_scsi_smc_medium_flags,
           {"Flags", "scsi_smc.medium_flags",
            FT_UINT8, BASE_HEX, NULL, 0x0,
            NULL, HFILL}
         },
-        { &hf_scsi_smc_inv1,
+	{ &hf_scsi_smc_inv1,
           {"INV1", "scsi_smc.inv1",
            FT_BOOLEAN, 8, NULL, 0x02,
            NULL, HFILL}
         },
-        { &hf_scsi_smc_inv2,
+	{ &hf_scsi_smc_inv2,
           {"INV2", "scsi_smc.inv2",
            FT_BOOLEAN, 8, NULL, 0x01,
            NULL, HFILL}
         },
-        { &hf_scsi_smc_range_flags,
+	{ &hf_scsi_smc_range_flags,
           {"Flags", "scsi_smc.range_flags",
            FT_UINT8, BASE_HEX, NULL, 0x0,
            NULL, HFILL}
         },
-        { &hf_scsi_smc_fast,
+	{ &hf_scsi_smc_fast,
           {"FAST", "scsi_smc.fast",
            FT_BOOLEAN, 8, NULL, 0x02,
            NULL, HFILL}
         },
-        { &hf_scsi_smc_range,
+	{ &hf_scsi_smc_range,
           {"RANGE", "scsi_smc.range",
            FT_BOOLEAN, 8, NULL, 0x01,
            NULL, HFILL}
@@ -915,7 +919,7 @@ proto_register_scsi_smc(void)
            FT_UINT16, BASE_DEC, NULL, 0x0,
            NULL, HFILL}
         },
-        { &hf_scsi_smc_invert,
+	{ &hf_scsi_smc_invert,
           {"INVERT", "scsi_smc.invert",
            FT_BOOLEAN, 8, NULL, 0x01,
            NULL, HFILL}
@@ -1145,6 +1149,12 @@ proto_register_scsi_smc(void)
 
     proto_register_subtree_array(ett, array_length(ett));
 }
+
+void
+proto_reg_handoff_scsi_smc(void)
+{
+}
+
 
 /*
  * Editor modelines  -  http://www.wireshark.org/tools/modelines.html

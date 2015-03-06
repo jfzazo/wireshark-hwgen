@@ -20,16 +20,15 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "packet-link16.h"
-
-void proto_register_link16(void);
 
 /* Elmasry, G., (2012), Tactical Wireless Communications and Networks: Design Concepts and Challenges, Wiley, ISBN 9781119951766. */
 enum {
     WORDFORMAT_INITIAL = 0,
     WORDFORMAT_CONTINUATION,
-    WORDFORMAT_EXTENSION
+    WORDFORMAT_EXTENSION,
 };
 
 static const value_string WordFormat_Strings[] = {
@@ -287,15 +286,6 @@ void proto_register_link16(void)
     new_register_dissector("link16", dissect_link16, proto_link16);
 }
 
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+void proto_reg_handoff_link16(void)
+{
+}

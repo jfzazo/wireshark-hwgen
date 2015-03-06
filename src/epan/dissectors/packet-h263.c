@@ -32,6 +32,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include "packet-h263.h"
@@ -84,15 +85,15 @@ static gint ett_h263_optype		= -1;
 
 const value_string h263_srcformat_vals[] =
 {
-	{ H263_SRCFORMAT_FORB,		"forbidden" },
-	{ H263_SRCFORMAT_SQCIF,		"sub-QCIF 128x96" },
-	{ H263_SRCFORMAT_QCIF,		"QCIF 176x144" },
-	{ H263_SRCFORMAT_CIF,			"CIF 352x288" },
-	{ H263_SRCFORMAT_4CIF,		"4CIF 704x576" },
-	{ H263_SRCFORMAT_16CIF,		"16CIF 1408x1152" },
-	{ 6,							"Reserved",},
-	{ H263_PLUSPTYPE,				"extended PTYPE" },
-	{ 0,		NULL },
+  { H263_SRCFORMAT_FORB,		"forbidden" },
+  { H263_SRCFORMAT_SQCIF,		"sub-QCIF 128x96" },
+  { H263_SRCFORMAT_QCIF,		"QCIF 176x144" },
+  { H263_SRCFORMAT_CIF,			"CIF 352x288" },
+  { H263_SRCFORMAT_4CIF,		"4CIF 704x576" },
+  { H263_SRCFORMAT_16CIF,		"16CIF 1408x1152" },
+  { 6,							"Reserved",},
+  { H263_PLUSPTYPE,				"extended PTYPE" },
+  { 0,		NULL },
 };
 
 /*
@@ -102,67 +103,67 @@ const value_string h263_srcformat_vals[] =
  */
 static const value_string ext_srcformat_vals[] =
 {
-	{ 0,							"reserved" },
-	{ H263_SRCFORMAT_SQCIF,		"sub-QCIF 128x96" },
-	{ H263_SRCFORMAT_QCIF,		"QCIF 176x144" },
-	{ H263_SRCFORMAT_CIF,			"CIF 352x288" },
-	{ H263_SRCFORMAT_4CIF,		"4CIF 704x576" },
-	{ H263_SRCFORMAT_16CIF,		"16CIF 1408x1152" },
-	{ 6,							"Custom source format",},
-	{ 7,							"Reserved" },
-	{ 0,		NULL },
+  { 0,							"reserved" },
+  { H263_SRCFORMAT_SQCIF,		"sub-QCIF 128x96" },
+  { H263_SRCFORMAT_QCIF,		"QCIF 176x144" },
+  { H263_SRCFORMAT_CIF,			"CIF 352x288" },
+  { H263_SRCFORMAT_4CIF,		"4CIF 704x576" },
+  { H263_SRCFORMAT_16CIF,		"16CIF 1408x1152" },
+  { 6,							"Custom source format",},
+  { 7,							"Reserved" },
+  { 0,		NULL },
 };
 
 static const value_string h263_ufep_vals[] =
 {
-	{ 0,		"Only MPPTYPE included" },
-	{ 1,		"All extended PTYPE fields are included" },
-	{ 0,		NULL },
+  { 0,		"Only MPPTYPE included" },
+  { 1,		"All extended PTYPE fields are included" },
+  { 0,		NULL },
 };
 
 static const true_false_string on_off_flg = {
-	"On",
-	"Off"
+  "On",
+  "Off"
 };
 static const true_false_string picture_coding_type_flg = {
-	"INTER (P-picture)",
-	"INTRA (I-picture)"
+  "INTER (P-picture)",
+  "INTRA (I-picture)"
 };
 
 static const value_string picture_coding_type_vals[] =
 {
-	{ 0,		"I-Frame" },
-	{ 1,		"P-frame" },
-	{ 0,		NULL },
+  { 0,		"I-Frame" },
+  { 1,		"P-frame" },
+  { 0,		NULL },
 };
 
 static const true_false_string PB_frames_mode_flg = {
-	"PB-frame",
-	"Normal I- or P-picture"
+  "PB-frame",
+  "Normal I- or P-picture"
 };
 
 static const true_false_string cpm_flg = {
-	"On",
-	"Off"
+  "On",
+  "Off"
 };
 
 static const true_false_string custom_pcf_flg = {
-	"Custom PCF",
-	"CIF PCF"
+  "Custom PCF",
+  "CIF PCF"
 };
 
 /*  Bits 1-3 Picture Type Code:*/
 static const value_string picture_type_code_vals[] =
 {
-	{ 0,		"I-picture (INTRA)" },
-	{ 1,		"P-picture (INTER)" },
-	{ 2,		"Improved PB-frame (see Annex M)" },
-	{ 3,		"B-picture (see Annex O)" },
-	{ 4,		"EI-picture (see Annex O)" },
-	{ 5,		"EP-picture (see Annex O)" },
-	{ 6,		"Reserved" },
-	{ 7,		"Reserved" },
-	{ 0,		NULL },
+  { 0,		"I-picture (INTRA)" },
+  { 1,		"P-picture (INTER)" },
+  { 2,		"Improved PB-frame (see Annex M)" },
+  { 3,		"B-picture (see Annex O)" },
+  { 4,		"EI-picture (see Annex O)" },
+  { 5,		"EP-picture (see Annex O)" },
+  { 6,		"Reserved" },
+  { 7,		"Reserved" },
+  { 0,		NULL },
 };
 
 
@@ -638,8 +639,10 @@ static void dissect_h263_data( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
 
 	col_append_str( pinfo->cinfo, COL_INFO, "H263 payload ");
 
-	h263_payload_item = proto_tree_add_item( tree, proto_h263_data, tvb, offset, -1, ENC_NA );
-	h263_payload_tree = proto_item_add_subtree( h263_payload_item, ett_h263_payload );
+	if( tree ) {
+	  h263_payload_item = proto_tree_add_item( tree, proto_h263_data, tvb, offset, -1, ENC_NA );
+	  h263_payload_tree = proto_item_add_subtree( h263_payload_item, ett_h263_payload );
+	}
 
 	length = tvb_reported_length_remaining(tvb,0);
 	if(length<4){
@@ -1010,29 +1013,16 @@ proto_register_h263_data(void)
 		},
 };
 
-	static gint *ett[] =
+        static gint *ett[] =
 	{
-		&ett_h263_payload,
-		&ett_h263_optype,
+            &ett_h263_payload,
+            &ett_h263_optype,
 	};
 
-	proto_register_subtree_array(ett, array_length(ett));
+        proto_register_subtree_array(ett, array_length(ett));
 
 	proto_h263_data = proto_register_protocol("ITU-T Recommendation H.263",
 	    "H.263", "h263");
 	proto_register_field_array(proto_h263_data, hf, array_length(hf));
 	register_dissector("h263data", dissect_h263_data, proto_h263_data);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

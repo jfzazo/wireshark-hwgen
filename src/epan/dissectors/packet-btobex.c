@@ -27,8 +27,11 @@
 
 #include <epan/packet.h>
 #include <epan/reassemble.h>
+#include <epan/tap.h>
 #include <epan/expert.h>
-#include "packet-bluetooth.h"
+#include <epan/wmem/wmem.h>
+
+#include "packet-bluetooth-hci.h"
 #include "packet-btrfcomm.h"
 #include "packet-btl2cap.h"
 #include "packet-btsdp.h"
@@ -178,7 +181,6 @@ static int hf_map_application_parameter_data_status_indicator = -1;
 static int hf_map_application_parameter_data_status_value = -1;
 static int hf_map_application_parameter_data_mse_time = -1;
 static int hf_profile = -1;
-static int hf_type = -1;
 
 static expert_field ei_unexpected_data = EI_INIT;
 
@@ -1213,7 +1215,6 @@ dissect_headers(proto_tree *tree, tvbuff_t *tvb, int offset, packet_info *pinfo,
                             offset += 1;
                             proto_tree_add_item(parameter_tree, hf_authentication_info, tvb, offset, sub_parameter_length - 1, ENC_ASCII|ENC_NA);
                             offset += sub_parameter_length - 1;
-                            break;
                         default:
                             proto_tree_add_item(parameter_tree, hf_application_parameter_data, tvb, offset, sub_parameter_length, ENC_NA);
                             offset += sub_parameter_length;
@@ -1279,13 +1280,7 @@ dissect_headers(proto_tree *tree, tvbuff_t *tvb, int offset, packet_info *pinfo,
                 proto_tree_add_item(hdr_tree, hf_hdr_length, tvb, offset, 2, ENC_BIG_ENDIAN);
                 offset += 2;
 
-                if (hdr_id == 0x042) { /* hdr type in ASCII string*/
-                    handle_item = proto_tree_add_item(hdr_tree, hf_type, tvb, offset,
-                            item_length - 3, ENC_ASCII | ENC_NA);
-                } else {
-                    handle_item = proto_tree_add_item(hdr_tree, hf_hdr_val_byte_seq, tvb, offset,
-                            item_length - 3, ENC_NA);
-                }
+                handle_item = proto_tree_add_item(hdr_tree, hf_hdr_val_byte_seq, tvb, offset, item_length - 3, ENC_NA);
 
                 if (((hdr_id == 0x46) || (hdr_id == 0x4a)) && (item_length == 19)) { /* target or who */
                     for(i=0; target_vals[i].strptr != NULL; i++) {
@@ -1365,8 +1360,8 @@ dissect_headers(proto_tree *tree, tvbuff_t *tvb, int offset, packet_info *pinfo,
                 }
                 else if (is_ascii_str(tvb_get_ptr(tvb, offset,item_length - 3), item_length - 3))
                 {
-                    proto_item_append_text(hdr_tree, " (\"%s\")", tvb_get_string_enc(wmem_packet_scope(), tvb, offset,item_length - 3, ENC_ASCII));
-                    col_append_fstr(pinfo->cinfo, COL_INFO, " \"%s\"", tvb_get_string_enc(wmem_packet_scope(), tvb, offset,item_length - 3, ENC_ASCII));
+                    proto_item_append_text(hdr_tree, " (\"%s\")", tvb_get_string(wmem_packet_scope(), tvb, offset,item_length - 3));
+                    col_append_fstr(pinfo->cinfo, COL_INFO, " \"%s\"", tvb_get_string(wmem_packet_scope(), tvb, offset,item_length - 3));
                 }
 
                 if (item_length >= 3) /* prevent infinite loops */
@@ -1424,7 +1419,7 @@ dissect_btobex(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 
     save_fragmented = pinfo->fragmented;
 
-    is_obex_over_l2cap = (proto_btl2cap == (gint) GPOINTER_TO_UINT(wmem_list_frame_data(
+    is_obex_over_l2cap = (proto_btrfcomm == (gint) GPOINTER_TO_UINT(wmem_list_frame_data(
                 wmem_list_frame_prev(wmem_list_tail(pinfo->layers)))));
 
     if (is_obex_over_l2cap) {
@@ -1548,7 +1543,8 @@ dissect_btobex(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
                 col_set_str(pinfo->cinfo, COL_INFO, "Rcvd ");
                 break;
             default:
-                col_set_str(pinfo->cinfo, COL_INFO, "UnknownDirection ");
+                col_add_fstr(pinfo->cinfo, COL_INFO, "Unknown direction %d ",
+                    pinfo->p2p_dir);
                 break;
         }
 
@@ -1984,7 +1980,7 @@ proto_register_btobex(void)
         },
         { &hf_bip_application_parameter_data_service_id,
             { "Service ID",   "btobex.parameter.value.service_id",
-            FT_UINT16, BASE_HEX | BASE_EXT_STRING, &bluetooth_uuid_vals_ext, 0x00,
+            FT_UINT16, BASE_HEX | BASE_EXT_STRING, &bt_sig_uuid_vals_ext, 0x00,
             NULL, HFILL }
         },
         { &hf_bip_application_parameter_data_store_flag,
@@ -2503,10 +2499,6 @@ proto_register_btobex(void)
         { &hf_profile,
           { "Profile", "btobex.profile", FT_UINT32, BASE_DEC | BASE_EXT_STRING, &profile_vals_ext, 0x0,
             "Blutooth Profile used in this OBEX session", HFILL }
-        },
-        { &hf_type,
-          { "Type", "btobex.type", FT_STRINGZ, STR_ASCII, NULL, 0x0,
-            NULL, HFILL }
         }
     };
 
@@ -2590,9 +2582,9 @@ proto_reg_handoff_btobex(void)
     xml_handle  = find_dissector("xml");
     data_handle = find_dissector("data");
 
-    dissector_add_for_decode_as("btrfcomm.channel", btobex_handle);
-    dissector_add_for_decode_as("btl2cap.psm", btobex_handle);
-    dissector_add_for_decode_as("btl2cap.cid", btobex_handle);
+    dissector_add_handle("btrfcomm.channel", btobex_handle);
+    dissector_add_handle("btl2cap.psm", btobex_handle);
+    dissector_add_handle("btl2cap.cid", btobex_handle);
 }
 
 /*

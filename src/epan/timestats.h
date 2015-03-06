@@ -1,6 +1,6 @@
 /* timestats.h
  * Routines and definitions for time statistics
- * Copyright 2003 Lars Roland
+ * Copyrigth 2003 Lars Roland
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>

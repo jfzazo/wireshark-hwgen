@@ -24,6 +24,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 #include "packet-aim.h"
@@ -43,13 +45,13 @@ void proto_reg_handoff_aim_ssi(void);
 #define FAMILY_SSI_TYPE_ICONINFO      0x0014
 
 static const value_string aim_fnac_family_ssi_types[] = {
-	{ FAMILY_SSI_TYPE_BUDDY,	 "Buddy" },
-	{ FAMILY_SSI_TYPE_GROUP,	 "Group" },
-	{ FAMILY_SSI_TYPE_PERMIT,	 "Permit" },
-	{ FAMILY_SSI_TYPE_DENY,		 "Deny" },
-	{ FAMILY_SSI_TYPE_PDINFO,	 "PDINFO" },
+	{ FAMILY_SSI_TYPE_BUDDY, "Buddy" },
+	{ FAMILY_SSI_TYPE_GROUP, "Group" },
+	{ FAMILY_SSI_TYPE_PERMIT, "Permit" },
+	{ FAMILY_SSI_TYPE_DENY, "Deny" },
+	{ FAMILY_SSI_TYPE_PDINFO, "PDINFO" },
 	{ FAMILY_SSI_TYPE_PRESENCEPREFS, "Presence Preferences" },
-	{ FAMILY_SSI_TYPE_ICONINFO,	 "Icon Info" },
+	{ FAMILY_SSI_TYPE_ICONINFO, "Icon Info" },
 	{ 0, NULL }
 };
 
@@ -153,12 +155,14 @@ static int dissect_ssi_ssi_items(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 {
 	int offset = 0;
 	gint ssi_entry_size;
+	proto_item *ti;
 	proto_tree *ssi_entry = NULL;
 	int size = tvb_length(tvb);
 	while (size > offset)
 	{
 		ssi_entry_size = calc_ssi_entry_size(tvb, offset);
-		ssi_entry = proto_tree_add_subtree(tree, tvb, offset, ssi_entry_size, ett_aim_ssi, NULL, "SSI Entry");
+		ti = proto_tree_add_text(tree, tvb, offset, ssi_entry_size, "SSI Entry");
+		ssi_entry = proto_item_add_subtree(ti, ett_aim_ssi);
 		offset = dissect_ssi_item(tvb, pinfo, offset, ssi_entry);
 	}
 	return offset;
@@ -195,6 +199,7 @@ static int dissect_aim_snac_ssi_time_and_items_num(tvbuff_t *tvb, packet_info *p
 static int dissect_aim_snac_ssi_list(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
 	int offset = 0;
+	proto_item *ti;
 	proto_tree *ssi_entry = NULL;
 	guint16 num_items, i;
 	nstime_t tmptime;
@@ -211,8 +216,8 @@ static int dissect_aim_snac_ssi_list(tvbuff_t *tvb, packet_info *pinfo _U_, prot
 
 	for(i = 0; i < num_items; i++) {
 		ssi_entry_size = calc_ssi_entry_size(tvb, offset);
-		ssi_entry = proto_tree_add_subtree_format(tree, tvb, offset, ssi_entry_size,
-				ett_aim_ssi, NULL, "SSI Entry %u", i);
+		ti = proto_tree_add_text(tree, tvb, offset, ssi_entry_size, "SSI Entry %u", i);
+		ssi_entry = proto_item_add_subtree(ti, ett_aim_ssi);
 		offset = dissect_ssi_item(tvb, pinfo, offset, ssi_entry);
 	}
 	tmptime.secs = tvb_get_ntohl(tvb, offset);
@@ -293,27 +298,27 @@ static int dissect_aim_snac_ssi_auth_reply(tvbuff_t *tvb, packet_info *pinfo _U_
 
 
 static const aim_subtype aim_fnac_family_ssi[] = {
-	{ 0x0001, "Error",				 dissect_aim_snac_error },
-	{ 0x0002, "Request Rights",			 NULL },
-	{ 0x0003, "Rights Info",			 dissect_aim_ssi_rightsinfo },
-	{ 0x0004, "Request List (first time)",		 NULL },
-	{ 0x0005, "Request List",			 dissect_aim_snac_ssi_time_and_items_num },
-	{ 0x0006, "List",				 dissect_aim_snac_ssi_list },
-	{ 0x0007, "Activate",				 NULL },
-	{ 0x0008, "Add Buddy",				 dissect_ssi_ssi_item },
-	{ 0x0009, "Modify Buddy",			 dissect_ssi_ssi_items },
-	{ 0x000a, "Delete Buddy",			 dissect_ssi_ssi_item },
-	{ 0x000e, "Server Ack",				 dissect_aim_ssi_result },
-	{ 0x000f, "No List",				 dissect_aim_snac_ssi_time_and_items_num },
-	{ 0x0011, "Edit Start",				 NULL },
-	{ 0x0012, "Edit Stop",				 NULL },
+	{ 0x0001, "Error", dissect_aim_snac_error },
+	{ 0x0002, "Request Rights", NULL },
+	{ 0x0003, "Rights Info", dissect_aim_ssi_rightsinfo },
+	{ 0x0004, "Request List (first time)", NULL },
+	{ 0x0005, "Request List", dissect_aim_snac_ssi_time_and_items_num },
+	{ 0x0006, "List", dissect_aim_snac_ssi_list },
+	{ 0x0007, "Activate", NULL },
+	{ 0x0008, "Add Buddy", dissect_ssi_ssi_item },
+	{ 0x0009, "Modify Buddy", dissect_ssi_ssi_items },
+	{ 0x000a, "Delete Buddy", dissect_ssi_ssi_item },
+	{ 0x000e, "Server Ack", dissect_aim_ssi_result },
+	{ 0x000f, "No List", dissect_aim_snac_ssi_time_and_items_num },
+	{ 0x0011, "Edit Start", NULL },
+	{ 0x0012, "Edit Stop", NULL },
 	{ 0x0014, "Grant Future Authorization to Buddy", dissect_aim_snac_ssi_auth_request },
-	{ 0x0015, "Future Authorization Granted",	 dissect_aim_snac_ssi_auth_request },
-	{ 0x0018, "Send Authentication Request",	 dissect_aim_snac_ssi_auth_request },
-	{ 0x0019, "Authentication Request",		 dissect_aim_snac_ssi_auth_request },
-	{ 0x001a, "Send Authentication Reply",		 dissect_aim_snac_ssi_auth_reply },
-	{ 0x001b, "Authentication Reply",		 dissect_aim_snac_ssi_auth_reply },
-	{ 0x001c, "Remote User Added Client To List",	 dissect_aim_ssi_was_added },
+	{ 0x0015, "Future Authorization Granted", dissect_aim_snac_ssi_auth_request },
+	{ 0x0018, "Send Authentication Request", dissect_aim_snac_ssi_auth_request },
+	{ 0x0019, "Authentication Request", dissect_aim_snac_ssi_auth_request },
+	{ 0x001a, "Send Authentication Reply", dissect_aim_snac_ssi_auth_reply },
+	{ 0x001b, "Authentication Reply", dissect_aim_snac_ssi_auth_reply },
+	{ 0x001c, "Remote User Added Client To List", dissect_aim_ssi_was_added },
 	{ 0, NULL, NULL }
 };
 
@@ -391,16 +396,3 @@ void proto_reg_handoff_aim_ssi(void)
 {
 	aim_init_family(proto_aim_ssi, ett_aim_ssi, FAMILY_SSI, aim_fnac_family_ssi);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

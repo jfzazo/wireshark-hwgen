@@ -23,7 +23,13 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
+#include <epan/etypes.h>
+#include <epan/conversation.h>
+#include "packet-fc.h"
 #include "packet-fclctl.h"
 
 const value_string fc_lctl_proto_val[] = {
@@ -67,8 +73,8 @@ static const value_string fc_lctl_rjt_acode_val[] = {
 };
 
 static const value_string fc_lctl_rjt_val[] = {
-    {FC_LCTL_RJT_INVDID             , "Invalid D_ID"},
     {FC_LCTL_RJT_INVSID             , "Invalid S_ID"},
+    {FC_LCTL_RJT_INVDID             , "Invalid D_ID"},
     {FC_LCTL_RJT_NPORT_NOTAVAIL_T   , "N_Port Not Avail (Temporary)"},
     {FC_LCTL_RJT_NPORT_NOTAVAIL_P   , "N_Port Not Avail (Permanent)"},
     {FC_LCTL_RJT_CLASS_NOTSUPP      , "Class Not Supported"},
@@ -105,7 +111,6 @@ static const value_string fc_lctl_rjt_val[] = {
     {FC_LCTL_RJT_VEND_ERR           , "Vendor Unique Error"},
     {0, NULL},
 };
-static value_string_ext fc_lctl_rjt_val_ext = VALUE_STRING_EXT_INIT(fc_lctl_rjt_val);
 
 const gchar *
 fclctl_get_typestr (guint8 linkctl_type, guint8 type)
@@ -123,26 +128,13 @@ fclctl_get_paramstr (guint32 linkctl_type, guint32 param)
     if (linkctl_type == FC_LCTL_PBSY) {
       return wmem_strdup_printf(wmem_packet_scope(), "%s, %s",
                  val_to_str (((param & 0xFF000000) >> 24), fc_lctl_pbsy_acode_val, "0x%x"),
-                 val_to_str (((param & 0x00FF0000) >> 16), fc_lctl_pbsy_rjt_val, "0x%x"));
+		 val_to_str (((param & 0x00FF0000) >> 16), fc_lctl_pbsy_rjt_val, "0x%x"));
     }
     if ((linkctl_type == FC_LCTL_FRJT) ||
              (linkctl_type == FC_LCTL_PRJT)) {
       return wmem_strdup_printf(wmem_packet_scope(), "%s, %s",
                  val_to_str (((param & 0xFF000000) >> 24), fc_lctl_rjt_acode_val, "0x%x"),
-                 val_to_str_ext (((param & 0x00FF0000) >> 16), &fc_lctl_rjt_val_ext, "%x"));
+                 val_to_str (((param & 0x00FF0000) >> 16), fc_lctl_rjt_val, "%x"));
     }
     return "";
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

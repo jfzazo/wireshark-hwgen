@@ -27,8 +27,6 @@
 
 #include "packet-ipmi.h"
 
-void proto_register_ipmi_picmg(void);
-
 static gint ett_ipmi_picmg_led_color = -1;
 static gint ett_ipmi_picmg_05_byte1 = -1;
 static gint ett_ipmi_picmg_06_byte1 = -1;
@@ -122,14 +120,6 @@ static gint hf_ipmi_picmg_01_rs_fruid = -1;
 static gint hf_ipmi_picmg_01_rs_site_num = -1;
 static gint hf_ipmi_picmg_01_rs_site_type = -1;
 
-static gint hf_ipmi_picmg_02_shelf_address = -1;
-static gint hf_ipmi_picmg_02_shelf_type = -1;
-static gint hf_ipmi_picmg_02_shelf_length = -1;
-
-static gint hf_ipmi_picmg_03_shelf_address = -1;
-static gint hf_ipmi_picmg_03_shelf_type = -1;
-static gint hf_ipmi_picmg_03_shelf_length = -1;
-
 static gint hf_ipmi_picmg_04_fruid = -1;
 static gint hf_ipmi_picmg_04_cmd = -1;
 
@@ -162,11 +152,7 @@ static gint hf_ipmi_picmg_08_state_local = -1;
 static gint hf_ipmi_picmg_08_lamptest_duration = -1;
 
 static gint hf_ipmi_picmg_09_ipmba = -1;
-static gint hf_ipmi_picmg_09_ipmba_link = -1;
-static gint hf_ipmi_picmg_09_ipmba_state = -1;
 static gint hf_ipmi_picmg_09_ipmbb = -1;
-static gint hf_ipmi_picmg_09_ipmbb_link = -1;
-static gint hf_ipmi_picmg_09_ipmbb_state = -1;
 
 static gint hf_ipmi_picmg_0a_fruid = -1;
 static gint hf_ipmi_picmg_0a_msk_d_locked = -1;
@@ -747,7 +733,7 @@ rs01(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 static void
 rs02(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
-	ipmi_add_typelen(tree, hf_ipmi_picmg_02_shelf_address, hf_ipmi_picmg_02_shelf_type, hf_ipmi_picmg_02_shelf_length, tvb, 0, TRUE);
+	ipmi_add_typelen(tree, "Shelf Address", tvb, 0, TRUE);
 }
 
 /* Set Shelf Address Info
@@ -755,7 +741,7 @@ rs02(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 static void
 rq03(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
-	ipmi_add_typelen(tree, hf_ipmi_picmg_03_shelf_address, hf_ipmi_picmg_03_shelf_type, hf_ipmi_picmg_03_shelf_length, tvb, 0, TRUE);
+	ipmi_add_typelen(tree, "Shelf Address", tvb, 0, TRUE);
 }
 
 /* FRU Control.
@@ -880,10 +866,8 @@ rs08(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 
 /* Set IPMB State
  */
-static const true_false_string tfs_local_control_override = { "Local Control State", "Override State (Isolate)" };
-
 static void
-parse_ipmb_state(proto_tree *tree, tvbuff_t *tvb, guint offs, int hf, int hf_link, int hf_state, int ett)
+parse_ipmb_state(proto_tree *tree, tvbuff_t *tvb, guint offs, int hf, int ett)
 {
 	char buf[32];
 	const char *desc;
@@ -908,17 +892,18 @@ parse_ipmb_state(proto_tree *tree, tvbuff_t *tvb, guint offs, int hf, int hf_lin
 		ti = proto_tree_add_uint_format_value(tree, hf, tvb, 0, 1,
 				v, "%s, %s", desc, (v & 1) ? "Local Control" : "Override");
 		s_tree = proto_item_add_subtree(ti, ett);
-		proto_tree_add_uint_format_value(s_tree, hf_link, tvb, 0, 1, v, "%s (0x%02x)",
-				desc, num);
-		proto_tree_add_item(s_tree, hf_state, tvb, 0, 1, ENC_NA);
+		proto_tree_add_text(s_tree, tvb, 0, 1, "%sLink: %s (0x%02x)",
+				ipmi_dcd8(v, 0xfe), desc, num);
+		proto_tree_add_text(s_tree, tvb, 0, 1, "%sState: %s",
+				ipmi_dcd8(v, 0x01), (v & 1) ? "Local Control State" : "Override State (Isolate)");
 	}
 }
 
 static void
 rq09(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
-	parse_ipmb_state(tree, tvb, 0, hf_ipmi_picmg_09_ipmba, hf_ipmi_picmg_09_ipmba_link, hf_ipmi_picmg_09_ipmba_state, ett_ipmi_picmg_09_ipmba);
-	parse_ipmb_state(tree, tvb, 1, hf_ipmi_picmg_09_ipmbb, hf_ipmi_picmg_09_ipmbb_link, hf_ipmi_picmg_09_ipmbb_state, ett_ipmi_picmg_09_ipmbb);
+	parse_ipmb_state(tree, tvb, 0, hf_ipmi_picmg_09_ipmba, ett_ipmi_picmg_09_ipmba);
+	parse_ipmb_state(tree, tvb, 1, hf_ipmi_picmg_09_ipmbb, ett_ipmi_picmg_09_ipmbb);
 }
 
 /* Set FRU Activation Policy
@@ -1595,7 +1580,7 @@ static const value_string picmg_24_controls[] = {
 	{ 0, NULL }
 };
 
-static void
+void
 fmt_power_amps(gchar *s, guint32 v)
 {
 	g_snprintf(s, ITEM_LABEL_LENGTH, "%d.%dA", v / 10, v % 10);
@@ -1703,7 +1688,7 @@ static const value_string cc28[] = {
 	{ 0, NULL }
 };
 
-static void
+void
 fmt_100ms(gchar *s, guint32 v)
 {
 	g_snprintf(s, ITEM_LABEL_LENGTH, "%d.%dS", v / 10, v % 10);
@@ -2031,7 +2016,7 @@ rs2f(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 		desc = "Reserved";
 	}
 
-	ti = proto_tree_add_uint_format_value(tree, hf_ipmi_picmg_2f_comp_prop, tvb, 0, 0, pno, "%s (0x%02x)", desc, pno);
+	ti = proto_tree_add_text(tree, tvb, 0, 0, "Property selector: %s (0x%02x)", desc, pno);
 	PROTO_ITEM_SET_GENERATED(ti);
 	if (pno < array_length(compprops)) {
 		compprops[pno].intrp(tvb, tree);
@@ -2683,7 +2668,7 @@ static ipmi_cmd_t cmd_picmg[] = {
 };
 
 void
-proto_register_ipmi_picmg(void)
+ipmi_register_picmg(gint proto_ipmi)
 {
 	static hf_register_info hf[] = {
 		{ &hf_ipmi_picmg_led_function,
@@ -2694,7 +2679,7 @@ proto_register_ipmi_picmg(void)
 				"ipmi.led.on_duration", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_led_color,
 			{ "Color",
-				"ipmi.led.color", FT_UINT8, BASE_HEX, VALS(led_color_vals), 0x0f, NULL, HFILL }},
+				"ipmi.led.color", FT_UINT8, BASE_HEX, led_color_vals, 0x0f, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_linkinfo_grpid,
 			{ "Grouping ID",
@@ -2704,13 +2689,13 @@ proto_register_ipmi_picmg(void)
 				"ipmi.linkinfo.type_ext", FT_UINT32, BASE_HEX, NULL, 0x00f00000, NULL, HFILL }},
 		{ &hf_ipmi_picmg_linkinfo_type,
 			{ "Type",
-				"ipmi.linkinfo.type", FT_UINT32, BASE_HEX, VALS(linkinfo_type_vals), 0x000ff000, NULL, HFILL }},
+				"ipmi.linkinfo.type", FT_UINT32, BASE_HEX, linkinfo_type_vals, 0x000ff000, NULL, HFILL }},
 		{ &hf_ipmi_picmg_linkinfo_ports,
 			{ "Ports",
-				"ipmi.linkinfo.ports", FT_UINT32, BASE_HEX, VALS(linkinfo_ports_vals), 0x00000f00, NULL, HFILL }},
+				"ipmi.linkinfo.ports", FT_UINT32, BASE_HEX, linkinfo_ports_vals, 0x00000f00, NULL, HFILL }},
 		{ &hf_ipmi_picmg_linkinfo_iface,
 			{ "Interface",
-				"ipmi.linkinfo.iface", FT_UINT32, BASE_HEX, VALS(linkinfo_iface_vals), 0x000000c0, NULL, HFILL }},
+				"ipmi.linkinfo.iface", FT_UINT32, BASE_HEX, linkinfo_iface_vals, 0x000000c0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_linkinfo_chan,
 			{ "Channel",
 				"ipmi.linkinfo.chan", FT_UINT32, BASE_DEC, NULL, 0x0000003f, NULL, HFILL }},
@@ -2803,13 +2788,13 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg01.rq_fruid", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_01_rq_addr_key_type,
 			{ "Address Key Type",
-				"ipmi.picmg01.rq_addr_key_type", FT_UINT8, BASE_HEX, VALS(addr_key_type_vals), 0, NULL, HFILL }},
+				"ipmi.picmg01.rq_addr_key_type", FT_UINT8, BASE_HEX, addr_key_type_vals, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_01_rq_addr_key,
 			{ "Address Key",
 				"ipmi.picmg01.rq_addr_key", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_01_rq_site_type,
 			{ "Site Type",
-				"ipmi.picmg01.rq_site_type", FT_UINT8, BASE_HEX, VALS(site_type_vals), 0, NULL, HFILL }},
+				"ipmi.picmg01.rq_site_type", FT_UINT8, BASE_HEX, site_type_vals, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_01_rs_hwaddr,
 			{ "Hardware Address",
 				"ipmi.picmg01.rs_hwaddr", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
@@ -2827,34 +2812,14 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg01.rs_site_num", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_01_rs_site_type,
 			{ "Site Type",
-				"ipmi.picmg01.rs_site_type", FT_UINT8, BASE_HEX, VALS(site_type_vals), 0, NULL, HFILL }},
-
-		{ &hf_ipmi_picmg_02_shelf_address,
-			{ "Shelf Address",
-				"ipmi.picmg02.shelf_address", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_ipmi_picmg_02_shelf_type,
-			{ "Type",
-				"ipmi.picmg02.shelf_type", FT_UINT8, BASE_DEC, NULL, 0xc0, NULL, HFILL }},
-		{ &hf_ipmi_picmg_02_shelf_length,
-			{ "Length",
-				"ipmi.picmg02.shelf_length", FT_UINT8, BASE_DEC, NULL, 0x3f, NULL, HFILL }},
-
-		{ &hf_ipmi_picmg_03_shelf_address,
-			{ "Shelf Address",
-				"ipmi.picmg03.shelf_address", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-		{ &hf_ipmi_picmg_03_shelf_type,
-			{ "Type",
-				"ipmi.picmg03.shelf_type", FT_UINT8, BASE_DEC, NULL, 0xc0, NULL, HFILL }},
-		{ &hf_ipmi_picmg_03_shelf_length,
-			{ "Length",
-				"ipmi.picmg03.shelf_length", FT_UINT8, BASE_DEC, NULL, 0x3f, NULL, HFILL }},
+				"ipmi.picmg01.rs_site_type", FT_UINT8, BASE_HEX, site_type_vals, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_04_fruid,
 			{ "FRU ID",
 				"ipmi.picmg04.fruid", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_04_cmd,
 			{ "Command",
-				"ipmi.picmg04.cmd", FT_UINT8, BASE_HEX, VALS(vals_04_cmd), 0, NULL, HFILL }},
+				"ipmi.picmg04.cmd", FT_UINT8, BASE_HEX, vals_04_cmd, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_05_fruid,
 			{ "FRU ID",
@@ -2901,10 +2866,10 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg06.cap_blue", FT_BOOLEAN, 8, NULL, 0x02, NULL, HFILL }},
 		{ &hf_ipmi_picmg_06_default_local_color,
 			{ "Default LED Color in Local Control state",
-				"ipmi.picmg06.def_local", FT_UINT8, BASE_HEX, VALS(led_color_vals), 0x0f, NULL, HFILL }},
+				"ipmi.picmg06.def_local", FT_UINT8, BASE_HEX, led_color_vals, 0x0f, NULL, HFILL }},
 		{ &hf_ipmi_picmg_06_default_override_color,
 			{ "Default LED Color in Override state",
-				"ipmi.picmg06.def_override", FT_UINT8, BASE_HEX, VALS(led_color_vals), 0x0f, NULL, HFILL }},
+				"ipmi.picmg06.def_override", FT_UINT8, BASE_HEX, led_color_vals, 0x0f, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_07_fruid,
 			{ "FRU ID",
@@ -2935,21 +2900,9 @@ proto_register_ipmi_picmg(void)
 		{ &hf_ipmi_picmg_09_ipmba,
 			{ "IPMB-A State",
 				"ipmi.picmg09.ipmba", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
-		{ &hf_ipmi_picmg_09_ipmba_link,
-			{ "Link",
-				"ipmi.picmg09.ipmba_link", FT_UINT8, BASE_HEX, NULL, 0xFE, NULL, HFILL }},
-		{ &hf_ipmi_picmg_09_ipmba_state,
-			{ "State",
-				"ipmi.picmg09.ipmba_state", FT_BOOLEAN, 8, TFS(&tfs_local_control_override), 0x01, NULL, HFILL }},
 		{ &hf_ipmi_picmg_09_ipmbb,
 			{ "IPMB-B State",
 				"ipmi.picmg09.ipmbb", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
-		{ &hf_ipmi_picmg_09_ipmbb_link,
-			{ "Link",
-				"ipmi.picmg09.ipmbb_link", FT_UINT8, BASE_HEX, NULL, 0xFE, NULL, HFILL }},
-		{ &hf_ipmi_picmg_09_ipmbb_state,
-			{ "State",
-				"ipmi.picmg09.ipmbb_state", FT_BOOLEAN, 8, TFS(&tfs_local_control_override), 0x01, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_0a_fruid,
 			{ "FRU ID",
@@ -2982,7 +2935,7 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg0c.fruid", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_0c_cmd,
 			{ "Command",
-				"ipmi.picmg0c.cmd", FT_UINT8, BASE_HEX, VALS(vals_0c_cmd), 0, NULL, HFILL }},
+				"ipmi.picmg0c.cmd", FT_UINT8, BASE_HEX, vals_0c_cmd, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_0d_fruid,
 			{ "FRU ID",
@@ -2996,7 +2949,7 @@ proto_register_ipmi_picmg(void)
 
 		{ &hf_ipmi_picmg_0f_iface,
 			{ "Interface",
-				"ipmi.linkinfo.iface", FT_UINT8, BASE_HEX, VALS(linkinfo_iface_vals), 0x000000c0, NULL, HFILL }},
+				"ipmi.linkinfo.iface", FT_UINT8, BASE_HEX, linkinfo_iface_vals, 0x000000c0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_0f_chan,
 			{ "Channel",
 				"ipmi.linkinfo.chan", FT_UINT8, BASE_DEC, NULL, 0x0000003f, NULL, HFILL }},
@@ -3019,14 +2972,14 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg11.power_level", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_11_set_to_desired,
 			{ "Set Present Levels to Desired",
-				"ipmi.picmg11.set_to_desired", FT_UINT8, BASE_HEX, VALS(vals_11_set), 0, NULL, HFILL }},
+				"ipmi.picmg11.set_to_desired", FT_UINT8, BASE_HEX, vals_11_set, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_12_fruid,
 			{ "FRU ID",
 				"ipmi.picmg12.fruid", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_12_pwr_type,
 			{ "Power Type",
-				"ipmi.picmg12.pwr_type", FT_UINT8, BASE_HEX, VALS(vals_12_pwr_type), 0, NULL, HFILL }},
+				"ipmi.picmg12.pwr_type", FT_UINT8, BASE_HEX, vals_12_pwr_type, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_12_dynamic,
 			{ "Dynamic Power Configuration",
 				"ipmi.picmg12.dynamic", FT_BOOLEAN, 8, NULL, 0x80, NULL, HFILL }},
@@ -3071,7 +3024,7 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg15.fan_level", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_15_local_enable,
 			{ "Local Control Enable State",
-				"ipmi.picmg15.local_enable", FT_UINT8, BASE_HEX, VALS(enable_vals), 0, NULL, HFILL }},
+				"ipmi.picmg15.local_enable", FT_UINT8, BASE_HEX, enable_vals, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_16_fruid,
 			{ "FRU ID",
@@ -3084,21 +3037,21 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg16.local_level", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_16_local_enable,
 			{ "Local Control Enable State",
-				"ipmi.picmg16.local_enable", FT_UINT8, BASE_HEX, VALS(enabled_vals), 0, NULL, HFILL }},
+				"ipmi.picmg16.local_enable", FT_UINT8, BASE_HEX, enabled_vals, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_17_cmd,
 			{ "Command",
 				"ipmi.picmg17.cmd", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_17_resid,
 			{ "Bused Resource ID",
-				"ipmi.picmg17.resid", FT_UINT8, BASE_HEX, VALS(busresid_vals), 0, NULL, HFILL }},
+				"ipmi.picmg17.resid", FT_UINT8, BASE_HEX, busresid_vals, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_17_status,
 			{ "Status",
 				"ipmi.picmg17.status", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_18_li_key_type,
 			{ "Link Info Key Type",
-				"ipmi.picmg18.li_key_type", FT_UINT8, BASE_HEX, VALS(vals_18_keytype), 0, NULL, HFILL }},
+				"ipmi.picmg18.li_key_type", FT_UINT8, BASE_HEX, vals_18_keytype, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_18_li_key,
 			{ "Link Info Key",
 				"ipmi.picmg18.li_key", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
@@ -3125,7 +3078,7 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg1c.fan_site_number", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_1c_fan_enable_state,
 			{ "Fan Enable state",
-				"ipmi.picmg1c.fan_enable_state", FT_UINT8, BASE_HEX, VALS(enable_vals), 0, NULL, HFILL }},
+				"ipmi.picmg1c.fan_enable_state", FT_UINT8, BASE_HEX, enable_vals, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_1c_fan_policy_timeout,
 			{ "Fan Policy Timeout",
 				"ipmi.picmg1c.fan_policy_timeout", FT_UINT8, BASE_CUSTOM, ipmi_fmt_5s_1based, 0, NULL, HFILL }},
@@ -3134,7 +3087,7 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg1c.site_number", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_1c_site_type,
 			{ "Site Type",
-				"ipmi.picmg1c.site_type", FT_UINT8, BASE_HEX, VALS(site_type_vals), 0, NULL, HFILL }},
+				"ipmi.picmg1c.site_type", FT_UINT8, BASE_HEX, site_type_vals, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_1d_fan_site_number,
 			{ "Fan Tray Site Number",
@@ -3144,13 +3097,13 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg1d.site_number", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_1d_site_type,
 			{ "Site Type",
-				"ipmi.picmg1d.site_type", FT_UINT8, BASE_HEX, VALS(site_type_vals), 0, NULL, HFILL }},
+				"ipmi.picmg1d.site_type", FT_UINT8, BASE_HEX, site_type_vals, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_1d_policy,
 			{ "Policy",
-				"ipmi.picmg1d.fan_enable_state", FT_UINT8, BASE_HEX, VALS(vals_1d_policy), 0, NULL, HFILL }},
+				"ipmi.picmg1d.fan_enable_state", FT_UINT8, BASE_HEX, vals_1d_policy, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_1d_coverage,
 			{ "Coverage",
-				"ipmi.picmg1d.coverage", FT_UINT8, BASE_HEX, VALS(vals_1d_coverage), 0, NULL, HFILL }},
+				"ipmi.picmg1d.coverage", FT_UINT8, BASE_HEX, vals_1d_coverage, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_1e_fruid,
 			{ "FRU ID",
@@ -3170,7 +3123,7 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg1f.rq_fruid", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_1f_rq_op,
 			{ "Operation",
-				"ipmi.picmg1f.rq_op", FT_UINT8, BASE_HEX, VALS(vals_1f_op), 0, NULL, HFILL }},
+				"ipmi.picmg1f.rq_op", FT_UINT8, BASE_HEX, vals_1f_op, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_1f_rq_lockid,
 			{ "Lock ID",
 				"ipmi.picmg1f.rq_lockid", FT_UINT16, BASE_HEX, NULL, 0, NULL, HFILL }},
@@ -3208,7 +3161,7 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg21.addr_count", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_21_site_type,
 			{ "Site Type",
-				"ipmi.picmg21.site_type", FT_UINT8, BASE_HEX, VALS(site_type_vals), 0, NULL, HFILL }},
+				"ipmi.picmg21.site_type", FT_UINT8, BASE_HEX, site_type_vals, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_21_site_num,
 			{ "Site Number",
 				"ipmi.picmg21.site_num", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
@@ -3317,7 +3270,7 @@ proto_register_ipmi_picmg(void)
 				"ipmi.prop00.preparation", FT_BOOLEAN, 8, NULL, 0x04, NULL, HFILL }},
 		{ &hf_ipmi_picmg_prop00_rollback,
 			{ "Rollback/Backup support",
-				"ipmi.prop00.rollback", FT_UINT8, BASE_HEX, VALS(vals_prop00_rollback), 0x03, NULL, HFILL }},
+				"ipmi.prop00.rollback", FT_UINT8, BASE_HEX, vals_prop00_rollback, 0x03, NULL, HFILL }},
 		{ &hf_ipmi_picmg_prop01_fw_major,
 			{ "Major Firmware Revision (binary encoded)",
 				"ipmi.prop01.fw_major", FT_UINT8, BASE_HEX, NULL, 0x7f, NULL, HFILL }},
@@ -3343,7 +3296,7 @@ proto_register_ipmi_picmg(void)
 
 		{ &hf_ipmi_picmg_31_action,
 			{ "Upgrade action",
-				"ipmi.picmg31.action", FT_UINT8, BASE_HEX, VALS(vals_31_action), 0, NULL, HFILL }},
+				"ipmi.picmg31.action", FT_UINT8, BASE_HEX, vals_31_action, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_32_block,
 			{ "Block Number",
@@ -3377,11 +3330,11 @@ proto_register_ipmi_picmg(void)
 
 		{ &hf_ipmi_picmg_35_rollback_override,
 			{ "Rollback Override Policy",
-				"ipmi.picmg35.rollback_override", FT_UINT8, BASE_HEX, VALS(vals_35_override), 0, NULL, HFILL }},
+				"ipmi.picmg35.rollback_override", FT_UINT8, BASE_HEX, vals_35_override, 0, NULL, HFILL }},
 
 		{ &hf_ipmi_picmg_36_result,
 			{ "Self test result",
-				"ipmi.picmg36.self_test_result", FT_UINT8, BASE_HEX, VALS(vals_36_result), 0, NULL, HFILL }},
+				"ipmi.picmg36.self_test_result", FT_UINT8, BASE_HEX, vals_36_result, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_36_fail,
 			{ "Self-test error bitfield",
 				"ipmi.picmg36.fail", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
@@ -3759,17 +3712,3 @@ proto_register_ipmi_picmg(void)
 	ipmi_register_netfn_cmdtab(IPMI_GROUP_REQ, IPMI_OEM_NONE, sig_picmg, 1,
 			"PICMG", cmd_picmg, array_length(cmd_picmg));
 }
-
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

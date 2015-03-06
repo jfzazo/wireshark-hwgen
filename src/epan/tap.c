@@ -467,12 +467,11 @@ find_tap_id(const char *name)
  */
 GString *
 register_tap_listener(const char *tapname, void *tapdata, const char *fstring,
-		      guint flags, tap_reset_cb reset, tap_packet_cb packet, tap_draw_cb draw)
+    guint flags, tap_reset_cb reset, tap_packet_cb packet, tap_draw_cb draw)
 {
 	tap_listener_t *tl;
 	int tap_id;
 	GString *error_string;
-	gchar *err_msg;
 
 	tap_id=find_tap_id(tapname);
 	if(!tap_id){
@@ -486,12 +485,11 @@ register_tap_listener(const char *tapname, void *tapdata, const char *fstring,
 	tl->needs_redraw=TRUE;
 	tl->flags=flags;
 	if(fstring){
-		if(!dfilter_compile(fstring, &tl->code, &err_msg)){
+		if(!dfilter_compile(fstring, &tl->code)){
 			error_string = g_string_new("");
 			g_string_printf(error_string,
 			    "Filter \"%s\" is invalid - %s",
-			    fstring, err_msg);
-			g_free(err_msg);
+			    fstring, dfilter_error_msg);
 			g_free(tl);
 			return error_string;
 		}
@@ -516,7 +514,6 @@ set_tap_dfilter(void *tapdata, const char *fstring)
 {
 	tap_listener_t *tl=NULL,*tl2;
 	GString *error_string;
-	gchar *err_msg;
 
 	if(!tap_listener_queue){
 		return NULL;
@@ -541,12 +538,11 @@ set_tap_dfilter(void *tapdata, const char *fstring)
 		}
 		tl->needs_redraw=TRUE;
 		if(fstring){
-			if(!dfilter_compile(fstring, &tl->code, &err_msg)){
+			if(!dfilter_compile(fstring, &tl->code)){
 				error_string = g_string_new("");
 				g_string_printf(error_string,
 						 "Filter \"%s\" is invalid - %s",
-						 fstring, err_msg);
-				g_free(err_msg);
+						 fstring, dfilter_error_msg);
 				return error_string;
 			}
 		}
@@ -657,16 +653,3 @@ union_of_tap_listener_flags(void)
 	}
 	return flags;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

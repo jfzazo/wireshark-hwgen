@@ -26,6 +26,7 @@
 
 #if 0
 #endif
+#include <glib.h>
 #include <epan/packet.h>
 #if 0
 #include <epan/llcsaps.h>
@@ -35,6 +36,7 @@
 #include <epan/addr_resolv.h>
 
 void proto_register_retix_bpdu(void);
+void proto_reg_handoff_retix_bpdu(void);
 
 static gint ett_retix_bpdu = -1;
 static int proto_retix_bpdu = -1;
@@ -115,15 +117,7 @@ proto_register_retix_bpdu(void)
   register_dissector("rbpdu", dissect_retix_bpdu, proto_retix_bpdu);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */
+void
+proto_reg_handoff_retix_bpdu(void)
+{
+}

@@ -59,10 +59,17 @@
 /*  Include files */
 #include "config.h"
 
+#include <string.h>
 
-#include <epan/packet.h>
+#include <sys/stat.h>
+
+#include <glib.h>
+
+#include <epan/wmem/wmem.h>
 #include <epan/decode_as.h>
+#include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <wsutil/pint.h>
 #include <epan/crc16-tvb.h>
 #include <epan/expert.h>
 #include <epan/addr_resolv.h>
@@ -70,7 +77,6 @@
 #include <epan/uat.h>
 #include <epan/strutil.h>
 #include <epan/show_exception.h>
-#include <wsutil/pint.h>
 
 /* Use libgcrypt for cipher libraries. */
 #ifdef HAVE_LIBGCRYPT
@@ -127,7 +133,7 @@ static guint          num_static_addrs = 0;
 
 /* Sanity-checks a UAT record. */
 static void
-addr_uat_update_cb(void *r, char **err)
+addr_uat_update_cb(void *r, const char **err)
 {
     static_addr_t *map = (static_addr_t *)r;
     /* Ensure a valid short address */
@@ -200,7 +206,6 @@ static int proto_ieee802154_nonask_phy = -1;
 static int hf_ieee802154_nonask_phy_preamble = -1;
 static int hf_ieee802154_nonask_phy_sfd = -1;
 static int hf_ieee802154_nonask_phy_length = -1;
-static int hf_ieee802154_nonask_phr = -1;
 
 static int proto_ieee802154 = -1;
 static int hf_ieee802154_frame_length = -1;
@@ -255,12 +260,10 @@ static int hf_ieee802154_assoc_permit = -1;
 static int hf_ieee802154_gts_count = -1;
 static int hf_ieee802154_gts_permit = -1;
 static int hf_ieee802154_gts_direction = -1;
-static int hf_ieee802154_gts_address = -1;
 static int hf_ieee802154_pending16 = -1;
 static int hf_ieee802154_pending64 = -1;
 
 /*  Registered fields for Auxiliary Security Header */
-static int hf_ieee802154_security_control_field = -1;
 static int hf_ieee802154_security_level = -1;
 static int hf_ieee802154_key_id_mode = -1;
 static int hf_ieee802154_aux_sec_reserved = -1;
@@ -410,6 +413,7 @@ dissect_ieee802154_fcf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, ieee
 {
     guint16     fcf;
     proto_tree *field_tree;
+    proto_item *ti;
 
     /* Get the FCF field. */
     fcf = tvb_get_letohs(tvb, *offset);
@@ -431,9 +435,9 @@ dissect_ieee802154_fcf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, ieee
     /* Add the FCF to the protocol tree. */
     if (tree) {
         /*  Create the FCF subtree. */
-        field_tree = proto_tree_add_subtree_format(tree, tvb, *offset, 2, ett_ieee802154_fcf, NULL,
-                "Frame Control Field: %s (0x%04x)",
+        ti = proto_tree_add_text(tree, tvb, *offset, 2, "Frame Control Field: %s (0x%04x)",
                 val_to_str_const(packet->frame_type, ieee802154_frame_types, "Unknown"), fcf);
+        field_tree = proto_item_add_subtree(ti, ett_ieee802154_fcf);
 
         /* FCF Fields. */
         proto_tree_add_uint(field_tree, hf_ieee802154_frame_type, tvb, *offset, 1, fcf & IEEE802154_FCF_TYPE_MASK);
@@ -471,7 +475,8 @@ dissect_ieee802154_nonask_phy(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     proto_item *proto_root      = NULL;
 
     guint       offset          = 0;
-    guint8      phr;
+    guint32     preamble;
+    guint8      sfd,phr;
     tvbuff_t*   mac;
 
     /* Create the protocol tree. */
@@ -485,22 +490,24 @@ dissect_ieee802154_nonask_phy(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     /* Add the packet length. */
     col_add_fstr(pinfo->cinfo, COL_PACKET_LENGTH, "%i", tvb_length(tvb));
 
+    preamble=tvb_get_letohl(tvb,offset);
+    sfd=tvb_get_guint8(tvb,offset+4);
     phr=tvb_get_guint8(tvb,offset+4+1);
 
     if(tree) {
+        proto_tree *phr_tree;
+        proto_item *pi;
         guint loffset=offset;
-        static const int * phr_fields[] = {
-                    &hf_ieee802154_nonask_phy_length,
-                    NULL
-                };
 
-        proto_tree_add_item(ieee802154_tree, hf_ieee802154_nonask_phy_preamble, tvb, loffset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_uint(ieee802154_tree, hf_ieee802154_nonask_phy_preamble, tvb, loffset, 4, preamble);
         loffset+=4;
-        proto_tree_add_item(ieee802154_tree, hf_ieee802154_nonask_phy_sfd, tvb, loffset, 1, ENC_LITTLE_ENDIAN);
+        proto_tree_add_uint(ieee802154_tree, hf_ieee802154_nonask_phy_sfd, tvb, loffset, 1, sfd);
         loffset+=1;
 
-        proto_tree_add_bitmask(ieee802154_tree, tvb, loffset, hf_ieee802154_nonask_phr, ett_ieee802154_nonask_phy_phr,
-            phr_fields, ENC_NA);
+        pi = proto_tree_add_text(ieee802154_tree, tvb, loffset, 1, "PHR: 0x%02x", phr);
+        phr_tree = proto_item_add_subtree(pi, ett_ieee802154_nonask_phy_phr);
+
+        proto_tree_add_uint(phr_tree, hf_ieee802154_nonask_phy_length, tvb, loffset, 1, phr);
     }
 
     offset+=4+2*1;
@@ -728,26 +735,26 @@ dissect_ieee802154_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
         offset += 2;
     }
     else if (packet->dst_addr_mode == IEEE802154_FCF_ADDR_EXT) {
-        guint64 *p_addr = (guint64 *)wmem_new(pinfo->pool, guint64);
+        static guint64 addr; /* has to be static due to SET_ADDRESS */
 
         /* Get the address */
         packet->dst64 = tvb_get_letoh64(tvb, offset);
 
         /* Copy and convert the address to network byte order. */
-        *p_addr = pntoh64(&(packet->dst64));
+        addr = pntoh64(&(packet->dst64));
 
         /* Display the destination address. */
         /* XXX - OUI resolution doesn't happen when displaying resolved
          * EUI64 addresses; that should probably be fixed in
          * epan/addr_resolv.c.
          */
-        SET_ADDRESS(&pinfo->dl_dst, AT_EUI64, 8, p_addr);
-        SET_ADDRESS(&pinfo->dst, AT_EUI64, 8, p_addr);
+        SET_ADDRESS(&pinfo->dl_dst, AT_EUI64, 8, &addr);
+        SET_ADDRESS(&pinfo->dst, AT_EUI64, 8, &addr);
         if (tree) {
             proto_tree_add_item(ieee802154_tree, hf_ieee802154_dst64, tvb, offset, 8, ENC_LITTLE_ENDIAN);
-            proto_item_append_text(proto_root, ", Dst: %s", eui64_to_display(wmem_packet_scope(), packet->dst64));
+            proto_item_append_text(proto_root, ", Dst: %s", ep_eui64_to_display(packet->dst64));
         }
-        col_append_fstr(pinfo->cinfo, COL_INFO, ", Dst: %s", eui64_to_display(wmem_packet_scope(), packet->dst64));
+        col_append_fstr(pinfo->cinfo, COL_INFO, ", Dst: %s", ep_eui64_to_display(packet->dst64));
         offset += 8;
     }
     else if (packet->dst_addr_mode != IEEE802154_FCF_ADDR_NONE) {
@@ -829,8 +836,7 @@ dissect_ieee802154_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
                         ieee_hints->map_rec->start_fnum);
                 }
                 else {
-                    ti = proto_tree_add_uint_format_value(ieee802154_tree, hf_ieee802154_src64_origin, tvb, 0, 0,
-                        ieee_hints->map_rec->start_fnum, "Pre-configured");
+                    ti = proto_tree_add_text(ieee802154_tree, tvb, 0, 0, "Origin: Pre-configured");
                 }
                 PROTO_ITEM_SET_GENERATED(ti);
             }
@@ -841,27 +847,27 @@ dissect_ieee802154_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
         offset += 2;
     }
     else if (packet->src_addr_mode == IEEE802154_FCF_ADDR_EXT) {
-        guint64 *p_addr = (guint64 *)wmem_new(pinfo->pool, guint64);
+        static guint64 addr; /* has to be static due to SET_ADDRESS */
 
         /* Get the address. */
         packet->src64 = tvb_get_letoh64(tvb, offset);
 
         /* Copy and convert the address to network byte order. */
-        *p_addr = pntoh64(&(packet->src64));
+        addr = pntoh64(&(packet->src64));
 
         /* Display the source address. */
         /* XXX - OUI resolution doesn't happen when displaying resolved
          * EUI64 addresses; that should probably be fixed in
          * epan/addr_resolv.c.
          */
-        SET_ADDRESS(&pinfo->dl_src, AT_EUI64, 8, p_addr);
-        SET_ADDRESS(&pinfo->src, AT_EUI64, 8, p_addr);
+        SET_ADDRESS(&pinfo->dl_src, AT_EUI64, 8, &addr);
+        SET_ADDRESS(&pinfo->src, AT_EUI64, 8, &addr);
         if (tree) {
             proto_tree_add_item(ieee802154_tree, hf_ieee802154_src64, tvb, offset, 8, ENC_LITTLE_ENDIAN);
-            proto_item_append_text(proto_root, ", Src: %s", eui64_to_display(wmem_packet_scope(), packet->src64));
+            proto_item_append_text(proto_root, ", Src: %s", ep_eui64_to_display(packet->src64));
         }
 
-        col_append_fstr(pinfo->cinfo, COL_INFO, ", Src: %s", eui64_to_display(wmem_packet_scope(), packet->src64));
+        col_append_fstr(pinfo->cinfo, COL_INFO, ", Src: %s", ep_eui64_to_display(packet->src64));
         offset += 8;
     }
     else if (packet->src_addr_mode != IEEE802154_FCF_ADDR_NONE) {
@@ -900,12 +906,6 @@ dissect_ieee802154_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
       proto_tree *header_tree, *field_tree;
       guint8                    security_control;
       guint                     aux_length = 5; /* Minimum length of the auxiliary header. */
-      static const int * security_fields[] = {
-                    &hf_ieee802154_security_level,
-                    &hf_ieee802154_key_id_mode,
-                    &hf_ieee802154_aux_sec_reserved,
-                    NULL
-                };
 
       /* Parse the security control field. */
       security_control = tvb_get_guint8(tvb, offset);
@@ -916,11 +916,15 @@ dissect_ieee802154_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
       if (packet->key_id_mode != KEY_ID_MODE_IMPLICIT) aux_length++;
       if (packet->key_id_mode == KEY_ID_MODE_KEY_EXPLICIT_4) aux_length += 4;
       if (packet->key_id_mode == KEY_ID_MODE_KEY_EXPLICIT_8) aux_length += 8;
-      header_tree = proto_tree_add_subtree(ieee802154_tree, tvb, offset, aux_length,
-                    ett_ieee802154_auxiliary_security, NULL, "Auxiliary Security Header");
+      ti = proto_tree_add_text(ieee802154_tree, tvb, offset, aux_length, "Auxiliary Security Header");
+      header_tree = proto_item_add_subtree(ti, ett_ieee802154_auxiliary_security);
 
       /* Security Control Field */
-      proto_tree_add_bitmask(header_tree, tvb, offset, hf_ieee802154_security_control_field, ett_ieee802154_aux_sec_control, security_fields, ENC_NA);
+      ti = proto_tree_add_text(header_tree, tvb, offset, 1, "Security Control Field (0x%02x)", security_control);
+      field_tree = proto_item_add_subtree(ti, ett_ieee802154_aux_sec_control);
+      proto_tree_add_uint(field_tree, hf_ieee802154_security_level, tvb, offset, 1, security_control & IEEE802154_AUX_SEC_LEVEL_MASK);
+      proto_tree_add_uint(field_tree, hf_ieee802154_key_id_mode, tvb, offset, 1, security_control & IEEE802154_AUX_KEY_ID_MODE_MASK);
+      proto_tree_add_uint(field_tree, hf_ieee802154_aux_sec_reserved, tvb, offset, 1, security_control & IEEE802154_AUX_KEY_RESERVED_MASK);
       offset++;
 
       /* Frame Counter Field */
@@ -931,8 +935,8 @@ dissect_ieee802154_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
       /* Key identifier field(s). */
       if (packet->key_id_mode != KEY_ID_MODE_IMPLICIT) {
         /* Create a subtree. */
-        field_tree = proto_tree_add_subtree(header_tree, tvb, offset, 1,
-                    ett_ieee802154_aux_sec_key_id, &ti, "Key Identifier Field"); /* Will fix length later. */
+        ti = proto_tree_add_text(header_tree, tvb, offset, 1, "Key Identifier Field"); /* Will fix length later. */
+        field_tree = proto_item_add_subtree(ti, ett_ieee802154_aux_sec_key_id);
         /* Add key source, if it exists. */
         if (packet->key_id_mode == KEY_ID_MODE_KEY_EXPLICIT_4) {
           packet->key_source.addr32 = tvb_get_ntohl(tvb, offset);
@@ -1143,8 +1147,8 @@ dissect_ieee802154_fcs:
         /* Display the FCS depending on expected FCS format */
         if ((options & DISSECT_IEEE802154_OPTION_CC24xx)) {
             /* Create a subtree for the FCS. */
-            field_tree = proto_tree_add_subtree_format(ieee802154_tree, tvb, offset, 2, ett_ieee802154_fcs, NULL,
-                        "Frame Check Sequence (TI CC24xx format): FCS %s", (fcs_ok) ? "OK" : "Bad");
+            ti = proto_tree_add_text(ieee802154_tree, tvb, offset, 2, "Frame Check Sequence (TI CC24xx format): FCS %s", (fcs_ok) ? "OK" : "Bad");
+            field_tree = proto_item_add_subtree(ti, ett_ieee802154_fcs);
             /* Display FCS contents.  */
             ti = proto_tree_add_int(field_tree, hf_ieee802154_rssi, tvb, offset++, 1, (gint8) (fcs & IEEE802154_CC24xx_RSSI));
             proto_item_append_text(ti, " dB");  /*  Displaying Units */
@@ -1201,17 +1205,25 @@ dissect_ieee802154_fcs:
 static void
 dissect_ieee802154_superframe(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guint *offset)
 {
-    static const int * superframe[] = {
-        &hf_ieee802154_beacon_order,
-        &hf_ieee802154_superframe_order,
-        &hf_ieee802154_cap,
-        &hf_ieee802154_superframe_battery_ext,
-        &hf_ieee802154_superframe_coord,
-        &hf_ieee802154_assoc_permit,
-        NULL
-    };
+    proto_tree *field_tree = NULL;
+    proto_item *ti;
+    guint16     superframe;
 
-    proto_tree_add_bitmask_text(tree, tvb, *offset, 2, "Superframe Specification", NULL , ett_ieee802154_superframe, superframe, ENC_LITTLE_ENDIAN, BMT_NO_INT|BMT_NO_TFS);
+    /* Parse the superframe spec. */
+    superframe = tvb_get_letohs(tvb, *offset);
+    if (tree) {
+        /*  Add Subtree for superframe specification */
+        ti = proto_tree_add_text(tree, tvb, *offset, 2, "Superframe Specification");
+        field_tree = proto_item_add_subtree(ti, ett_ieee802154_superframe);
+
+        /*  Add Beacon Order to the superframe spec. */
+        proto_tree_add_uint(field_tree, hf_ieee802154_beacon_order, tvb, *offset, 2, superframe & IEEE802154_BEACON_ORDER_MASK);
+        proto_tree_add_uint(field_tree, hf_ieee802154_superframe_order, tvb, *offset, 2, superframe & IEEE802154_SUPERFRAME_ORDER_MASK);
+        proto_tree_add_uint(field_tree, hf_ieee802154_cap, tvb, *offset, 2, superframe & IEEE802154_SUPERFRAME_CAP_MASK);
+        proto_tree_add_boolean(field_tree, hf_ieee802154_superframe_battery_ext, tvb, *offset, 2, superframe & IEEE802154_BATT_EXTENSION_MASK);
+        proto_tree_add_boolean(field_tree, hf_ieee802154_superframe_coord, tvb, *offset, 2, superframe & IEEE802154_SUPERFRAME_COORD_MASK);
+        proto_tree_add_boolean(field_tree, hf_ieee802154_assoc_permit, tvb, *offset, 2, superframe & IEEE802154_ASSOC_PERMIT_MASK);
+    }
     (*offset) += 2;
 } /* dissect_ieee802154_superframe */
 
@@ -1246,11 +1258,12 @@ dissect_ieee802154_gtsinfo(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
     if (tree) {
         /*  Add Subtree for GTS information. */
         if (gts_count) {
-            field_tree = proto_tree_add_subtree(tree, tvb, *offset, 2 + (gts_count * 3), ett_ieee802154_gts, NULL, "GTS");
+            ti = proto_tree_add_text(tree, tvb, *offset, 2 + (gts_count * 3), "GTS");
         }
         else {
-            field_tree = proto_tree_add_subtree(tree, tvb, *offset, 1, ett_ieee802154_gts, NULL, "GTS");
+            ti = proto_tree_add_text(tree, tvb, *offset, 1, "GTS");
         }
+        field_tree = proto_item_add_subtree(ti, ett_ieee802154_gts);
 
         proto_tree_add_uint(field_tree, hf_ieee802154_gts_count, tvb, *offset, 1, gts_count);
         proto_tree_add_boolean(field_tree, hf_ieee802154_gts_permit, tvb, *offset, 1, gts_spec & IEEE802154_GTS_PERMIT_MASK);
@@ -1265,10 +1278,11 @@ dissect_ieee802154_gtsinfo(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
 
         /* Display the directions mask. */
         if (tree) {
-            proto_tree  *dir_tree;
+            proto_tree  *dir_tree = NULL;
 
             /* Create a subtree. */
-            dir_tree = proto_tree_add_subtree(field_tree, tvb, *offset, 1, ett_ieee802154_gts_direction, &ti, "GTS Directions");
+            ti = proto_tree_add_text(field_tree, tvb, *offset, 1, "GTS Directions");
+            dir_tree = proto_item_add_subtree(ti, ett_ieee802154_gts_direction);
 
             /* Add the directions to the subtree. */
             for (i=0; i<gts_count; i++) {
@@ -1281,7 +1295,10 @@ dissect_ieee802154_gtsinfo(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
         (*offset) += 1;
 
         /* Create a subtree for the GTS descriptors. */
-        subtree = proto_tree_add_subtree(field_tree, tvb, *offset, gts_count * 3, ett_ieee802154_gts_descriptors, NULL, "GTS Descriptors");
+        if (tree) {
+            ti = proto_tree_add_text(field_tree, tvb, *offset, gts_count * 3, "GTS Descriptors");
+            subtree = proto_item_add_subtree(ti, ett_ieee802154_gts_descriptors);
+        }
 
         /* Get and display the GTS descriptors. */
         for (i=0; i<gts_count; i++) {
@@ -1293,9 +1310,9 @@ dissect_ieee802154_gtsinfo(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
 
             if (tree) {
                 /* Add address, slot, and time length fields. */
-                ti = proto_tree_add_uint(subtree, hf_ieee802154_gts_address, tvb, (*offset), 3, gts_addr);
+                ti = proto_tree_add_text(subtree, tvb, (*offset), 3, "{Address: 0x%04x", gts_addr);
                 proto_item_append_text(ti, ", Slot: %i", gts_slot);
-                proto_item_append_text(ti, ", Length: %i", gts_length);
+                proto_item_append_text(ti, ", Length: %i}", gts_length);
             }
             (*offset) += 3;
         } /* for */
@@ -1321,7 +1338,8 @@ dissect_ieee802154_gtsinfo(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
 static void
 dissect_ieee802154_pendaddr(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guint *offset)
 {
-    proto_tree *subtree;
+    proto_tree *subtree = NULL;
+    proto_item *ti;
     guint8      pend_spec;
     guint8      pend_num16;
     guint8      pend_num64;
@@ -1331,10 +1349,11 @@ dissect_ieee802154_pendaddr(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
     pend_spec = tvb_get_guint8(tvb, *offset);
     pend_num16 = pend_spec & IEEE802154_PENDADDR_SHORT_MASK;
     pend_num64 = (pend_spec & IEEE802154_PENDADDR_LONG_MASK) >> IEEE802154_PENDADDR_LONG_SHIFT;
-
-    /*  Add Subtree for the addresses */
-    subtree = proto_tree_add_subtree_format(tree, tvb, *offset, 1 + 2*pend_num16 + 8*pend_num64,
-                        ett_ieee802154_pendaddr, NULL, "Pending Addresses: %i Short and %i Long", pend_num16, pend_num64);
+    if (tree) {
+        /*  Add Subtree for the addresses */
+        ti = proto_tree_add_text(tree, tvb, *offset, 1 + 2*pend_num16 + 8*pend_num64, "Pending Addresses: %i Short and %i Long", pend_num16, pend_num64);
+        subtree = proto_item_add_subtree(ti, ett_ieee802154_pendaddr);
+    }
     (*offset) += 1;
 
     for (i=0; i<pend_num16; i++) {
@@ -1366,13 +1385,15 @@ dissect_ieee802154_pendaddr(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
 static void
 dissect_ieee802154_assoc_req(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, ieee802154_packet *packet)
 {
-    proto_tree *subtree;
+    proto_tree *subtree = NULL;
     proto_item *ti;
     guint8      capability;
 
     /* Create a subtree for this command frame. */
-    subtree = proto_tree_add_subtree(tree, tvb, 0, 1, ett_ieee802154_cmd, NULL,
-                    val_to_str_const(packet->command_id, ieee802154_cmd_names, "Unknown Command"));
+    if (tree) {
+        ti = proto_tree_add_text(tree, tvb, 0, 1, "%s", val_to_str_const(packet->command_id, ieee802154_cmd_names, "Unknown Command"));
+        subtree = proto_item_add_subtree(ti, ett_ieee802154_cmd);
+    }
 
     /* Get and display capability info. */
     capability = tvb_get_guint8(tvb, 0);
@@ -1414,19 +1435,24 @@ dissect_ieee802154_assoc_req(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 static void
 dissect_ieee802154_assoc_rsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, ieee802154_packet *packet)
 {
-    proto_tree *subtree;
+    proto_tree *subtree = NULL;
     proto_item *ti;
     guint16     short_addr;
     guint8      status;
     guint       offset  = 0;
 
     /* Create a subtree for this command frame. */
-    subtree = proto_tree_add_subtree(tree, tvb, offset, 3, ett_ieee802154_cmd, NULL,
-                    val_to_str_const(packet->command_id, ieee802154_cmd_names, "Unknown Command"));
+    if (tree) {
+        ti = proto_tree_add_text(tree, tvb, offset, 3, "%s", val_to_str_const(packet->command_id,
+                    ieee802154_cmd_names, "Unknown Command"));
+        subtree = proto_item_add_subtree(ti, ett_ieee802154_cmd);
+    }
 
     /* Get and display the short address. */
     short_addr = tvb_get_letohs(tvb, offset);
-    proto_tree_add_uint(subtree, hf_ieee802154_assoc_addr, tvb, offset, 2, short_addr);
+    if (tree) {
+        proto_tree_add_uint(subtree, hf_ieee802154_assoc_addr, tvb, offset, 2, short_addr);
+    }
     offset += 2;
 
     /* Get and display the status. */
@@ -1484,13 +1510,15 @@ dissect_ieee802154_assoc_rsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 static void
 dissect_ieee802154_disassoc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, ieee802154_packet *packet)
 {
-    proto_tree *subtree;
+    proto_tree *subtree = NULL;
     proto_item *ti;
     guint8      reason;
 
     /* Create a subtree for this command frame. */
-    subtree = proto_tree_add_subtree(tree, tvb, 0, 1, ett_ieee802154_cmd, NULL,
-                    val_to_str_const(packet->command_id, ieee802154_cmd_names, "Unknown Command"));
+    if (tree) {
+        ti = proto_tree_add_text(tree, tvb, 0, 1, "%s", val_to_str_const(packet->command_id, ieee802154_cmd_names, "Unknown Command"));
+        subtree = proto_item_add_subtree(ti, ett_ieee802154_cmd);
+    }
 
     /* Get and display the disassociation reason. */
     reason = tvb_get_guint8(tvb, 0);
@@ -1544,8 +1572,8 @@ dissect_ieee802154_disassoc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 static void
 dissect_ieee802154_realign(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, ieee802154_packet *packet)
 {
-    proto_tree *subtree;
-    proto_item *subitem;
+    proto_tree *subtree = NULL;
+    proto_item *ti;
     guint16     pan_id;
     guint16     coord_addr;
     guint8      channel;
@@ -1553,8 +1581,10 @@ dissect_ieee802154_realign(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
     guint       offset  = 0;
 
     /* Create a subtree for this command frame. */
-    subtree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_ieee802154_cmd, &subitem,
-                val_to_str_const(packet->command_id, ieee802154_cmd_names, "Unknown Command"));
+    if (tree) {
+        ti = proto_tree_add_text(tree, tvb, offset, 0, "%s", val_to_str_const(packet->command_id, ieee802154_cmd_names, "Unknown Command"));
+        subtree = proto_item_add_subtree(ti, ett_ieee802154_cmd);
+    }
 
     /* Get and display the command PAN ID. */
     pan_id = tvb_get_letohs(tvb, offset);
@@ -1597,7 +1627,7 @@ dissect_ieee802154_realign(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
 
     /* Fix the length of the command subtree. */
     if (tree) {
-        proto_item_set_len(subitem, offset);
+        proto_item_set_len(subtree, offset);
     }
 
     /* Call the data dissector for any leftover bytes. */
@@ -1628,7 +1658,7 @@ dissect_ieee802154_realign(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
 static void
 dissect_ieee802154_gtsreq(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, ieee802154_packet *packet)
 {
-    proto_tree *subtree;
+    proto_tree *subtree = NULL;
     proto_item *ti;
     guint8      characteristics;
     guint8      length;
@@ -1636,8 +1666,11 @@ dissect_ieee802154_gtsreq(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
     guint8      type;
 
     /* Create a subtree for this command frame. */
-    subtree = proto_tree_add_subtree(tree, tvb, 0, 1, ett_ieee802154_cmd, NULL,
-                val_to_str_const(packet->command_id, ieee802154_cmd_names, "Unknown Command"));
+    if (tree) {
+        ti = proto_tree_add_text(tree, tvb, 0, 1, "%s", val_to_str_const(packet->command_id, ieee802154_cmd_names,
+                                                                         "Unknown Command"));
+        subtree = proto_item_add_subtree(ti, ett_ieee802154_cmd);
+    }
 
     /* Get the characteristics field. */
     characteristics = tvb_get_guint8(tvb, 0);
@@ -2427,10 +2460,6 @@ void proto_register_ieee802154(void)
         { &hf_ieee802154_nonask_phy_length,
         { "Frame Length",                   "wpan-nonask-phy.frame_length", FT_UINT8, BASE_HEX, NULL,
             IEEE802154_PHY_LENGTH_MASK, NULL, HFILL }},
-
-        { &hf_ieee802154_nonask_phr,
-        { "PHR",                   "wpan-nonask-phy.phr", FT_UINT8, BASE_HEX, NULL,
-            0x0, NULL, HFILL }},
     };
 
     static hf_register_info hf[] = {
@@ -2636,10 +2665,6 @@ void proto_register_ieee802154(void)
         { "Direction",                  "wpan.gts.direction", FT_BOOLEAN, BASE_NONE, TFS(&ieee802154_gts_direction_tfs), 0x0,
             "A flag defining the direction of the GTS Slot.", HFILL }},
 
-        { &hf_ieee802154_gts_address,
-        { "Address",                  "wpan.gts.address", FT_UINT16, BASE_HEX, NULL, 0x0,
-            NULL, HFILL }},
-
         { &hf_ieee802154_pending16,
         { "Address",                    "wpan.pending16", FT_UINT16, BASE_HEX, NULL, 0x0,
             "Device with pending data to receive.", HFILL }},
@@ -2653,10 +2678,6 @@ void proto_register_ieee802154(void)
         { &hf_ieee802154_security_level,
         { "Security Level", "wpan.aux_sec.sec_level", FT_UINT8, BASE_HEX, VALS(ieee802154_sec_level_names),
             IEEE802154_AUX_SEC_LEVEL_MASK, "The Security Level of the frame", HFILL }},
-
-        { &hf_ieee802154_security_control_field,
-        { "Security Control Field", "wpan.aux_sec.security_control_field", FT_UINT8, BASE_HEX, NULL,
-            0x0, NULL, HFILL }},
 
         { &hf_ieee802154_key_id_mode,
         { "Key Identifier Mode", "wpan.aux_sec.key_id_mode", FT_UINT8, BASE_HEX, VALS(ieee802154_key_id_mode_names),
@@ -2810,8 +2831,8 @@ void proto_register_ieee802154(void)
 
     /* Register the subdissector list */
     panid_dissector_table = register_dissector_table(IEEE802154_PROTOABBREV_WPAN_PANID, "IEEE 802.15.4 PANID", FT_UINT16, BASE_HEX);
-    ieee802154_heur_subdissector_list = register_heur_dissector_list(IEEE802154_PROTOABBREV_WPAN);
-    ieee802154_beacon_subdissector_list = register_heur_dissector_list(IEEE802154_PROTOABBREV_WPAN_BEACON);
+    register_heur_dissector_list(IEEE802154_PROTOABBREV_WPAN, &ieee802154_heur_subdissector_list);
+    register_heur_dissector_list(IEEE802154_PROTOABBREV_WPAN_BEACON, &ieee802154_beacon_subdissector_list);
 
     /*  Register dissectors with Wireshark. */
     register_dissector(IEEE802154_PROTOABBREV_WPAN, dissect_ieee802154, proto_ieee802154);

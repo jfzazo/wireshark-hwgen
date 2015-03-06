@@ -29,6 +29,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
 
@@ -455,7 +457,7 @@ dissect_png(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *da
 
     while(tvb_reported_length_remaining(tvb, offset) > 0){
         guint32     len_field;
-        proto_item *len_it;
+        proto_item *chunk_it, *len_it;
         proto_tree *chunk_tree;
         guint32     type;
         guint8     *type_str;
@@ -468,8 +470,9 @@ dissect_png(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *da
                 tvb, offset+4, 4, ENC_ASCII|ENC_NA);
 
         /* 4 byte len field, 4 byte chunk type, 4 byte CRC */
-        chunk_tree = proto_tree_add_subtree_format(tree, tvb, offset, 4+4+len_field+4, ett_png_chunk, NULL,
-                "%s (%s)", val_to_str_const(type, chunk_types, "unknown"), type_str);
+        chunk_it = proto_tree_add_text(tree, tvb, offset, 4+4+len_field+4, "%s (%s)", 
+                val_to_str_const(type, chunk_types, "unknown"), type_str);
+        chunk_tree = proto_item_add_subtree(chunk_it, ett_png_chunk);
 
         len_it = proto_tree_add_item(chunk_tree, &hfi_png_chunk_len,
                 tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -487,7 +490,7 @@ dissect_png(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *da
         proto_tree_add_item(chunk_tree, &hfi_png_chunk_flag_stc, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset+=4;
 
-        chunk_tvb=tvb_new_subset_length(tvb, offset, len_field);
+        chunk_tvb=tvb_new_subset(tvb, offset, len_field, len_field);
         switch (type) {
             case CHUNK_TYPE_IHDR:
                 dissect_png_ihdr(chunk_tvb, pinfo, chunk_tree);

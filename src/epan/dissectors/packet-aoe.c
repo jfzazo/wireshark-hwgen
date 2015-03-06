@@ -19,9 +19,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 #include <epan/conversation.h>
-#include <epan/etypes.h>
+#include <etypes.h>
 
 void proto_register_aoe(void);
 void proto_reg_handoff_aoe(void);
@@ -260,11 +263,11 @@ dissect_ata_pdu(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int offset,
   if(ata_info){
     if(response){
       if(ata_info->request_frame){
-        nstime_t delta_ts;
+	nstime_t delta_ts;
         tmp_item=proto_tree_add_uint(tree, hf_aoe_response_to, tvb, 0, 0, ata_info->request_frame);
         PROTO_ITEM_SET_GENERATED(tmp_item);
-        nstime_delta(&delta_ts, &pinfo->fd->abs_ts, &ata_info->req_time);
-        tmp_item=proto_tree_add_time(tree, hf_aoe_time, tvb, offset, 0, &delta_ts);
+		nstime_delta(&delta_ts, &pinfo->fd->abs_ts, &ata_info->req_time);
+        tmp_item=proto_tree_add_time(tree, hf_aoe_time, tvb, offset, 0,	&delta_ts);
         PROTO_ITEM_SET_GENERATED(tmp_item);
       }
     } else {
@@ -302,7 +305,7 @@ dissect_ata_pdu(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int offset,
   } else {
     proto_tree_add_item(tree, hf_aoe_astatus, tvb, offset, 1, ENC_BIG_ENDIAN);
     if(ata_info != NULL && ata_info->request_frame){
-      /* we don't know what command it was unless we saw the request_frame */
+      /* we dont know what command it was unless we saw the request_frame */
       tmp_item=proto_tree_add_uint(tree, hf_aoe_acmd, tvb, 0, 0, ata_info->cmd);
       PROTO_ITEM_SET_GENERATED(tmp_item);
       col_append_fstr(pinfo->cinfo, COL_INFO, " ATA:%s", val_to_str(ata_info->cmd, ata_cmd_vals, " Unknown ATA<0x%02x>"));
@@ -323,26 +326,29 @@ dissect_aoe_v1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
   guint8 flags, cmd;
   guint32 tag;
-  proto_item *flags_item;
-  proto_tree *flags_tree;
+  proto_item *flags_item=NULL;
+  proto_tree *flags_tree=NULL;
 
   /* read and dissect the flags */
   flags=tvb_get_guint8(tvb, 0)&0x0f;
-
-  flags_tree=proto_tree_add_subtree(tree, tvb, 0, 1, ett_aoe_flags, &flags_item, "Flags:");
-
+  if(tree){
+    flags_item=proto_tree_add_text(tree, tvb, 0, 1, "Flags:");
+    flags_tree=proto_item_add_subtree(flags_item, ett_aoe_flags);
+  }
   proto_tree_add_item(flags_tree, hf_aoe_flags_response, tvb, 0, 1, ENC_BIG_ENDIAN);
   proto_tree_add_item(flags_tree, hf_aoe_flags_error, tvb, 0, 1, ENC_BIG_ENDIAN);
-
-  proto_item_append_text(flags_item,(flags&AOE_FLAGS_RESPONSE)?" Response":" Request");
-  if(flags&AOE_FLAGS_ERROR){
+  if(flags_item){
+    proto_item_append_text(flags_item,(flags&AOE_FLAGS_RESPONSE)?" Response":" Request");
+    if(flags&AOE_FLAGS_ERROR){
       proto_item_append_text(flags_item, " Error");
+    }
   }
+
 
   /* error */
   if(flags&AOE_FLAGS_ERROR){
     proto_tree_add_item(tree, hf_aoe_error, tvb, 1, 1, ENC_BIG_ENDIAN);
-    col_append_fstr(pinfo->cinfo, COL_INFO, "Error:%s ", val_to_str(tvb_get_guint8(tvb, 1), error_vals, "Unknown error<%d>"));
+	col_append_fstr(pinfo->cinfo, COL_INFO, "Error:%s ", val_to_str(tvb_get_guint8(tvb, 1), error_vals, "Unknown error<%d>"));
   }
 
   /* major/minor address */
@@ -418,38 +424,38 @@ proto_register_aoe(void)
   static hf_register_info hf[] = {
     { &hf_aoe_cmd,
       { "Command", "aoe.cmd", FT_UINT8, BASE_DEC, VALS(cmd_vals), 0x0,
-        "AOE Command", HFILL}},
+	"AOE Command", HFILL}},
     { &hf_aoe_version,
       { "Version", "aoe.version", FT_UINT8, BASE_DEC, NULL, 0x0,
-        "Version of the AOE protocol", HFILL}},
+	"Version of the AOE protocol", HFILL}},
     { &hf_aoe_error,
       { "Error", "aoe.error", FT_UINT8, BASE_DEC, VALS(error_vals), 0x0,
-        "Error code", HFILL}},
+	"Error code", HFILL}},
     { &hf_aoe_err_feature,
       { "Err/Feature", "aoe.err_feature", FT_UINT8, BASE_HEX, NULL, 0x0,
-        NULL, HFILL}},
+	NULL, HFILL}},
     { &hf_aoe_sector_count,
       { "Sector Count", "aoe.sector_count", FT_UINT8, BASE_DEC, NULL, 0x0,
-        NULL, HFILL}},
+	NULL, HFILL}},
     { &hf_aoe_flags_response,
       { "Response flag", "aoe.response", FT_BOOLEAN, 8, TFS(&tfs_response), AOE_FLAGS_RESPONSE, "Whether this is a response PDU or not", HFILL}},
     { &hf_aoe_flags_error,
       { "Error flag", "aoe.flags_error", FT_BOOLEAN, 8, TFS(&tfs_error), AOE_FLAGS_ERROR, "Whether this is an error PDU or not", HFILL}},
     { &hf_aoe_major,
       { "Major", "aoe.major", FT_UINT16, BASE_HEX, NULL, 0x0,
-        "Major address", HFILL}},
+	"Major address", HFILL}},
     { &hf_aoe_minor,
       { "Minor", "aoe.minor", FT_UINT8, BASE_HEX, NULL, 0x0,
-        "Minor address", HFILL}},
+	"Minor address", HFILL}},
     { &hf_aoe_acmd,
       { "ATA Cmd", "aoe.ata.cmd", FT_UINT8, BASE_HEX, VALS(ata_cmd_vals), 0x0,
-        "ATA command opcode", HFILL}},
+	"ATA command opcode", HFILL}},
     { &hf_aoe_astatus,
       { "ATA Status", "aoe.ata.status", FT_UINT8, BASE_HEX, NULL, 0x0,
-        "ATA status bits", HFILL}},
+	"ATA status bits", HFILL}},
     { &hf_aoe_tag,
       { "Tag", "aoe.tag", FT_UINT32, BASE_HEX, NULL, 0x0,
-        "Command Tag", HFILL}},
+	"Command Tag", HFILL}},
     { &hf_aoe_aflags_e,
       { "E", "aoe.aflags.e", FT_BOOLEAN, 8, TFS(&tfs_aflags_e), AOE_AFLAGS_E, "Whether this is a normal or LBA48 command", HFILL}},
     { &hf_aoe_aflags_d,
@@ -487,16 +493,3 @@ proto_reg_handoff_aoe(void)
 {
   dissector_add_uint("ethertype", ETHERTYPE_AOE, aoe_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

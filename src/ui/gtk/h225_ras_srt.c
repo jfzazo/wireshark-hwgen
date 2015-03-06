@@ -25,14 +25,19 @@
 
 #include <string.h>
 
+#include <gtk/gtk.h>
 
 #include <epan/packet.h>
+#include <epan/packet_info.h>
+#include <epan/epan.h>
 #include <epan/value_string.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-h225.h>
 
 #include "epan/timestats.h"
 #include "ui/simple_dialog.h"
+#include "../file.h"
+#include "../stat_menu.h"
 
 #include "ui/gtk/gui_stat_util.h"
 #include "ui/gtk/dlg_utils.h"
@@ -40,12 +45,13 @@
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtk_h225rassrt(void);
 static void gtk_h225rassrt_init(const char *opt_arg, void *userdata);
 
 static tap_param h225_rassrt_params[] = {
-	{ PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+	{ PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg h225_rassrt_dlg = {
@@ -198,7 +204,6 @@ h225rassrt_draw(void *phs)
 	h225rassrt_t *hs=(h225rassrt_t *)phs;
 	int i;
 	char str[3][256];
-	gchar* tmp_str;
 	GtkListStore *store;
 	GtkTreeIter iter;
 
@@ -218,11 +223,10 @@ h225rassrt_draw(void *phs)
 				"%8.2f msec", nstime_to_msec(&(hs->ras_rtd[i].stats.max)));
 		g_snprintf(str[2], sizeof(char[256]),
 				"%8.2f msec", get_average(&(hs->ras_rtd[i].stats.tot), hs->ras_rtd[i].stats.num));
-		tmp_str = val_to_str_wmem(NULL,i,ras_message_category,"Other (%d)");
 
 		gtk_list_store_append(store, &iter);
 		gtk_list_store_set(store, &iter,
-			0, tmp_str,
+			0, val_to_str(i,ras_message_category,"Other"),
 			1, hs->ras_rtd[i].stats.num,
 			2, str[0],
 			3, str[1],
@@ -234,7 +238,6 @@ h225rassrt_draw(void *phs)
 			9, hs->ras_rtd[i].req_dup_num,
 			10, hs->ras_rtd[i].rsp_dup_num,
 			-1);
-		wmem_free(NULL, tmp_str);
 	}
 }
 

@@ -34,6 +34,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/asn1.h>
@@ -450,7 +451,7 @@ static int hf_ilp_GANSSSignals_signal7 = -1;
 static int hf_ilp_GANSSSignals_signal8 = -1;
 
 /*--- End of included file: packet-ilp-hf.c ---*/
-#line 60 "../../asn1/ilp/packet-ilp-template.c"
+#line 61 "../../asn1/ilp/packet-ilp-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_ilp = -1;
@@ -594,7 +595,7 @@ static gint ett_ilp_T_lPPPayload = -1;
 static gint ett_ilp_T_tia801Payload = -1;
 
 /*--- End of included file: packet-ilp-ett.c ---*/
-#line 64 "../../asn1/ilp/packet-ilp-template.c"
+#line 65 "../../asn1/ilp/packet-ilp-template.c"
 
 /* Include constants */
 
@@ -611,7 +612,7 @@ static gint ett_ilp_T_tia801Payload = -1;
 #define maxPosSize                     1024
 
 /*--- End of included file: packet-ilp-val.h ---*/
-#line 67 "../../asn1/ilp/packet-ilp-template.c"
+#line 68 "../../asn1/ilp/packet-ilp-template.c"
 
 
 
@@ -4089,11 +4090,11 @@ static int dissect_ILP_PDU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_
 
 
 /*--- End of included file: packet-ilp-fn.c ---*/
-#line 70 "../../asn1/ilp/packet-ilp-template.c"
+#line 71 "../../asn1/ilp/packet-ilp-template.c"
 
 
 static guint
-get_ilp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_ilp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   /* PDU length = Message length */
   return tvb_get_ntohs(tvb,offset);
@@ -4104,7 +4105,7 @@ dissect_ilp_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
   tcp_dissect_pdus(tvb, pinfo, tree, ilp_desegment, ILP_HEADER_SIZE,
                    get_ilp_pdu_len, dissect_ILP_PDU_PDU, data);
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 void proto_reg_handoff_ilp(void);
@@ -5640,7 +5641,7 @@ void proto_register_ilp(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-ilp-hfarr.c ---*/
-#line 96 "../../asn1/ilp/packet-ilp-template.c"
+#line 97 "../../asn1/ilp/packet-ilp-template.c"
   };
 
   /* List of subtrees */
@@ -5786,7 +5787,7 @@ void proto_register_ilp(void) {
     &ett_ilp_T_tia801Payload,
 
 /*--- End of included file: packet-ilp-ettarr.c ---*/
-#line 102 "../../asn1/ilp/packet-ilp-template.c"
+#line 103 "../../asn1/ilp/packet-ilp-template.c"
   };
 
   module_t *ilp_module;

@@ -10,6 +10,13 @@
 
 
 #include "config.h"
+#ifdef _MSC_VER
+#pragma warning(disable:4005)
+#pragma warning(disable:4013)
+#pragma warning(disable:4018)
+#pragma warning(disable:4101)
+#endif
+
 #include <glib.h>
 #include <string.h>
 #include <epan/packet.h>
@@ -18,8 +25,6 @@
 #include "packet-dcerpc-nt.h"
 #include "packet-windows-common.h"
 #include "packet-dcerpc-initshutdown.h"
-void proto_register_dcerpc_initshutdown(void);
-void proto_reg_handoff_dcerpc_initshutdown(void);
 
 /* Ett declarations */
 static gint ett_dcerpc_initshutdown = -1;
@@ -27,22 +32,22 @@ static gint ett_initshutdown_initshutdown_ReasonFlags = -1;
 
 
 /* Header field declarations */
-static gint hf_initshutdown_initshutdown_Abort_server = -1;
-static gint hf_initshutdown_initshutdown_InitEx_do_reboot = -1;
-static gint hf_initshutdown_initshutdown_InitEx_force_apps = -1;
-static gint hf_initshutdown_initshutdown_InitEx_hostname = -1;
-static gint hf_initshutdown_initshutdown_InitEx_message = -1;
-static gint hf_initshutdown_initshutdown_InitEx_reason = -1;
-static gint hf_initshutdown_initshutdown_InitEx_timeout = -1;
-static gint hf_initshutdown_initshutdown_Init_do_reboot = -1;
-static gint hf_initshutdown_initshutdown_Init_force_apps = -1;
-static gint hf_initshutdown_initshutdown_Init_hostname = -1;
-static gint hf_initshutdown_initshutdown_Init_message = -1;
-static gint hf_initshutdown_initshutdown_Init_timeout = -1;
-static gint hf_initshutdown_initshutdown_ReasonFlags_SHTDN_REASON_FLAG_PLANNED = -1;
-static gint hf_initshutdown_initshutdown_ReasonFlags_SHTDN_REASON_FLAG_USER_DEFINED = -1;
 static gint hf_initshutdown_opnum = -1;
+static gint hf_initshutdown_initshutdown_ReasonFlags_SHTDN_REASON_FLAG_PLANNED = -1;
+static gint hf_initshutdown_initshutdown_Init_message = -1;
+static gint hf_initshutdown_initshutdown_InitEx_timeout = -1;
+static gint hf_initshutdown_initshutdown_InitEx_message = -1;
+static gint hf_initshutdown_initshutdown_ReasonFlags_SHTDN_REASON_FLAG_USER_DEFINED = -1;
+static gint hf_initshutdown_initshutdown_Init_timeout = -1;
 static gint hf_initshutdown_werror = -1;
+static gint hf_initshutdown_initshutdown_InitEx_force_apps = -1;
+static gint hf_initshutdown_initshutdown_InitEx_do_reboot = -1;
+static gint hf_initshutdown_initshutdown_InitEx_reason = -1;
+static gint hf_initshutdown_initshutdown_Init_do_reboot = -1;
+static gint hf_initshutdown_initshutdown_Abort_server = -1;
+static gint hf_initshutdown_initshutdown_Init_hostname = -1;
+static gint hf_initshutdown_initshutdown_InitEx_hostname = -1;
+static gint hf_initshutdown_initshutdown_Init_force_apps = -1;
 
 static gint proto_dcerpc_initshutdown = -1;
 /* Version information */
@@ -137,12 +142,12 @@ int
 initshutdown_dissect_enum_ReasonMajor(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, guint8 *drep _U_, int hf_index _U_, guint32 *param _U_)
 {
 	guint32 parameter=0;
-	if (param) {
-		parameter = *param;
+	if(param){
+		parameter=(guint32)*param;
 	}
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &parameter);
-	if (param) {
-		*param = parameter;
+	if(param){
+		*param=(guint32)parameter;
 	}
 	return offset;
 }
@@ -182,12 +187,12 @@ int
 initshutdown_dissect_enum_ReasonMinor(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, guint8 *drep _U_, int hf_index _U_, guint32 *param _U_)
 {
 	guint32 parameter=0;
-	if (param) {
-		parameter = *param;
+	if(param){
+		parameter=(guint32)*param;
 	}
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &parameter);
-	if (param) {
-		*param = parameter;
+	if(param){
+		*param=(guint32)parameter;
 	}
 	return offset;
 }
@@ -212,7 +217,7 @@ initshutdown_dissect_bitmap_ReasonFlags(tvbuff_t *tvb _U_, int offset _U_, packe
 		tree = proto_item_add_subtree(item,ett_initshutdown_initshutdown_ReasonFlags);
 	}
 
-	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, -1, &flags);
+	offset = dissect_ndr_uint32(tvb, offset, pinfo, NULL, di, drep, -1, &flags);
 	proto_item_append_text(item, ": ");
 
 	if (!flags)
@@ -298,7 +303,7 @@ initshutdown_dissect_element_Init_do_reboot(tvbuff_t *tvb _U_, int offset _U_, p
 }
 
 /* IDL: WERROR initshutdown_Init( */
-/* IDL: [in] [unique(1)] uint16 *hostname, */
+/* IDL: [unique(1)] [in] uint16 *hostname, */
 /* IDL: [in] [unique(1)] lsa_StringLarge *message, */
 /* IDL: [in] uint32 timeout, */
 /* IDL: [in] uint8 force_apps, */
@@ -353,7 +358,7 @@ initshutdown_dissect_element_Abort_server_(tvbuff_t *tvb _U_, int offset _U_, pa
 }
 
 /* IDL: WERROR initshutdown_Abort( */
-/* IDL: [in] [unique(1)] uint16 *server */
+/* IDL: [unique(1)] [in] uint16 *server */
 /* IDL: ); */
 
 static int
@@ -444,7 +449,7 @@ initshutdown_dissect_element_InitEx_reason(tvbuff_t *tvb _U_, int offset _U_, pa
 }
 
 /* IDL: WERROR initshutdown_InitEx( */
-/* IDL: [in] [unique(1)] uint16 *hostname, */
+/* IDL: [unique(1)] [in] uint16 *hostname, */
 /* IDL: [in] [unique(1)] lsa_StringLarge *message, */
 /* IDL: [in] uint32 timeout, */
 /* IDL: [in] uint8 force_apps, */
@@ -499,38 +504,38 @@ static dcerpc_sub_dissector initshutdown_dissectors[] = {
 void proto_register_dcerpc_initshutdown(void)
 {
 	static hf_register_info hf[] = {
-	{ &hf_initshutdown_initshutdown_Abort_server,
-		{ "Server", "initshutdown.initshutdown_Abort.server", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_InitEx_do_reboot,
-		{ "Do Reboot", "initshutdown.initshutdown_InitEx.do_reboot", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_InitEx_force_apps,
-		{ "Force Apps", "initshutdown.initshutdown_InitEx.force_apps", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_InitEx_hostname,
-		{ "Hostname", "initshutdown.initshutdown_InitEx.hostname", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_InitEx_message,
-		{ "Message", "initshutdown.initshutdown_InitEx.message", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_InitEx_reason,
-		{ "Reason", "initshutdown.initshutdown_InitEx.reason", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_InitEx_timeout,
-		{ "Timeout", "initshutdown.initshutdown_InitEx.timeout", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_Init_do_reboot,
-		{ "Do Reboot", "initshutdown.initshutdown_Init.do_reboot", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_Init_force_apps,
-		{ "Force Apps", "initshutdown.initshutdown_Init.force_apps", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_Init_hostname,
-		{ "Hostname", "initshutdown.initshutdown_Init.hostname", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_Init_message,
-		{ "Message", "initshutdown.initshutdown_Init.message", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_Init_timeout,
-		{ "Timeout", "initshutdown.initshutdown_Init.timeout", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_ReasonFlags_SHTDN_REASON_FLAG_PLANNED,
-		{ "Shtdn Reason Flag Planned", "initshutdown.initshutdown_ReasonFlags.SHTDN_REASON_FLAG_PLANNED", FT_BOOLEAN, 32, TFS(&initshutdown_ReasonFlags_SHTDN_REASON_FLAG_PLANNED_tfs), ( 0x80000000 ), NULL, HFILL }},
-	{ &hf_initshutdown_initshutdown_ReasonFlags_SHTDN_REASON_FLAG_USER_DEFINED,
-		{ "Shtdn Reason Flag User Defined", "initshutdown.initshutdown_ReasonFlags.SHTDN_REASON_FLAG_USER_DEFINED", FT_BOOLEAN, 32, TFS(&initshutdown_ReasonFlags_SHTDN_REASON_FLAG_USER_DEFINED_tfs), ( 0x40000000 ), NULL, HFILL }},
 	{ &hf_initshutdown_opnum,
-		{ "Operation", "initshutdown.opnum", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
+	  { "Operation", "initshutdown.opnum", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_ReasonFlags_SHTDN_REASON_FLAG_PLANNED,
+	  { "Shtdn Reason Flag Planned", "initshutdown.initshutdown_ReasonFlags.SHTDN_REASON_FLAG_PLANNED", FT_BOOLEAN, 32, TFS(&initshutdown_ReasonFlags_SHTDN_REASON_FLAG_PLANNED_tfs), ( 0x80000000 ), NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_Init_message,
+	  { "Message", "initshutdown.initshutdown_Init.message", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_InitEx_timeout,
+	  { "Timeout", "initshutdown.initshutdown_InitEx.timeout", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_InitEx_message,
+	  { "Message", "initshutdown.initshutdown_InitEx.message", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_ReasonFlags_SHTDN_REASON_FLAG_USER_DEFINED,
+	  { "Shtdn Reason Flag User Defined", "initshutdown.initshutdown_ReasonFlags.SHTDN_REASON_FLAG_USER_DEFINED", FT_BOOLEAN, 32, TFS(&initshutdown_ReasonFlags_SHTDN_REASON_FLAG_USER_DEFINED_tfs), ( 0x40000000 ), NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_Init_timeout,
+	  { "Timeout", "initshutdown.initshutdown_Init.timeout", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
 	{ &hf_initshutdown_werror,
-		{ "Windows Error", "initshutdown.werror", FT_UINT32, BASE_HEX, VALS(WERR_errors), 0, NULL, HFILL }},
+	  { "Windows Error", "initshutdown.werror", FT_UINT32, BASE_HEX, VALS(WERR_errors), 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_InitEx_force_apps,
+	  { "Force Apps", "initshutdown.initshutdown_InitEx.force_apps", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_InitEx_do_reboot,
+	  { "Do Reboot", "initshutdown.initshutdown_InitEx.do_reboot", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_InitEx_reason,
+	  { "Reason", "initshutdown.initshutdown_InitEx.reason", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_Init_do_reboot,
+	  { "Do Reboot", "initshutdown.initshutdown_Init.do_reboot", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_Abort_server,
+	  { "Server", "initshutdown.initshutdown_Abort.server", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_Init_hostname,
+	  { "Hostname", "initshutdown.initshutdown_Init.hostname", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_InitEx_hostname,
+	  { "Hostname", "initshutdown.initshutdown_InitEx.hostname", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_initshutdown_initshutdown_Init_force_apps,
+	  { "Force Apps", "initshutdown.initshutdown_Init.force_apps", FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
 	};
 
 

@@ -27,6 +27,8 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-usb.h"
 
 static int proto_acr122                                                    = -1;
@@ -322,25 +324,25 @@ dissect_acr122(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 
         col_add_fstr(pinfo->cinfo, COL_INFO, "Command: %s", val_to_str_ext_const(command, &command_vals_ext, "Unknown"));
 
-        proto_tree_add_item(main_tree, hf_class, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(main_tree, hf_class, tvb, offset, 1, ENC_NA);
         offset += 1;
 
-        proto_tree_add_item(main_tree, hf_ins, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(main_tree, hf_ins, tvb, offset, 1, ENC_NA);
         offset += 1;
 
-        p1_item = proto_tree_add_item(main_tree, hf_p1, tvb, offset, 1, ENC_BIG_ENDIAN);
+        p1_item = proto_tree_add_item(main_tree, hf_p1, tvb, offset, 1, ENC_NA);
         offset += 1;
 
-        p2_item = proto_tree_add_item(main_tree, hf_p2, tvb, offset, 1, ENC_BIG_ENDIAN);
+        p2_item = proto_tree_add_item(main_tree, hf_p2, tvb, offset, 1, ENC_NA);
         offset += 1;
 
-        proto_tree_add_item(main_tree, hf_length, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(main_tree, hf_length, tvb, offset, 1, ENC_NA);
         offset += 1;
 
         switch (command) {
         case CMD_DIRECT_TRANSMIT:
             if (length > 0) {
-                next_tvb = tvb_new_subset_length(tvb, offset, length);
+                next_tvb = tvb_new_subset(tvb, offset, length, length);
                 call_dissector_with_data(pn532_handle, next_tvb, pinfo, tree, usb_conv_info);
                 offset += length;
             }
@@ -521,7 +523,7 @@ dissect_acr122(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             use_status_word = TRUE;
 
             if (tvb_length_remaining(tvb, offset) > 2) {
-                next_tvb = tvb_new_subset_length(tvb, offset, tvb_length_remaining(tvb, offset) - 2);
+                next_tvb = tvb_new_subset(tvb, offset, tvb_length_remaining(tvb, offset) - 2, tvb_length_remaining(tvb, offset) - 2);
                 call_dissector_with_data(pn532_handle, next_tvb, pinfo, tree, usb_conv_info);
                 offset += tvb_length_remaining(tvb, offset) - 2;
             }

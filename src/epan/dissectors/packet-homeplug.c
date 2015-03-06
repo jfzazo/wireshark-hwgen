@@ -25,8 +25,9 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/expert.h>
 
 #include <epan/etypes.h>
 
@@ -158,7 +159,6 @@ static int hf_homeplug_ns_extended            = -1;
 static int hf_homeplug_ns_netw_ctrl_ac        = -1;
 static int hf_homeplug_ns_netw_ctrl_icid      = -1;
 static int hf_homeplug_ns_bytes40_robo        = -1;
-static int hf_homeplug_ns_mhz                 = -1;
 static int hf_homeplug_ns_fails_robo          = -1;
 static int hf_homeplug_ns_drops_robo          = -1;
 static int hf_homeplug_ns_netw_da             = -1;
@@ -228,7 +228,6 @@ static gint ett_homeplug_bcn                  = -1;
 static gint ett_homeplug_bcl                  = -1;
 static gint ett_homeplug_stc                  = -1;
 
-static expert_field ei_homeplug_tone_map_not_exist = EI_INIT;
 
 static guint8  homeplug_ne     = 0;
 static guint8  homeplug_melen  = 0;
@@ -1017,6 +1016,7 @@ static void dissect_homeplug_ns(ptvcursor_t * cursor, packet_info * pinfo)
   guint8 iTone = 0;
   guint8 i_buffer = 0;
 
+  guint16 ns_bytes40 = 0;
   guint64 newt_da = 0;
   gboolean extended = (homeplug_melen >= HOMEPLUG_NS_EXT_LEN);
   proto_item * ti;
@@ -1038,7 +1038,11 @@ static void dissect_homeplug_ns(ptvcursor_t * cursor, packet_info * pinfo)
     ptvcursor_add(cursor, hf_homeplug_ns_netw_ctrl_icid, 1, ENC_BIG_ENDIAN);
 
     ptvcursor_add_no_advance(cursor, hf_homeplug_ns_bytes40_robo, 2, ENC_LITTLE_ENDIAN);
-    ptvcursor_add(cursor, hf_homeplug_ns_mhz, 2, ENC_BIG_ENDIAN);
+    ns_bytes40 = tvb_get_letohs(ptvcursor_tvbuff(cursor),
+        ptvcursor_current_offset(cursor));
+    proto_tree_add_text(ptvcursor_tree(cursor), ptvcursor_tvbuff(cursor),
+        ptvcursor_current_offset(cursor), 2, "MHz :  %.3f", (float)(ns_bytes40)/42);
+    ptvcursor_advance(cursor, 2);
 
     ptvcursor_add(cursor, hf_homeplug_ns_fails_robo, 2, ENC_LITTLE_ENDIAN);
     ptvcursor_add(cursor, hf_homeplug_ns_drops_robo, 2, ENC_LITTLE_ENDIAN);
@@ -1056,14 +1060,18 @@ static void dissect_homeplug_ns(ptvcursor_t * cursor, packet_info * pinfo)
           ptvcursor_add(cursor, hf_homeplug_ns_netw_da, 6, ENC_NA);
 
           ptvcursor_add_no_advance(cursor, hf_homeplug_ns_bytes40, 2, ENC_LITTLE_ENDIAN);
-          ptvcursor_add(cursor, hf_homeplug_ns_mhz, 2, ENC_BIG_ENDIAN);
+          ns_bytes40 = tvb_get_letohs(ptvcursor_tvbuff(cursor),
+                                      ptvcursor_current_offset(cursor));
+          proto_tree_add_text(ptvcursor_tree(cursor), ptvcursor_tvbuff(cursor),
+                              ptvcursor_current_offset(cursor), 2, "MHz :  %.3f", (float)(ns_bytes40)/42);
+          ptvcursor_advance(cursor, 2);
 
           ptvcursor_add(cursor, hf_homeplug_ns_fails, 2, ENC_LITTLE_ENDIAN);
           ptvcursor_add(cursor, hf_homeplug_ns_drops, 2, ENC_LITTLE_ENDIAN);
         }
         ptvcursor_pop_subtree(cursor);
       } else {
-        proto_tree_add_expert_format(ptvcursor_tree(cursor), pinfo, &ei_homeplug_tone_map_not_exist, ptvcursor_tvbuff(cursor),
+        proto_tree_add_text(ptvcursor_tree(cursor), ptvcursor_tvbuff(cursor),
             ptvcursor_current_offset(cursor), 12, "Tone Map #%d does not exist", iTone+1);
       }
 
@@ -1300,8 +1308,8 @@ static int check_tvb_length(ptvcursor_t *cursor, const gint length)
 static void
 dissect_homeplug(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 {
-  proto_item * it;
-  proto_tree * homeplug_tree;
+  proto_item * it= NULL;
+  proto_tree * homeplug_tree= NULL;
   ptvcursor_t * cursor;
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "HomePlug");
@@ -1310,8 +1318,10 @@ dissect_homeplug(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 
   homeplug_offset = 0;
 
-  it = proto_tree_add_item(tree, proto_homeplug, tvb, homeplug_offset, -1, ENC_NA);
-  homeplug_tree = proto_item_add_subtree(it, ett_homeplug);
+  if (tree) {
+    it = proto_tree_add_item(tree, proto_homeplug, tvb, homeplug_offset, -1, ENC_NA);
+    homeplug_tree = proto_item_add_subtree(it, ett_homeplug);
+  }
 
   cursor = ptvcursor_new(homeplug_tree, tvb, 0);
 
@@ -1345,11 +1355,6 @@ dissect_homeplug(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
   ptvcursor_free(cursor);
 }
 
-static void
-homeplug_fmt_mhz( gchar *result, guint32 ns_bytes40 )
-{
-   g_snprintf( result, ITEM_LABEL_LENGTH, "%.3f", (float)(ns_bytes40)/42);
-}
 
 void
 proto_reg_handoff_homeplug(void)
@@ -1912,11 +1917,6 @@ proto_register_homeplug(void)
       FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }
     },
 
-    { &hf_homeplug_ns_mhz,
-      { "Mhz", "homeplug.ns.mhz",
-      FT_UINT16, BASE_CUSTOM, homeplug_fmt_mhz, 0x0, NULL, HFILL }
-    },
-
     { &hf_homeplug_ns_fails_robo,
       { "Fails Received in ROBO", "homeplug.ns.fails_robo",
       FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }
@@ -2176,29 +2176,9 @@ proto_register_homeplug(void)
     &ett_homeplug_stc
   };
 
-  static ei_register_info ei[] = {
-    { &ei_homeplug_tone_map_not_exist, { "homeplug.tone_map_not_exist", PI_PROTOCOL, PI_WARN, "Tone Map does not exist", EXPFILL }},
-  };
-
-  expert_module_t* expert_homeplug;
-
   proto_homeplug = proto_register_protocol("HomePlug protocol", "HomePlug", "homeplug");
 
   proto_register_field_array(proto_homeplug, hf, array_length(hf));
-  proto_register_subtree_array(ett, array_length(ett));
-  expert_homeplug = expert_register_protocol(proto_homeplug);
-  expert_register_field_array(expert_homeplug, ei, array_length(ei));
-}
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */
+  proto_register_subtree_array(ett, array_length(ett));
+}

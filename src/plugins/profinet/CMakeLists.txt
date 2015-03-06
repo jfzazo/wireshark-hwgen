@@ -19,11 +19,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-include(WiresharkPlugin)
-
-# This info is from moduleinfo.nmake
-set_module_info(profinet 0 2 4 0)
-
 set(DISSECTOR_SRC
 	packet-dcerpc-pn-io.c
 	packet-dcom-cba.c
@@ -64,10 +59,18 @@ register_dissector_files(plugin.c
 	${DISSECTOR_SRC}
 )
 
-add_plugin_library(profinet)
+add_library(profinet ${LINK_MODE_MODULE}
+	${PLUGIN_FILES}
+)
+set_target_properties(profinet PROPERTIES PREFIX "")
+set_target_properties(profinet PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+set_target_properties(profinet PROPERTIES FOLDER "Plugins")
+
+target_link_libraries(profinet epan)
 
 install(TARGETS profinet
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION} NAMELINK_SKIP
 	RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}
 )
+

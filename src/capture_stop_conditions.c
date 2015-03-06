@@ -20,7 +20,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <time.h>
 #include <string.h>
@@ -208,16 +208,3 @@ static gboolean _cnd_eval_capturesize(condition* cnd, va_list ap){
  */
 static void _cnd_reset_capturesize(condition *cnd _U_){
 } /* END _cnd_reset_capturesize() */
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

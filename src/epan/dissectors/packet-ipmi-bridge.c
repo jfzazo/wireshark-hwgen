@@ -27,8 +27,6 @@
 
 #include "packet-ipmi.h"
 
-void proto_register_ipmi_bridge(void);
-
 /* Bridge commands are not implemented (yet) */
 
 
@@ -136,21 +134,8 @@ static ipmi_cmd_t cmd_bridge[] = {
 };
 
 void
-proto_register_ipmi_bridge(void)
+ipmi_register_bridge(gint proto_ipmi _U_)
 {
-  ipmi_register_netfn_cmdtab(IPMI_BRIDGE_REQ, IPMI_OEM_NONE, NULL, 0, NULL,
-                             cmd_bridge, array_length(cmd_bridge));
+	ipmi_register_netfn_cmdtab(IPMI_BRIDGE_REQ, IPMI_OEM_NONE, NULL, 0, NULL,
+			cmd_bridge, array_length(cmd_bridge));
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

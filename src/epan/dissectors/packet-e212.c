@@ -26,15 +26,12 @@
  * according to www.uke.gov.pl status from January 2011
  * Copyright 2011, Grzegorz Szczytowski <grzegorz.szczytowski@gmail.com>
  */
-/* SoftBank PLMN codes updated according to http://ja.wikipedia.org/wiki/Mobile_Network_Code
- * as E.212 is still not updated
- */
 
 #include "config.h"
 
-#include <stdlib.h>
-
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 
 #include "packet-e212.h"
 #include "expert.h"
@@ -43,19 +40,19 @@ void proto_register_e212(void);
 
 /*
  * Annex to ITU Operational Bulletin
- * No. 1056 - 15.VII.2014
+ * No. 1019 - 1.I.2013
  *
  * COMPLEMENT TO ITU-T RECOMMENDATION E.212 (05/2008)
  *
- * Amendment No. 2 ITU Operational Bulletin No. 1058 - 15.VIII.2014
+ * Amendment No. 23 ITU Operational Bulletin No. 1047 - 1.III.2014
  *
  * Find the bulletins here:
- * http://www.itu.int/pub/T-SP-OB
+ * http://www.itu.int/en/publications/ITU-T/Pages/publications.aspx?parent=T-SP&view=T-SP1
  */
 static const value_string E212_codes[] = {
     {  202, "Greece" },
     {  203, "Unassigned" },
-    {  204, "Netherlands" },
+    {  204, "Netherlands (Kingdom of the)" },
     {  205, "Unassigned" },
     {  206, "Belgium" },
     {  207, "Unassigned" },
@@ -63,30 +60,30 @@ static const value_string E212_codes[] = {
     {  209, "Unassigned" },
     {  210, "Unassigned" },
     {  211, "Unassigned" },
-    {  212, "Unassigned" },
-    {  213, "Andorra" },
+    {  212, "Monaco (Principality of)" },
+    {  213, "Andorra (Principality of)" },
     {  214, "Spain" },
     {  215, "Unassigned" },
-    {  216, "Hungary" },
+    {  216, "Hungary (Republic of)" },
     {  217, "Unassigned" },
     {  218, "Bosnia and Herzegovina" },
-    {  219, "Croatia" },
-    {  220, "Serbia" },
+    {  219, "Croatia (Republic of)" },
+    {  220, "Serbia (Republic of)" },
     {  221, "Unassigned" },
     {  222, "Italy" },
     {  223, "Unassigned" },
     {  224, "Unassigned" },
-    {  225, "Unassigned" },
+    {  225, "Vatican City State" },
     {  226, "Romania" },
     {  227, "Unassigned" },
-    {  228, "Switzerland / Liechtenstein" },
+    {  228, "Switzerland (Confederation of)" },
     {  229, "Unassigned" },
-    {  230, "Czech Rep." },
-    {  231, "Slovakia" },
+    {  230, "Czech Republic" },
+    {  231, "Slovak Republic" },
     {  232, "Austria" },
     {  233, "Unassigned" },
-    {  234, "United Kingdom" },
-    {  235, "United Kingdom" },
+    {  234, "United Kingdom of Great Britain and Northern Ireland" },
+    {  235, "United Kingdom of Great Britain and Northern Ireland" },
     {  236, "Unassigned" },
     {  237, "Unassigned" },
     {  238, "Denmark" },
@@ -97,9 +94,9 @@ static const value_string E212_codes[] = {
     {  243, "Unassigned" },
     {  244, "Finland" },
     {  245, "Unassigned" },
-    {  246, "Lithuania" },
-    {  247, "Latvia" },
-    {  248, "Estonia" },
+    {  246, "Lithuania (Republic of)" },
+    {  247, "Latvia (Republic of)" },
+    {  248, "Estonia (Republic of)" },
     {  249, "Unassigned" },
     {  250, "Russian Federation" },
     {  251, "Unassigned" },
@@ -108,12 +105,12 @@ static const value_string E212_codes[] = {
     {  254, "Unassigned" },
     {  255, "Ukraine" },
     {  256, "Unassigned" },
-    {  257, "Belarus" },
+    {  257, "Belarus (Republic of)" },
     {  258, "Unassigned" },
     {  259, "Moldova (Republic of)" },
-    {  260, "Poland" },
+    {  260, "Poland (Republic of)" },
     {  261, "Unassigned" },
-    {  262, "Germany" },
+    {  262, "Germany (Federal Republic of)" },
     {  263, "Unassigned" },
     {  264, "Unassigned" },
     {  265, "Unassigned" },
@@ -125,30 +122,30 @@ static const value_string E212_codes[] = {
     {  271, "Unassigned" },
     {  272, "Ireland" },
     {  273, "Unassigned" },
-    {  274, "Iceland / Faroe Islands" },
+    {  274, "Iceland" },
     {  275, "Unassigned" },
-    {  276, "Albania" },
+    {  276, "Albania (Republic of)" },
     {  277, "Unassigned" },
     {  278, "Malta" },
     {  279, "Unassigned" },
-    {  280, "Cyprus" },
+    {  280, "Cyprus (Republic of)" },
     {  281, "Unassigned" },
     {  282, "Georgia" },
-    {  283, "Unassigned" },
-    {  284, "Bulgaria" },
+    {  283, "Armenia (Republic of)" },
+    {  284, "Bulgaria (Republic of)" },
     {  285, "Unassigned" },
     {  286, "Turkey" },
     {  287, "Unassigned" },
     {  288, "Faroe Islands" },
     {  289, "Unassigned" },
-    {  290, "Greenland" },
+    {  290, "Greenland (Denmark)" },
     {  291, "Unassigned" },
-    {  292, "San Marino" },
-    {  293, "Slovenia" },
+    {  292, "San Marino (Republic of)" },
+    {  293, "Slovenia (Republic of)" },
     {  294, "The Former Yugoslav Republic of Macedonia" },
-    {  295, "Liechtenstein" },
+    {  295, "Liechtenstein (Principality of)" },
     {  296, "Unassigned" },
-    {  297, "Montenegro" },
+    {  297, "Montenegro (Republic of)" },
     {  298, "Unassigned" },
     {  299, "Unassigned" },
     {  300, "Unassigned" },
@@ -159,15 +156,15 @@ static const value_string E212_codes[] = {
     {  305, "Unassigned" },
     {  306, "Unassigned" },
     {  307, "Unassigned" },
-    {  308, "Saint Pierre and Miquelon" },
+    {  308, "Saint Pierre and Miquelon (Collectivite territoriale de la Republique francaise)" },
     {  309, "Unassigned" },
-    {  310, "United States" },
-    {  311, "United States" },
-    {  312, "United States" },
-    {  313, "United States" },
-    {  314, "Unassigned" },
-    {  315, "Unassigned" },
-    {  316, "United States" },
+    {  310, "United States of America" },
+    {  311, "United States of America" },
+    {  312, "United States of America" },
+    {  313, "United States of America" },
+    {  314, "United States of America" },
+    {  315, "United States of America" },
+    {  316, "United States of America" },
     {  317, "Unassigned" },
     {  318, "Unassigned" },
     {  319, "Unassigned" },
@@ -181,9 +178,9 @@ static const value_string E212_codes[] = {
     {  327, "Unassigned" },
     {  328, "Unassigned" },
     {  329, "Unassigned" },
-    {  330, "Unassigned" },
+    {  330, "Puerto Rico" },
     {  331, "Unassigned" },
-    {  332, "Unassigned" },
+    {  332, "United States Virgin Islands" },
     {  333, "Unassigned" },
     {  334, "Mexico" },
     {  335, "Unassigned" },
@@ -191,7 +188,7 @@ static const value_string E212_codes[] = {
     {  337, "Unassigned" },
     {  338, "Jamaica" },
     {  339, "Unassigned" },
-    {  340, "French Guiana / Guadeloupe / Martinique" },
+    {  340, "Martinique/Guadeloupe (French Departments of)" },
     {  341, "Unassigned" },
     {  342, "Barbados" },
     {  343, "Unassigned" },
@@ -213,17 +210,17 @@ static const value_string E212_codes[] = {
     {  359, "Unassigned" },
     {  360, "Saint Vincent and the Grenadines" },
     {  361, "Unassigned" },
-    {  362, "Curacao" },
+    {  362, "Netherlands Antilles" },
     {  363, "Aruba" },
-    {  364, "Unassigned" },
+    {  364, "Bahamas (Commonwealth of the)" },
     {  365, "Anguilla" },
-    {  366, "Dominica" },
+    {  366, "Dominica (Commonwealth of)" },
     {  367, "Unassigned" },
     {  368, "Cuba" },
     {  369, "Unassigned" },
-    {  370, "Dominican Rep." },
+    {  370, "Dominican Republic" },
     {  371, "Unassigned" },
-    {  372, "Haiti" },
+    {  372, "Haiti (Republic of)" },
     {  373, "Unassigned" },
     {  374, "Trinidad and Tobago" },
     {  375, "Unassigned" },
@@ -251,44 +248,44 @@ static const value_string E212_codes[] = {
     {  397, "Unassigned" },
     {  398, "Unassigned" },
     {  399, "Unassigned" },
-    {  400, "Azerbaijan" },
-    {  401, "Kazakhstan" },
-    {  402, "Bhutan" },
+    {  400, "Azerbaijani Republic" },
+    {  401, "Kazakhstan (Republic of)" },
+    {  402, "Bhutan (Kingdom of)" },
     {  403, "Unassigned" },
-    {  404, "India" },
-    {  405, "India" },
-    {  406, "Unassigned" },
+    {  404, "India (Republic of)" },
+    {  405, "India (Republic of)" },
+    {  406, "India (Republic of)" },
     {  407, "Unassigned" },
     {  408, "Unassigned" },
     {  409, "Unassigned" },
-    {  410, "Pakistan" },
+    {  410, "Pakistan (Islamic Republic of)" },
     {  411, "Unassigned" },
     {  412, "Afghanistan" },
-    {  413, "Sri Lanka" },
-    {  414, "Myanmar" },
+    {  413, "Sri Lanka (Democratic Socialist Republic of)" },
+    {  414, "Myanmar (Union of)" },
     {  415, "Lebanon" },
-    {  416, "Jordan" },
+    {  416, "Jordan (Hashemite Kingdom of)" },
     {  417, "Syrian Arab Republic" },
-    {  418, "Iraq" },
-    {  419, "Kuwait" },
-    {  420, "Saudi Arabia" },
-    {  421, "Yemen" },
-    {  422, "Oman" },
+    {  418, "Iraq (Republic of)" },
+    {  419, "Kuwait (State of)" },
+    {  420, "Saudi Arabia (Kingdom of)" },
+    {  421, "Yemen (Republic of)" },
+    {  422, "Oman (Sultanate of)" },
     {  423, "Unassigned" },
     {  424, "United Arab Emirates" },
-    {  425, "Israel" },
-    {  426, "Bahrain" },
-    {  427, "Qatar" },
+    {  425, "Israel (State of)" },
+    {  426, "Bahrain (Kingdom of)" },
+    {  427, "Qatar (State of)" },
     {  428, "Mongolia" },
     {  429, "Nepal" },
-    {  430, "Unassigned" },
-    {  431, "Unassigned" },
+    {  430, "United Arab Emirates (Abu Dhabi)" },
+    {  431, "United Arab Emirates (Dubai)" },
     {  432, "Iran (Islamic Republic of)" },
     {  433, "Unassigned" },
-    {  434, "Uzbekistan" },
+    {  434, "Uzbekistan (Republic of)" },
     {  435, "Unassigned" },
-    {  436, "Tajikistan" },
-    {  437, "Kyrgyzstan" },
+    {  436, "Tajikistan (Republic of)" },
+    {  437, "Kyrgyz Republic" },
     {  438, "Turkmenistan" },
     {  439, "Unassigned" },
     {  440, "Japan" },
@@ -301,29 +298,29 @@ static const value_string E212_codes[] = {
     {  447, "Unassigned" },
     {  448, "Unassigned" },
     {  449, "Unassigned" },
-    {  450, "Korea (Rep. of)" },
+    {  450, "Korea (Republic of)" },
     {  451, "Unassigned" },
-    {  452, "Viet Nam" },
+    {  452, "Viet Nam (Socialist Republic of)" },
     {  453, "Unassigned" },
-    {  454, "Hong Kong, China" },
+    {  454, "Hongkong, China" },
     {  455, "Macao, China" },
-    {  456, "Cambodia" },
-    {  457, "Lao P.D.R." },
+    {  456, "Cambodia (Kingdom of)" },
+    {  457, "Lao People's Democratic Republic" },
     {  458, "Unassigned" },
     {  459, "Unassigned" },
-    {  460, "China" },
-    {  461, "Unassigned" },
+    {  460, "China (People's Republic of)" },
+    {  461, "China (People's Republic of)" },
     {  462, "Unassigned" },
     {  463, "Unassigned" },
     {  464, "Unassigned" },
     {  465, "Unassigned" },
-    {  466, "Unassigned" },
-    {  467, "Unassigned" },
+    {  466, "Taiwan, China" },
+    {  467, "Democratic People's Republic of Korea" },
     {  468, "Unassigned" },
     {  469, "Unassigned" },
-    {  470, "Bangladesh" },
+    {  470, "Bangladesh (People's Republic of)" },
     {  471, "Unassigned" },
-    {  472, "Maldives" },
+    {  472, "Maldives (Republic of)" },
     {  473, "Unassigned" },
     {  474, "Unassigned" },
     {  475, "Unassigned" },
@@ -361,12 +358,12 @@ static const value_string E212_codes[] = {
     {  507, "Unassigned" },
     {  508, "Unassigned" },
     {  509, "Unassigned" },
-    {  510, "Indonesia" },
+    {  510, "Indonesia (Republic of)" },
     {  511, "Unassigned" },
     {  512, "Unassigned" },
     {  513, "Unassigned" },
-    {  514, "Timor-Leste" },
-    {  515, "Philippines" },
+    {  514, "Democratic Republic of Timor-Leste" },
+    {  515, "Philippines (Republic of the)" },
     {  516, "Unassigned" },
     {  517, "Unassigned" },
     {  518, "Unassigned" },
@@ -376,7 +373,7 @@ static const value_string E212_codes[] = {
     {  522, "Unassigned" },
     {  523, "Unassigned" },
     {  524, "Unassigned" },
-    {  525, "Singapore" },
+    {  525, "Singapore (Republic of)" },
     {  526, "Unassigned" },
     {  527, "Unassigned" },
     {  528, "Brunei Darussalam" },
@@ -385,25 +382,25 @@ static const value_string E212_codes[] = {
     {  531, "Unassigned" },
     {  532, "Unassigned" },
     {  533, "Unassigned" },
-    {  534, "Unassigned" },
-    {  535, "Unassigned" },
-    {  536, "Unassigned" },
+    {  534, "Previously assigned to Northern Mariana Islands (Commonwealth of the)" },
+    {  535, "Previously assigned to Guam" },
+    {  536, "Nauru (Republic of)" },
     {  537, "Papua New Guinea" },
     {  538, "Unassigned" },
-    {  539, "Tonga" },
+    {  539, "Tonga (Kingdom of)" },
     {  540, "Solomon Islands" },
-    {  541, "Vanuatu" },
-    {  542, "Fiji / Nauru" },
-    {  543, "Unassigned" },
-    {  544, "Unassigned" },
-    {  545, "Unassigned" },
-    {  546, "New Caledonia" },
-    {  547, "French Polynesia" },
+    {  541, "Vanuatu (Republic of)" },
+    {  542, "Fiji (Republic of)" },
+    {  543, "Wallis and Futuna (Territoire francais d'outre-mer)" },
+    {  544, "American Samoa" },
+    {  545, "Kiribati (Republic of)" },
+    {  546, "New Caledonia (Territoire francais d'outre-mer)" },
+    {  547, "French Polynesia (Territoire francais d'outre-mer)" },
     {  548, "Cook Islands" },
-    {  549, "Samoa" },
-    {  550, "Micronesia" },
-    {  551, "Unassigned" },
-    {  552, "Palau" },
+    {  549, "Samoa (Independent State of)" },
+    {  550, "Micronesia (Federated States of)" },
+    {  551, "Marshall Islands (Republic of the)" },
+    {  552, "Palau (Republic of)" },
     {  553, "Tuvalu" },
     {  554, "Unassigned" },
     {  555, "Niue" },
@@ -453,62 +450,62 @@ static const value_string E212_codes[] = {
     {  599, "Unassigned" },
     {  600, "Unassigned" },
     {  601, "Unassigned" },
-    {  602, "Egypt" },
-    {  603, "Algeria" },
-    {  604, "Morocco" },
+    {  602, "Egypt (Arab Republic of)" },
+    {  603, "Algeria (People's Democratic Republic of)" },
+    {  604, "Morocco (Kingdom of)" },
     {  605, "Tunisia" },
-    {  606, "Unassigned" },
-    {  607, "Gambia" },
-    {  608, "Senegal" },
-    {  609, "Mauritania" },
-    {  610, "Mali" },
-    {  611, "Guinea" },
-    {  612, "Cote d'Ivoire" },
+    {  606, "Libya (Socialist People's Libyan Arab Jamahiriya)" },
+    {  607, "Gambia (Republic of the)" },
+    {  608, "Senegal (Republic of)" },
+    {  609, "Mauritania (Islamic Republic of)" },
+    {  610, "Mali (Republic of)" },
+    {  611, "Guinea (Republic of)" },
+    {  612, "Cote d'Ivoire (Republic of)" },
     {  613, "Burkina Faso" },
-    {  614, "Niger" },
-    {  615, "Togo" },
-    {  616, "Benin" },
-    {  617, "Mauritius" },
-    {  618, "Liberia" },
+    {  614, "Niger (Republic of the)" },
+    {  615, "Togolese Republic" },
+    {  616, "Benin (Republic of)" },
+    {  617, "Mauritius (Republic of)" },
+    {  618, "Liberia (Republic of)" },
     {  619, "Sierra Leone" },
     {  620, "Ghana" },
-    {  621, "Nigeria" },
-    {  622, "Chad" },
-    {  623, "Central African Rep." },
-    {  624, "Cameroon" },
-    {  625, "Cabo Verde" },
-    {  626, "Sao Tome and Principe" },
-    {  627, "Equatorial Guinea" },
-    {  628, "Gabon" },
-    {  629, "Congo" },
-    {  630, "Dem. Rep. of the Congo" },
-    {  631, "Angola" },
-    {  632, "Guinea-Bissau" },
-    {  633, "Seychelles" },
-    {  634, "Sudan" },
-    {  635, "Rwanda" },
-    {  636, "Ethiopia" },
-    {  637, "Unassigned" },
-    {  638, "Djibouti" },
-    {  639, "Kenya" },
-    {  640, "Tanzania" },
-    {  641, "Uganda" },
-    {  642, "Burundi" },
-    {  643, "Mozambique" },
+    {  621, "Nigeria (Federal Republic of)" },
+    {  622, "Chad (Republic of)" },
+    {  623, "Central African Republic" },
+    {  624, "Cameroon (Republic of)" },
+    {  625, "Cape Verde (Republic of)" },
+    {  626, "Sao Tome and Principe (Democratic Republic of)" },
+    {  627, "Equatorial Guinea (Republic of)" },
+    {  628, "Gabonese Republic" },
+    {  629, "Congo (Republic of the)" },
+    {  630, "Democratic Republic of the Congo" },
+    {  631, "Angola (Republic of)" },
+    {  632, "Guinea-Bissau (Republic of)" },
+    {  633, "Seychelles (Republic of)" },
+    {  634, "Sudan (Republic of the)" },
+    {  635, "Rwanda (Republic of)" },
+    {  636, "Ethiopia (Federal Democratic Republic of)" },
+    {  637, "Somali Democratic Republic" },
+    {  638, "Djibouti (Republic of)" },
+    {  639, "Kenya (Republic of)" },
+    {  640, "Tanzania (United Republic of)" },
+    {  641, "Uganda (Republic of)" },
+    {  642, "Burundi (Republic of)" },
+    {  643, "Mozambique (Republic of)" },
     {  644, "Unassigned" },
-    {  645, "Zambia" },
-    {  646, "Madagascar" },
+    {  645, "Zambia (Republic of)" },
+    {  646, "Madagascar (Republic of)" },
     {  647, "French Departments and Territories in the Indian Ocean" },
-    {  648, "Zimbabwe" },
-    {  649, "Namibia" },
+    {  648, "Zimbabwe (Republic of)" },
+    {  649, "Namibia (Republic of)" },
     {  650, "Malawi" },
-    {  651, "Lesotho" },
-    {  652, "Botswana" },
-    {  653, "Swaziland" },
-    {  654, "Comoros" },
-    {  655, "South Africa" },
+    {  651, "Lesotho (Kingdom of)" },
+    {  652, "Botswana (Republic of)" },
+    {  653, "Swaziland (Kingdom of)" },
+    {  654, "Comoros (Union of the)" },
+    {  655, "South Africa (Republic of)" },
     {  656, "Unassigned" },
-    {  657, "Unassigned" },
+    {  657, "Eritrea" },
     {  658, "Unassigned" },
     {  659, "South Sudan" },
     {  660, "Unassigned" },
@@ -555,17 +552,17 @@ static const value_string E212_codes[] = {
     {  701, "Unassigned" },
     {  702, "Belize" },
     {  703, "Unassigned" },
-    {  704, "Guatemala" },
+    {  704, "Guatemala (Republic of)" },
     {  705, "Unassigned" },
-    {  706, "El Salvador" },
+    {  706, "El Salvador (Republic of)" },
     {  707, "Unassigned" },
-    {  708, "Honduras" },
+    {  708, "Honduras (Republic of)" },
     {  709, "Unassigned" },
     {  710, "Nicaragua" },
     {  711, "Unassigned" },
     {  712, "Costa Rica" },
     {  713, "Unassigned" },
-    {  714, "Panama" },
+    {  714, "Panama (Republic of)" },
     {  715, "Unassigned" },
     {  716, "Peru" },
     {  717, "Unassigned" },
@@ -575,7 +572,7 @@ static const value_string E212_codes[] = {
     {  721, "Unassigned" },
     {  722, "Argentina" },
     {  723, "Unassigned" },
-    {  724, "Brazil" },
+    {  724, "Brazil (Federative Republic of)" },
     {  725, "Unassigned" },
     {  726, "Unassigned" },
     {  727, "Unassigned" },
@@ -583,23 +580,23 @@ static const value_string E212_codes[] = {
     {  729, "Unassigned" },
     {  730, "Chile" },
     {  731, "Unassigned" },
-    {  732, "Colombia" },
+    {  732, "Colombia (Republic of)" },
     {  733, "Unassigned" },
     {  734, "Venezuela (Bolivarian Republic of)" },
     {  735, "Unassigned" },
-    {  736, "Bolivia (Plurinational State of)" },
+    {  736, "Bolivia (Republic of)" },
     {  737, "Unassigned" },
     {  738, "Guyana" },
     {  739, "Unassigned" },
     {  740, "Ecuador" },
     {  741, "Unassigned" },
-    {  742, "Unassigned" },
+    {  742, "French Guiana (French Department of)" },
     {  743, "Unassigned" },
-    {  744, "Paraguay" },
+    {  744, "Paraguay (Republic of)" },
     {  745, "Unassigned" },
-    {  746, "Suriname" },
+    {  746, "Suriname (Republic of)" },
     {  747, "Unassigned" },
-    {  748, "Uruguay" },
+    {  748, "Uruguay (Eastern Republic of)" },
     {  749, "Unassigned" },
     {  750, "Falkland Islands (Malvinas)" },
     {  751, "Unassigned" },
@@ -783,47 +780,25 @@ static const value_string mcc_mnc_codes[] = {
     {  202070, "AMD TELECOM" },
     {  202090, "WIND" },
     {  202100, "WIND" },
-    {  204010, "RadioAccess Network Services B.V." },
-    {  204020, "Tele2 Nederland B.V." },
-    {  204030, "Voiceworks B.V." },
-    {  204040, "Vodafone Libertel B.V." },
-    {  204050, "Elephant Talk Communications Premium Rate Services" },
-    {  204060, "Mundio Mobile (Netherlands) Ltd" },
+    {  204020, "Tele2 (Netherlands) B.V." },
+    {  204030, "Blyk N.V." },
+    {  204040, "Vodafone Libertel N.V." },
+    {  204050, "Elephant Talk Comm. Premium Rate Serv. Neth. B.V." },
+    {  204060, "Barablu Mobile Benelux Ltd" },
     {  204070, "Teleena holding B.V." },
     {  204080, "KPN Mobile The Netherlands B.V." },
-    {  204090, "Lycamobile Netherlands Limited" },
     {  204100, "KPN B.V." },
-    {  204120, "KPN B.V." },
-    {  204130, "Unica Installatietechniek B.V." },
-    {  204150, "Ziggo B.V." },
+    {  204120, "Telfort B.V." },
+    {  204140, "INMO B.V." },
     {  204160, "T-Mobile Netherlands B.V." },
-    {  204170, "Intercity Mobile Communications B.V." },
-    {  204180, "UPC Nederland B.V." },
-    {  204190, "Mixe Communication Solutions B.V." },
-    {  204200, "T-Mobile Netherlands B.V." },
+    {  204180, "Telfort B.V." },
+    {  204200, "Orange Nederland N.V." },
     {  204210, "ProRail B.V." },
-    {  204220, "Ministerie van Defensie" },
-    {  204230, "ASpider Solutions Nederland B.V." },
-    {  204240, "Private Mobility Nederland B.V." },
-    {  204250, "CAPX B.V." },
-    {  204260, "SpeakUp B.V." },
-    {  204280, "Lancelot B.V." },
-    {  204290, "Private Mobile Ltd" },
-    {  204600, "Nextgen Mobile Ltd" },
-    {  204610, "BodyTrace Netherlands B.V." },
-    {  204640, "Zetacom B.V." },
-    {  204650, "AGMS Netherlands B.V." },
-    {  204660, "Utility Connect B.V." },
-    {  204670, "RadioAccess B.V." },
-    {  204680, "Roamware (Netherlands) B.V." },
+    {  204600, "KPN B.V." },
     {  204690, "KPN Mobile The Netherlands B.V." },
-    {  206010, "Belgacom nv" },
-    {  206020, "N.M.B.S" },
-    {  206050, "Telenet nv" },
-    {  206060, "Lycamobile sprl" },
-    {  206070, "Mundio Mobile Belgium nv" },
-    {  206100, "Mobistar sa" },
-    {  206200, "Base Company nv" },
+    {  206010, "Proximus" },
+    {  206100, "Mobistar" },
+    {  206200, "Base" },
     {  208010, "Orange France" },
     {  208020, "Orange France" },
     {  208030, "MobiquiThings" },
@@ -831,17 +806,17 @@ static const value_string mcc_mnc_codes[] = {
     {  208050, "Globalstar Europe" },
     {  208060, "Globalstar Europe" },
     {  208070, "Globalstar Europe" },
-    {  208090, "S.F.R." },
+    {  208090, "SFR" },
     {  208100, "S.F.R." },
     {  208110, "S.F.R." },
-    {  208130, "S.F.R." },
+    {  208130, "SFR" },
     {  208140, "RFF" },
     {  208150, "Free Mobile" },
     {  208200, "Bouygues Telecom" },
     {  208210, "Bouygues Telecom" },
     {  208220, "Transatel" },
     {  208230, "Omer Telecom Ltd" },
-    {  208240, "MobiquiThings" },
+    {  208240, "Mobiqui Things" },
     {  208250, "Lycamobile" },
     {  208260, "NRJ Mobile" },
     {  208270, "Afone" },
@@ -856,14 +831,14 @@ static const value_string mcc_mnc_codes[] = {
     {  213030, "Mobiland" },
     {  214010, "Vodafone Espana, SAU" },
     {  214030, "France Telecom Espana, SA" },
-    {  214040, "Xfera Moviles, S.A." },
+    {  214040, "Xfera Moviles, SA" },
     {  214050, "Telefonica Moviles Espana, SAU" },
     {  214060, "Vodafone Espana, SAU" },
     {  214070, "Telefonica Moviles Espana, SAU" },
     {  214080, "Euskaltel, SA" },
     {  214090, "France Telecom Espana, SA" },
     {  214100, "Operadora de Telecomunicaciones Opera SL" },
-    {  214110, "France Telecom Espana, SA" },
+    {  214110, "France Telecom Espana SA" },
     {  214120, "Contacta Servicios Avanzados de Telecomunicaciones SL" },
     {  214130, "Incotel Ingeniera y Consultaria SL" },
     {  214140, "Incotel Servicioz Avanzados SL" },
@@ -875,7 +850,8 @@ static const value_string mcc_mnc_codes[] = {
     {  214200, "Fonyou Telecom, SL" },
     {  214210, "Jazz Telecom, SAU" },
     {  214220, "Best Spain Telecom, SL" },
-    {  214240, "Vizzavi Espana, S.L." },
+    {  214230, "Barablu Movil Espana, SLU" },
+    {  214240, "Vizzavi Espana, SL" },
     {  214250, "Lycamobile, SL" },
     {  214260, "Lleida Networks Serveis Telematics, SL" },
     {  214270, "SCN Truphone SL" },
@@ -883,11 +859,10 @@ static const value_string mcc_mnc_codes[] = {
     {  214290, "NEO-SKY 2002, S.A." },
     {  214300, "Compatel Limited" },
     {  214310, "Red Digital De Telecomunicaciones de las Islas Baleares, S.L." },
-    {  214320, "TUENTI TECHNOLOGIES, S.L." },
     {  216010, "Telenor Hungary Ltd" },
     {  216300, "Magyar Telecom Plc" },
     {  216700, "Vodafone" },
-    {  216710, "UPC Hungary Ltd" },
+    {  216710, "UPC Hungary Ldt" },
     {  218030, "Eronet Mobile Communications Ltd." },
     {  218050, "MOBI'S (Mobilina Srpske)" },
     {  218900, "GSMBIH" },
@@ -947,7 +922,7 @@ static const value_string mcc_mnc_codes[] = {
     {  232150, "Barablu Mobile Austria Ltd" },
     {  232910, "OBB - Infrastruktur Bau AG" },
     {  234000, "British Telecom" },
-    {  234010, "Mapesbury Communications Ltd" },
+    {  234010, "Mapesbury Communications Ltd." },
     {  234020, "O2 UK Ltd." },
     {  234030, "Jersey Airtel Ltd" },
     {  234040, "FMS Solutions Ltd" },
@@ -961,12 +936,12 @@ static const value_string mcc_mnc_codes[] = {
     {  234120, "Network Rail Infrastructure Ltd" },
     {  234130, "Network Rail Infrastructure Ltd" },
     {  234140, "Hay Systems Ltd" },
-    {  234150, "Vodafone Ltd" },
+    {  234150, "Vodafone Ltd." },
     {  234160, "Opal Telecom Ltd" },
     {  234170, "Flextel Ltd" },
     {  234180, "Cloud9" },
     {  234190, "Teleware plc" },
-    {  234200, "Hutchison 3G UK Ltd" },
+    {  234200, "Hutchison 3G UK Ltd." },
     {  234210, "LogicStar Ltd" },
     {  234220, "Routo Telecommunications Ltd" },
     {  234230, "Vectone Network Ltd" },
@@ -995,7 +970,7 @@ static const value_string mcc_mnc_codes[] = {
     {  234760, "British Telecom" },
     {  234780, "Airwave mmO2 Ltd" },
     {  234860, "EE Limited ( TM)" },
-    {  235000, "Mundlo Mobile Limited" },
+    {  235000, "Mundio Mobile Limited" },
     {  235010, "EE Limited ( TM)" },
     {  235020, "EE Limited ( TM)" },
     {  235770, "British Telecom" },
@@ -1008,6 +983,7 @@ static const value_string mcc_mnc_codes[] = {
     {  238030, "MIGway A/S" },
     {  238040, "NextGen Mobile Ltd T/A CardBoardFish" },
     {  238060, "Hi3G" },
+    {  238070, "Barablu Mobile Ltd." },
     {  238080, "Nordisk Mobiltelefon Danmark A/S" },
     {  238100, "TDC Mobil" },
     {  238120, "Lycamobile Denmark" },
@@ -1015,7 +991,6 @@ static const value_string mcc_mnc_codes[] = {
     {  238200, "Telia" },
     {  238280, "CoolTEL" },
     {  238300, "Interactive Digital Media GmbH" },
-    {  238430, "MobiWeb Limited" },
     {  238660, "TT-Netvaerket P/S" },
     {  238770, "Tele2" },
     {  240010, "Telia Sonera Sverige AB" },
@@ -1024,8 +999,11 @@ static const value_string mcc_mnc_codes[] = {
     {  240040, "3G Infrastructure Services AB" },
     {  240050, "Svenska UMTS-Nat AB" },
     {  240060, "Telenor Sverige AB" },
+    {  240070, "Tele2 Sverige AB" },
     {  240080, "Telenor Sverige AB" },
+    {  240090, "Djuice Mobile Sweden, filial till Telenor Mobile Sweden AS" },
     {  240100, "Spring Mobil AB" },
+    {  240110, "Linholmen Science Park AB" },
     {  240120, "Lycamobile Sweden Limited" },
     {  240130, "Alltele Foretag Sverige AB" },
     {  240140, "TDC Sverige AB" },
@@ -1039,34 +1017,35 @@ static const value_string mcc_mnc_codes[] = {
     {  240220, "EuTel AB" },
     {  240230, "Infobip LTD" },
     {  240240, "Net4Mobility HB" },
-    {  240260, "Beepsend A.B." },
+    {  240250, "Digitel Mobile Srl" },
+    {  240260, "Beepsend AB" },
     {  240270, "Fogg Mobile AB" },
     {  240280, "CoolTEL Aps" },
     {  240290, "Mercury International Carrier Services" },
     {  240300, "NextGen Mobile Ltd" },
-    {  240320, "Compatel Ltd." },
+    {  240310, "Mobimax AB" },
+    {  240320, "Compatel Ltd" },
     {  240330, "Mobile Arts AB" },
-    {  240340, "Pro Net Telecommunications Services Ltd." },
+    {  240340, " Pro Net Telecommunications Services Ltd." },
     {  240350, "42 Telecom LTD" },
     {  240360, "Interactive Digital Media GmbH" },
     {  240370, "CLX Networks AB" },
     {  240380, "Voxbone SA" },
+    {  240390, "iCentrex Sweden AB" },
     {  240400, "ReWiCom Scandinavia AB" },
     {  240410, "Shyam Telecom UK Ltd" },
     {  240420, "Telenor Connexion AB" },
-    {  240430, "MobiWeb Ltd." },
-    {  240440, "Limitless Mobile AB" },
-    {  240450, "Spirius AB" },
-    {  240650, "shared use for closed networks" },
-    {  240660, "shared use for closed networks" },
-    {  240670, "shared use for test purpose" },
-    {  240680, "shared use for test purpose" },
-    {  240690, "crisis management after determination by the Swedish Post- and Telecom Authority" },
+    {  240650, "Shared use for closed networks" },
+    {  240660, "Shared use for closed networks" },
+    {  240670, "Shared use for test purpose" },
+    {  240680, "Shared use for test purpose" },
+    {  240690, "Crisis management after determination by the SwedishPost and Telecom Authority" },
     {  242010, "Telenor Norge AS" },
     {  242020, "NetCom AS" },
     {  242030, "Teletopia Gruppen AS" },
     {  242040, "Tele2 Norge AS" },
     {  242050, "Network Norway AS" },
+    {  242060, "ICE Norge AS" },
     {  242070, "Ventelo Bedrift AS" },
     {  242080, "TDC AS" },
     {  242090, "Com4 AS" },
@@ -1077,7 +1056,7 @@ static const value_string mcc_mnc_codes[] = {
     {  242210, "Jernbaneverket" },
     {  242220, "Network Norway AS" },
     {  242230, "Lycamobile Norway Ltd" },
-    {  242240, "Mobile Norway AS" },
+    {  242340, "Mobile Norway AS" },
     {  244030, "DNA Oy" },
     {  244040, "DNA Oy" },
     {  244050, "Elisa Oy" },
@@ -1087,7 +1066,7 @@ static const value_string mcc_mnc_codes[] = {
     {  244130, "DNA Oy" },
     {  244140, "Alands Mobiltelefon AB" },
     {  244160, "Oy Finland Tele2 AB" },
-    {  244210, "Saunalahti Group Oyj" },
+    {  244210, "Saunalahti Group Ltd." },
     {  244290, "SCNL TRUPHONE" },
     {  244910, "TeliaSonera Finland Oyj" },
     {  246010, "Omnitel" },
@@ -1144,8 +1123,8 @@ static const value_string mcc_mnc_codes[] = {
     {  257020, "MTS" },
     {  257030, "BelCel Joint Venture (JV)" },
     {  257040, "Closed joint-stock company \"Belarusian telecommunication network\"" },
-    {  257050, "Republican Unitary Telecommunication Enterprise (RUE) Beltelecom (National Telecommunications Operator of the Republic of Belarus)" },
-    {  257060, "Belorussian Cloud Technologies" },
+    {  257050, "Republican Unitary Telecommunication Enterprise (RUE) Beltelecom" },
+    {  257060, "Yota Bel Foreign Limited Liability Company (FLLC) / Belorussian Cloud Technologies" },
     {  259010, "Orange Moldova GSM" },
     {  259020, "Moldcell GSM" },
     {  259040, "Eventis Mobile GSM" },
@@ -1195,12 +1174,12 @@ static const value_string mcc_mnc_codes[] = {
     {  262070, "Telefonica Germany GmbH & Co. oHG" },
     {  262080, "Telefonica Germany GmbH & Co. oHG" },
     {  262090, "Vodafone D2 GmbH" },
-    {  262100, "DB Netz AG" },
+    {  262100, "Vodafone D2 GmbH / DB Netz AG" },
     {  262110, "Telefonica Germany GmbH & Co. oHG" },
     {  262120, "E-Plus Mobilfunk GmbH & Co. KG" },
     {  262130, "Mobilcom Multimedia GmbH" },
     {  262140, "Quam GmbH" },
-    {  262150, "AirData AG" },
+    {  262150, "Airdata AG" },
     {  262160, "E-Plus Mobilfunk GmbH & Co. KG" },
     {  262170, "E-Plus Mobilfunk GmbH & Co. KG" },
     {  262180, "NetCologne Gesellschaft fur Telekommunikation mbH" },
@@ -1209,10 +1188,12 @@ static const value_string mcc_mnc_codes[] = {
     {  262410, "First Telecom GmbH" },
     {  262420, "Vodafone D2 GmbH" },
     {  262430, "Vodafone D2 GmbH" },
+    {  262760, "Siemens AG, ICMNPGUSTA" },
     {  262770, "E-Plus Mobilfunk GmbH & Co. KG" },
     {  262780, "Telekom Deutschland GmbH" },
     {  262790, "ng4T GmbH" },
     {  266010, "Gibtelecom GSM" },
+    {  266060, "CTS" },
     {  266090, "Eazi Telecom Limited" },
     {  268010, "Vodafone Telecel - Comunicacoes Pessoais, S.A." },
     {  268030, "Optimus - Telecomunicacoes, S.A." },
@@ -1222,7 +1203,6 @@ static const value_string mcc_mnc_codes[] = {
     {  270020, "MTX Connect S.a r.l." },
     {  270100, "BLUE COMMUNICATIONS" },
     {  270770, "Tango" },
-    {  270780, "Interactive Digital Media (IDM)" },
     {  270990, "Voxmobile S.A." },
     {  272010, "Vodafone Ireland Plc" },
     {  272020, "Telefonica Ltd" },
@@ -1243,7 +1223,7 @@ static const value_string mcc_mnc_codes[] = {
     {  278770, "3G Telecommunications Ltd" },
     {  280010, "CYTA" },
     {  280100, "Scancom (Cyprus) Ltd." },
-    {  280200, "PrimeTel PLC" },
+    {  280200, "Primetel PLC" },
     {  280220, "Lemontel Ltd" },
     {  282010, "Geocell Ltd." },
     {  282020, "Magti GSM Ltd." },
@@ -1251,7 +1231,7 @@ static const value_string mcc_mnc_codes[] = {
     {  282040, "Mobitel Ltd." },
     {  282050, "Silknet JSC" },
     {  282060, "JSC Compatel" },
-    {  282070, "GLOBALCELL  LTD" },
+    {  282070, "GLOBALCELL LTD" },
     {  284010, "Mobiltel EAD" },
     {  284050, "Globul" },
     {  286010, "Turkcell" },
@@ -1260,6 +1240,7 @@ static const value_string mcc_mnc_codes[] = {
     {  286040, "Aycell" },
     {  288010, "Faroese Telecom - GSM" },
     {  288020, "Kall GSM" },
+    {  288030, "Edge Mobile Sp/F" },
     {  290010, "Tele Greenland" },
     {  292010, "Prima San Marino / San Marino Telecom" },
     {  293400, "SI Mobil" },
@@ -1273,7 +1254,7 @@ static const value_string mcc_mnc_codes[] = {
     {  294110, "MOBIK TELEKOMUNIKACII DOOEL- Skopje" },
     {  295010, "Swisscom Schweiz AG" },
     {  295020, "Orange (Liechtenstein) AG" },
-    {  295050, "Mobilkom (Liechtenstein) AG" },
+    {  295050, "Mobilkom (Liechstein) AG" },
     {  295060, "Cubic AG" },
     {  297010, "Telenor Montenegro" },
     {  297020, "Crnogorski Telekom" },
@@ -1282,7 +1263,7 @@ static const value_string mcc_mnc_codes[] = {
     {  302221, "Telus Mobility" },
     {  302222, "Telus Mobility" },
     {  302250, "ALO Mobile Inc" },
-    {  302270, "Bragg Communications" },
+    {  302270, "Bragg Comunications" },
     {  302290, "Airtel Wireless" },
     {  302320, "Dave Wireless" },
     {  302340, "Execulink" },
@@ -1295,7 +1276,7 @@ static const value_string mcc_mnc_codes[] = {
     {  302510, "Videotron Ltd" },
     {  302530, "Keewatinook Okimacinac" },
     {  302560, "Lynx Mobility" },
-    {  302570, "Light Squared" },
+    {  302570, "LightSquared" },
     {  302590, "Quadro Communication" },
     {  302610, "Bell Mobility" },
     {  302620, "Ice Wireless" },
@@ -1304,7 +1285,7 @@ static const value_string mcc_mnc_codes[] = {
     {  302656, "Tbay Mobility" },
     {  302660, "MTS Mobility" },
     {  302670, "CityTel Mobility" },
-    {  302680, "Sask Tel Mobility" },
+    {  302680, "SaskTel Mobility" },
     {  302690, "Bell Mobility" },
     {  302710, "Globalstar" },
     {  302720, "Rogers Wireless" },
@@ -1327,7 +1308,7 @@ static const value_string mcc_mnc_codes[] = {
     {  310030, "Centennial Communications" },
     {  310035, "ETEX Communications dba ETEX Wireless" },
     {  310040, "MTA Communications dba MTA Wireless" },
-    {  310050, "Alaska Communications" },
+    {  310050, "ACS Wireless Inc" },
     {  310060, "Consolidated Telcom" },
     {  310070, "AT&T" },
     {  310080, "Corr Wireless Communications LLC" },
@@ -1351,12 +1332,12 @@ static const value_string mcc_mnc_codes[] = {
     {  310260, "T-Mobile USA" },
     {  310270, "T-Mobile USA" },
     {  310280, "Contennial Puerto Rio License Corp." },
-    {  310290, "NEP Cellcorp Inc." },
+    {  310290, "Nep Cellcorp Inc." },
     {  310300, "Blanca Telephone Company" },
     {  310310, "T-Mobile USA" },
     {  310320, "Smith Bagley Inc, dba Cellular One" },
     {  310330, "AWCC" },
-    {  310340, "High Plains Midwest LLC, dba Westlink Communications" },
+    {  310340, "High Plains Midwest LLC, dba Wetlink Communications" },
     {  310350, "Mohave Cellular L.P." },
     {  310360, "Cellular Network Partnership dba Pioneer Cellular" },
     {  310370, "Docomo Pacific Inc" },
@@ -1373,7 +1354,7 @@ static const value_string mcc_mnc_codes[] = {
     {  310480, "Choice Phone LLC" },
     {  310490, "T-Mobile USA" },
     {  310500, "Public Service Cellular, Inc." },
-    {  310510, "Nsighttel Wireless Inc" },
+    {  310510, "Nsighttel Wireless LLC" },
     {  310520, "Transactions Network Services" },
     {  310530, "Iowa Wireless Services LLC" },
     {  310540, "Oklahoma Western Telephone Company" },
@@ -1390,7 +1371,7 @@ static const value_string mcc_mnc_codes[] = {
     {  310660, "T-Mobile USA" },
     {  310670, "AT&T Mobility Vanguard Services" },
     {  310680, "AT&T" },
-    {  310690, "Keystone Wireless LLC" },
+    {  310690, "Keystane Wireless LLC" },
     {  310700, "Cross Valiant Cellular Partnership" },
     {  310710, "Arctic Slope Telephone Association Cooperative" },
     {  310720, "Wireless Solutions International Inc." },
@@ -1425,19 +1406,19 @@ static const value_string mcc_mnc_codes[] = {
     {  311010, "Chariton Valley Communications Corp., Inc." },
     {  311020, "Missouri RSA No. 5 Partnership" },
     {  311030, "Indigo Wireless, Inc." },
-    {  311040, "Commnet Wireless LLC" },
+    {  311040, "Commnet Wireless, LLC" },
     {  311050, "Thumb Cellular Limited Partnership" },
     {  311060, "Space Data Corporation" },
-    {  311070, "Wisconsin RSA #7 Limited Partnership" },
+    {  311070, "Wisconsin RSA#7 Ltd Patnership" },
     {  311080, "Pine Telephone Company dba Pine Cellular" },
     {  311090, "LongLines Wireless" },
     {  311100, "Nex-Tech Wireless LLC" },
     {  311110, "Verizon Wireless" },
     {  311120, "Choice Phone LLC" },
-    {  311130, "Light Squared LP" },
+    {  311130, "LightSquared LP" },
     {  311140, "Cross Telephone Company" },
     {  311150, "Wilkes Cellular Inc." },
-    {  311160, "Light Squared LP" },
+    {  311160, "LightSquared LP" },
     {  311170, "PetroCom LLC" },
     {  311180, "Cingular Wireless, Licensee Pacific Telesis Mobile Services, LLC" },
     {  311190, "Cellular Properties Inc." },
@@ -1476,10 +1457,10 @@ static const value_string mcc_mnc_codes[] = {
     {  311340, "Illinois Valley Cellular" },
     {  311350, "Sagebrush Cellular Inc dba Nemont" },
     {  311360, "Stelera Wireless LLC" },
-    {  311370, "GCI Communications Corp" },
+    {  311370, "GCI Communications Corp." },
     {  311380, "New Dimension Wireless Ltd" },
     {  311390, "Verizon Wireless" },
-    {  311410, "Iowa RSA No. 2 Limited Partnership" },
+    {  311410, "Iowa RSA No.2 Ltd Partnership" },
     {  311420, "Northwest Missouri Cellular Limited Partnership" },
     {  311430, "RSA 1 Limited Partnership dba Cellular 29 Plus" },
     {  311440, "Bluegrass Cellular LLC" },
@@ -1498,10 +1479,10 @@ static const value_string mcc_mnc_codes[] = {
     {  311489, "Verizon Wireless" },
     {  311490, "Sprintcom Inc" },
     {  311500, "Mosaic Telecom Inc" },
-    {  311510, "Light Squared LP" },
-    {  311520, "Light Squared LP" },
+    {  311510, "LightSquared LP" },
+    {  311520, "LightSquared LP" },
     {  311530, "Newcore Wireless LLC" },
-    {  311540, "Proximiti Mobility Inc" },
+    {  311540, "Poximiti Mobility Inc" },
     {  311550, "Commnet Midwest LLC" },
     {  311560, "OTZ Communications Inc" },
     {  311570, "Bend Cable Communications LLC" },
@@ -1534,10 +1515,10 @@ static const value_string mcc_mnc_codes[] = {
     {  311860, "Uintah Basin Electronic Telecommunications" },
     {  311870, "Sprintcom Inc" },
     {  311880, "Sprintcom Inc" },
-    {  311890, "Globecom Network Services Corporation" },
-    {  311900, "Gigsky Inc." },
+    {  311890, "Globecomm Network Services Corporation" },
+    {  311900, "Gigsky Inc" },
     {  311910, "SI Wireless LLC" },
-    {  311920, "Missouri RSA No 5 Partnership dba Charlton Valley Wireless Services" },
+    {  311920, "Missouri RSA No 5 Partnership dba Chariton Valley Wireless" },
     {  311940, "Clearwire Corporation" },
     {  311950, "Sunman Telecommunications corp." },
     {  311960, "Lycamobile USA Inc" },
@@ -1552,7 +1533,7 @@ static const value_string mcc_mnc_codes[] = {
     {  312060, "CoverageCo" },
     {  312070, "Adams Networks Inc" },
     {  312080, "South Georgia Regional Information Technology Authority" },
-    {  312090, "Allied Wireless Communications Corporation" },
+    {  312090, "Allied Wireless Communixcations Corporation" },
     {  312100, "ClearSky Technologies Inc" },
     {  312110, "Texas Energy Network LLC" },
     {  312120, "East Kentucky Network LLC dba Appalachian Wireless" },
@@ -1560,24 +1541,24 @@ static const value_string mcc_mnc_codes[] = {
     {  312140, "Cleveland Unlimited Inc" },
     {  312150, "Northwest Cell" },
     {  312160, "RSA1 Limited Partnership dba Chat Mobility" },
-    {  312170, "Iowa RSA No. 2 Limited Partnership" },
+    {  312170, "Iowa RSA No 2 Limited Partnership" },
     {  312180, "Keystone Wireless LLC" },
     {  312190, "Sprint-Nextel Communications Inc" },
     {  312200, "Voyager Mobility LLC" },
     {  313100, "Assigned to Public Safety" },
     {  316010, "Sprint-Nextel Communications Inc" },
     {  316011, "Southern Communications Services Inc." },
-    {  334001, "COMUNICACIONES DIGITALES DEL NORTE, S.A. DE C.V" },
-    {  334010, "NII DIGITAL, S. DE R.L. DE C.V." },
-    {  334020, "RADIOMOVIL DIPSA, S.A. DE C.V." },
-    {  334030, "PEGASO COMUNICACIONES Y SISTEMAS, S.A. DE C.V." },
-    {  334040, "IUSACELL PCS DE MEXICO, S.A. DE  C.V." },
-    {  334050, "COMUNICACIONES CELULARES DE OCCIDENTE, S.A. DE C.V. / SISTEMAS TELEFONICOS PORTATILES CELULARES, S.A. DE C.V. / TELECOMUNICACIONES DEL GOLFO, S.A. DE C.V. / SOS TELECOMUNICACIONES, S.A. DE C.V. / PORTATEL DEL SURESTE, S.A. DE C.V." },
-    {  334060, "SERVICIOS DE ACCESO INALAMBRICO, S.A DE C.V." },
-    {  334066, "TELEFONOS DE MEXICO, S.A.B. DE C.V" },
-    {  334070, "OPERADORA UNEFON, S. A. DE C.V." },
-    {  334080, "OPERADORA UNEFON, S. A. DE C.V." },
-    {  334090, "NII DIGITAL, S. DE R.L. DE C.V." },
+    {  334001, "Comunicaciones Digitales Del Norte, S.A. De C.V" },
+    {  334010, "NII Digital, S. De R.L. De C.V." },
+    {  334020, "Radiomovil Dipsa, S.A. De C.V." },
+    {  334030, "Pegaso Comunicaciones Y Sistemas, S.A. De C.V." },
+    {  334040, "Iusacell Pcs De Mexico, S.A. De  C.V." },
+    {  334050, "Comunicaciones Celulares De Occidente / Sistemas Telefonicos Portatiles Celulares / Telecomunicaciones Del Golfo / Telecomunicaciones / Portatel Del Sureste" },
+    {  334060, "Servicios De Acceso Inalambrico, S.A De C.V." },
+    {  334066, "Telefonos De Mexico, S.A.B. De C.V" },
+    {  334070, "Operadora Unefon, S.A. De C.V" },
+    {  334080, "Operadora Unefon, S.A. De C.V" },
+    {  334090, "NII Digital, S. De R.L. De C.V." },
     {  338020, "Cable & Wireless Jamaica Ltd." },
     {  338050, "Digicel (Jamaica) Ltd." },
     {  338110, "Cable & Wireless Jamaica Ltd trading as Lime" },
@@ -1600,7 +1581,7 @@ static const value_string mcc_mnc_codes[] = {
     {  348570, "Caribbean Cellular Telephone Ltd." },
     {  348770, "Digicel (BVI) Ltd" },
     {  350000, "Bermuda Digital Communications Ltd (CellOne)" },
-    {  352110, "Cable & Wireless Grenada ltd trading as lime" },
+    {  352110, "Cable & Wireless Grenada ltd trading as Lime" },
     {  354860, "Cable & Wireless (West Indies) Ltd trading as Lime" },
     {  356110, "Cable & Wireless St Kitts & Nevis Ltd trading as Lime" },
     {  358110, "Cable & Wireless (St Lucia) Ltd trading as Lime" },
@@ -1623,13 +1604,13 @@ static const value_string mcc_mnc_codes[] = {
     {  374120, "TSTT Mobile" },
     {  374130, "Digicel Trinidad and Tobago Ltd." },
     {  374140, "LaqTel Ltd." },
-    {  376350, "Cable & Wireless (TCI) Ltd trading as Lime" },
+    {  376350, "Cable & Wireless (TCI) Ltd trading as   Lime" },
     {  376352, "IslandCom Communications Ltd." },
     {  376360, "IslandCom Communication Ltd" },
-    {  400010, "\"Azercell Telecom\" LLC" },
-    {  400020, "\"Bakcell\" LLC" },
-    {  400030, "\"Catel\" LLC" },
-    {  400040, "\"Azerfon\" LLC" },
+    {  400010, "Azercell Limited Liability Joint Venture" },
+    {  400020, "Bakcell Limited Liability Company" },
+    {  400030, "Catel JV" },
+    {  400040, "Azerphone LLC" },
     {  401010, "Kar-Tel llc" },
     {  401020, "TSC Kazak Telecom" },
     {  402110, "Bhutan Telecom Ltd" },
@@ -1679,7 +1660,7 @@ static const value_string mcc_mnc_codes[] = {
     {  404490, "Bharti Airtel Ltd., Andra Pradesh" },
     {  404500, "Reliance Telecom Ltd., North East" },
     {  404510, "BSNL, H.P." },
-    {  404520, "Reliance Telecom Ltd., Orissa" },
+    {  404520, "Reliance TelecomLtd., Orissa" },
     {  404530, "BSNL, Punjab" },
     {  404540, "BSNL, UP (West)" },
     {  404550, "BSNL, UP (East)" },
@@ -1813,6 +1794,7 @@ static const value_string mcc_mnc_codes[] = {
     {  410070, "Warid Telecom" },
     {  412010, "AWCC" },
     {  412200, "Roshan" },
+    {  412300, "New1" },
     {  412400, "Areeba Afghanistan" },
     {  412500, "Etisalat" },
     {  412800, "Afghan Telecom" },
@@ -1832,7 +1814,7 @@ static const value_string mcc_mnc_codes[] = {
     {  416010, "Fastlink" },
     {  416020, "Xpress" },
     {  416030, "Umniah" },
-    {  416770, "MobileCom" },
+    {  416770, "Mobilecom" },
     {  417010, "Syriatel" },
     {  417020, "Spacetel Syria" },
     {  417090, "Syrian Telecom" },
@@ -1858,7 +1840,7 @@ static const value_string mcc_mnc_codes[] = {
     {  418920, "ITPC (Al Nakheel)" },
     {  418930, "ITPC (Iraqcell)" },
     {  418940, "ITPC (Shaly)" },
-    {  419020, "ZAIN" },
+    {  419020, "Mobile Telecommunications Company" },
     {  419030, "Wataniya Telecom" },
     {  419040, "Viva" },
     {  420010, "Saudi Telecom" },
@@ -1871,11 +1853,10 @@ static const value_string mcc_mnc_codes[] = {
     {  422040, "Oman Telecommunications Company (Omantel)" },
     {  424020, "Etisalat" },
     {  425010, "Partner Communications Co. Ltd." },
-    {  425020, "Cellcom Israel Ltd" },
-    {  425030, "Pelephone Communications Ltd" },
+    {  425020, "Cellcom Israel Ltd." },
+    {  425030, "Pelephone Communications Ltd." },
     {  425040, "Globalsim Ltd" },
     {  425060, "Wataniya" },
-    {  425070, "Mirs Ltd" },
     {  425080, "Golan Telecom Ltd" },
     {  425110, "365 Telecom (MVNO)" },
     {  425120, "Free Telecom (MVNO)" },
@@ -1887,9 +1868,7 @@ static const value_string mcc_mnc_codes[] = {
     {  425180, "Cellact Communications Ltd (MVNO)" },
     {  425190, "Azi Communications Ltd" },
     {  425200, "Bezeq Ltd" },
-    {  425210, "B.I.P Communications Ltd." },
-    {  425230, "Beezz Communication Solutions Ltd." },
-    {  426010, "Bahrain Telecommunications Company (BATELCO)" },
+    {  426010, "BATELCO" },
     {  426020, "Zain Bahrain" },
     {  426030, "Civil Aviation Authority" },
     {  426040, "STC Bahrain" },
@@ -1900,7 +1879,7 @@ static const value_string mcc_mnc_codes[] = {
     {  429010, "Nepal Telecommunications" },
     {  432110, "Telecommunication Company of Iran (TCI)" },
     {  432140, "Telecommunication Kish Co. (KIFZO)" },
-    {  432190, "Telecommunication Company of Iran (TCI) - Isfahan Celcom GSM" },
+    {  432190, "Telecommunication Company of Iran (TCI) - Isfahan Celcom" },
     {  434010, "Buztel" },
     {  434020, "Uzmacom" },
     {  434040, "Daewoo Unitel" },
@@ -1914,9 +1893,10 @@ static const value_string mcc_mnc_codes[] = {
     {  437010, "Bitel GSM" },
     {  438010, "Barash Communication Technologies (BCTI)" },
     {  438020, "TM-Cell" },
-    {  440010, "NTT DoCoMo Inc." },
-    {  440020, "NTT DoCoMo Kansai Inc." },
-    {  440030, "NTT DoCoMo Hokuriku Inc." },
+    {  440000, "EMOBILE" },
+    {  440010, "NTT DoCoMo, Inc." },
+    {  440020, "NTT DoCoMo Kansai, Inc." },
+    {  440030, "NTT DoCoMo Hokuriku, Inc." },
     {  440040, "SoftBank" },
     {  440060, "SoftBank" },
     {  440070, "KDDI Corporation" },
@@ -2080,9 +2060,9 @@ static const value_string mcc_mnc_codes[] = {
     {  455000, "SmarTone - Comunicacoes Moveis, S.A." },
     {  455010, "Companhia de Telecomunicacoes de Macau S.A.R.L." },
     {  455020, "China Telecom (Macau) Limitada" },
-    {  455030, "Hutchison - Telefone (Macau) Limitada" },
+    {  455030, "Hutchison - Telefone(Macau) Limitada" },
     {  455040, "Companhia de Telecomunicacoes de Macau S.A.R.L." },
-    {  455050, "Hutchison - Telefone (Macau) Limitada" },
+    {  455050, "Hutchison - Telefone(Macau) Limitada" },
     {  455060, "SmarTone - Comunicacoes Moveis, S.A." },
     {  456010, "Mobitel (Cam GSM)" },
     {  456020, "Hello" },
@@ -2110,7 +2090,7 @@ static const value_string mcc_mnc_codes[] = {
     {  502160, "DIGI Telecommunications" },
     {  502170, "Malaysian Mobile Services Sdn Bhd" },
     {  502180, "U Mobile Sdn. Bhd." },
-    {  502190, "Celcom (Malaysia) Berhad" },
+    {  502190, "CelCom (Malaysia) Berhad" },
     {  502200, "Electcoms Wireless Sdn Bhd" },
     {  505010, "Telstra Corporation Ltd." },
     {  505020, "Optus Mobile Pty. Ltd." },
@@ -2125,7 +2105,7 @@ static const value_string mcc_mnc_codes[] = {
     {  505110, "Telstra Corporation Ltd." },
     {  505120, "Hutchison Telecommunications (Australia) Pty. Ltd." },
     {  505130, "Railcorp" },
-    {  505140, "AAPT Ltd" },
+    {  505140, "AAPT Ltd." },
     {  505150, "3GIS Pty Ltd. (Telstra & Hutchison 3G)" },
     {  505160, "Victorian Rail Track" },
     {  505170, "Vivid Wireless Pty Ltd" },
@@ -2140,8 +2120,6 @@ static const value_string mcc_mnc_codes[] = {
     {  505260, "Dialogue Communications Pty Ltd" },
     {  505270, "Nexium Telecommunications" },
     {  505280, "RCOM International Pty Ltd" },
-    {  505300, "Compatel Limited" },
-    {  505310, "BHP Billiton" },
     {  505620, "NBNCo Limited" },
     {  505680, "NBNCo Limited" },
     {  505710, "Telstra Corporation Ltd." },
@@ -2191,7 +2169,7 @@ static const value_string mcc_mnc_codes[] = {
     {  530070, "Bluereach Limited" },
     {  530240, "NZ Communications - UMTS Network" },
     {  537010, "Bmobile" },
-    {  537020, "Telikom PNG Ltd" },
+    {  537020, "Greencom" },
     {  537030, "Digicel Ltd" },
     {  539010, "Tonga Communications Corporation" },
     {  539430, "Digicel" },
@@ -2204,7 +2182,6 @@ static const value_string mcc_mnc_codes[] = {
     {  542020, "Digicel (Fiji) Ltd" },
     {  542030, "Telecom Fiji Ltd (CDMA)" },
     {  546010, "OPT Mobilis" },
-    {  547050, "VITI" },
     {  547100, "Mara Telecom" },
     {  547150, "Pacific Mobile Telecom" },
     {  547200, "Tikiphone" },
@@ -2228,10 +2205,10 @@ static const value_string mcc_mnc_codes[] = {
     {  607020, "Africell" },
     {  607030, "Comium Services Ltd" },
     {  607040, "Qcell" },
-    {  608010, "Sonatel Mobiles (Orange)" },
+    {  608010, "Sonatel (Orange)" },
     {  608020, "Sentel GSM (Tigo)" },
     {  608030, "Expresso Senegal" },
-    {  608040, "CSU" },
+    {  608040, "CSU-SA" },
     {  609010, "Mattel S.A." },
     {  609020, "Chinguitel S.A." },
     {  609100, "Mauritel Mobiles" },
@@ -2262,7 +2239,7 @@ static const value_string mcc_mnc_codes[] = {
     {  619010, "Celtel" },
     {  619020, "Millicom" },
     {  619030, "Africell" },
-    {  619040, "Comium (Sierra Leone) Ltd" },
+    {  619040, "Comium (Sierra Leone) Ltd." },
     {  619050, "Lintel (Sierra Leone) Ltd." },
     {  619250, "Mobitel" },
     {  619400, "Datatel (SL) Ltd GSM" },
@@ -2292,7 +2269,7 @@ static const value_string mcc_mnc_codes[] = {
     {  628020, "MOOV" },
     {  628030, "CELTEL" },
     {  628040, "USAN GABON" },
-    {  628050, "Reseau de l'Administration Gabonaise (RAG)" },
+    {  628050, "Reseau de l Administration Gabonaise (RAG)" },
     {  629010, "Celtel" },
     {  629100, "Libertis Telecom" },
     {  630010, "Vodacom Congo RDC sprl" },
@@ -2315,10 +2292,13 @@ static const value_string mcc_mnc_codes[] = {
     {  634060, "Zain Sudan" },
     {  634990, "MTN Sudan" },
     {  635100, "MTN Rwandacell" },
-    {  635130, "TIGO RWANDA LTD" },
+    {  635130, "TIGO RWANDA Ltd" },
     {  635140, "AIRTEL RWANDA Ltd" },
-    {  635170, "Olleh Rwanda Networks (ORN)" },
     {  636010, "ETH MTN" },
+    {  637010, "Horizon Telecom LMD" },
+    {  637020, "Horizon Telecom LMD" },
+    {  637300, "Golis Telecommunications Company" },
+    {  637700, "Onkod Telecom Ltd." },
     {  638010, "Evatis" },
     {  639020, "Safaricom Ltd." },
     {  639030, "Kencell Communications Ltd." },
@@ -2341,6 +2321,7 @@ static const value_string mcc_mnc_codes[] = {
     {  642020, "Africell" },
     {  642030, "ONAMOB" },
     {  642070, "LACELL" },
+    {  642080, "HITS TELECOM" },
     {  642820, "U.COM" },
     {  643010, "T.D.M. GSM" },
     {  643030, "Movitel" },
@@ -2350,6 +2331,7 @@ static const value_string mcc_mnc_codes[] = {
     {  645030, "Zamtel" },
     {  646010, "Celtel Madagascar (Zain), GSM" },
     {  646020, "Orange Madagascar, GSM" },
+    {  646030, "Madamobil, CDMA 2000" },
     {  646040, "Telecom Malagasy Mobile, GSM" },
     {  647000, "Orange La Reunion" },
     {  647020, "Outremer Telecom" },
@@ -2364,8 +2346,8 @@ static const value_string mcc_mnc_codes[] = {
     {  650100, "Celtel ltd." },
     {  651010, "Vodacom Lesotho (pty) Ltd." },
     {  651020, "Econet Ezin-cel" },
-    {  652010, "Mascom Wireless (Pty) Ltd" },
-    {  652020, "Orange Botswana (Pty) Ltd" },
+    {  652010, "Mascom Wireless (Pty) Ltd." },
+    {  652020, "Orange Botswana (Pty) Ltd." },
     {  652040, "Botswana Telecommunications Corporation (BTC)" },
     {  653010, "SPTC" },
     {  653100, "Swazi MTN" },
@@ -2380,7 +2362,6 @@ static const value_string mcc_mnc_codes[] = {
     {  655120, "Mobile Telephone Networks (MTN) Pty Ltd" },
     {  655130, "Neotel Pty Ltd" },
     {  655140, "Neotel Pty Ltd" },
-    {  655160, "Phoenix Systems Integration (Pty) Ltd" },
     {  655190, "Wireless Business Solutions (iBurst)" },
     {  655210, "Cape Town Metropolitan Council" },
     {  655250, "Wirels Connect" },
@@ -2402,12 +2383,11 @@ static const value_string mcc_mnc_codes[] = {
     {  659970, "Gemtel" },
     {  702670, "Belize Telecommunications Ltd., GSM 1900" },
     {  702680, "International Telecommunications Ltd. (INTELCO)" },
-    {  704010, "Servicios de Comunicaciones Personales Inalembricas, S.A. (SERCOM, S.A)" },
+    {  704010, "Servicios de Comunicaciones Personales Inalambricas, S.A. (SERCOM, S.A)" },
     {  704020, "Comunicaciones Celulares S.A." },
     {  704030, "Telefonica Centroamerica Guatemala S.A." },
     {  706010, "CTE Telecom Personal, S.A. de C.V." },
     {  706020, "Digicel, S.A. de C.V." },
-    {  706030, "Telemovil El Salvador, S.A." },
     {  708001, "Megatel" },
     {  708002, "Celtel" },
     {  708040, "Digicel Honduras" },
@@ -2419,7 +2399,7 @@ static const value_string mcc_mnc_codes[] = {
     {  712040, "Telefonica de Costa Rica TC, S.A." },
     {  712200, "Virtualis" },
     {  714010, "Cable & Wireless Panama S.A." },
-    {  714020, "BSC de Panama S.A. / Telefonica Moviles Panama S.A." },
+    {  714020, "Telefonica Moviles Panama S.A." },
     {  714030, "Claro Panama, S.A." },
     {  714040, "Digicel (Panama), S.A." },
     {  716100, "TIM Peru" },
@@ -2481,13 +2461,15 @@ static const value_string mcc_mnc_codes[] = {
     {  732111, "Colombia Movil S.A." },
     {  732123, "Telefonica Moviles Colombia S.A." },
     {  732130, "Avantel" },
+    {  734010, "Infonet" },
     {  734020, "Corporacion Digitel" },
+    {  734030, "Digicel" },
     {  734040, "Telcel, C.A." },
     {  734060, "Telecomunicaciones Movilnet, C.A." },
     {  736010, "Nuevatel S.A." },
     {  736020, "ENTEL S.A." },
     {  736030, "Telecel S.A." },
-    {  738002, "Guyana Telephone & Telegraph Company Limited (Cellink)" },
+    {  738002, "Guyana Telephone & Telegraph Company Limited" },
     {  738010, "Cel*Star (Guyana) Inc." },
     {  740000, "Otecel S.A. - Bellsouth" },
     {  740010, "Porta GSM" },
@@ -2506,27 +2488,32 @@ static const value_string mcc_mnc_codes[] = {
     {  748100, "CTI Movil" },
     {  750001, "Touch" },
     {  901010, "ICO Global Communications" },
+    {  901020, "Sense Communications International AS" },
     {  901030, "Iridium Communications Inc" },
     {  901050, "Thuraya RMSS Network" },
     {  901060, "Thuraya Satellite Telecommunications Company" },
+    {  901090, "Tele1 Europe" },
     {  901100, "Asia Cellular Satellite (AceS)" },
     {  901110, "Inmarsat Ltd." },
     {  901120, "Maritime Communications Partner AS (MCP network)" },
-    {  901130, "BebbiCell AG (Formerly Global Networks Switzerland AG)" },
+    {  901130, "Global Networks Switzerland AG" },
     {  901140, "Telenor" },
-    {  901150, "OnAir N.V. (Formerly SITA on behalf of Onair)" },
-    {  901160, "Jasper Wireless, Inc" },
+    {  901150, "OnAir" },
+    {  901160, "Jasper Wireless, Inc." },
     {  901170, "Jersey Telecom" },
     {  901180, "Cingular Wireless" },
     {  901190, "Vodafone Malta (Vodafone Group)" },
     {  901200, "Intermatica" },
-    {  901210, "Wins Limited (Formerly Seanet Maritime Communications AB)" },
+    {  901210, "Seanet Maritime Communications AB" },
     {  901220, "MediaLincc Ltd" },
+    {  901230, "Beeline" },
     {  901240, "Voxbone SA" },
+    {  901250, "In & Phone" },
     {  901260, "Telecom Italia" },
-    {  901270, "OnAir N.V. (Formerly SITA on behalf of Onair)" },
+    {  901270, "Onair" },
     {  901280, "Vodafone Group" },
     {  901290, "Telenor Connexion AB" },
+    {  901300, "Terrestar Netwoks" },
     {  901310, "France Telecom Orange" },
     {  901320, "MegaFon" },
     {  901330, "Smart Communications , Inc" },
@@ -2535,9 +2522,7 @@ static const value_string mcc_mnc_codes[] = {
     {  901360, "Azerfon LLC" },
     {  901370, "TRANSATEL" },
     {  901380, "Multiregional TransitTelecom (MTT)" },
-    {  901390, "MTX Connect" },
-    {  901400, "Deutsche Telekom AG" },
-    {  901410, "BodyTrace Netherlands B.V." },
+    {  901390, "MTX Connect Ltd" },
     {  901880, "UN Office for the Coordination of Humanitarian Affairs (OCHA)" },
     { 1666665, "Unset" },
     {  0, NULL }
@@ -2547,17 +2532,8 @@ static value_string_ext mcc_mnc_codes_ext = VALUE_STRING_EXT_INIT(mcc_mnc_codes)
 
 
 static int proto_e212   = -1;
-static int hf_E212_imsi = -1;
 static int hf_E212_mcc  = -1;
-static int hf_E212_mcc_lai = -1;
-static int hf_E212_mcc_sai = -1;
-static int hf_E212_mcc_rai = -1;
 static int hf_E212_mnc  = -1;
-static int hf_E212_mnc_lai = -1;
-static int hf_E212_mnc_sai = -1;
-static int hf_E212_mnc_rai = -1;
-
-static int ett_e212_imsi = -1;
 
 static expert_field ei_E212_mcc_non_decimal = EI_INIT;
 static expert_field ei_E212_mnc_non_decimal = EI_INIT;
@@ -2620,7 +2596,7 @@ static expert_field ei_E212_mnc_non_decimal = EI_INIT;
  * Return MCC MNC in a packet scope allocated string that can be used in labels.
  */
 gchar *
-dissect_e212_mcc_mnc_wmem_packet_str(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, e212_number_type_t number_type, gboolean little_endian)
+dissect_e212_mcc_mnc_wmem_packet_str(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, gboolean little_endian)
 {
 
     int         start_offset, mcc_mnc;
@@ -2630,25 +2606,7 @@ dissect_e212_mcc_mnc_wmem_packet_str(tvbuff_t *tvb, packet_info *pinfo, proto_tr
     proto_item *item;
     gchar      *mcc_mnc_str;
     gboolean    long_mnc = FALSE;
-    int         hf_E212_mcc_id, hf_E212_mnc_id;
 
-    switch(number_type){
-    case E212_LAI:
-        hf_E212_mcc_id = hf_E212_mcc_lai;
-        hf_E212_mnc_id = hf_E212_mnc_lai;
-        break;
-    case E212_RAI:
-        hf_E212_mcc_id = hf_E212_mcc_rai;
-        hf_E212_mnc_id = hf_E212_mnc_rai;
-        break;
-    case E212_SAI:
-        hf_E212_mcc_id = hf_E212_mcc_sai;
-        hf_E212_mnc_id = hf_E212_mnc_sai;
-        break;
-    default:
-        hf_E212_mcc_id = hf_E212_mcc;
-        hf_E212_mnc_id = hf_E212_mnc;
-    }
     start_offset = offset;
     /* MCC + MNC */
     mcc_mnc = tvb_get_ntoh24(tvb,offset);
@@ -2675,12 +2633,12 @@ dissect_e212_mcc_mnc_wmem_packet_str(tvbuff_t *tvb, packet_info *pinfo, proto_tr
         else
             mnc = 100 * mnc3 + mnc;
     }
-    item = proto_tree_add_uint(tree, hf_E212_mcc_id , tvb, start_offset, 2, mcc );
+    item = proto_tree_add_uint(tree, hf_E212_mcc , tvb, start_offset, 2, mcc );
     if (((mcc1 > 9) || (mcc2 > 9) || (mcc3 > 9)) && (mcc_mnc != 0xffffff))
         expert_add_info(pinfo, item, &ei_E212_mcc_non_decimal);
 
     if (long_mnc) {
-        item = proto_tree_add_uint_format_value(tree, hf_E212_mnc_id , tvb, start_offset + 1, 2, mnc,
+        item = proto_tree_add_uint_format_value(tree, hf_E212_mnc , tvb, start_offset + 1, 2, mnc,
                    "%s (%03u)",
                    val_to_str_ext_const(mcc * 1000 + mnc, &mcc_mnc_codes_ext, "Unknown"),
                    mnc);
@@ -2714,9 +2672,9 @@ dissect_e212_mcc_mnc_wmem_packet_str(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 }
 
 int
-dissect_e212_mcc_mnc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, e212_number_type_t number_type, gboolean little_endian)
+dissect_e212_mcc_mnc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, gboolean little_endian)
 {
-    dissect_e212_mcc_mnc_wmem_packet_str(tvb, pinfo, tree, offset, number_type, little_endian);
+    dissect_e212_mcc_mnc_wmem_packet_str(tvb, pinfo, tree, offset, little_endian);
     return offset +3;
 }
 
@@ -2823,170 +2781,6 @@ dissect_e212_mcc_mnc_in_address(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 }
 
 /*
- * MNC of length 2:
- *
- *     8   7   6   5   4   3   2   1
- *   +---+---+---+---+---+---+---+---+
- *   |  MCC digit 1  |  Other data   |  octet x
- *   +---------------+---------------+
- *   |  MNC digit 1  |  MCC digit 2  |  octet x+1
- *   +---------------+---------------+
- *   | MNC digit  3  |  MNC digit 2  |  octet x+2
- *   +---------------+---------------+
- *
- * MNC of length 3:
- *
- *     8   7   6   5   4   3   2   1
- *   +---+---+---+---+---+---+---+---+
- *   |  MCC digit 1  |  Other data   |  octet x
- *   +---------------+---------------+
- *   |  MCC digit 3  |  MCC digit 2  |  octet x+1
- *   +---------------+---------------+
- *   |  MNC digit 2  |  MNC digit 1  |  octet x+2
- *   +---------------+---------------+
- *   |  .....        |  MNC digit 3  |  octet x+3
- *   +---------------+---------------+
- */
-static int
-dissect_e212_mcc_mnc_high_nibble(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset)
-{
-
-    guint32     start_offset;
-    guint8      octet;
-    guint16     mcc, mnc;
-    guint8      mcc1, mcc2, mcc3, mnc1, mnc2, mnc3;
-    gboolean    long_mnc;
-
-    long_mnc = FALSE;
-    start_offset = offset;
-
-    /* MCC digits 1 */
-    octet = tvb_get_guint8(tvb,offset);
-    mcc1  = octet >> 4;
-    offset++;
-
-    /* MCC digits 1 and 2 */
-    octet = tvb_get_guint8(tvb,offset);
-    mcc2  = octet & 0x0f;
-    mcc3  = octet >> 4;
-    offset++;
-
-    /* MNC digit 1 and MNC digit 2 */
-    octet = tvb_get_guint8(tvb,offset);
-    mnc1  = octet & 0x0f;
-    mnc2  = octet >> 4;
-    offset++;
-
-    /* MNC digits 3 */
-    octet = tvb_get_guint8(tvb,offset);
-    mnc3  = octet & 0x0f;
-
-    mcc   = 100 * mcc1 + 10 * mcc2 + mcc3;
-    mnc   = 10 * mnc1 + mnc2;
-
-    /* Try to match the MCC and 2 digits MNC with an entry in our list of operators */
-    if (!try_val_to_str_ext(mcc * 1000 + 10 * mnc, &mcc_mnc_codes_ext)) {
-        mnc = 10 * mnc + mnc3;
-        long_mnc = TRUE;
-    }
-
-    proto_tree_add_uint(tree, hf_E212_mcc , tvb, start_offset, 2, mcc );
-
-    if (long_mnc)
-        proto_tree_add_uint_format_value(tree, hf_E212_mnc , tvb, start_offset + 2, 2, mnc,
-                   "%s (%03u)",
-                   val_to_str_ext_const(mcc * 1000 + mnc, &mcc_mnc_codes_ext, "Unknown"),
-                   mnc);
-    else
-        proto_tree_add_uint_format_value(tree, hf_E212_mnc , tvb, start_offset + 2, 1, mnc,
-                   "%s (%02u)",
-                   val_to_str_ext_const(mcc * 1000 + 10 * mnc, &mcc_mnc_codes_ext, "Unknown"),
-                   mnc);
-
-    if (long_mnc)
-        return 7;
-    else
-        return 5;
-}
-
-static int
-dissect_e212_mcc_mnc_in_utf8_address(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset)
-{
-    guint16 mcc, mnc;
-    gboolean    long_mnc = FALSE;
-
-    mcc = atoi(tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 3, ENC_UTF_8));
-    mnc = atoi(tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 3, 2, ENC_UTF_8));
-
-    /* Try to match the MCC and 2 digits MNC with an entry in our list of operators */
-    if (!try_val_to_str_ext(mcc * 1000 + 10 * mnc, &mcc_mnc_codes_ext)) {
-            mnc = atoi(tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 3, 3, ENC_UTF_8));
-            long_mnc = TRUE;
-    }
-
-    proto_tree_add_uint(tree, hf_E212_mcc, tvb, offset, 3, mcc );
-
-    if (long_mnc)
-        proto_tree_add_uint_format_value(tree, hf_E212_mnc, tvb, offset + 3, 3, mnc,
-                   "%s (%03u)",
-                   val_to_str_ext_const(mcc * 1000 + mnc, &mcc_mnc_codes_ext, "Unknown1"),
-                   mnc);
-    else
-        proto_tree_add_uint_format_value(tree, hf_E212_mnc, tvb, offset + 3, 2, mnc,
-                   "%s (%02u)",
-                   val_to_str_ext_const(mcc * 1000 + 10 * mnc, &mcc_mnc_codes_ext, "Unknown2"),
-                   mnc);
-
-    if (long_mnc)
-        return 6;
-    else
-        return 5;
-}
-
-const gchar *
-dissect_e212_imsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, int length, gboolean skip_first)
-{
-    proto_item *item;
-    proto_tree *subtree;
-    const gchar *imsi_str;
-
-    /* Fetch the BCD encoded digits from tvb indicated half byte, formating the digits according to
-     * a default digit set of 0-9 returning "?" for overdecadic digits a pointer to the wmem
-     * allocated string will be returned.
-     */
-    imsi_str = tvb_bcd_dig_to_wmem_packet_str( tvb, offset, length, NULL, skip_first);
-    item = proto_tree_add_string(tree, hf_E212_imsi, tvb, offset, length, imsi_str);
-
-    subtree = proto_item_add_subtree(item, ett_e212_imsi);
-
-    if(skip_first) {
-        dissect_e212_mcc_mnc_high_nibble(tvb, pinfo, subtree, offset);
-    } else {
-        dissect_e212_mcc_mnc_in_address(tvb, pinfo, subtree, offset);
-    }
-
-    return imsi_str;
-}
-
-const gchar *
-dissect_e212_utf8_imsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, int length)
-{
-    proto_item *item;
-    proto_tree *subtree;
-    const gchar *imsi_str;
-
-    /* Fetch the UTF8-encoded IMSI */
-    imsi_str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_UTF_8);
-    item = proto_tree_add_string(tree, hf_E212_imsi, tvb, offset, length, imsi_str);
-
-    subtree = proto_item_add_subtree(item, ett_e212_imsi);
-
-    dissect_e212_mcc_mnc_in_utf8_address(tvb, pinfo, subtree, offset);
-
-    return imsi_str;
-}
-
-/*
  * Register the protocol with Wireshark.
  *
  * This format is required because a script is used to build the C function
@@ -3000,48 +2794,13 @@ proto_register_e212(void)
 
 /* Setup list of header fields  See Section 1.6.1 for details */
     static hf_register_info hf[] = {
-    { &hf_E212_imsi,
-        { "IMSI","e212.imsi",
-        FT_STRING, BASE_NONE, NULL, 0x0,
-        "International mobile subscriber identity(IMSI)", HFILL }
-    },
     { &hf_E212_mcc,
         { "Mobile Country Code (MCC)","e212.mcc",
         FT_UINT16, BASE_DEC|BASE_EXT_STRING, &E212_codes_ext, 0x0,
         "Mobile Country Code MCC", HFILL }
     },
-    { &hf_E212_mcc_lai,
-        { "Mobile Country Code (MCC)","e212.lai.mcc",
-        FT_UINT16, BASE_DEC|BASE_EXT_STRING, &E212_codes_ext, 0x0,
-        "Mobile Country Code MCC", HFILL }
-    },
-    { &hf_E212_mcc_rai,
-        { "Mobile Country Code (MCC)","e212.rai.mcc",
-        FT_UINT16, BASE_DEC|BASE_EXT_STRING, &E212_codes_ext, 0x0,
-        "Mobile Country Code MCC", HFILL }
-    },
-    { &hf_E212_mcc_sai,
-        { "Mobile Country Code (MCC)","e212.sai.mcc",
-        FT_UINT16, BASE_DEC|BASE_EXT_STRING, &E212_codes_ext, 0x0,
-        "Mobile Country Code MCC", HFILL }
-    },
     { &hf_E212_mnc,
         { "Mobile Network Code (MNC)","e212.mnc",
-        FT_UINT16, BASE_DEC, NULL, 0x0,
-        "Mobile network code", HFILL }
-    },
-    { &hf_E212_mnc_lai,
-        { "Mobile Network Code (MNC)","e212.lai.mnc",
-        FT_UINT16, BASE_DEC, NULL, 0x0,
-        "Mobile network code", HFILL }
-    },
-    { &hf_E212_mnc_rai,
-        { "Mobile Network Code (MNC)","e212.rai.mnc",
-        FT_UINT16, BASE_DEC, NULL, 0x0,
-        "Mobile network code", HFILL }
-    },
-    { &hf_E212_mnc_sai,
-        { "Mobile Network Code (MNC)","e212.sai.mnc",
         FT_UINT16, BASE_DEC, NULL, 0x0,
         "Mobile network code", HFILL }
     },
@@ -3051,11 +2810,6 @@ proto_register_e212(void)
         FT_STRING, BASE_NONE, NULL, 0,
         "Mobile Subscriber Identification Number(MSIN)", HFILL }},
 #endif
-    };
-
-
-    static gint *ett_e212_array[] = {
-        &ett_e212_imsi,
     };
 
     static ei_register_info ei[] = {
@@ -3078,21 +2832,7 @@ proto_register_e212(void)
      * the header fields and subtrees used.
      */
     proto_register_field_array(proto_e212, hf, array_length(hf));
-    proto_register_subtree_array(ett_e212_array, array_length(ett_e212_array));
     expert_e212 = expert_register_protocol(proto_e212);
     expert_register_field_array(expert_e212, ei, array_length(ei));
 
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

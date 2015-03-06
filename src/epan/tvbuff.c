@@ -44,7 +44,6 @@
 #include "wsutil/unicode-utils.h"
 #include "wsutil/nstime.h"
 #include "wsutil/time_util.h"
-#include "wsutil/ws_mempbrk.h"
 #include "tvbuff.h"
 #include "tvbuff-int.h"
 #include "strutil.h"
@@ -59,7 +58,7 @@
  * yet defined.
  */
 #include <time.h>
-/*#ifndef HAVE_STRPTIME*/
+/*#ifdef NEED_STRPTIME_H*/
 #ifndef strptime
 #include "wsutil/strptime.h"
 #endif
@@ -164,67 +163,59 @@ tvb_add_to_chain(tvbuff_t *parent, tvbuff_t *child)
 	}
 }
 
-/*
- * Check whether that offset goes more than one byte past the
- * end of the buffer.
- *
- * If not, return 0; otherwise, return exception
- */
-static inline int
-validate_offset(const tvbuff_t *tvb, const guint abs_offset)
-{
-	if (G_LIKELY(abs_offset <= tvb->length))
-		return 0;
-	else if (abs_offset <= tvb->reported_length)
-		return BoundsError;
-	else if (tvb->flags & TVBUFF_FRAGMENT)
-		return FragmentBoundsError;
-	else
-		return ReportedBoundsError;
-}
+#define COMPUTE_OFFSET(tvb, offset, offset_ptr, exception) \
+	if (offset >= 0) { \
+		/* Positive offset - relative to the beginning of the packet. */ \
+		if ((guint) offset <= tvb->length) { \
+			*offset_ptr = offset; \
+		} else if ((guint) offset <= tvb->reported_length) { \
+			exception = BoundsError; \
+		} else if (tvb->flags & TVBUFF_FRAGMENT) { \
+			exception = FragmentBoundsError; \
+		} else { \
+			exception = ReportedBoundsError; \
+		} \
+	} \
+	else { \
+		/* Negative offset - relative to the end of the packet. */ \
+		if ((guint) -offset <= tvb->length) { \
+			*offset_ptr = tvb->length + offset; \
+		} else if ((guint) -offset <= tvb->reported_length) { \
+			exception =  BoundsError; \
+		} else if (tvb->flags & TVBUFF_FRAGMENT) { \
+			exception = FragmentBoundsError; \
+		} else { \
+			exception = ReportedBoundsError; \
+		} \
+	} \
 
-static inline int
-compute_offset(const tvbuff_t *tvb, const gint offset, guint *offset_ptr)
-{
-	if (offset >= 0) {
-		/* Positive offset - relative to the beginning of the packet. */
-		if ((guint) offset <= tvb->length) {
-			*offset_ptr = offset;
-		} else if ((guint) offset <= tvb->reported_length) {
-			return BoundsError;
-		} else if (tvb->flags & TVBUFF_FRAGMENT) {
-			return FragmentBoundsError;
-		} else {
-			return ReportedBoundsError;
-		}
-	}
-	else {
-		/* Negative offset - relative to the end of the packet. */
-		if ((guint) -offset <= tvb->length) {
-			*offset_ptr = tvb->length + offset;
-		} else if ((guint) -offset <= tvb->reported_length) {
-			return BoundsError;
-		} else if (tvb->flags & TVBUFF_FRAGMENT) {
-			return FragmentBoundsError;
-		} else {
-			return ReportedBoundsError;
-		}
-	}
-
-	return 0;
-}
-
-static inline int
-compute_offset_and_remaining(const tvbuff_t *tvb, const gint offset, guint *offset_ptr, guint *rem_len)
-{
-	int exception;
-
-	exception = compute_offset(tvb, offset, offset_ptr);
-	if (!exception)
-		*rem_len = tvb->length - *offset_ptr;
-
-	return exception;
-}
+#define COMPUTE_OFFSET_AND_REMAINING(tvb, offset, offset_ptr, rem_len, exception) \
+	if (offset >= 0) { \
+		/* Positive offset - relative to the beginning of the packet. */ \
+		if ((guint) offset <= tvb->length) { \
+			*offset_ptr = offset; \
+		} else if ((guint) offset <= tvb->reported_length) { \
+			exception = BoundsError; \
+		} else if (tvb->flags & TVBUFF_FRAGMENT) { \
+			exception = FragmentBoundsError; \
+		} else { \
+			exception = ReportedBoundsError; \
+		} \
+	} \
+	else { \
+		/* Negative offset - relative to the end of the packet. */ \
+		if ((guint) -offset <= tvb->length) { \
+			*offset_ptr = tvb->length + offset; \
+		} else if ((guint) -offset <= tvb->reported_length) { \
+			exception =  BoundsError; \
+		} else if (tvb->flags & TVBUFF_FRAGMENT) { \
+			exception = FragmentBoundsError; \
+		} else { \
+			exception = ReportedBoundsError; \
+		} \
+	} \
+	if (!exception) \
+		rem_len = tvb->length - *offset_ptr; \
 
 /* Computes the absolute offset and length based on a possibly-negative offset
  * and a length that is possible -1 (which means "to the end of the data").
@@ -245,13 +236,13 @@ check_offset_length_no_exception(const tvbuff_t *tvb,
 				 guint *offset_ptr, guint *length_ptr)
 {
 	guint end_offset;
-	int   exception;
+	int   exception = 0;
 
 	DISSECTOR_ASSERT(offset_ptr);
 	DISSECTOR_ASSERT(length_ptr);
 
 	/* Compute the offset */
-	exception = compute_offset(tvb, offset, offset_ptr);
+	COMPUTE_OFFSET(tvb, offset, offset_ptr, exception);
 	if (exception)
 		return exception;
 
@@ -277,7 +268,21 @@ check_offset_length_no_exception(const tvbuff_t *tvb,
 	if (end_offset < *offset_ptr)
 		return BoundsError;
 
-	return validate_offset(tvb, end_offset);
+	/*
+	 * Check whether that offset goes more than one byte past the
+	 * end of the buffer.
+	 *
+	 * If not, return 0; otherwise, return exception
+	 */
+	if (G_LIKELY(end_offset <= tvb->length))
+		return 0;
+	else if (end_offset <= tvb->reported_length)
+		return BoundsError;
+	else if (tvb->flags & TVBUFF_FRAGMENT)
+		return FragmentBoundsError;
+	else
+		return ReportedBoundsError;
+
 }
 
 /* Checks (+/-) offset and length and throws an exception if
@@ -384,11 +389,8 @@ static tvbuff_t *
 tvb_generic_clone_offset_len(tvbuff_t *tvb, guint offset, guint len)
 {
 	tvbuff_t *cloned_tvb;
-	guint8 *data;
 
-	DISSECTOR_ASSERT(tvb_bytes_exist(tvb, offset, len));
-
-	data = (guint8 *) g_malloc(len);
+	guint8 *data = (guint8 *) g_malloc(len);
 
 	tvb_memcpy(tvb, data, offset, len);
 
@@ -431,9 +433,9 @@ static inline gint
 _tvb_captured_length_remaining(const tvbuff_t *tvb, const gint offset)
 {
 	guint abs_offset, rem_length;
-	int   exception;
+	int   exception = 0;
 
-	exception = compute_offset_and_remaining(tvb, offset, &abs_offset, &rem_length);
+	COMPUTE_OFFSET_AND_REMAINING(tvb, offset, &abs_offset, rem_length, exception);
 	if (exception)
 		return 0;
 
@@ -444,11 +446,11 @@ gint
 tvb_captured_length_remaining(const tvbuff_t *tvb, const gint offset)
 {
 	guint abs_offset, rem_length;
-	int   exception;
+	int   exception = 0;
 
 	DISSECTOR_ASSERT(tvb && tvb->initialized);
 
-	exception = compute_offset_and_remaining(tvb, offset, &abs_offset, &rem_length);
+	COMPUTE_OFFSET_AND_REMAINING(tvb, offset, &abs_offset, rem_length, exception);
 	if (exception)
 		return 0;
 
@@ -459,11 +461,11 @@ guint
 tvb_ensure_captured_length_remaining(const tvbuff_t *tvb, const gint offset)
 {
 	guint abs_offset, rem_length;
-	int   exception;
+	int   exception = 0;
 
 	DISSECTOR_ASSERT(tvb && tvb->initialized);
 
-	exception = compute_offset_and_remaining(tvb, offset, &abs_offset, &rem_length);
+	COMPUTE_OFFSET_AND_REMAINING(tvb, offset, &abs_offset, rem_length, exception);
 	if (exception)
 		THROW(exception);
 
@@ -503,24 +505,6 @@ tvb_bytes_exist(const tvbuff_t *tvb, const gint offset, const gint length)
 		return FALSE;
 
 	return TRUE;
-}
-
-/* Validates that 'length' bytes, where 'length' is a 64-bit unsigned
- * integer, are available starting from offset (pos/neg). Throws an
- * exception if they aren't. */
-void
-tvb_ensure_bytes_exist64(const tvbuff_t *tvb, const gint offset, const guint64 length)
-{
-	/*
-	 * Make sure the value fits in a signed integer; if not, assume
-	 * that means that it's too big.
-	 */
-	if (length > G_MAXINT) {
-		THROW(ReportedBoundsError);
-	}
-
-	/* OK, now cast it and try it with tvb_ensure_bytes_exist(). */
-	tvb_ensure_bytes_exist(tvb, offset, (gint)length);
 }
 
 /* Validates that 'length' bytes are available starting from
@@ -600,19 +584,19 @@ tvb_ensure_bytes_exist(const tvbuff_t *tvb, const gint offset, const gint length
 gboolean
 tvb_offset_exists(const tvbuff_t *tvb, const gint offset)
 {
-	guint abs_offset;
-	int   exception;
+	guint offset_ptr;
+	int   exception = 0;
 
 	DISSECTOR_ASSERT(tvb && tvb->initialized);
 
-	exception = compute_offset(tvb, offset, &abs_offset);
+	COMPUTE_OFFSET(tvb, offset, &offset_ptr, exception);
 	if (exception)
 		return FALSE;
 
 	/* compute_offset only throws an exception on >, not >= because of the
 	 * comment above check_offset_length_no_exception, but here we want the
 	 * opposite behaviour so we check ourselves... */
-	if (abs_offset < tvb->length) {
+	if (offset_ptr < tvb->length) {
 		return TRUE;
 	}
 	else {
@@ -631,17 +615,17 @@ tvb_reported_length(const tvbuff_t *tvb)
 gint
 tvb_reported_length_remaining(const tvbuff_t *tvb, const gint offset)
 {
-	guint abs_offset;
-	int   exception;
+	guint offset_ptr;
+	int   exception = 0;
 
 	DISSECTOR_ASSERT(tvb && tvb->initialized);
 
-	exception = compute_offset(tvb, offset, &abs_offset);
+	COMPUTE_OFFSET(tvb, offset, &offset_ptr, exception);
 	if (exception)
 		return 0;
 
-	if (tvb->reported_length >= abs_offset)
-		return tvb->reported_length - abs_offset;
+	if (tvb->reported_length >= offset_ptr)
+		return tvb->reported_length - offset_ptr;
 	else
 		return 0;
 }
@@ -758,12 +742,23 @@ fast_ensure_contiguous(tvbuff_t *tvb, const gint offset, const guint length)
 static inline const guint8*
 guint8_pbrk(const guint8* haystack, size_t haystacklen, const guint8 *needles, guchar *found_needle)
 {
-	const guint8 *result = ws_mempbrk(haystack, haystacklen, needles);
+	gchar         tmp[256] = { 0 };
+	const guint8 *haystack_end;
 
-	if (result && found_needle)
-		*found_needle = *result;
+	while (*needles)
+		tmp[*needles++] = 1;
 
-	return result;
+	haystack_end = haystack + haystacklen;
+	while (haystack < haystack_end) {
+		if (tmp[*haystack]) {
+			if (found_needle)
+				*found_needle = *haystack;
+			return haystack;
+		}
+		haystack++;
+	}
+
+	return NULL;
 }
 
 
@@ -951,114 +946,6 @@ tvb_get_ntoh64(tvbuff_t *tvb, const gint offset)
 
 	ptr = fast_ensure_contiguous(tvb, offset, sizeof(guint64));
 	return pntoh64(ptr);
-}
-
-guint16
-tvb_get_guint16(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letohs(tvb, offset);
-	} else {
-		return tvb_get_ntohs(tvb, offset);
-	}
-}
-
-guint32
-tvb_get_guint24(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letoh24(tvb, offset);
-	} else {
-		return tvb_get_ntoh24(tvb, offset);
-	}
-}
-
-guint32
-tvb_get_guint32(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letohl(tvb, offset);
-	} else {
-		return tvb_get_ntohl(tvb, offset);
-	}
-}
-
-guint64
-tvb_get_guint40(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letoh40(tvb, offset);
-	} else {
-		return tvb_get_ntoh40(tvb, offset);
-	}
-}
-
-gint64
-tvb_get_gint40(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letohi40(tvb, offset);
-	} else {
-		return tvb_get_ntohi40(tvb, offset);
-	}
-}
-
-guint64
-tvb_get_guint48(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letoh48(tvb, offset);
-	} else {
-		return tvb_get_ntoh48(tvb, offset);
-	}
-}
-
-gint64
-tvb_get_gint48(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letohi48(tvb, offset);
-	} else {
-		return tvb_get_ntohi48(tvb, offset);
-	}
-}
-
-guint64
-tvb_get_guint56(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letoh56(tvb, offset);
-	} else {
-		return tvb_get_ntoh56(tvb, offset);
-	}
-}
-
-gint64
-tvb_get_gint56(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letohi56(tvb, offset);
-	} else {
-		return tvb_get_ntohi56(tvb, offset);
-	}
-}
-
-guint64
-tvb_get_guint64(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letoh64(tvb, offset);
-	} else {
-		return tvb_get_ntoh64(tvb, offset);
-	}
-}
-
-gfloat
-tvb_get_ieee_float(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letohieee_float(tvb, offset);
-	} else {
-		return tvb_get_ntohieee_float(tvb, offset);
-	}
-}
-
-gdouble
-tvb_get_ieee_double(tvbuff_t *tvb, const gint offset, const guint encoding) {
-	if (encoding & ENC_LITTLE_ENDIAN) {
-		return tvb_get_letohieee_double(tvb, offset);
-	} else {
-		return tvb_get_ntohieee_double(tvb, offset);
-	}
 }
 
 /*
@@ -1704,12 +1591,12 @@ tvb_get_letohguid(tvbuff_t *tvb, const gint offset, e_guid_t *guid)
  * NOTE: to support code written when proto_tree_add_item() took a
  * gboolean as its last argument, with FALSE meaning "big-endian"
  * and TRUE meaning "little-endian", we treat any non-zero value of
- * "encoding" as meaning "little-endian".
+ * "representation" as meaning "little-endian".
  */
 void
-tvb_get_guid(tvbuff_t *tvb, const gint offset, e_guid_t *guid, const guint encoding)
+tvb_get_guid(tvbuff_t *tvb, const gint offset, e_guid_t *guid, const guint representation)
 {
-	if (encoding) {
+	if (representation) {
 		tvb_get_letohguid(tvb, offset, guid);
 	} else {
 		tvb_get_ntohguid(tvb, offset, guid);
@@ -1872,17 +1759,24 @@ tvb_find_guint8(tvbuff_t *tvb, const gint offset, const gint maxlength, const gu
 {
 	const guint8 *result;
 	guint	      abs_offset;
+	guint	      tvbufflen;
 	guint	      limit;
-	int           exception;
 
 	DISSECTOR_ASSERT(tvb && tvb->initialized);
 
-	exception = compute_offset_and_remaining(tvb, offset, &abs_offset, &limit);
-	if (exception)
-		THROW(exception);
+	check_offset_length(tvb, offset, -1, &abs_offset, &tvbufflen);
 
 	/* Only search to end of tvbuff, w/o throwing exception. */
-	if (limit > (guint) maxlength) {
+	if (maxlength == -1) {
+		/* No maximum length specified; search to end of tvbuff. */
+		limit = tvbufflen;
+	}
+	else if (tvbufflen < (guint) maxlength) {
+		/* Maximum length goes past end of tvbuff; search to end
+		   of tvbuff. */
+		limit = tvbufflen;
+	}
+	else {
 		/* Maximum length doesn't go past end of tvbuff; search
 		   to that value. */
 		limit = maxlength;
@@ -1932,17 +1826,24 @@ tvb_pbrk_guint8(tvbuff_t *tvb, const gint offset, const gint maxlength, const gu
 {
 	const guint8 *result;
 	guint	      abs_offset;
+	guint	      tvbufflen;
 	guint	      limit;
-	int           exception;
 
 	DISSECTOR_ASSERT(tvb && tvb->initialized);
 
-	exception = compute_offset_and_remaining(tvb, offset, &abs_offset, &limit);
-	if (exception)
-		THROW(exception);
+	check_offset_length(tvb, offset, -1, &abs_offset, &tvbufflen);
 
 	/* Only search to end of tvbuff, w/o throwing exception. */
-	if (limit > (guint) maxlength) {
+	if (maxlength == -1) {
+		/* No maximum length specified; search to end of tvbuff. */
+		limit = tvbufflen;
+	}
+	else if (tvbufflen < (guint) maxlength) {
+		/* Maximum length goes past end of tvbuff; search to end
+		   of tvbuff. */
+		limit = tvbufflen;
+	}
+	else {
 		/* Maximum length doesn't go past end of tvbuff; search
 		   to that value. */
 		limit = maxlength;
@@ -3070,12 +2971,6 @@ tvb_get_nstringz0(tvbuff_t *tvb, const gint offset, const guint bufsize, guint8*
 gint
 tvb_find_line_end(tvbuff_t *tvb, const gint offset, int len, gint *next_offset, const gboolean desegment)
 {
-#ifdef WIN32
-	static const char __declspec(align(16)) crlf[] = "\r\n" ;
-#else
-	static const char crlf[] __attribute__((aligned(16))) = "\r\n" ;
-#endif
-
 	gint   eob_offset;
 	gint   eol_offset;
 	int    linelen;
@@ -3094,7 +2989,7 @@ tvb_find_line_end(tvbuff_t *tvb, const gint offset, int len, gint *next_offset, 
 	/*
 	 * Look either for a CR or an LF.
 	 */
-	eol_offset = tvb_pbrk_guint8(tvb, offset, len, crlf, &found_needle);
+	eol_offset = tvb_pbrk_guint8(tvb, offset, len, "\r\n", &found_needle);
 	if (eol_offset == -1) {
 		/*
 		 * No CR or LF - line is presumably continued in next packet.
@@ -3405,9 +3300,9 @@ tvb_skip_guint8(tvbuff_t *tvb, int offset, const int maxlength, const guint8 ch)
  * separator.
  */
 gchar *
-tvb_bytes_to_str_punct(wmem_allocator_t *scope, tvbuff_t *tvb, const gint offset, const gint len, const gchar punct)
+tvb_bytes_to_ep_str_punct(tvbuff_t *tvb, const gint offset, const gint len, const gchar punct)
 {
-	return (gchar*)bytestring_to_str(scope, ensure_contiguous(tvb, offset, len), len, punct);
+	return bytes_to_ep_str_punct(ensure_contiguous(tvb, offset, len), len, punct);
 }
 
 
@@ -3482,10 +3377,10 @@ tvb_bcd_dig_to_wmem_packet_str(tvbuff_t *tvb, const gint offset, const gint len,
  * Format a bunch of data from a tvbuff as bytes, returning a pointer
  * to the string with the formatted data.
  */
-gchar *tvb_bytes_to_str(wmem_allocator_t *allocator, tvbuff_t *tvb,
-    const gint offset, const gint len)
+gchar *
+tvb_bytes_to_ep_str(tvbuff_t *tvb, const gint offset, const gint len)
 {
-	return bytes_to_str(allocator, ensure_contiguous(tvb, offset, len), len);
+	return bytes_to_ep_str(ensure_contiguous(tvb, offset, len), len);
 }
 
 /* Find a needle tvbuff within a haystack tvbuff. */

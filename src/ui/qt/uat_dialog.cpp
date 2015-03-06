@@ -125,7 +125,6 @@ void UatDialog::keyPressEvent(QKeyEvent *evt)
         switch (evt->key()) {
         case Qt::Key_Escape:
             cur_line_edit_->setText(saved_string_pref_);
-            /* Fall Through */
         case Qt::Key_Enter:
         case Qt::Key_Return:
             stringPrefEditingFinished();
@@ -137,7 +136,6 @@ void UatDialog::keyPressEvent(QKeyEvent *evt)
         switch (evt->key()) {
         case Qt::Key_Escape:
             cur_combo_box_->setCurrentIndex(saved_combo_idx_);
-            /* Fall Through */
         case Qt::Key_Enter:
         case Qt::Key_Return:
             // XXX The combo box eats enter and return
@@ -173,12 +171,7 @@ QString UatDialog::fieldString(guint row, guint column)
         string_rep = str;
         break;
     case PT_TXTMOD_HEXBYTES: {
-        {
-            char* temp_str = bytes_to_str(NULL, (const guint8 *) str, length);
-            QString qstr(temp_str);
-            string_rep = qstr;
-            wmem_free(NULL, temp_str);
-        }
+        string_rep = bytes_to_ep_str((const guint8 *) str, length);
         break;
     }
     default:
@@ -186,7 +179,6 @@ QString UatDialog::fieldString(guint row, guint column)
         break;
     }
 
-    g_free((char*)str);
     return string_rep;
 }
 
@@ -372,15 +364,15 @@ void UatDialog::enumPrefCurrentIndexChanged(int index)
     void *rec = UAT_INDEX_PTR(uat_, row);
     uat_field_t *field = &uat_->fields[cur_column_];
     const QByteArray& enum_txt = cur_combo_box_->itemText(index).toUtf8();
-    char *err = NULL;
+    const char *err = NULL;
 
     if (field->cb.chk && field->cb.chk(rec, enum_txt.constData(), (unsigned) enum_txt.size(), field->cbdata.chk, field->fld_data, &err)) {
         field->cb.set(rec, enum_txt.constData(), (unsigned) enum_txt.size(), field->cbdata.set, field->fld_data);
         ok_button_->setEnabled(true);
+        uat_update_record(uat_, rec, TRUE);
     } else {
-        /* XXX - do something useful with the error message string */
-        g_free(err);
         ok_button_->setEnabled(false);
+        uat_update_record(uat_, rec, FALSE);
     }
     uat_->changed = TRUE;
 }
@@ -396,7 +388,7 @@ void UatDialog::stringPrefTextChanged(const QString &text)
     void *rec = UAT_INDEX_PTR(uat_, row);
     uat_field_t *field = &uat_->fields[cur_column_];
     const QByteArray& txt = text.toUtf8();
-    char *err = NULL;
+    const char *err = NULL;
     bool enable_ok = true;
     SyntaxLineEdit::SyntaxState ss = SyntaxLineEdit::Empty;
 
@@ -405,11 +397,11 @@ void UatDialog::stringPrefTextChanged(const QString &text)
             field->cb.set(rec, txt.constData(), (unsigned) txt.size(), field->cbdata.set, field->fld_data);
             saved_string_pref_ = text;
             ss = SyntaxLineEdit::Valid;
+            uat_update_record(uat_, rec, TRUE);
         } else {
-            /* XXX - do something useful with the error message string */
-            g_free(err);
             enable_ok = false;
             ss = SyntaxLineEdit::Invalid;
+            uat_update_record(uat_, rec, FALSE);
         }
     }
 
@@ -484,7 +476,7 @@ void UatDialog::applyChanges()
 
     if (uat_->flags & UAT_AFFECTS_FIELDS) {
         /* Recreate list with new fields and redissect packets */
-        wsApp->emitAppSignal(WiresharkApplication::FieldsChanged);
+        wsApp->emitAppSignal(WiresharkApplication::ColumnsChanged);
     }
     if (uat_->flags & UAT_AFFECTS_DISSECTION) {
         /* Just redissect packets if we have any */
@@ -498,11 +490,11 @@ void UatDialog::on_buttonBox_accepted()
     if (!uat_) return;
 
     if (uat_->changed) {
-        gchar *err = NULL;
+        const gchar *err = NULL;
+        uat_save(uat_, &err);
 
-        if (!uat_save(uat_, &err)) {
+        if (err) {
             report_failure("Error while saving %s: %s", uat_->name, err);
-            g_free(err);
         }
 
         if (uat_->post_update_cb) {
@@ -517,11 +509,12 @@ void UatDialog::on_buttonBox_rejected()
     if (!uat_) return;
 
     if (uat_->changed) {
-        gchar *err = NULL;
+        const gchar *err = NULL;
         uat_clear(uat_);
-        if (!uat_load(uat_, &err)) {
+        uat_load(uat_, &err);
+
+        if (err) {
             report_failure("Error while loading %s: %s", uat_->name, err);
-            g_free(err);
         }
         applyChanges();
     }

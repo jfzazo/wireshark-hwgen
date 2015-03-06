@@ -27,7 +27,7 @@ use Parse::Pidl::Util qw(has_property property_matches make_str);
 use Parse::Pidl::NDR qw(ContainsString GetNextLevel);
 use Parse::Pidl::Dump qw(DumpType DumpFunction);
 use Parse::Pidl::Wireshark::Conformance qw(ReadConformance);
-use File::Basename;
+use File::Basename;	
 
 use vars qw($VERSION);
 $VERSION = '0.01';
@@ -154,7 +154,7 @@ sub Enum($$$$)
 	$self->pidl_hdr("int $dissectorname(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, guint8 *drep _U_, int hf_index _U_, g$e->{BASE_TYPE} *param _U_);");
 
 	$self->pidl_def("const value_string ".$valsstring."[] = {");
-	foreach (@{$e->{ELEMENTS}}) {
+		foreach (@{$e->{ELEMENTS}}) {
 		next unless (/([^=]*)=(.*)/);
 		$self->pidl_def("\t{ $1, \"$1\" },");
 	}
@@ -168,15 +168,15 @@ sub Enum($$$$)
 	$self->pidl_code("{");
 	$self->indent;
 	$self->pidl_code("g$e->{BASE_TYPE} parameter=0;");
-	$self->pidl_code("if (param) {");
+	$self->pidl_code("if(param){");
 	$self->indent;
-	$self->pidl_code("parameter = *param;");
+	$self->pidl_code("parameter=(g$e->{BASE_TYPE})*param;");
 	$self->deindent;
 	$self->pidl_code("}");
 	$self->pidl_code("offset = dissect_ndr_$e->{BASE_TYPE}(tvb, offset, pinfo, tree, di, drep, hf_index, &parameter);");
-	$self->pidl_code("if (param) {");
+	$self->pidl_code("if(param){");
 	$self->indent;
-	$self->pidl_code("*param = parameter;");
+	$self->pidl_code("*param=(guint32)parameter;");
 	$self->deindent;
 	$self->pidl_code("}");
 	$self->pidl_code("return offset;");
@@ -187,13 +187,6 @@ sub Enum($$$$)
 	my $enum_size = $e->{BASE_TYPE};
 	$enum_size =~ s/uint//g;
 	$self->register_type($name, "offset = $dissectorname(tvb, offset, pinfo, tree, di, drep, \@HF\@, \@PARAM\@);", "FT_UINT$enum_size", "BASE_DEC", "0", "VALS($valsstring)", $enum_size / 8);
-}
-
-sub Pipe($$$$)
-{
-	my ($self,$e,$name,$ifname) = @_;
-	error($e->{ORIGINAL}, "Pipe not yet supported");
-	return;
 }
 
 sub Bitmap($$$$)
@@ -228,7 +221,7 @@ sub Bitmap($$$$)
 	$self->deindent;
 	$self->pidl_code("}\n");
 
-	$self->pidl_code("offset = dissect_ndr_$e->{BASE_TYPE}(tvb, offset, pinfo, tree, di, drep, -1, &flags);");
+	$self->pidl_code("offset = dissect_ndr_$e->{BASE_TYPE}(tvb, offset, pinfo, NULL, di, drep, -1, &flags);");
 
 	$self->pidl_code("proto_item_append_text(item, \": \");\n");
 	$self->pidl_code("if (!flags)");
@@ -241,7 +234,7 @@ sub Bitmap($$$$)
 		my $filtername = "$ifname\.$name\.$en";
 
 		$self->{hf_used}->{$hf_bitname} = 1;
-
+		
 		$self->register_hf_field($hf_bitname, field2name($en), $filtername, "FT_BOOLEAN", $e->{ALIGN} * 8, "TFS(&$name\_$en\_tfs)", $ev, "");
 
 		$self->pidl_def("static const true_false_string $name\_$en\_tfs = {");
@@ -322,7 +315,7 @@ sub ElementLevel($$$$$$$$)
 
 
 			($bs = 1) if (property_matches($e, "flag", ".*LIBNDR_FLAG_STR_ASCII.*"));
-
+			
 			if (property_matches($e, "flag", ".*LIBNDR_FLAG_STR_SIZE4.*") and property_matches($e, "flag", ".*LIBNDR_FLAG_STR_LEN4.*")) {
 				$self->pidl_code("char *data;\n");
 				$self->pidl_code("offset = dissect_ndr_cvstring(tvb, offset, pinfo, tree, di, drep, $bs, $hf, FALSE, &data);");
@@ -346,23 +339,17 @@ sub ElementLevel($$$$$$$$)
 			my $call;
 
 			if ($self->{conformance}->{imports}->{$l->{DATA_TYPE}}) {
-				$call = $self->{conformance}->{imports}->{$l->{DATA_TYPE}}->{DATA};
+				$call = $self->{conformance}->{imports}->{$l->{DATA_TYPE}}->{DATA};	
 				$self->{conformance}->{imports}->{$l->{DATA_TYPE}}->{USED} = 1;
-			} elsif (defined($self->{conformance}->{imports}->{"$pn.$e->{NAME}"})) {
-				$call = $self->{conformance}->{imports}->{"$pn.$e->{NAME}"}->{DATA};
+				} elsif (defined($self->{conformance}->{imports}->{"$pn.$e->{NAME}"})) {
+					$call = $self->{conformance}->{imports}->{"$pn.$e->{NAME}"}->{DATA};
 				$self->{conformance}->{imports}->{"$pn.$e->{NAME}"}->{USED} = 1;
+
 			} elsif (defined($self->{conformance}->{types}->{$l->{DATA_TYPE}})) {
 				$call= $self->{conformance}->{types}->{$l->{DATA_TYPE}}->{DISSECTOR_NAME};
 				$self->{conformance}->{types}->{$l->{DATA_TYPE}}->{USED} = 1;
 			} else {
-				my $t;
-				if (ref($l->{DATA_TYPE}) eq "HASH" ) {
-					$t = "$l->{DATA_TYPE}->{TYPE}_$l->{DATA_TYPE}->{NAME}";
-				} else {
-					$t = $l->{DATA_TYPE};
-				}
-
-				$self->pidl_code("offset = $ifname\_dissect_struct_" . $t . "(tvb,offset,pinfo,tree,di,drep,$hf,$param);");
+				$self->pidl_code("offset = $ifname\_dissect_struct_" . $l->{DATA_TYPE} . "(tvb,offset,pinfo,tree,di,drep,$hf,$param);");
 
 				return;
 			}
@@ -405,34 +392,9 @@ sub ElementLevel($$$$$$$$)
 		$self->pidl_code("di->call_data->flags = saved_flags;");
 		$self->deindent;
 		$self->pidl_code("}");
-	} elsif ($_->{TYPE} eq "PIPE") {
-		error($e->{ORIGINAL}, "Type PIPE not yet supported");
 	} else {
 		die("Unknown type `$_->{TYPE}'");
 	}
-}
-
-sub SwitchType($$;$)
-{
-	my ($e, $type, $nodiscriminant) = @_;
-
-	my $switch_dt =  getType($type);
-	my $switch_type = undef;
-	if ($switch_dt->{DATA}->{TYPE} eq "ENUM") {
-		$switch_type = Parse::Pidl::Typelist::enum_type_fn($switch_dt->{DATA});
-	} elsif ($switch_dt->{DATA}->{TYPE} eq "BITMAP") {
-		$switch_type = Parse::Pidl::Typelist::bitmap_type_fn($switch_dt->{DATA});
-	} elsif ($switch_dt->{DATA}->{TYPE} eq "SCALAR") {
-		if (defined $e->{SWITCH_TYPE}) {
-			$switch_type = "$e->{SWITCH_TYPE}";
-		} else {
-			$switch_type = "$switch_dt->{DATA}->{NAME}";
-		}
-	} elsif (not defined $e->{SWITCH_TYPE}) {
-		$switch_type = $nodiscriminant;
-	}
-
-	return $switch_type
 }
 
 sub Element($$$$$$)
@@ -448,22 +410,27 @@ sub Element($$$$$$)
 		my $name = $isoruseswitch->[1];
 
 		my $switch_dt =  getType($type);
-		my $switch_raw_type = SwitchType($e, $type, "uint32");
-		if (not defined($switch_raw_type)) {
-			die("Unknown type[$type]\n");
+		my $switch_type;
+		if ($switch_dt->{DATA}->{TYPE} eq "ENUM") {
+			$switch_type = "g".Parse::Pidl::Typelist::enum_type_fn($switch_dt->{DATA});
+		} elsif ($switch_dt->{DATA}->{TYPE} eq "SCALAR") {
+			$switch_type = "g$type";
 		}
-		my $switch_type = "g${switch_raw_type}";
 
-		$moreparam = ", $switch_type *".$name;
+		if ($switch_type ne "") {
+			$moreparam = ", $switch_type *".$name;
 
-		if (($e->{PROPERTIES}->{switch_is} eq "") && ($switchvars{$name}) &&
-			#not a "native" type
-			(!($type =~ /^uint(8|16|1632|32|3264|64)/))) {
-			$param = $name;
-		} elsif ( $switch_dt->{DATA}->{TYPE} eq "ENUM") {
-			$param = $name;
+			if (($e->{PROPERTIES}->{switch_is} eq "") && ($switchvars{$name}) &&
+				#not a "native" type
+				(!($type =~ /^uint(8|16|1632|32|3264|64)/))) {
+				$param = $name;
+			} elsif ( $switch_dt->{DATA}->{TYPE} eq "ENUM") {
+				$param = $name;
+			} else {
+				$param = "*".$name;
+			}
 		} else {
-			$param = "*".$name;
+			$moreparam = "";
 		}
 
 		if ($name ne "") {
@@ -497,12 +464,6 @@ sub Element($$$$$$)
 			BASE_TYPE => "BASE_NONE"
 		};
 	}
-	if (property_matches($e, "flag", ".*LIBNDR_FLAG_ALIGN.*")) {
-		my $align_flag = $e->{PROPERTIES}->{flag};
-		if ($align_flag =~ m/LIBNDR_FLAG_ALIGN(\d+)/) {
-			$call_code = "ALIGN_TO_$1_BYTES; ".$call_code;
-		}
-	}
 
 	my $hf = $self->register_hf_field("hf_$ifname\_$pn\_$e->{NAME}", field2name($e->{NAME}), "$ifname.$pn.$e->{NAME}", $type->{FT_TYPE}, $type->{BASE_TYPE}, $type->{VALSSTRING}, $type->{MASK}, "");
 	$self->{hf_used}->{$hf} = 1;
@@ -523,7 +484,6 @@ sub Element($$$$$$)
 			}
 		}
 		next if ($_->{TYPE} eq "SWITCH");
-		next if (defined($self->{conformance}->{noemit}->{"$dissectorname$add"}));
 		$self->pidl_def("static int $dissectorname$add(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, guint8 *drep _U_$moreparam);");
 		$self->pidl_fn_start("$dissectorname$add");
 		$self->pidl_code("static int");
@@ -557,7 +517,7 @@ sub Function($$$)
 	foreach (@{$fn->{ELEMENTS}}) {
 	    $dissectornames{$_->{NAME}} = $self->Element($_, $fn->{NAME}, $ifname, undef, undef) if not defined($dissectornames{$_->{NAME}});
 	}
-
+	
 	my $fn_name = $_->{NAME};
 	$fn_name =~ s/^${ifname}_//;
 
@@ -568,7 +528,7 @@ sub Function($$$)
 	$self->pidl_code("{");
 	$self->indent;
 	if ( not defined($fn->{RETURN_TYPE})) {
-	} elsif ($fn->{RETURN_TYPE} eq "NTSTATUS" or $fn->{RETURN_TYPE} eq "WERROR")
+	} elsif ($fn->{RETURN_TYPE} eq "NTSTATUS" or $fn->{RETURN_TYPE} eq "WERROR") 
 	{
 		$self->pidl_code("guint32 status;\n");
 	} elsif (my $type = getType($fn->{RETURN_TYPE})) {
@@ -670,16 +630,18 @@ sub Struct($$$$)
 		my $switch_info = undef;
 
 		my $v = $_->{NAME};
-		if (scalar(grep {/^$v$/} keys(%$varswitchs)) == 1) {
+		if (scalar(grep {/$v/} keys(%$varswitchs)) == 1) {
 			# This element is one of the switch attribute
-			my $switch_raw_type = SwitchType($e, $_->{TYPE}, "uint32");
-			if (not defined($switch_raw_type)) {
-				die("Unknown type[$_->{TYPE}]\n");
+			my $switch_dt =  getType($_->{TYPE});
+			my $switch_type;
+			if ($switch_dt->{DATA}->{TYPE} eq "ENUM") {
+				$switch_type = "g".Parse::Pidl::Typelist::enum_type_fn($switch_dt->{DATA});
+			} elsif ($switch_dt->{DATA}->{TYPE} eq "SCALAR") {
+				$switch_type = "g$_->{TYPE}";
 			}
-			my $switch_type = "g${switch_raw_type}";
 
 			if ($switch_type ne "") {
-				push @$vars, "$switch_type $v = 0;";
+				push @$vars, "$switch_type $v;";
 			}
 			$switch_info = [ $_->{TYPE}, $v ];
 			$varswitchs->{$v} = $switch_info;
@@ -693,13 +655,6 @@ sub Struct($$$$)
 		$res.="\t".$self->Element($_, $name, $ifname, $switch_info, %switch_hash)."\n\n";
 	}
 
-	my $doalign = undef;
-	if ($e->{ALIGN} > 1 and not property_matches($e, "flag", ".*LIBNDR_FLAG_NOALIGN.*")) {
-		$doalign = 1;
-	} elsif (property_matches($e, "flag", ".*LIBNDR_FLAG_NOALIGN.*")) {
-		$doalign = 0;
-	}
-
 	$self->pidl_hdr("int $dissectorname(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *parent_tree _U_, dcerpc_info* di _U_, guint8 *drep _U_, int hf_index _U_, guint32 param _U_);");
 
 	$self->pidl_fn_start($dissectorname);
@@ -709,12 +664,7 @@ sub Struct($$$$)
 	$self->indent;
 	$self->pidl_code($_) foreach (@$vars);
 	$self->pidl_code("proto_item *item = NULL;");
-	if($res) {
-		$self->pidl_code("proto_tree *tree = NULL;");
-	}
-	if (defined($doalign) and $doalign == 0) {
-		$self->pidl_code("gboolean oldalign = di->no_align;");
-	}
+	$self->pidl_code("proto_tree *tree = NULL;");
 	$self->pidl_code("int old_offset;");
 	$self->pidl_code("");
 
@@ -723,41 +673,25 @@ sub Struct($$$$)
 	}
 	$self->pidl_code("");
 
-	if (defined($doalign)) {
-		if ($doalign == 1) {
-			$self->pidl_code("ALIGN_TO_$e->{ALIGN}_BYTES;");
-		}
-		if ($doalign == 0) {
-			$self->pidl_code("di->no_align = TRUE;");
-		}
-		$self->pidl_code("");
-	}
-
 	$self->pidl_code("old_offset = offset;");
 	$self->pidl_code("");
 	$self->pidl_code("if (parent_tree) {");
 	$self->indent;
 	$self->pidl_code("item = proto_tree_add_item(parent_tree, hf_index, tvb, offset, -1, ENC_NA);");
-	if($res) {
-		$self->pidl_code("tree = proto_item_add_subtree(item, ett_$ifname\_$name);");
-	}
+	$self->pidl_code("tree = proto_item_add_subtree(item, ett_$ifname\_$name);");
 	$self->deindent;
 	$self->pidl_code("}");
 
 	$self->pidl_code("\n$res");
 
 	$self->pidl_code("proto_item_set_len(item, offset-old_offset);\n");
-	if (defined($doalign) and $doalign == 1) {
+	if ($e->{ALIGN} > 1) {
 		$self->pidl_code("");
 		$self->pidl_code("if (di->call_data->flags & DCERPC_IS_NDR64) {");
 		$self->indent;
 		$self->pidl_code("ALIGN_TO_$e->{ALIGN}_BYTES;");
 		$self->deindent;
 		$self->pidl_code("}");
-	}
-	if (defined($doalign) and $doalign == 0) {
-		$self->pidl_code("");
-		$self->pidl_code("di->no_align = oldalign;");
 	}
 	$self->pidl_code("");
 	$self->pidl_code("return offset;");
@@ -775,7 +709,7 @@ sub Union($$$$)
 	my $dissectorname = "$ifname\_dissect_".StripPrefixes($name, $self->{conformance}->{strip_prefixes});
 
 	return if (defined($self->{conformance}->{noemit}->{StripPrefixes($name, $self->{conformance}->{strip_prefixes})}));
-
+	
 	$self->register_ett("ett_$ifname\_$name");
 
 	my $res = "";
@@ -787,12 +721,15 @@ sub Union($$$$)
 		$res.="\t\tbreak;\n";
 	}
 
-	my $switch_type = undef;
-	my $switch_dissect = undef;
-	my $switch_raw_type = SwitchType($e, $e->{SWITCH_TYPE});
-	if (defined($switch_raw_type)) {
-		$switch_type = "g${switch_raw_type}";
-		$switch_dissect = "dissect_ndr_${switch_raw_type}";
+	my $switch_type;
+	my $switch_dissect;
+	my $switch_dt = getType($e->{SWITCH_TYPE});
+	if ($switch_dt->{DATA}->{TYPE} eq "ENUM") {
+		$switch_type = "g".Parse::Pidl::Typelist::enum_type_fn($switch_dt->{DATA});
+		$switch_dissect = "dissect_ndr_" .Parse::Pidl::Typelist::enum_type_fn($switch_dt->{DATA});
+	} elsif ($switch_dt->{DATA}->{TYPE} eq "SCALAR") {
+		$switch_type = "g$e->{SWITCH_TYPE}";
+		$switch_dissect = "dissect_ndr_$e->{SWITCH_TYPE}";
 	}
 
 	$self->pidl_fn_start($dissectorname);
@@ -813,7 +750,8 @@ sub Union($$$$)
 	$self->pidl_code("old_offset = offset;");
 	$self->pidl_code("if (parent_tree) {");
 	$self->indent;
-	$self->pidl_code("tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_$ifname\_$name, &item, \"$name\");");
+	$self->pidl_code("item = proto_tree_add_text(parent_tree, tvb, offset, -1, \"$name\");");
+	$self->pidl_code("tree = proto_item_add_subtree(item, ett_$ifname\_$name);");
 	$self->deindent;
 	$self->pidl_code("}");
 
@@ -844,7 +782,7 @@ sub Union($$$$)
 sub Const($$$)
 {
 	my ($self,$const,$ifname) = @_;
-
+	
 	if (!defined($const->{ARRAY_LEN}[0])) {
 		$self->pidl_hdr("#define $const->{NAME}\t( $const->{VALUE} )\n");
 	} else {
@@ -864,13 +802,13 @@ sub Type($$$$)
 	my ($self, $e, $name, $ifname) = @_;
 
 	$self->PrintIdl(DumpType($e->{ORIGINAL}));
+
 	{
 		ENUM => \&Enum,
 		STRUCT => \&Struct,
 		UNION => \&Union,
 		BITMAP => \&Bitmap,
-		TYPEDEF => \&Typedef,
-		PIPE    => \&Pipe
+		TYPEDEF => \&Typedef
 	}->{$e->{TYPE}}->($self, $e, $name, $ifname);
 }
 
@@ -883,14 +821,12 @@ sub RegisterInterface($$)
 	$self->pidl_code("{");
 	$self->indent;
 
-	$self->{res}->{headers} .= "void proto_register_dcerpc_$x->{NAME}(void);\n";
-
 	$self->{res}->{code}.=$self->DumpHfList()."\n";
 	$self->{res}->{code}.="\n".DumpEttList($self->{ett})."\n";
-
+	
 	if (defined($x->{UUID})) {
-		# These can be changed to non-pidl_code names if the old
-		# dissectors in epan/dissectors are deleted.
+		# These can be changed to non-pidl_code names if the old dissectors
+		# in epan/dissctors are deleted.
 
 		my $name = uc($x->{NAME}) . " (pidl)";
 		my $short_name = uc($x->{NAME});
@@ -936,8 +872,6 @@ sub RegisterInterfaceHandoff($$)
 		$self->deindent;
 		$self->pidl_code("}");
 		$self->pidl_fn_end("proto_reg_handoff_dcerpc_$x->{NAME}");
-
-		$self->{res}->{headers} .= "void proto_reg_handoff_dcerpc_$x->{NAME}(void);\n";
 
 		$self->{hf_used}->{"hf_$x->{NAME}_opnum"} = 1;
 	}
@@ -1011,7 +945,7 @@ sub ProcessInterface($$)
 	$self->Interface($x);
 	$self->pidl_code("\n".DumpFunctionTable($x));
 
-	foreach (sort(keys %{$return_types{$x->{NAME}}})) {
+	foreach (keys %{$return_types{$x->{NAME}}}) {
 		my ($type, $desc) = @{$return_types{$x->{NAME}}->{$_}};
 		my $dt = $self->find_type($type);
 		$dt or die("Unable to find information about return type `$type'");
@@ -1060,11 +994,11 @@ sub Initialize($$)
 
 	$self->{conformance} = {
 		imports => {},
-		header_fields=> {}
+		header_fields=> {} 
 	};
 
 	ReadConformance($cnf_file, $self->{conformance}) or print STDERR "warning: No conformance file `$cnf_file'\n";
-
+	
 	foreach my $bytes (qw(1 2 4 8)) {
 		my $bits = $bytes * 8;
 		$self->register_type("uint$bits", "offset = PIDL_dissect_uint$bits(tvb, offset, pinfo, tree, di, drep, \@HF\@, \@PARAM\@);", "FT_UINT$bits", "BASE_DEC", 0, "NULL", $bytes);
@@ -1084,22 +1018,15 @@ sub Initialize($$)
 	$self->register_type("NTTIME_hyper", "offset = dissect_ndr_nt_NTTIME(tvb, offset, pinfo, tree, di, drep, \@HF\@);","FT_ABSOLUTE_TIME", "ABSOLUTE_TIME_LOCAL", 0, "NULL", 4);
 	$self->register_type("time_t", "offset = dissect_ndr_time_t(tvb, offset, pinfo,tree, di, drep, \@HF\@, NULL);","FT_ABSOLUTE_TIME", "ABSOLUTE_TIME_LOCAL", 0, "NULL", 4);
 	$self->register_type("NTTIME_1sec", "offset = dissect_ndr_nt_NTTIME(tvb, offset, pinfo, tree, di, drep, \@HF\@);", "FT_ABSOLUTE_TIME", "ABSOLUTE_TIME_LOCAL", 0, "NULL", 4);
-	$self->register_type("dom_sid28", "
-		di->hf_index = \@HF\@;
-
-		offset = dissect_ndr_nt_SID28(tvb, offset, pinfo, tree, di, drep);
-	", "FT_STRING", "BASE_NONE", 0, "NULL", 4);
 	$self->register_type("SID", "
 		di->hf_index = \@HF\@;
 
 		offset = dissect_ndr_nt_SID_with_options(tvb, offset, pinfo, tree, di, drep, param);
 	","FT_STRING", "BASE_NONE", 0, "NULL", 4);
-	$self->register_type("WERROR",
+	$self->register_type("WERROR", 
 		"offset = PIDL_dissect_uint32(tvb, offset, pinfo, tree, di, drep, \@HF\@, \@PARAM\@);","FT_UINT32", "BASE_DEC", 0, "VALS(WERR_errors)", 4);
-	$self->register_type("NTSTATUS",
+	$self->register_type("NTSTATUS", 
 		"offset = PIDL_dissect_uint32(tvb, offset, pinfo, tree, di, drep, \@HF\@, \@PARAM\@);","FT_UINT32", "BASE_DEC", 0, "VALS(NT_errors)", 4);
-	$self->register_type("ipv6address", "proto_tree_add_item(tree, \@HF\@, tvb, offset, 16, ENC_NA); offset += 16;", "FT_IPv6", "BASE_NONE", 0, "NULL", 16);
-	$self->register_type("ipv4address", "proto_tree_add_item(tree, \@HF\@, tvb, offset, 4, ENC_BIG_ENDIAN); offset += 4;", "FT_IPv4", "BASE_NONE", 0, "NULL", 4);
 
 }
 
@@ -1113,7 +1040,7 @@ sub Parse($$$$$)
 
 	return (undef, undef) if defined($self->{conformance}->{noemit_dissector});
 
-	my $notice =
+	my $notice = 
 "/* DO NOT EDIT
 	This file was automatically generated by Pidl
 	from $idl_file and $cnf_file.
@@ -1128,6 +1055,13 @@ sub Parse($$$$$)
 
 	$self->{res}->{headers} = "\n";
 	$self->{res}->{headers} .= "#include \"config.h\"\n";
+
+	$self->{res}->{headers} .= "#ifdef _MSC_VER\n";
+	$self->{res}->{headers} .= "#pragma warning(disable:4005)\n";
+	$self->{res}->{headers} .= "#pragma warning(disable:4013)\n";
+	$self->{res}->{headers} .= "#pragma warning(disable:4018)\n";
+	$self->{res}->{headers} .= "#pragma warning(disable:4101)\n";
+	$self->{res}->{headers} .= "#endif\n\n";
 
 	$self->{res}->{headers} .= "#include <glib.h>\n";
 	$self->{res}->{headers} .= "#include <string.h>\n";
@@ -1212,7 +1146,7 @@ sub DumpEttDeclaration
 # HF
 ###############################################################################
 
-sub register_hf_field($$$$$$$$$)
+sub register_hf_field($$$$$$$$$) 
 {
 	my ($self,$index,$name,$filter_name,$ft_type,$base_type,$valsstring,$mask,$blurb) = @_;
 
@@ -1232,31 +1166,14 @@ sub register_hf_field($$$$$$$$$)
 		BLURB => $blurb
 	};
 
-	if ((not defined($blurb) or $blurb eq "") and
+	if ((not defined($blurb) or $blurb eq "") and 
 			defined($self->{conformance}->{fielddescription}->{$index})) {
-		$self->{conformance}->{header_fields}->{$index}->{BLURB} =
+		$self->{conformance}->{header_fields}->{$index}->{BLURB} = 
 			$self->{conformance}->{fielddescription}->{$index}->{DESCRIPTION};
 		$self->{conformance}->{fielddescription}->{$index}->{USED} = 1;
 	}
 
 	return $index;
-}
-
-sub change_hf_field_type($$$$)
-{
-	my ($self,$index,$ft_type,$base_type) = @_;
-	if (defined ($self->{conformance}->{hf_renames}->{$index})) {
-		print "Field $index has been renamed to ".$self->{conformance}->{hf_renames}->{$index}->{NEWNAME}." you can't change it's type";
-		return 0;
-	}
-
-	if (!defined ($self->{conformance}->{header_fields}->{$index})) {
-		print "Field $index doesn't exists";
-		return 0;
-	}
-	$self->{conformance}->{header_fields}->{$index}->{FT_TYPE} = $ft_type;
-	$self->{conformance}->{header_fields}->{$index}->{BASE_TYPE} = $base_type;
-	return 1;
 }
 
 sub DumpHfDeclaration($)
@@ -1266,7 +1183,7 @@ sub DumpHfDeclaration($)
 
 	$res = "\n/* Header field declarations */\n";
 
-	foreach (sort(keys %{$self->{conformance}->{header_fields}}))
+	foreach (keys %{$self->{conformance}->{header_fields}}) 
 	{
 		$res .= "static gint $_ = -1;\n";
 	}
@@ -1293,7 +1210,7 @@ sub DumpHfList($)
 	my ($self) = @_;
 	my $res = "\tstatic hf_register_info hf[] = {\n";
 
-	foreach (sort {$a->{INDEX} cmp $b->{INDEX}} values %{$self->{conformance}->{header_fields}})
+	foreach (values %{$self->{conformance}->{header_fields}}) 
 	{
 		$res .= "\t{ &$_->{INDEX},
 		{ ".make_str($_->{NAME}).", ".make_str($_->{FILTER}).", $_->{FT_TYPE}, $_->{BASE_TYPE}, $_->{VALSSTRING}, $_->{MASK}, ".make_str_or_null($_->{BLURB}).", HFILL }},

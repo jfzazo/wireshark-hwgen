@@ -146,7 +146,7 @@ host_triplet = @host@
 target_triplet = @target@
 DIST_COMMON = $(srcdir)/../Makefile.am.inc $(srcdir)/Makefile.common \
 	$(srcdir)/Makefile.in $(srcdir)/Makefile.am \
-	$(top_srcdir)/depcomp README
+	$(top_srcdir)/depcomp AUTHORS README
 @HAVE_WARNINGS_AS_ERRORS_TRUE@am__append_1 = -Werror
 subdir = wiretap
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -195,17 +195,16 @@ am__DEPENDENCIES_1 =
 am__objects_1 = libwiretap_la-5views.lo libwiretap_la-aethra.lo \
 	libwiretap_la-ascendtext.lo libwiretap_la-atm.lo \
 	libwiretap_la-ber.lo libwiretap_la-btsnoop.lo \
-	libwiretap_la-camins.lo libwiretap_la-capsa.lo \
-	libwiretap_la-catapult_dct2000.lo libwiretap_la-commview.lo \
-	libwiretap_la-cosine.lo libwiretap_la-csids.lo \
-	libwiretap_la-daintree-sna.lo libwiretap_la-dbs-etherwatch.lo \
-	libwiretap_la-dct3trace.lo libwiretap_la-erf.lo \
-	libwiretap_la-eyesdn.lo libwiretap_la-file_access.lo \
-	libwiretap_la-file_wrappers.lo libwiretap_la-hcidump.lo \
-	libwiretap_la-i4btrace.lo libwiretap_la-ipfix.lo \
-	libwiretap_la-iptrace.lo libwiretap_la-iseries.lo \
-	libwiretap_la-mime_file.lo libwiretap_la-k12.lo \
-	libwiretap_la-lanalyzer.lo libwiretap_la-logcat_text.lo \
+	libwiretap_la-camins.lo libwiretap_la-catapult_dct2000.lo \
+	libwiretap_la-commview.lo libwiretap_la-cosine.lo \
+	libwiretap_la-csids.lo libwiretap_la-daintree-sna.lo \
+	libwiretap_la-dbs-etherwatch.lo libwiretap_la-dct3trace.lo \
+	libwiretap_la-erf.lo libwiretap_la-eyesdn.lo \
+	libwiretap_la-file_access.lo libwiretap_la-file_wrappers.lo \
+	libwiretap_la-hcidump.lo libwiretap_la-i4btrace.lo \
+	libwiretap_la-ipfix.lo libwiretap_la-iptrace.lo \
+	libwiretap_la-iseries.lo libwiretap_la-mime_file.lo \
+	libwiretap_la-k12.lo libwiretap_la-lanalyzer.lo \
 	libwiretap_la-logcat.lo libwiretap_la-libpcap.lo \
 	libwiretap_la-merge.lo libwiretap_la-mpeg.lo \
 	libwiretap_la-mp2t.lo libwiretap_la-netmon.lo \
@@ -314,8 +313,8 @@ CCDEPMODE = @CCDEPMODE@
 CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
-CFLAGS_SSE42 = @CFLAGS_SSE42@
 CONFIG_ARGS = @CONFIG_ARGS@
+CONFIG_WITH_ARGS = @CONFIG_WITH_ARGS@
 COREFOUNDATION_FRAMEWORKS = @COREFOUNDATION_FRAMEWORKS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -341,7 +340,6 @@ ELINKS = @ELINKS@
 ENABLE_STATIC = @ENABLE_STATIC@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FLOORL_LO = @FLOORL_LO@
 FOP = @FOP@
 GEOIP_LIBS = @GEOIP_LIBS@
 GETOPT_LO = @GETOPT_LO@
@@ -414,7 +412,7 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
-LUA_CFLAGS = @LUA_CFLAGS@
+LUA_INCLUDES = @LUA_INCLUDES@
 LUA_LIBS = @LUA_LIBS@
 LYNX = @LYNX@
 MAKEINFO = @MAKEINFO@
@@ -450,14 +448,14 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_LIBS = @PLUGIN_LIBS@
 POD2HTML = @POD2HTML@
 POD2MAN = @POD2MAN@
-POPCOUNT_LO = @POPCOUNT_LO@
 PORTAUDIO_INCLUDES = @PORTAUDIO_INCLUDES@
 PORTAUDIO_LIBS = @PORTAUDIO_LIBS@
 PYTHON = @PYTHON@
+PY_CFLAGS = @PY_CFLAGS@
+PY_LIBS = @PY_LIBS@
 QT_MIN_VERSION = @QT_MIN_VERSION@
 Qt_LIBS = @Qt_LIBS@
 RANLIB = @RANLIB@
-RCC = @RCC@
 RPMBUILD_WITH_ARGS = @RPMBUILD_WITH_ARGS@
 SBC_CFLAGS = @SBC_CFLAGS@
 SBC_LIBS = @SBC_LIBS@
@@ -468,6 +466,8 @@ SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+STRNCASECMP_LO = @STRNCASECMP_LO@
+STRPTIME_C = @STRPTIME_C@
 STRPTIME_LO = @STRPTIME_LO@
 SYSTEMCONFIGURATION_FRAMEWORKS = @SYSTEMCONFIGURATION_FRAMEWORKS@
 UIC = @UIC@
@@ -487,6 +487,7 @@ ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 ac_cv_wireshark_have_rpm = @ac_cv_wireshark_have_rpm@
+ac_ws_python_config = @ac_ws_python_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -516,8 +517,6 @@ echld_test_bin = @echld_test_bin@
 editcap_bin = @editcap_bin@
 editcap_man = @editcap_man@
 exec_prefix = @exec_prefix@
-extcapdir = @extcapdir@
-have_sw_vers = @have_sw_vers@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -538,10 +537,10 @@ mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 plugindir = @plugindir@
-plugins_dir = @plugins_dir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pythondir = @pythondir@
 randpkt_bin = @randpkt_bin@
 randpkt_man = @randpkt_man@
 rawshark_bin = @rawshark_bin@
@@ -601,7 +600,6 @@ NONGENERATED_C_FILES = \
 	ber.c			\
 	btsnoop.c		\
 	camins.c		\
-	capsa.c			\
 	catapult_dct2000.c	\
 	commview.c		\
 	cosine.c		\
@@ -621,7 +619,6 @@ NONGENERATED_C_FILES = \
 	mime_file.c		\
 	k12.c			\
 	lanalyzer.c		\
-	logcat_text.c		\
 	logcat.c		\
 	libpcap.c		\
 	merge.c			\
@@ -661,7 +658,6 @@ NONGENERATED_HEADER_FILES = \
 	ber.h			\
 	btsnoop.h		\
 	camins.h		\
-	capsa.h			\
 	catapult_dct2000.h	\
 	commview.h		\
 	cosine.h		\
@@ -683,7 +679,6 @@ NONGENERATED_HEADER_FILES = \
 	lanalyzer.h		\
 	libpcap.h		\
 	logcat.h		\
-	logcat_text.h		\
 	merge.h			\
 	mpeg.h			\
 	mp2t.h			\
@@ -740,7 +735,7 @@ GENERATED_FILES = $(GENERATED_C_FILES) $(GENERATED_HEADER_FILES)
 noinst_LTLIBRARIES = libwiretap_generated.la
 lib_LTLIBRARIES = libwiretap.la
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-libwiretap_la_LDFLAGS = -version-info 0:0:0 @LDFLAGS_SHAREDLIB@
+libwiretap_la_LDFLAGS = -version-info 4:4:0 @LDFLAGS_SHAREDLIB@
 AM_NON_GENERATED_CFLAGS = -DWS_BUILD_DLL $(am__append_1)
 AM_CPPFLAGS = -I$(srcdir)/..
 CLEANFILES = \
@@ -882,7 +877,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-ber.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-btsnoop.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-camins.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-capsa.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-catapult_dct2000.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-commview.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-cosine.Plo@am__quote@
@@ -903,7 +897,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-lanalyzer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-libpcap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-logcat.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-logcat_text.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-merge.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-mime_file.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-mp2t.Plo@am__quote@
@@ -932,25 +925,22 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libwiretap_la-wtap.Plo@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
-@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
@@ -1003,13 +993,6 @@ libwiretap_la-camins.lo: camins.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='camins.c' object='libwiretap_la-camins.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwiretap_la_CFLAGS) $(CFLAGS) -c -o libwiretap_la-camins.lo `test -f 'camins.c' || echo '$(srcdir)/'`camins.c
-
-libwiretap_la-capsa.lo: capsa.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwiretap_la_CFLAGS) $(CFLAGS) -MT libwiretap_la-capsa.lo -MD -MP -MF $(DEPDIR)/libwiretap_la-capsa.Tpo -c -o libwiretap_la-capsa.lo `test -f 'capsa.c' || echo '$(srcdir)/'`capsa.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwiretap_la-capsa.Tpo $(DEPDIR)/libwiretap_la-capsa.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='capsa.c' object='libwiretap_la-capsa.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwiretap_la_CFLAGS) $(CFLAGS) -c -o libwiretap_la-capsa.lo `test -f 'capsa.c' || echo '$(srcdir)/'`capsa.c
 
 libwiretap_la-catapult_dct2000.lo: catapult_dct2000.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwiretap_la_CFLAGS) $(CFLAGS) -MT libwiretap_la-catapult_dct2000.lo -MD -MP -MF $(DEPDIR)/libwiretap_la-catapult_dct2000.Tpo -c -o libwiretap_la-catapult_dct2000.lo `test -f 'catapult_dct2000.c' || echo '$(srcdir)/'`catapult_dct2000.c
@@ -1143,13 +1126,6 @@ libwiretap_la-lanalyzer.lo: lanalyzer.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='lanalyzer.c' object='libwiretap_la-lanalyzer.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwiretap_la_CFLAGS) $(CFLAGS) -c -o libwiretap_la-lanalyzer.lo `test -f 'lanalyzer.c' || echo '$(srcdir)/'`lanalyzer.c
-
-libwiretap_la-logcat_text.lo: logcat_text.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwiretap_la_CFLAGS) $(CFLAGS) -MT libwiretap_la-logcat_text.lo -MD -MP -MF $(DEPDIR)/libwiretap_la-logcat_text.Tpo -c -o libwiretap_la-logcat_text.lo `test -f 'logcat_text.c' || echo '$(srcdir)/'`logcat_text.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libwiretap_la-logcat_text.Tpo $(DEPDIR)/libwiretap_la-logcat_text.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='logcat_text.c' object='libwiretap_la-logcat_text.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwiretap_la_CFLAGS) $(CFLAGS) -c -o libwiretap_la-logcat_text.lo `test -f 'logcat_text.c' || echo '$(srcdir)/'`logcat_text.c
 
 libwiretap_la-logcat.lo: logcat.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libwiretap_la_CFLAGS) $(CFLAGS) -MT libwiretap_la-logcat.lo -MD -MP -MF $(DEPDIR)/libwiretap_la-logcat.Tpo -c -o libwiretap_la-logcat.lo `test -f 'logcat.c' || echo '$(srcdir)/'`logcat.c

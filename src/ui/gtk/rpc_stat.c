@@ -28,15 +28,18 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/epan.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-rpc.h>
 
+#include "../stat_menu.h"
 #include "ui/simple_dialog.h"
 
 #include "ui/gtk/gui_stat_menu.h"
@@ -49,6 +52,7 @@
 #include "ui/gtk/gtkglobals.h"
 #include "ui/gtk/filter_autocomplete.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkrpcstat(void);
 
@@ -519,19 +523,9 @@ gtk_rpcstat_cb(GtkAction *action _U_, gpointer user_data _U_)
 }
 
 
-static stat_tap_ui rpcstat_ui = {
-	REGISTER_STAT_GROUP_GENERIC,
-	NULL,
-	"rpc,srt",
-	gtk_rpcstat_init,
-	-1,
-	0,
-	NULL
-};
-
 void
 register_tap_listener_gtkrpcstat(void)
 {
-	register_stat_tap_ui(&rpcstat_ui, NULL);
+	register_stat_cmd_arg("rpc,srt,", gtk_rpcstat_init, NULL);
 }
 

@@ -35,9 +35,6 @@ void ByteViewTab::addTab(const char *name, tvbuff_t *tvb, proto_tree *tree, QTre
     ByteViewText *byte_view_text = new ByteViewText(this, tvb, tree, protoTree, encoding);
 
     byte_view_text->setAccessibleName(name);
-    byte_view_text->setMonospaceFont(mono_font_);
-    connect(this, SIGNAL(monospaceFontChanged(QFont)), byte_view_text, SLOT(setMonospaceFont(QFont)));
-    connect(byte_view_text, SIGNAL(byteFieldHovered(QString&)), this, SIGNAL(byteFieldHovered(QString&)));
     QTabWidget::addTab(byte_view_text, name);
 }
 
@@ -170,6 +167,8 @@ void ByteViewTab::protoTreeItemChanged(QTreeWidgetItem *current) {
                 // Appendix (trailer) bytes
                 byte_view_text->setFieldAppendixHighlight(fa_start, fa_end);
 
+                byte_view_text->renderBytes();
+
                 setCurrentIndex(i);
             }
             byte_view_text = qobject_cast<ByteViewText*>(widget(++i));
@@ -180,13 +179,6 @@ void ByteViewTab::protoTreeItemChanged(QTreeWidgetItem *current) {
 void ByteViewTab::setCaptureFile(capture_file *cf)
 {
     cap_file_ = cf;
-}
-
-void ByteViewTab::setMonospaceFont(const QFont &mono_font)
-{
-    mono_font_ = mono_font;
-    emit monospaceFontChanged(mono_font_);
-    update();
 }
 
 /*

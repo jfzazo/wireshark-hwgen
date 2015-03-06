@@ -28,8 +28,9 @@
 
 #include <wsutil/filesystem.h>
 #include <epan/prefs.h>
+#include <epan/proto.h>
 
-#include "ui/filters.h"
+#include "../filters.h"
 #include "ui/simple_dialog.h"
 #include "ui/main_statusbar.h"
 
@@ -43,6 +44,7 @@
 #include "ui/gtk/help_dlg.h"
 #include "ui/gtk/filter_autocomplete.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 #define E_FILT_DIALOG_PTR_KEY       "filter_dialog_ptr"
 #define E_FILT_BUTTON_PTR_KEY       "filter_button_ptr"
@@ -1345,65 +1347,43 @@ filter_te_syntax_check_cb(GtkWidget *w, gpointer user_data _U_)
         statusbar_pop_filter_msg();
     }
 
-    if (g_object_get_data(G_OBJECT(w), E_FILT_MULTI_FIELD_NAME_ONLY_KEY)) {
-        gchar  **fields;
-        guint    i_field = 0;
-
-        fields = g_regex_split_simple(" *([^ \\|]+) *(?:(?:\\|\\|)|(?:or))? *",
-                strval, G_REGEX_ANCHORED, G_REGEX_MATCH_ANCHORED);
-
-        for (i_field =0; i_field < g_strv_length(fields); i_field += 1) {
-            if (fields[i_field] && *fields[i_field]) {
-                c = proto_check_field_name(fields[i_field]);
-                if (c != 0) {
-                    colorize_filter_te_as_invalid(w);
-                    if (use_statusbar)
-                        statusbar_push_filter_msg(" Invalid filter");
-                    g_strfreev(fields);
-                    return;
-                }
-            }
-        }
-        g_strfreev(fields);
-    }
-
     /* colorize filter string entry */
     if (g_object_get_data(G_OBJECT(w), E_FILT_FIELD_NAME_ONLY_KEY) &&
-        (c = proto_check_field_name(strval)) != 0)
+        strval && (c = proto_check_field_name(strval)) != 0)
     {
         colorize_filter_te_as_invalid(w);
         if (use_statusbar) {
             statusbar_push_filter_msg(" Illegal character in field name: '%c'", c);
         }
-    } else {
-        gchar *err_msg;
-
-        if (dfilter_compile(strval, &dfp, &err_msg)) {
-            if (dfp != NULL) {
-                depr = dfilter_deprecated_tokens(dfp);
+    } else if (strval && dfilter_compile(strval, &dfp)) {
+        if (dfp != NULL) {
+            depr = dfilter_deprecated_tokens(dfp);
+        }
+        if (strlen(strval) == 0) {
+            colorize_filter_te_as_empty(w);
+        } else if (depr) {
+            /* You keep using that word. I do not think it means what you think it means. */
+            colorize_filter_te_as_deprecated(w);
+            if (use_statusbar) {
+                /*
+                 * We're being lazy and only printing the first "problem" token.
+                 * Would it be better to print all of them?
+                 */
+                statusbar_push_temporary_msg(" \"%s\" may have unexpected results (see the User's Guide)",
+                                      (const char *) g_ptr_array_index(depr, 0));
             }
-            if (strlen(strval) == 0) {
-                colorize_filter_te_as_empty(w);
-            } else if (depr) {
-                /* You keep using that word. I do not think it means what you think it means. */
-                colorize_filter_te_as_deprecated(w);
-                if (use_statusbar) {
-                    /*
-                     * We're being lazy and only printing the first "problem" token.
-                     * Would it be better to print all of them?
-                     */
-                    statusbar_push_temporary_msg(" \"%s\" may have unexpected results (see the User's Guide)",
-                                          (const char *) g_ptr_array_index(depr, 0));
-                }
-            } else {
-                colorize_filter_te_as_valid(w);
-            }
-            dfilter_free(dfp);
         } else {
-            colorize_filter_te_as_invalid(w);
-            if (use_statusbar)
-                statusbar_push_filter_msg(" Invalid filter: %s", err_msg);
-            g_free(err_msg);
+            colorize_filter_te_as_valid(w);
+        }
+        dfilter_free(dfp);
+    } else {
+        colorize_filter_te_as_invalid(w);
+        if (use_statusbar) {
+            if (dfilter_error_msg) {
+                statusbar_push_filter_msg(" Invalid filter: %s", dfilter_error_msg);
+            } else {
+                statusbar_push_filter_msg(" Invalid filter");
+            }
         }
     }
 }

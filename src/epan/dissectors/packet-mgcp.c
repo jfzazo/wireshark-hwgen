@@ -36,9 +36,11 @@
 #include "config.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #include <epan/packet.h>
 #include <epan/exceptions.h>
+#include <epan/wmem/wmem.h>
 #include <epan/prefs.h>
 #include <epan/conversation.h>
 #include <epan/tap.h>
@@ -139,8 +141,6 @@ static int hf_mgcp_req_dup = -1;
 static int hf_mgcp_req_dup_frame = -1;
 static int hf_mgcp_rsp_dup = -1;
 static int hf_mgcp_rsp_dup_frame = -1;
-static int hf_mgcp_unknown_parameter = -1;
-static int hf_mgcp_malformed_parameter = -1;
 
 static const value_string mgcp_return_code_vals[] = {
 	{000, "Response Acknowledgement"},
@@ -202,7 +202,6 @@ static const value_string mgcp_return_code_vals[] = {
 	{541, "Invalid or unsupported LocalConnectionOptions"},
 	{0,   NULL }
 };
-static value_string_ext mgcp_return_code_vals_ext = VALUE_STRING_EXT_INIT(mgcp_return_code_vals);
 
 /* TODO: add/use when tested/have capture to test with */
 /*
@@ -248,11 +247,11 @@ static int mgcp_tap = -1;
  * the raw text of the mgcp message, much like the HTTP dissector does.
  *
  */
-static guint global_mgcp_gateway_tcp_port   = TCP_PORT_MGCP_GATEWAY;
-static guint global_mgcp_gateway_udp_port   = UDP_PORT_MGCP_GATEWAY;
+static guint global_mgcp_gateway_tcp_port = TCP_PORT_MGCP_GATEWAY;
+static guint global_mgcp_gateway_udp_port = UDP_PORT_MGCP_GATEWAY;
 static guint global_mgcp_callagent_tcp_port = TCP_PORT_MGCP_CALLAGENT;
 static guint global_mgcp_callagent_udp_port = UDP_PORT_MGCP_CALLAGENT;
-static gboolean global_mgcp_raw_text      = FALSE;
+static gboolean global_mgcp_raw_text = FALSE;
 static gboolean global_mgcp_message_count = FALSE;
 
 /* Some basic utility functions that are specific to this dissector */
@@ -266,15 +265,15 @@ static gint tvb_parse_param(tvbuff_t *tvb, gint offset, gint maxlength, int** hf
  * are written in the same style.
  */
 static void dissect_mgcp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-				 proto_tree *mgcp_tree, proto_tree *ti);
+                                 proto_tree *mgcp_tree, proto_tree *ti);
 static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 static void dissect_mgcp_params(tvbuff_t *tvb, proto_tree *tree);
 static void dissect_mgcp_connectionparams(proto_tree *parent_tree, tvbuff_t *tvb,
-					  gint offset, gint param_type_len,
-					  gint param_val_len);
+                                          gint offset, gint param_type_len,
+                                          gint param_val_len);
 static void dissect_mgcp_localconnectionoptions(proto_tree *parent_tree, tvbuff_t *tvb,
-						gint offset, gint param_type_len,
-						gint param_val_len);
+                                                gint offset, gint param_type_len,
+                                                gint param_val_len);
 
 
 static void mgcp_raw_text_add(tvbuff_t *tvb, proto_tree *tree);
@@ -291,7 +290,7 @@ static dissector_handle_t sdp_handle;
 static dissector_handle_t mgcp_handle;
 extern void
 dissect_asciitpkt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-		  dissector_handle_t subdissector_handle);
+     dissector_handle_t subdissector_handle);
 extern guint16 is_asciitpkt(tvbuff_t *tvb);
 
 /*
@@ -332,14 +331,14 @@ static int dissect_mgcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 {
 	gint sectionlen;
 	guint32 num_messages;
-	gint tvb_sectionend, tvb_sectionbegin, tvb_len;
+	gint tvb_sectionend,tvb_sectionbegin, tvb_len;
 	proto_tree *mgcp_tree, *ti;
 	const gchar *verb_name = "";
 
 	/* Initialize variables */
 	tvb_sectionend = 0;
 	tvb_sectionbegin = tvb_sectionend;
-	tvb_len = tvb_reported_length(tvb);
+	tvb_len = tvb_length(tvb);
 	num_messages = 0;
 	mgcp_tree = NULL;
 	ti = NULL;
@@ -349,7 +348,7 @@ static int dissect_mgcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 	 * for a valid MGCP verb or response code.  This isn't infallible,
 	 * but it's cheap and it's better than nothing.
 	 */
-	if (is_mgcp_verb(tvb, 0, tvb_len, &verb_name) || is_mgcp_rspcode(tvb, 0, tvb_len))
+	if (is_mgcp_verb(tvb,0,tvb_len, &verb_name) || is_mgcp_rspcode(tvb,0,tvb_len))
 	{
 		/*
 		 * Set the columns now, so that they'll be set correctly if we throw
@@ -368,7 +367,7 @@ static int dissect_mgcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 			if (tree)
 			{
 				/* Create our mgcp subtree */
-				ti = proto_tree_add_item(tree, proto_mgcp, tvb, 0, 0, ENC_NA);
+				ti = proto_tree_add_item(tree,proto_mgcp,tvb,0,0, ENC_NA);
 				mgcp_tree = proto_item_add_subtree(ti, ett_mgcp);
 			}
 
@@ -376,8 +375,8 @@ static int dissect_mgcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 			if (sectionlen != -1)
 			{
 				dissect_mgcp_message(tvb_new_subset(tvb, tvb_sectionbegin,
-				                                    sectionlen, sectionlen),
-				                                    pinfo, tree, mgcp_tree, ti);
+				                                    sectionlen, -1),
+				                                    pinfo, tree, mgcp_tree,ti);
 				tvb_sectionbegin = tvb_sectionend;
 			}
 			else
@@ -389,7 +388,7 @@ static int dissect_mgcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 		if (mgcp_tree)
 		{
 			proto_item *tii = proto_tree_add_uint(mgcp_tree, hf_mgcp_messagecount, tvb,
-			                                     0 , 0 , num_messages);
+			                                     0 ,0 , num_messages);
 			PROTO_ITEM_SET_HIDDEN(tii);
 		}
 
@@ -403,16 +402,16 @@ static int dissect_mgcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 		{
 			if (num_messages > 1)
 			{
-				col_add_fstr(pinfo->cinfo, COL_PROTOCOL, "MGCP (%i messages)", num_messages);
+				col_add_fstr(pinfo->cinfo, COL_PROTOCOL, "MGCP (%i messages)",num_messages);
 			}
 			else
 			{
-				col_add_fstr(pinfo->cinfo, COL_PROTOCOL, "MGCP (%i message)", num_messages);
+				col_add_fstr(pinfo->cinfo, COL_PROTOCOL, "MGCP (%i message)",num_messages);
 			}
 		}
 
-		sectionlen = tvb_find_line_end(tvb, tvb_sectionbegin, -1,
-		                               &tvb_sectionend, FALSE);
+		sectionlen = tvb_find_line_end(tvb, tvb_sectionbegin,-1,
+		                               &tvb_sectionend,FALSE);
 		col_prepend_fstr(pinfo->cinfo, COL_INFO, "%s",
 		                 tvb_format_text(tvb, tvb_sectionbegin, sectionlen));
 
@@ -448,7 +447,7 @@ static int dissect_tpkt_mgcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 		 * Dissect ASCII TPKT header
 		 */
 		dissect_asciitpkt(tvb, pinfo, tree, mgcp_handle);
-		offset = tvb_reported_length(tvb);
+		offset = tvb_length(tvb);
 	}
 
 	return offset;
@@ -461,11 +460,11 @@ static mgcp_info_t *mi;
 
 /* Dissect an individual MGCP message */
 static void dissect_mgcp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-				 proto_tree *mgcp_tree, proto_tree *ti)
+                                 proto_tree *mgcp_tree, proto_tree *ti)
 {
 	/* Declare variables */
 	gint sectionlen;
-	gint tvb_sectionend, tvb_sectionbegin, tvb_len;
+	gint tvb_sectionend,tvb_sectionbegin, tvb_len;
 	tvbuff_t *next_tvb;
 	const gchar *verb_name = "";
 
@@ -494,23 +493,23 @@ static void dissect_mgcp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 	mi->hasDigitMap = FALSE;
 
 	/* Initialize variables */
-	tvb_len = tvb_reported_length(tvb);
+	tvb_len = tvb_length(tvb);
 
 	/*
 	 * Check to see whether we're really dealing with MGCP by looking
 	 * for a valid MGCP verb or response code.  This isn't infallible,
 	 * but it's cheap and it's better than nothing.
 	 */
-	if (is_mgcp_verb(tvb, 0, tvb_len, &verb_name) || is_mgcp_rspcode(tvb, 0, tvb_len))
+	if (is_mgcp_verb(tvb,0,tvb_len,&verb_name) || is_mgcp_rspcode(tvb,0,tvb_len))
 	{
 		/* dissect first line */
 		tvb_sectionbegin = 0;
 		tvb_sectionend = tvb_sectionbegin;
-		sectionlen = tvb_find_line_end(tvb, 0, -1, &tvb_sectionend, FALSE);
+		sectionlen = tvb_find_line_end(tvb,0,-1,&tvb_sectionend,FALSE);
 		if (sectionlen > 0)
 		{
 			dissect_mgcp_firstline(tvb_new_subset(tvb, tvb_sectionbegin,
-			                       sectionlen, sectionlen), pinfo,
+			                       sectionlen,-1), pinfo,
 			                       mgcp_tree);
 		}
 		tvb_sectionbegin = tvb_sectionend;
@@ -522,7 +521,7 @@ static void dissect_mgcp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 			                                &tvb_sectionend);
 			if (sectionlen > 0)
 			{
-				dissect_mgcp_params(tvb_new_subset(tvb, tvb_sectionbegin, sectionlen, sectionlen),
+				dissect_mgcp_params(tvb_new_subset(tvb, tvb_sectionbegin, sectionlen, -1),
 				                                   mgcp_tree);
 			}
 		}
@@ -530,7 +529,7 @@ static void dissect_mgcp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 		/* Set the mgcp payload length correctly so we don't include any
 		   encapsulated SDP */
 		sectionlen = tvb_sectionend;
-		proto_item_set_len(ti, sectionlen);
+		proto_item_set_len(ti,sectionlen);
 
 		/* Display the raw text of the mgcp message if desired */
 
@@ -557,14 +556,14 @@ static void dissect_mgcp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
  */
 static void mgcp_raw_text_add(tvbuff_t *tvb, proto_tree *tree)
 {
-	gint tvb_linebegin, tvb_lineend, tvb_len, linelen;
+	gint tvb_linebegin,tvb_lineend,tvb_len,linelen;
 
 	tvb_linebegin = 0;
-	tvb_len = tvb_reported_length(tvb);
+	tvb_len = tvb_length(tvb);
 
 	do
 	{
-		tvb_find_line_end(tvb, tvb_linebegin, -1, &tvb_lineend, FALSE);
+		tvb_find_line_end(tvb,tvb_linebegin,-1,&tvb_lineend,FALSE);
 		linelen = tvb_lineend - tvb_linebegin;
 		proto_tree_add_format_text(tree, tvb, tvb_linebegin, linelen);
 		tvb_linebegin = tvb_lineend;
@@ -583,6 +582,372 @@ static void mgcp_init_protocol(void)
 	mgcp_calls = g_hash_table_new(mgcp_call_hash, mgcp_call_equal);
 }
 
+/* Register all the bits needed with the filtering engine */
+void proto_register_mgcp(void)
+{
+    static hf_register_info hf[] =
+    {
+        { &hf_mgcp_req,
+          { "Request", "mgcp.req", FT_BOOLEAN, BASE_NONE, NULL, 0x0,
+            "True if MGCP request", HFILL }},
+        { &hf_mgcp_rsp,
+          { "Response", "mgcp.rsp", FT_BOOLEAN, BASE_NONE, NULL, 0x0,
+            "TRUE if MGCP response", HFILL }},
+        { &hf_mgcp_req_frame,
+          { "Request Frame", "mgcp.reqframe", FT_FRAMENUM, BASE_NONE, NULL, 0,
+            NULL, HFILL }},
+        { &hf_mgcp_rsp_frame,
+          { "Response Frame", "mgcp.rspframe", FT_FRAMENUM, BASE_NONE, NULL, 0,
+            NULL, HFILL }},
+        { &hf_mgcp_time,
+          { "Time from request", "mgcp.time", FT_RELATIVE_TIME, BASE_NONE, NULL, 0,
+            "Timedelta between Request and Response", HFILL }},
+        { &hf_mgcp_req_verb,
+          { "Verb", "mgcp.req.verb", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Name of the verb", HFILL }},
+        { &hf_mgcp_req_endpoint,
+          { "Endpoint", "mgcp.req.endpoint", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Endpoint referenced by the message", HFILL }},
+        { &hf_mgcp_transid,
+          { "Transaction ID", "mgcp.transid", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Transaction ID of this message", HFILL }},
+        { &hf_mgcp_version,
+          { "Version", "mgcp.version", FT_STRING, BASE_NONE, NULL, 0x0,
+            "MGCP Version", HFILL }},
+        { &hf_mgcp_rsp_rspcode,
+          { "Response Code", "mgcp.rsp.rspcode", FT_UINT32, BASE_DEC, VALS(mgcp_return_code_vals), 0x0,
+            NULL, HFILL }},
+        { &hf_mgcp_rsp_rspstring,
+          { "Response String", "mgcp.rsp.rspstring", FT_STRING, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }},
+        { &hf_mgcp_params,
+          { "Parameters", "mgcp.params", FT_NONE, BASE_NONE, NULL, 0x0,
+            "MGCP parameters", HFILL }},
+        { &hf_mgcp_param_rspack,
+          { "ResponseAck (K)", "mgcp.param.rspack", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Response Ack", HFILL }},
+        { &hf_mgcp_param_bearerinfo,
+          { "BearerInformation (B)", "mgcp.param.bearerinfo", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Bearer Information", HFILL }},
+        { &hf_mgcp_param_callid,
+          { "CallId (C)", "mgcp.param.callid", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Call Id", HFILL }},
+        { &hf_mgcp_param_connectionid,
+          {"ConnectionIdentifier (I)", "mgcp.param.connectionid", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Connection Identifier", HFILL }},
+        { &hf_mgcp_param_secondconnectionid,
+          { "SecondConnectionID (I2)", "mgcp.param.secondconnectionid", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Second Connection Identifier", HFILL }},
+        { &hf_mgcp_param_notifiedentity,
+          { "NotifiedEntity (N)", "mgcp.param.notifiedentity", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Notified Entity", HFILL }},
+        { &hf_mgcp_param_requestid,
+          { "RequestIdentifier (X)", "mgcp.param.requestid", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Request Identifier", HFILL }},
+        { &hf_mgcp_param_localconnoptions,
+          { "LocalConnectionOptions (L)", "mgcp.param.localconnectionoptions", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Local Connection Options", HFILL }},
+        { &hf_mgcp_param_localconnoptions_p,
+          { "Packetization period (p)", "mgcp.param.localconnectionoptions.p", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Packetization period", HFILL }},
+        { &hf_mgcp_param_localconnoptions_a,
+          { "Codecs (a)", "mgcp.param.localconnectionoptions.a", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Codecs", HFILL }},
+        { &hf_mgcp_param_localconnoptions_s,
+          { "Silence Suppression (s)", "mgcp.param.localconnectionoptions.s", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Silence Suppression", HFILL }},
+        { &hf_mgcp_param_localconnoptions_e,
+          { "Echo Cancellation (e)", "mgcp.param.localconnectionoptions.e", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Echo Cancellation", HFILL }},
+        { &hf_mgcp_param_localconnoptions_scrtp,
+          { "RTP ciphersuite (sc-rtp)", "mgcp.param.localconnectionoptions.scrtp", FT_STRING, BASE_NONE, NULL, 0x0,
+            "RTP ciphersuite", HFILL }},
+        { &hf_mgcp_param_localconnoptions_scrtcp,
+          { "RTCP ciphersuite (sc-rtcp)", "mgcp.param.localconnectionoptions.scrtcp", FT_STRING, BASE_NONE, NULL, 0x0,
+            "RTCP ciphersuite", HFILL }},
+        { &hf_mgcp_param_localconnoptions_b,
+          { "Bandwidth (b)", "mgcp.param.localconnectionoptions.b", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Bandwidth", HFILL }},
+        { &hf_mgcp_param_localconnoptions_esccd,
+          { "Content Destination (es-ccd)", "mgcp.param.localconnectionoptions.esccd", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Content Destination", HFILL }},
+        { &hf_mgcp_param_localconnoptions_escci,
+          { "Content Identifier (es-cci)", "mgcp.param.localconnectionoptions.escci", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Content Identifier", HFILL }},
+        { &hf_mgcp_param_localconnoptions_dqgi,
+          { "D-QoS GateID (dq-gi)", "mgcp.param.localconnectionoptions.dqgi", FT_STRING, BASE_NONE, NULL, 0x0,
+            "D-QoS GateID", HFILL }},
+        { &hf_mgcp_param_localconnoptions_dqrd,
+          { "D-QoS Reserve Destination (dq-rd)", "mgcp.param.localconnectionoptions.dqrd", FT_STRING, BASE_NONE, NULL, 0x0,
+            "D-QoS Reserve Destination", HFILL }},
+        { &hf_mgcp_param_localconnoptions_dqri,
+          { "D-QoS Resource ID (dq-ri)", "mgcp.param.localconnectionoptions.dqri", FT_STRING, BASE_NONE, NULL, 0x0,
+            "D-QoS Resource ID", HFILL }},
+        { &hf_mgcp_param_localconnoptions_dqrr,
+          { "D-QoS Resource Reservation (dq-rr)", "mgcp.param.localconnectionoptions.dqrr", FT_STRING, BASE_NONE, NULL, 0x0,
+            "D-QoS Resource Reservation", HFILL }},
+        { &hf_mgcp_param_localconnoptions_k,
+          { "Encryption Key (k)", "mgcp.param.localconnectionoptions.k", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Encryption Key", HFILL }},
+        { &hf_mgcp_param_localconnoptions_gc,
+          { "Gain Control (gc)", "mgcp.param.localconnectionoptions.gc", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Gain Control", HFILL }},
+        { &hf_mgcp_param_localconnoptions_fmtp,
+          { "Media Format (fmtp)", "mgcp.param.localconnectionoptions.fmtp", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Media Format", HFILL }},
+        { &hf_mgcp_param_localconnoptions_nt,
+          { "Network Type (nt)", "mgcp.param.localconnectionoptions.nt", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Network Type", HFILL }},
+        { &hf_mgcp_param_localconnoptions_ofmtp,
+          { "Optional Media Format (o-fmtp)", "mgcp.param.localconnectionoptions.ofmtp", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Optional Media Format", HFILL }},
+        { &hf_mgcp_param_localconnoptions_r,
+          { "Resource Reservation (r)", "mgcp.param.localconnectionoptions.r", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Resource Reservation", HFILL }},
+        { &hf_mgcp_param_localconnoptions_t,
+          { "Type of Service (r)", "mgcp.param.localconnectionoptions.t", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Type of Service", HFILL }},
+        { &hf_mgcp_param_localconnoptions_rcnf,
+          { "Reservation Confirmation (r-cnf)", "mgcp.param.localconnectionoptions.rcnf", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Reservation Confirmation", HFILL }},
+        { &hf_mgcp_param_localconnoptions_rdir,
+          { "Reservation Direction (r-dir)", "mgcp.param.localconnectionoptions.rdir", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Reservation Direction", HFILL }},
+        { &hf_mgcp_param_localconnoptions_rsh,
+          { "Resource Sharing (r-sh)", "mgcp.param.localconnectionoptions.rsh", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Resource Sharing", HFILL }},
+        { &hf_mgcp_param_localconnoptions_mp,
+          { "Multiple Packetization period (mp)", "mgcp.param.localconnectionoptions.mp", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Multiple Packetization period", HFILL }},
+        { &hf_mgcp_param_localconnoptions_fxr,
+          { "FXR (fxr/fx)", "mgcp.param.localconnectionoptions.fxr", FT_STRING, BASE_NONE, NULL, 0x0,
+            "FXR", HFILL }},
+        { &hf_mgcp_param_connectionmode,
+          { "ConnectionMode (M)", "mgcp.param.connectionmode", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Connection Mode", HFILL }},
+        { &hf_mgcp_param_reqevents,
+          { "RequestedEvents (R)", "mgcp.param.reqevents", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Requested Events", HFILL }},
+        { &hf_mgcp_param_signalreq,
+          { "SignalRequests (S)", "mgcp.param.signalreq", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Signal Request", HFILL }},
+        { &hf_mgcp_param_restartmethod,
+          { "RestartMethod (RM)", "mgcp.param.restartmethod", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Restart Method", HFILL }},
+        { &hf_mgcp_param_restartdelay,
+          { "RestartDelay (RD)", "mgcp.param.restartdelay", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Restart Delay", HFILL }},
+        { &hf_mgcp_param_digitmap,
+          { "DigitMap (D)", "mgcp.param.digitmap", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Digit Map", HFILL }},
+        { &hf_mgcp_param_observedevent,
+          { "ObservedEvents (O)", "mgcp.param.observedevents", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Observed Events", HFILL }},
+        { &hf_mgcp_param_connectionparam,
+          { "ConnectionParameters (P)", "mgcp.param.connectionparam", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Connection Parameters", HFILL }},
+        { &hf_mgcp_param_connectionparam_ps,
+          { "Packets sent (PS)", "mgcp.param.connectionparam.ps", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Packets sent (P:PS)", HFILL }},
+        { &hf_mgcp_param_connectionparam_os,
+          { "Octets sent (OS)", "mgcp.param.connectionparam.os", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Octets sent (P:OS)", HFILL }},
+        { &hf_mgcp_param_connectionparam_pr,
+          { "Packets received (PR)", "mgcp.param.connectionparam.pr", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Packets received (P:PR)", HFILL }},
+        { &hf_mgcp_param_connectionparam_or,
+          { "Octets received (OR)", "mgcp.param.connectionparam.or", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Octets received (P:OR)", HFILL }},
+        { &hf_mgcp_param_connectionparam_pl,
+          { "Packets lost (PL)", "mgcp.param.connectionparam.pl", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Packets lost (P:PL)", HFILL }},
+        { &hf_mgcp_param_connectionparam_ji,
+          { "Jitter (JI)", "mgcp.param.connectionparam.ji", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Average inter-packet arrival jitter in milliseconds (P:JI)", HFILL }},
+        { &hf_mgcp_param_connectionparam_la,
+          { "Latency (LA)", "mgcp.param.connectionparam.la", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Average latency in milliseconds (P:LA)", HFILL }},
+        { &hf_mgcp_param_connectionparam_pcrps,
+          { "Remote Packets sent (PC/RPS)", "mgcp.param.connectionparam.pcrps", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Remote Packets sent (P:PC/RPS)", HFILL }},
+        { &hf_mgcp_param_connectionparam_pcros,
+          { "Remote Octets sent (PC/ROS)", "mgcp.param.connectionparam.pcros", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Remote Octets sent (P:PC/ROS)", HFILL }},
+        { &hf_mgcp_param_connectionparam_pcrpl,
+          { "Remote Packets lost (PC/RPL)", "mgcp.param.connectionparam.pcrpl", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Remote Packets lost (P:PC/RPL)", HFILL }},
+        { &hf_mgcp_param_connectionparam_pcrji,
+          { "Remote Jitter (PC/RJI)", "mgcp.param.connectionparam.pcrji", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Remote Jitter (P:PC/RJI)", HFILL }},
+        { &hf_mgcp_param_connectionparam_x,
+          { "Vendor Extension", "mgcp.param.connectionparam.x", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Vendor Extension (P:X-*)", HFILL }},
+        { &hf_mgcp_param_reasoncode,
+          { "ReasonCode (E)", "mgcp.param.reasoncode", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Reason Code", HFILL }},
+        { &hf_mgcp_param_eventstates,
+          { "EventStates (ES)", "mgcp.param.eventstates", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Event States", HFILL }},
+        { &hf_mgcp_param_specificendpoint,
+          { "SpecificEndpointID (Z)", "mgcp.param.specificendpointid", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Specific Endpoint ID", HFILL }},
+        { &hf_mgcp_param_secondendpointid,
+          { "SecondEndpointID (Z2)", "mgcp.param.secondendpointid", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Second Endpoint ID", HFILL }},
+        { &hf_mgcp_param_reqinfo,
+          { "RequestedInfo (F)", "mgcp.param.reqinfo", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Requested Info", HFILL }},
+        { &hf_mgcp_param_quarantinehandling,
+          { "QuarantineHandling (Q)", "mgcp.param.quarantinehandling", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Quarantine Handling", HFILL }},
+        { &hf_mgcp_param_detectedevents,
+          { "DetectedEvents (T)", "mgcp.param.detectedevents", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Detected Events", HFILL }},
+        { &hf_mgcp_param_capabilities,
+          { "Capabilities (A)", "mgcp.param.capabilities", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Capabilities", HFILL }},
+        { &hf_mgcp_param_maxmgcpdatagram,
+          {"MaxMGCPDatagram (MD)", "mgcp.param.maxmgcpdatagram", FT_STRING, BASE_NONE, NULL, 0x0,
+           "Maximum MGCP Datagram size", HFILL }},
+        { &hf_mgcp_param_packagelist,
+          {"PackageList (PL)", "mgcp.param.packagelist", FT_STRING, BASE_NONE, NULL, 0x0,
+           "Package List", HFILL }},
+        { &hf_mgcp_param_extension,
+          { "Extension Parameter (non-critical)", "mgcp.param.extension", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Extension Parameter", HFILL }},
+        { &hf_mgcp_param_extension_critical,
+          { "Extension Parameter (critical)", "mgcp.param.extensioncritical", FT_STRING, BASE_NONE, NULL, 0x0,
+            "Critical Extension Parameter", HFILL }},
+        { &hf_mgcp_param_invalid,
+          { "Invalid Parameter", "mgcp.param.invalid", FT_STRING, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }},
+        { &hf_mgcp_messagecount,
+          { "MGCP Message Count", "mgcp.messagecount", FT_UINT32, BASE_DEC, NULL, 0x0,
+            "Number of MGCP message in a packet", HFILL }},
+        { &hf_mgcp_dup,
+          { "Duplicate Message", "mgcp.dup", FT_UINT32, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }},
+        { &hf_mgcp_req_dup,
+          { "Duplicate Request", "mgcp.req.dup", FT_UINT32, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }},
+        { &hf_mgcp_req_dup_frame,
+          { "Original Request Frame", "mgcp.req.dup.frame", FT_FRAMENUM, BASE_NONE, NULL, 0x0,
+            "Frame containing original request", HFILL }},
+        { &hf_mgcp_rsp_dup,
+          { "Duplicate Response", "mgcp.rsp.dup", FT_UINT32, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }},
+        { &hf_mgcp_rsp_dup_frame,
+          { "Original Response Frame", "mgcp.rsp.dup.frame", FT_FRAMENUM, BASE_NONE, NULL, 0x0,
+            "Frame containing original response", HFILL }},
+    };
+
+    static gint *ett[] =
+    {
+        &ett_mgcp,
+        &ett_mgcp_param,
+        &ett_mgcp_param_connectionparam,
+        &ett_mgcp_param_localconnectionoptions
+    };
+
+    module_t *mgcp_module;
+
+    /* Register protocol */
+    proto_mgcp = proto_register_protocol("Media Gateway Control Protocol", "MGCP", "mgcp");
+    proto_register_field_array(proto_mgcp, hf, array_length(hf));
+    proto_register_subtree_array(ett, array_length(ett));
+    register_init_routine(&mgcp_init_protocol);
+
+    new_register_dissector("mgcp", dissect_mgcp, proto_mgcp);
+
+    /* Register our configuration options */
+    mgcp_module = prefs_register_protocol(proto_mgcp, proto_reg_handoff_mgcp);
+
+    prefs_register_uint_preference(mgcp_module, "tcp.gateway_port",
+                                   "MGCP Gateway TCP Port",
+                                   "Set the UDP port for gateway messages "
+                                   "(if other than the default of 2427)",
+                                   10, &global_mgcp_gateway_tcp_port);
+
+    prefs_register_uint_preference(mgcp_module, "udp.gateway_port",
+                                   "MGCP Gateway UDP Port",
+                                   "Set the TCP port for gateway messages "
+                                   "(if other than the default of 2427)",
+                                   10, &global_mgcp_gateway_udp_port);
+
+    prefs_register_uint_preference(mgcp_module, "tcp.callagent_port",
+                                   "MGCP Callagent TCP Port",
+                                   "Set the TCP port for callagent messages "
+                                   "(if other than the default of 2727)",
+                                   10, &global_mgcp_callagent_tcp_port);
+
+    prefs_register_uint_preference(mgcp_module, "udp.callagent_port",
+                                   "MGCP Callagent UDP Port",
+                                   "Set the UDP port for callagent messages "
+                                   "(if other than the default of 2727)",
+                                   10, &global_mgcp_callagent_udp_port);
+
+
+    prefs_register_bool_preference(mgcp_module, "display_raw_text",
+                                  "Display raw text for MGCP message",
+                                  "Specifies that the raw text of the "
+                                  "MGCP message should be displayed "
+                                  "instead of (or in addition to) the "
+                                  "dissection tree",
+                                  &global_mgcp_raw_text);
+
+    prefs_register_obsolete_preference(mgcp_module, "display_dissect_tree");
+
+    prefs_register_bool_preference(mgcp_module, "display_mgcp_message_count",
+                                   "Display the number of MGCP messages",
+                                   "Display the number of MGCP messages "
+                                   "found in a packet in the protocol column.",
+                                   &global_mgcp_message_count);
+
+    mgcp_tap = register_tap("mgcp");
+}
+
+/* The registration hand-off routine */
+void proto_reg_handoff_mgcp(void)
+{
+	static gboolean mgcp_prefs_initialized = FALSE;
+	static dissector_handle_t mgcp_tpkt_handle;
+	/*
+	 * Variables to allow for proper deletion of dissector registration when
+	 * the user changes port from the gui.
+	 */
+	static guint gateway_tcp_port;
+	static guint gateway_udp_port;
+	static guint callagent_tcp_port;
+	static guint callagent_udp_port;
+
+	if (!mgcp_prefs_initialized)
+	{
+		/* Get a handle for the SDP dissector. */
+		sdp_handle = find_dissector("sdp");
+		mgcp_handle = new_create_dissector_handle(dissect_mgcp, proto_mgcp);
+		mgcp_tpkt_handle = new_create_dissector_handle(dissect_tpkt_mgcp, proto_mgcp);
+		mgcp_prefs_initialized = TRUE;
+	}
+	else
+	{
+		dissector_delete_uint("tcp.port", gateway_tcp_port, mgcp_tpkt_handle);
+		dissector_delete_uint("udp.port", gateway_udp_port, mgcp_handle);
+		dissector_delete_uint("tcp.port", callagent_tcp_port, mgcp_tpkt_handle);
+		dissector_delete_uint("udp.port", callagent_udp_port, mgcp_handle);
+	}
+
+	/* Set our port number for future use */
+	gateway_tcp_port = global_mgcp_gateway_tcp_port;
+	gateway_udp_port = global_mgcp_gateway_udp_port;
+
+	callagent_tcp_port = global_mgcp_callagent_tcp_port;
+	callagent_udp_port = global_mgcp_callagent_udp_port;
+
+	dissector_add_uint("tcp.port", global_mgcp_gateway_tcp_port, mgcp_tpkt_handle);
+	dissector_add_uint("udp.port", global_mgcp_gateway_udp_port, mgcp_handle);
+	dissector_add_uint("tcp.port", global_mgcp_callagent_tcp_port, mgcp_tpkt_handle);
+	dissector_add_uint("udp.port", global_mgcp_callagent_udp_port, mgcp_handle);
+}
 
 /*
  * is_mgcp_verb - A function for determining whether there is a
@@ -599,7 +964,7 @@ static void mgcp_init_protocol(void)
  */
 static gboolean is_mgcp_verb(tvbuff_t *tvb, gint offset, gint maxlength, const gchar **verb_name)
 {
-	gboolean returnvalue = FALSE;
+	int returnvalue = FALSE;
 	gchar word[5];
 
 	/* Read the string into 'word' and see if it looks like the start of a verb */
@@ -625,7 +990,7 @@ static gboolean is_mgcp_verb(tvbuff_t *tvb, gint offset, gint maxlength, const g
 	/* May be whitespace after verb code - anything else is an error.. */
 	if (returnvalue && maxlength >= 5)
 	{
-		char next = tvb_get_guint8(tvb, 4);
+		char next = tvb_get_guint8(tvb,4);
 		if ((next != ' ') && (next != '\t'))
 		{
 			returnvalue = FALSE;
@@ -651,7 +1016,7 @@ static gboolean is_mgcp_verb(tvbuff_t *tvb, gint offset, gint maxlength, const g
  */
 static gboolean is_mgcp_rspcode(tvbuff_t *tvb, gint offset, gint maxlength)
 {
-	gboolean returnvalue = FALSE;
+	int returnvalue = FALSE;
 	guint8 word[4];
 
 	/* Do 1st 3 characters look like digits? */
@@ -712,22 +1077,22 @@ static gboolean is_rfc2234_alpha(guint8 c)
  */
 static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 {
-	gint returnvalue = -1, tvb_current_offset, counter;
+	gint returnvalue = -1, tvb_current_offset,counter;
 	guint8 tempchar, plus_minus;
 	gchar **buf;
 
 	tvb_current_offset = offset;
 	*hf = NULL;
-	buf = NULL;
+	buf=NULL;
 
 	if (len > 0)
 	{
-		tempchar = tvb_get_guint8(tvb, tvb_current_offset);
+		tempchar = tvb_get_guint8(tvb,tvb_current_offset);
 
 		switch (tempchar)
 		{
 			case 'K':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -735,7 +1100,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				*hf = &hf_mgcp_param_rspack;
 				break;
 			case 'B':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -743,7 +1108,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				*hf = &hf_mgcp_param_bearerinfo;
 				break;
 			case 'C':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -753,7 +1118,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 			case 'I':
 				tvb_current_offset++;
 				if (len > (tvb_current_offset - offset) &&
-				   (tempchar = tvb_get_guint8(tvb, tvb_current_offset)) == ':')
+				   (tempchar = tvb_get_guint8(tvb,tvb_current_offset)) == ':')
 				{
 					*hf = &hf_mgcp_param_connectionid;
 					tvb_current_offset--;
@@ -765,7 +1130,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				}
 				break;
 			case 'N':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -778,7 +1143,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 
 				/* X: is RequestIdentifier */
 				if (len > (tvb_current_offset - offset) &&
-				   (tempchar = tvb_get_guint8(tvb, tvb_current_offset)) == ':')
+				   (tempchar = tvb_get_guint8(tvb,tvb_current_offset)) == ':')
 				{
 					*hf = &hf_mgcp_param_requestid;
 					tvb_current_offset--;
@@ -787,7 +1152,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				/* X+...: or X-....: are vendor extension parameters */
 				else
 				if (len > (tvb_current_offset - offset) &&
-				    ((plus_minus = tvb_get_guint8(tvb, tvb_current_offset)) == '-' ||
+				    ((plus_minus = tvb_get_guint8(tvb,tvb_current_offset)) == '-' ||
 				     (plus_minus == '+')))
 				{
 					/* Move past + or - */
@@ -817,7 +1182,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				}
 				break;
 			case 'L':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -827,7 +1192,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 			case 'M':
 				tvb_current_offset++;
 				if (len > (tvb_current_offset - offset) &&
-				   (tempchar = tvb_get_guint8(tvb, tvb_current_offset)) == ':')
+				   (tempchar = tvb_get_guint8(tvb,tvb_current_offset)) == ':')
 				{
 					*hf = &hf_mgcp_param_connectionmode;
 					tvb_current_offset--;
@@ -841,7 +1206,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 			case 'R':
 				tvb_current_offset++;
 				if (len > (tvb_current_offset - offset) &&
-				    (tempchar = tvb_get_guint8(tvb, tvb_current_offset)) == ':')
+				    (tempchar = tvb_get_guint8(tvb,tvb_current_offset)) == ':')
 				{
 					*hf = &hf_mgcp_param_reqevents;
 					tvb_current_offset--;
@@ -858,7 +1223,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				}
 				break;
 			case 'S':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -867,7 +1232,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				buf = &(mi->signalReq);
 				break;
 			case 'D':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -876,7 +1241,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				mi->hasDigitMap = TRUE;
 				break;
 			case 'O':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -887,7 +1252,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 			case 'P':
 				tvb_current_offset++;
 				if (len > (tvb_current_offset - offset) &&
-				    (tempchar = tvb_get_guint8(tvb, tvb_current_offset)) == ':')
+				    (tempchar = tvb_get_guint8(tvb,tvb_current_offset)) == ':')
 				{
 					*hf = &hf_mgcp_param_connectionparam;
 					tvb_current_offset--;
@@ -901,7 +1266,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 			case 'E':
 				tvb_current_offset++;
 				if (len > (tvb_current_offset - offset) &&
-				    (tempchar = tvb_get_guint8(tvb, tvb_current_offset)) == ':')
+				    (tempchar = tvb_get_guint8(tvb,tvb_current_offset)) == ':')
 				{
 					*hf = &hf_mgcp_param_reasoncode;
 					tvb_current_offset--;
@@ -915,7 +1280,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 			case 'Z':
 				tvb_current_offset++;
 				if (len > (tvb_current_offset - offset) &&
-				    (tempchar = tvb_get_guint8(tvb, tvb_current_offset)) == ':')
+				    (tempchar = tvb_get_guint8(tvb,tvb_current_offset)) == ':')
 				{
 					*hf = &hf_mgcp_param_specificendpoint;
 					tvb_current_offset--;
@@ -927,7 +1292,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				}
 				break;
 			case 'F':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -935,7 +1300,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				*hf = &hf_mgcp_param_reqinfo;
 				break;
 			case 'Q':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -943,7 +1308,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				*hf = &hf_mgcp_param_quarantinehandling;
 				break;
 			case 'T':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -951,7 +1316,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 				*hf = &hf_mgcp_param_detectedevents;
 				break;
 			case 'A':
-				if (tvb_get_guint8(tvb, tvb_current_offset+1) != ':')
+				if (tvb_get_guint8(tvb,tvb_current_offset+1) != ':')
 				{
 					*hf = &hf_mgcp_param_invalid;
 					break;
@@ -969,16 +1334,16 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
 
 		/* Add a recognised parameter type if we have one */
 		if (*hf != NULL && len > (tvb_current_offset - offset) &&
-		    tvb_get_guint8(tvb, tvb_current_offset) == ':')
+		    tvb_get_guint8(tvb,tvb_current_offset) == ':')
 		{
 			tvb_current_offset++;
-			tvb_current_offset = tvb_skip_wsp(tvb, tvb_current_offset, (len - tvb_current_offset + offset));
+			tvb_current_offset = tvb_skip_wsp(tvb,tvb_current_offset, (len - tvb_current_offset + offset));
 			returnvalue = tvb_current_offset;
 
-			/* set the observedEvents or signalReq used in Voip Calls analysis */
-			if (buf != NULL) {
-				*buf = tvb_get_string_enc(wmem_packet_scope(), tvb, tvb_current_offset, (len - tvb_current_offset + offset), ENC_ASCII);
-			}
+                       /* set the observedEvents or signalReq used in Voip Calls analysis */
+                       if (buf != NULL) {
+                               *buf = tvb_get_string(wmem_packet_scope(), tvb, tvb_current_offset, (len - tvb_current_offset + offset));
+                       }
 		}
 	}
 	else
@@ -1016,7 +1381,7 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf)
  */
 static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	gint tvb_current_offset, tvb_previous_offset, tvb_len, tvb_current_len;
+	gint tvb_current_offset,tvb_previous_offset,tvb_len,tvb_current_len;
 	gint tokennum, tokenlen;
 	proto_item* hidden_item;
 	char *transid = NULL;
@@ -1034,7 +1399,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 
 	static address null_address = { AT_NONE, -1, 0, NULL };
 	tvb_previous_offset = 0;
-	tvb_len = tvb_reported_length(tvb);
+	tvb_len = tvb_length(tvb);
 	tvb_current_offset = tvb_previous_offset;
 	mi->is_duplicate = FALSE;
 	mi->request_available = FALSE;
@@ -1045,7 +1410,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 
 		do
 		{
-			tvb_current_len = tvb_reported_length_remaining(tvb, tvb_previous_offset);
+			tvb_current_len = tvb_length_remaining(tvb,tvb_previous_offset);
 			tvb_current_offset = tvb_find_guint8(tvb, tvb_previous_offset, tvb_current_len, ' ');
 			if (tvb_current_offset == -1)
 			{
@@ -1060,9 +1425,9 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 			{
 				if (tokenlen > 4)
 					THROW(ReportedBoundsError);
-				code = tvb_format_text(tvb, tvb_previous_offset, tokenlen);
-				g_strlcpy(mi->code, code, 5);
-				if (is_mgcp_verb(tvb, tvb_previous_offset, tvb_current_len, &verb_description))
+				code = tvb_format_text(tvb,tvb_previous_offset,tokenlen);
+				g_strlcpy(mi->code,code,5);
+				if (is_mgcp_verb(tvb,tvb_previous_offset,tvb_current_len,&verb_description))
 				{
 					mgcp_type = MGCP_REQUEST;
 					if (verb_description != NULL)
@@ -1077,12 +1442,12 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 					                             strlen(code_with_verb) ? code_with_verb : code);
 				}
 				else
-				if (is_mgcp_rspcode(tvb, tvb_previous_offset, tvb_current_len))
+				if (is_mgcp_rspcode(tvb,tvb_previous_offset,tvb_current_len))
 				{
 					mgcp_type = MGCP_RESPONSE;
 					rspcode = atoi(code);
 					mi->rspcode = rspcode;
-					proto_tree_add_uint(tree, hf_mgcp_rsp_rspcode, tvb,
+					proto_tree_add_uint(tree,hf_mgcp_rsp_rspcode, tvb,
 					                    tvb_previous_offset, tokenlen, rspcode);
 				}
 				else
@@ -1092,7 +1457,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 			}
 			if (tokennum == 1)
 			{
-				transid = tvb_format_text(tvb, tvb_previous_offset, tokenlen);
+				transid = tvb_format_text(tvb,tvb_previous_offset,tokenlen);
 				/* XXX - what if this isn't a valid text string? */
 				mi->transid = (guint32)strtoul(transid, NULL, 10);
 				proto_tree_add_string(tree, hf_mgcp_transid, tvb,
@@ -1102,9 +1467,9 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 			{
 				if (mgcp_type == MGCP_REQUEST)
 				{
-					endpointId = tvb_format_text(tvb, tvb_previous_offset, tokenlen);
+					endpointId = tvb_format_text(tvb, tvb_previous_offset,tokenlen);
 					mi->endpointId = wmem_strdup(wmem_packet_scope(), endpointId);
-					proto_tree_add_string(tree, hf_mgcp_req_endpoint, tvb,
+					proto_tree_add_string(tree,hf_mgcp_req_endpoint, tvb,
 					                      tvb_previous_offset, tokenlen, endpointId);
 				}
 				else
@@ -1132,15 +1497,15 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 				if (tvb_current_offset < tvb_len )
 				{
 					tokenlen = tvb_find_line_end(tvb, tvb_previous_offset,
-					                             -1, &tvb_current_offset, FALSE);
+					                             -1, &tvb_current_offset,FALSE);
 				}
 				else
 				{
 					tokenlen = tvb_current_len;
 				}
-				proto_tree_add_string(tree, hf_mgcp_version, tvb,
+				proto_tree_add_string(tree,hf_mgcp_version, tvb,
 				                      tvb_previous_offset, tokenlen,
-				                      tvb_format_text(tvb, tvb_previous_offset,
+				                      tvb_format_text(tvb,tvb_previous_offset,
 				                      tokenlen));
 				break;
 			}
@@ -1207,7 +1572,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 							mi->request_available = TRUE;
 							mgcp_call->responded = TRUE;
 							mi->req_num = mgcp_call->req_num;
-							g_strlcpy(mi->code, mgcp_call->code, 5);
+							g_strlcpy(mi->code,mgcp_call->code,5);
 							item = proto_tree_add_uint_format(tree, hf_mgcp_req_frame,
 							                                  tvb, 0, 0, mgcp_call->req_num,
 							                                  "This is a response to a request in frame %u",
@@ -1241,7 +1606,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 								if (tree)
 								{
 									proto_item* item;
-									item = proto_tree_add_uint(tree, hf_mgcp_dup, tvb, 0, 0, mi->transid);
+									item = proto_tree_add_uint(tree, hf_mgcp_dup, tvb, 0,0, mi->transid);
 									PROTO_ITEM_SET_HIDDEN(item);
 									item = proto_tree_add_uint(tree, hf_mgcp_rsp_dup,
 									                           tvb, 0, 0, mi->transid);
@@ -1334,11 +1699,11 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 						if (tree)
 						{
 							proto_item* item;
-							item = proto_tree_add_uint(tree, hf_mgcp_dup, tvb, 0, 0, mi->transid);
+							item = proto_tree_add_uint(tree, hf_mgcp_dup, tvb, 0,0, mi->transid);
 							PROTO_ITEM_SET_HIDDEN(item);
-							item = proto_tree_add_uint(tree, hf_mgcp_req_dup, tvb, 0, 0, mi->transid);
+							item = proto_tree_add_uint(tree, hf_mgcp_req_dup, tvb, 0,0, mi->transid);
 							PROTO_ITEM_SET_GENERATED(item);
-							item = proto_tree_add_uint(tree, hf_mgcp_req_dup_frame, tvb, 0, 0, mi->req_num);
+							item = proto_tree_add_uint(tree, hf_mgcp_req_dup_frame, tvb, 0,0, mi->req_num);
 							PROTO_ITEM_SET_GENERATED(item);
 						}
 					}
@@ -1358,7 +1723,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 					mgcp_call->transid   = mi->transid;
 					mgcp_call->responded = FALSE;
 					mgcp_call->req_time=pinfo->fd->abs_ts;
-					g_strlcpy(mgcp_call->code, mi->code, 5);
+					g_strlcpy(mgcp_call->code,mi->code,5);
 
 					/* Store it */
 					g_hash_table_insert(mgcp_calls, new_mgcp_call_key, mgcp_call);
@@ -1407,7 +1772,7 @@ static void dissect_mgcp_params(tvbuff_t *tvb, proto_tree *tree)
 	gint tvb_tokenbegin;
 	proto_tree *mgcp_param_ti, *mgcp_param_tree;
 
-	tvb_len = tvb_reported_length(tvb);
+	tvb_len = tvb_length(tvb);
 	tvb_linebegin = 0;
 	tvb_lineend = tvb_linebegin;
 
@@ -1422,30 +1787,30 @@ static void dissect_mgcp_params(tvbuff_t *tvb, proto_tree *tree)
 		while (tvb_lineend < tvb_len)
 		{
 			old_lineend = tvb_lineend;
-			linelen = tvb_find_line_end(tvb, tvb_linebegin, -1, &tvb_lineend, FALSE);
+			linelen = tvb_find_line_end(tvb, tvb_linebegin, -1,&tvb_lineend,FALSE);
 			tvb_tokenbegin = tvb_parse_param(tvb, tvb_linebegin, linelen, &my_param);
 
 			if (my_param)
 			{
 				if (*my_param == hf_mgcp_param_connectionparam)
 				{
-					tokenlen = tvb_find_line_end(tvb, tvb_tokenbegin, -1, &tvb_lineend, FALSE);
+					tokenlen = tvb_find_line_end(tvb,tvb_tokenbegin,-1,&tvb_lineend,FALSE);
 					dissect_mgcp_connectionparams(mgcp_param_tree, tvb, tvb_linebegin,
 					                              tvb_tokenbegin - tvb_linebegin, tokenlen);
 				}
 				else
 				if (*my_param == hf_mgcp_param_localconnoptions)
 				{
-					tokenlen = tvb_find_line_end(tvb, tvb_tokenbegin, -1, &tvb_lineend, FALSE);
+					tokenlen = tvb_find_line_end(tvb,tvb_tokenbegin,-1,&tvb_lineend,FALSE);
 					dissect_mgcp_localconnectionoptions(mgcp_param_tree, tvb, tvb_linebegin,
 					                                    tvb_tokenbegin - tvb_linebegin, tokenlen);
 				}
 				else
 				{
-					tokenlen = tvb_find_line_end(tvb, tvb_tokenbegin, -1, &tvb_lineend, FALSE);
-					proto_tree_add_string(mgcp_param_tree, *my_param, tvb,
+					tokenlen = tvb_find_line_end(tvb,tvb_tokenbegin,-1,&tvb_lineend,FALSE);
+					proto_tree_add_string(mgcp_param_tree,*my_param, tvb,
 					                      tvb_linebegin, linelen,
-					                      tvb_format_text(tvb, tvb_tokenbegin, tokenlen));
+					                      tvb_format_text(tvb,tvb_tokenbegin, tokenlen));
 				}
 			}
 
@@ -1464,32 +1829,31 @@ static void
 dissect_mgcp_connectionparams(proto_tree *parent_tree, tvbuff_t *tvb, gint offset, gint param_type_len, gint param_val_len)
 {
 	proto_tree *tree = parent_tree;
+	proto_item *item = NULL;
 
-	gchar *tokenline;
-	gchar **tokens;
-	guint i;
+	gchar *tokenline = NULL;
+	gchar **tokens = NULL;
+	gchar **typval = NULL;
+	guint i = 0;
+	guint tokenlen = 0;
+	int hf_uint = -1;
+	int hf_string = -1;
 
 	if (parent_tree)
 	{
-		proto_item *item;
 		item = proto_tree_add_item(parent_tree, hf_mgcp_param_connectionparam, tvb, offset, param_type_len+param_val_len, ENC_ASCII|ENC_NA);
 		tree = proto_item_add_subtree(item, ett_mgcp_param_connectionparam);
 	}
 
 	/* The P: line */
 	offset += param_type_len; /* skip the P: */
-	tokenline = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, param_val_len, ENC_ASCII);
+	tokenline = tvb_get_string(wmem_packet_scope(), tvb, offset, param_val_len);
 
 	/* Split into type=value pairs separated by comma */
 	tokens = wmem_strsplit(wmem_packet_scope(), tokenline, ",", -1);
 
 	for (i = 0; tokens[i] != NULL; i++)
 	{
-		gchar **typval;
-		guint tokenlen;
-		int hf_uint = -1;
-		int hf_string = -1;
-
 		tokenlen = (int)strlen(tokens[i]);
 		typval = wmem_strsplit(wmem_packet_scope(), tokens[i], "=", 2);
 		if ((typval[0] != NULL) && (typval[1] != NULL))
@@ -1559,13 +1923,13 @@ dissect_mgcp_connectionparams(proto_tree *parent_tree, tvbuff_t *tvb, gint offse
 				}
 				else
 				{
-					proto_tree_add_string(tree, hf_mgcp_unknown_parameter, tvb, offset, tokenlen, tokens[i]);
+					proto_tree_add_text(tree, tvb, offset, tokenlen, "Unknown parameter: %s", tokens[i]);
 				}
 			}
 		}
 		else if (tree)
 		{
-			proto_tree_add_string(tree, hf_mgcp_malformed_parameter, tvb, offset, tokenlen, tokens[i]);
+			proto_tree_add_text(tree, tvb, offset, tokenlen, "Malformed parameter: %s", tokens[i]);
 		}
 		offset += tokenlen + 1; /* 1 extra for the delimiter */
 	}
@@ -1577,31 +1941,30 @@ static void
 dissect_mgcp_localconnectionoptions(proto_tree *parent_tree, tvbuff_t *tvb, gint offset, gint param_type_len, gint param_val_len)
 {
 	proto_tree *tree = parent_tree;
+	proto_item *item = NULL;
 
-	gchar *tokenline;
-	gchar **tokens;
-	guint i;
+	gchar *tokenline = NULL;
+	gchar **tokens = NULL;
+	gchar **typval = NULL;
+	guint i = 0;
+	guint tokenlen = 0;
+	int hf_uint = -1;
+	int hf_string = -1;
 
 	if (parent_tree)
 	{
-		proto_item *item;
 		item = proto_tree_add_item(parent_tree, hf_mgcp_param_localconnoptions, tvb, offset, param_type_len+param_val_len, ENC_ASCII|ENC_NA);
 		tree = proto_item_add_subtree(item, ett_mgcp_param_localconnectionoptions);
 	}
 
 	/* The L: line */
 	offset += param_type_len; /* skip the L: */
-	tokenline = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, param_val_len, ENC_ASCII);
+	tokenline = tvb_get_string(wmem_packet_scope(), tvb, offset, param_val_len);
 
 	/* Split into type=value pairs separated by comma */
 	tokens = wmem_strsplit(wmem_packet_scope(), tokenline, ",", -1);
 	for (i = 0; tokens[i] != NULL; i++)
 	{
-		gchar **typval;
-		guint tokenlen;
-		int hf_uint;
-		int hf_string;
-
 		hf_uint = -1;
 		hf_string = -1;
 
@@ -1728,13 +2091,13 @@ dissect_mgcp_localconnectionoptions(proto_tree *parent_tree, tvbuff_t *tvb, gint
 				}
 				else
 				{
-					proto_tree_add_string(tree, hf_mgcp_unknown_parameter, tvb, offset, tokenlen, tokens[i]);
+					proto_tree_add_text(tree, tvb, offset, tokenlen, "Unknown parameter: %s", tokens[i]);
 				}
 			}
 		}
 		else if (tree)
 		{
-			proto_tree_add_string(tree, hf_mgcp_malformed_parameter, tvb, offset, tokenlen, tokens[i]);
+			proto_tree_add_text(tree, tvb, offset, tokenlen, "Malformed parameter: %s", tokens[i]);
 		}
 		offset += tokenlen + 1; /* 1 extra for the delimiter */
 	}
@@ -1764,7 +2127,7 @@ dissect_mgcp_localconnectionoptions(proto_tree *parent_tree, tvbuff_t *tvb, gint
  */
 static gint tvb_find_null_line(tvbuff_t* tvb, gint offset, gint len, gint* next_offset)
 {
-	gint tvb_lineend, tvb_current_len, tvb_linebegin, maxoffset;
+	gint tvb_lineend,tvb_current_len,tvb_linebegin,maxoffset;
 	guint tempchar;
 
 	tvb_linebegin = offset;
@@ -1777,7 +2140,7 @@ static gint tvb_find_null_line(tvbuff_t* tvb, gint offset, gint len, gint* next_
 	}
 	else
 	{
-		tvb_current_len = tvb_reported_length_remaining(tvb, offset);
+		tvb_current_len = tvb_length_remaining(tvb,offset);
 	}
 
 	maxoffset = (tvb_current_len - 1) + offset;
@@ -1787,9 +2150,9 @@ static gint tvb_find_null_line(tvbuff_t* tvb, gint offset, gint len, gint* next_
 	do
 	{
 		tvb_linebegin = tvb_lineend;
-		tvb_current_len = tvb_reported_length_remaining(tvb, tvb_linebegin);
-		tvb_find_line_end(tvb, tvb_linebegin, tvb_current_len, &tvb_lineend, FALSE);
-		tempchar = tvb_get_guint8(tvb, tvb_linebegin);
+		tvb_current_len = tvb_length_remaining(tvb,tvb_linebegin);
+		tvb_find_line_end(tvb, tvb_linebegin, tvb_current_len, &tvb_lineend,FALSE);
+		tempchar = tvb_get_guint8(tvb,tvb_linebegin);
 	} while (tempchar != '\r' && tempchar != '\n' && tvb_lineend <= maxoffset);
 
 
@@ -1801,7 +2164,7 @@ static gint tvb_find_null_line(tvbuff_t* tvb, gint offset, gint len, gint* next_
 	}
 	else
 	{
-		tvb_current_len = tvb_reported_length_remaining(tvb, offset);
+		tvb_current_len = tvb_length_remaining(tvb,offset);
 	}
 
 	return tvb_current_len;
@@ -1830,10 +2193,10 @@ static gint tvb_find_null_line(tvbuff_t* tvb, gint offset, gint len, gint* next_
  */
 static gint tvb_find_dot_line(tvbuff_t* tvb, gint offset, gint len, gint* next_offset)
 {
-	gint tvb_current_offset, tvb_current_len, maxoffset, tvb_len;
+	gint tvb_current_offset, tvb_current_len, maxoffset,tvb_len;
 	guint8 tempchar;
 	tvb_current_len = len;
-	tvb_len = tvb_reported_length(tvb);
+	tvb_len = tvb_length(tvb);
 
 	if (len == -1)
 	{
@@ -1860,7 +2223,7 @@ static gint tvb_find_dot_line(tvbuff_t* tvb, gint offset, gint len, gint* next_o
 		/* Do we have and characters following the . ? */
 		if (tvb_current_offset < maxoffset)
 		{
-			tempchar = tvb_get_guint8(tvb, tvb_current_offset+1);
+			tempchar = tvb_get_guint8(tvb,tvb_current_offset+1);
 			/* Are the characters that follow the dot a newline or carriage return ? */
 			if (tempchar == '\r' || tempchar == '\n')
 			{
@@ -1871,7 +2234,7 @@ static gint tvb_find_dot_line(tvbuff_t* tvb, gint offset, gint len, gint* next_o
 				}
 				else
 				{
-					tempchar = tvb_get_guint8(tvb, tvb_current_offset-1);
+					tempchar = tvb_get_guint8(tvb,tvb_current_offset-1);
 
 					/* Are the characters that follow the dot a newline or a
 					   carriage return ? */
@@ -1891,7 +2254,7 @@ static gint tvb_find_dot_line(tvbuff_t* tvb, gint offset, gint len, gint* next_o
 			}
 			else
 			{
-				tempchar = tvb_get_guint8(tvb, tvb_current_offset-1);
+				tempchar = tvb_get_guint8(tvb,tvb_current_offset-1);
 				if (tempchar == '\r' || tempchar == '\n')
 				{
 					break;
@@ -1912,7 +2275,7 @@ static gint tvb_find_dot_line(tvbuff_t* tvb, gint offset, gint len, gint* next_o
 	}
 	else
 	{
-		tvb_find_line_end(tvb, tvb_current_offset, tvb_current_len, next_offset, FALSE);
+		tvb_find_line_end(tvb,tvb_current_offset,tvb_current_len,next_offset,FALSE);
 	}
 
 	if (tvb_current_offset == offset)
@@ -1927,392 +2290,3 @@ static gint tvb_find_dot_line(tvbuff_t* tvb, gint offset, gint len, gint* next_o
 	return tvb_current_len;
 }
 
-/* Register all the bits needed with the filtering engine */
-
-void proto_register_mgcp(void);
-void proto_reg_handoff_mgcp(void);
-
-void proto_register_mgcp(void)
-{
-	static hf_register_info hf[] =
-		{
-			{ &hf_mgcp_req,
-			  { "Request", "mgcp.req", FT_BOOLEAN, BASE_NONE, NULL, 0x0,
-			    "True if MGCP request", HFILL }},
-			{ &hf_mgcp_rsp,
-			  { "Response", "mgcp.rsp", FT_BOOLEAN, BASE_NONE, NULL, 0x0,
-			    "TRUE if MGCP response", HFILL }},
-			{ &hf_mgcp_req_frame,
-			  { "Request Frame", "mgcp.reqframe", FT_FRAMENUM, BASE_NONE, NULL, 0,
-			    NULL, HFILL }},
-			{ &hf_mgcp_rsp_frame,
-			  { "Response Frame", "mgcp.rspframe", FT_FRAMENUM, BASE_NONE, NULL, 0,
-			    NULL, HFILL }},
-			{ &hf_mgcp_time,
-			  { "Time from request", "mgcp.time", FT_RELATIVE_TIME, BASE_NONE, NULL, 0,
-			    "Timedelta between Request and Response", HFILL }},
-			{ &hf_mgcp_req_verb,
-			  { "Verb", "mgcp.req.verb", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Name of the verb", HFILL }},
-			{ &hf_mgcp_req_endpoint,
-			  { "Endpoint", "mgcp.req.endpoint", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Endpoint referenced by the message", HFILL }},
-			{ &hf_mgcp_transid,
-			  { "Transaction ID", "mgcp.transid", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Transaction ID of this message", HFILL }},
-			{ &hf_mgcp_version,
-			  { "Version", "mgcp.version", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "MGCP Version", HFILL }},
-			{ &hf_mgcp_rsp_rspcode,
-			  { "Response Code", "mgcp.rsp.rspcode", FT_UINT32, BASE_DEC|BASE_EXT_STRING, &mgcp_return_code_vals_ext, 0x0,
-			    NULL, HFILL }},
-			{ &hf_mgcp_rsp_rspstring,
-			  { "Response String", "mgcp.rsp.rspstring", FT_STRING, BASE_NONE, NULL, 0x0,
-			    NULL, HFILL }},
-			{ &hf_mgcp_params,
-			  { "Parameters", "mgcp.params", FT_NONE, BASE_NONE, NULL, 0x0,
-			    "MGCP parameters", HFILL }},
-			{ &hf_mgcp_param_rspack,
-			  { "ResponseAck (K)", "mgcp.param.rspack", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Response Ack", HFILL }},
-			{ &hf_mgcp_param_bearerinfo,
-			  { "BearerInformation (B)", "mgcp.param.bearerinfo", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Bearer Information", HFILL }},
-			{ &hf_mgcp_param_callid,
-			  { "CallId (C)", "mgcp.param.callid", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Call Id", HFILL }},
-			{ &hf_mgcp_param_connectionid,
-			  {"ConnectionIdentifier (I)", "mgcp.param.connectionid", FT_STRING, BASE_NONE, NULL, 0x0,
-			   "Connection Identifier", HFILL }},
-			{ &hf_mgcp_param_secondconnectionid,
-			  { "SecondConnectionID (I2)", "mgcp.param.secondconnectionid", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Second Connection Identifier", HFILL }},
-			{ &hf_mgcp_param_notifiedentity,
-			  { "NotifiedEntity (N)", "mgcp.param.notifiedentity", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Notified Entity", HFILL }},
-			{ &hf_mgcp_param_requestid,
-			  { "RequestIdentifier (X)", "mgcp.param.requestid", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Request Identifier", HFILL }},
-			{ &hf_mgcp_param_localconnoptions,
-			  { "LocalConnectionOptions (L)", "mgcp.param.localconnectionoptions", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Local Connection Options", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_p,
-			  { "Packetization period (p)", "mgcp.param.localconnectionoptions.p", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Packetization period", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_a,
-			  { "Codecs (a)", "mgcp.param.localconnectionoptions.a", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Codecs", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_s,
-			  { "Silence Suppression (s)", "mgcp.param.localconnectionoptions.s", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Silence Suppression", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_e,
-			  { "Echo Cancellation (e)", "mgcp.param.localconnectionoptions.e", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Echo Cancellation", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_scrtp,
-			  { "RTP ciphersuite (sc-rtp)", "mgcp.param.localconnectionoptions.scrtp", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "RTP ciphersuite", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_scrtcp,
-			  { "RTCP ciphersuite (sc-rtcp)", "mgcp.param.localconnectionoptions.scrtcp", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "RTCP ciphersuite", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_b,
-			  { "Bandwidth (b)", "mgcp.param.localconnectionoptions.b", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Bandwidth", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_esccd,
-			  { "Content Destination (es-ccd)", "mgcp.param.localconnectionoptions.esccd", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Content Destination", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_escci,
-			  { "Content Identifier (es-cci)", "mgcp.param.localconnectionoptions.escci", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Content Identifier", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_dqgi,
-			  { "D-QoS GateID (dq-gi)", "mgcp.param.localconnectionoptions.dqgi", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "D-QoS GateID", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_dqrd,
-			  { "D-QoS Reserve Destination (dq-rd)", "mgcp.param.localconnectionoptions.dqrd", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "D-QoS Reserve Destination", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_dqri,
-			  { "D-QoS Resource ID (dq-ri)", "mgcp.param.localconnectionoptions.dqri", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "D-QoS Resource ID", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_dqrr,
-			  { "D-QoS Resource Reservation (dq-rr)", "mgcp.param.localconnectionoptions.dqrr", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "D-QoS Resource Reservation", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_k,
-			  { "Encryption Key (k)", "mgcp.param.localconnectionoptions.k", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Encryption Key", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_gc,
-			  { "Gain Control (gc)", "mgcp.param.localconnectionoptions.gc", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Gain Control", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_fmtp,
-			  { "Media Format (fmtp)", "mgcp.param.localconnectionoptions.fmtp", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Media Format", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_nt,
-			  { "Network Type (nt)", "mgcp.param.localconnectionoptions.nt", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Network Type", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_ofmtp,
-			  { "Optional Media Format (o-fmtp)", "mgcp.param.localconnectionoptions.ofmtp", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Optional Media Format", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_r,
-			  { "Resource Reservation (r)", "mgcp.param.localconnectionoptions.r", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Resource Reservation", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_t,
-			  { "Type of Service (r)", "mgcp.param.localconnectionoptions.t", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Type of Service", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_rcnf,
-			  { "Reservation Confirmation (r-cnf)", "mgcp.param.localconnectionoptions.rcnf", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Reservation Confirmation", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_rdir,
-			  { "Reservation Direction (r-dir)", "mgcp.param.localconnectionoptions.rdir", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Reservation Direction", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_rsh,
-			  { "Resource Sharing (r-sh)", "mgcp.param.localconnectionoptions.rsh", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Resource Sharing", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_mp,
-			  { "Multiple Packetization period (mp)", "mgcp.param.localconnectionoptions.mp", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Multiple Packetization period", HFILL }},
-			{ &hf_mgcp_param_localconnoptions_fxr,
-			  { "FXR (fxr/fx)", "mgcp.param.localconnectionoptions.fxr", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "FXR", HFILL }},
-			{ &hf_mgcp_param_connectionmode,
-			  { "ConnectionMode (M)", "mgcp.param.connectionmode", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Connection Mode", HFILL }},
-			{ &hf_mgcp_param_reqevents,
-			  { "RequestedEvents (R)", "mgcp.param.reqevents", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Requested Events", HFILL }},
-			{ &hf_mgcp_param_signalreq,
-			  { "SignalRequests (S)", "mgcp.param.signalreq", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Signal Request", HFILL }},
-			{ &hf_mgcp_param_restartmethod,
-			  { "RestartMethod (RM)", "mgcp.param.restartmethod", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Restart Method", HFILL }},
-			{ &hf_mgcp_param_restartdelay,
-			  { "RestartDelay (RD)", "mgcp.param.restartdelay", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Restart Delay", HFILL }},
-			{ &hf_mgcp_param_digitmap,
-			  { "DigitMap (D)", "mgcp.param.digitmap", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Digit Map", HFILL }},
-			{ &hf_mgcp_param_observedevent,
-			  { "ObservedEvents (O)", "mgcp.param.observedevents", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Observed Events", HFILL }},
-			{ &hf_mgcp_param_connectionparam,
-			  { "ConnectionParameters (P)", "mgcp.param.connectionparam", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Connection Parameters", HFILL }},
-			{ &hf_mgcp_param_connectionparam_ps,
-			  { "Packets sent (PS)", "mgcp.param.connectionparam.ps", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Packets sent (P:PS)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_os,
-			  { "Octets sent (OS)", "mgcp.param.connectionparam.os", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Octets sent (P:OS)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_pr,
-			  { "Packets received (PR)", "mgcp.param.connectionparam.pr", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Packets received (P:PR)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_or,
-			  { "Octets received (OR)", "mgcp.param.connectionparam.or", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Octets received (P:OR)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_pl,
-			  { "Packets lost (PL)", "mgcp.param.connectionparam.pl", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Packets lost (P:PL)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_ji,
-			  { "Jitter (JI)", "mgcp.param.connectionparam.ji", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Average inter-packet arrival jitter in milliseconds (P:JI)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_la,
-			  { "Latency (LA)", "mgcp.param.connectionparam.la", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Average latency in milliseconds (P:LA)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_pcrps,
-			  { "Remote Packets sent (PC/RPS)", "mgcp.param.connectionparam.pcrps", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Remote Packets sent (P:PC/RPS)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_pcros,
-			  { "Remote Octets sent (PC/ROS)", "mgcp.param.connectionparam.pcros", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Remote Octets sent (P:PC/ROS)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_pcrpl,
-			  { "Remote Packets lost (PC/RPL)", "mgcp.param.connectionparam.pcrpl", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Remote Packets lost (P:PC/RPL)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_pcrji,
-			  { "Remote Jitter (PC/RJI)", "mgcp.param.connectionparam.pcrji", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Remote Jitter (P:PC/RJI)", HFILL }},
-			{ &hf_mgcp_param_connectionparam_x,
-			  { "Vendor Extension", "mgcp.param.connectionparam.x", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Vendor Extension (P:X-*)", HFILL }},
-			{ &hf_mgcp_param_reasoncode,
-			  { "ReasonCode (E)", "mgcp.param.reasoncode", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Reason Code", HFILL }},
-			{ &hf_mgcp_param_eventstates,
-			  { "EventStates (ES)", "mgcp.param.eventstates", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Event States", HFILL }},
-			{ &hf_mgcp_param_specificendpoint,
-			  { "SpecificEndpointID (Z)", "mgcp.param.specificendpointid", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Specific Endpoint ID", HFILL }},
-			{ &hf_mgcp_param_secondendpointid,
-			  { "SecondEndpointID (Z2)", "mgcp.param.secondendpointid", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Second Endpoint ID", HFILL }},
-			{ &hf_mgcp_param_reqinfo,
-			  { "RequestedInfo (F)", "mgcp.param.reqinfo", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Requested Info", HFILL }},
-			{ &hf_mgcp_param_quarantinehandling,
-			  { "QuarantineHandling (Q)", "mgcp.param.quarantinehandling", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Quarantine Handling", HFILL }},
-			{ &hf_mgcp_param_detectedevents,
-			  { "DetectedEvents (T)", "mgcp.param.detectedevents", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Detected Events", HFILL }},
-			{ &hf_mgcp_param_capabilities,
-			  { "Capabilities (A)", "mgcp.param.capabilities", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Capabilities", HFILL }},
-			{ &hf_mgcp_param_maxmgcpdatagram,
-			  {"MaxMGCPDatagram (MD)", "mgcp.param.maxmgcpdatagram", FT_STRING, BASE_NONE, NULL, 0x0,
-			   "Maximum MGCP Datagram size", HFILL }},
-			{ &hf_mgcp_param_packagelist,
-			  {"PackageList (PL)", "mgcp.param.packagelist", FT_STRING, BASE_NONE, NULL, 0x0,
-			   "Package List", HFILL }},
-			{ &hf_mgcp_param_extension,
-			  { "Extension Parameter (non-critical)", "mgcp.param.extension", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Extension Parameter", HFILL }},
-			{ &hf_mgcp_param_extension_critical,
-			  { "Extension Parameter (critical)", "mgcp.param.extensioncritical", FT_STRING, BASE_NONE, NULL, 0x0,
-			    "Critical Extension Parameter", HFILL }},
-			{ &hf_mgcp_param_invalid,
-			  { "Invalid Parameter", "mgcp.param.invalid", FT_STRING, BASE_NONE, NULL, 0x0,
-			    NULL, HFILL }},
-			{ &hf_mgcp_messagecount,
-			  { "MGCP Message Count", "mgcp.messagecount", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    "Number of MGCP message in a packet", HFILL }},
-			{ &hf_mgcp_dup,
-			  { "Duplicate Message", "mgcp.dup", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    NULL, HFILL }},
-			{ &hf_mgcp_req_dup,
-			  { "Duplicate Request", "mgcp.req.dup", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    NULL, HFILL }},
-			{ &hf_mgcp_req_dup_frame,
-			  { "Original Request Frame", "mgcp.req.dup.frame", FT_FRAMENUM, BASE_NONE, NULL, 0x0,
-			    "Frame containing original request", HFILL }},
-			{ &hf_mgcp_rsp_dup,
-			  { "Duplicate Response", "mgcp.rsp.dup", FT_UINT32, BASE_DEC, NULL, 0x0,
-			    NULL, HFILL }},
-			{ &hf_mgcp_rsp_dup_frame,
-			  { "Original Response Frame", "mgcp.rsp.dup.frame", FT_FRAMENUM, BASE_NONE, NULL, 0x0,
-			    "Frame containing original response", HFILL }},
-			{ &hf_mgcp_unknown_parameter,
-			  { "Unknown parameter", "mgcp.unknown_parameter", FT_STRING, BASE_NONE, NULL, 0x0,
-			    NULL, HFILL }},
-			{ &hf_mgcp_malformed_parameter,
-			  { "Malformed parameter", "mgcp.rsp.malformed_parameter", FT_STRING, BASE_NONE, NULL, 0x0,
-			    NULL, HFILL }},
-		};
-
-	static gint *ett[] =
-		{
-			&ett_mgcp,
-			&ett_mgcp_param,
-			&ett_mgcp_param_connectionparam,
-			&ett_mgcp_param_localconnectionoptions
-		};
-
-	module_t *mgcp_module;
-
-	/* Register protocol */
-	proto_mgcp = proto_register_protocol("Media Gateway Control Protocol", "MGCP", "mgcp");
-	proto_register_field_array(proto_mgcp, hf, array_length(hf));
-	proto_register_subtree_array(ett, array_length(ett));
-	register_init_routine(&mgcp_init_protocol);
-
-	new_register_dissector("mgcp", dissect_mgcp, proto_mgcp);
-
-	/* Register our configuration options */
-	mgcp_module = prefs_register_protocol(proto_mgcp, proto_reg_handoff_mgcp);
-
-	prefs_register_uint_preference(mgcp_module, "tcp.gateway_port",
-				       "MGCP Gateway TCP Port",
-				       "Set the UDP port for gateway messages "
-				       "(if other than the default of 2427)",
-				       10, &global_mgcp_gateway_tcp_port);
-
-	prefs_register_uint_preference(mgcp_module, "udp.gateway_port",
-				       "MGCP Gateway UDP Port",
-				       "Set the TCP port for gateway messages "
-				       "(if other than the default of 2427)",
-				       10, &global_mgcp_gateway_udp_port);
-
-	prefs_register_uint_preference(mgcp_module, "tcp.callagent_port",
-				       "MGCP Callagent TCP Port",
-				       "Set the TCP port for callagent messages "
-				       "(if other than the default of 2727)",
-				       10, &global_mgcp_callagent_tcp_port);
-
-	prefs_register_uint_preference(mgcp_module, "udp.callagent_port",
-				       "MGCP Callagent UDP Port",
-				       "Set the UDP port for callagent messages "
-				       "(if other than the default of 2727)",
-				       10, &global_mgcp_callagent_udp_port);
-
-
-	prefs_register_bool_preference(mgcp_module, "display_raw_text",
-				       "Display raw text for MGCP message",
-				       "Specifies that the raw text of the "
-				       "MGCP message should be displayed "
-				       "instead of (or in addition to) the "
-				       "dissection tree",
-				       &global_mgcp_raw_text);
-
-	prefs_register_obsolete_preference(mgcp_module, "display_dissect_tree");
-
-	prefs_register_bool_preference(mgcp_module, "display_mgcp_message_count",
-				       "Display the number of MGCP messages",
-				       "Display the number of MGCP messages "
-				       "found in a packet in the protocol column.",
-				       &global_mgcp_message_count);
-
-	mgcp_tap = register_tap("mgcp");
-}
-
-/* The registration hand-off routine */
-void proto_reg_handoff_mgcp(void)
-{
-	static gboolean mgcp_prefs_initialized = FALSE;
-	static dissector_handle_t mgcp_tpkt_handle;
-	/*
-	 * Variables to allow for proper deletion of dissector registration when
-	 * the user changes port from the gui.
-	 */
-	static guint gateway_tcp_port;
-	static guint gateway_udp_port;
-	static guint callagent_tcp_port;
-	static guint callagent_udp_port;
-
-	if (!mgcp_prefs_initialized)
-	{
-		/* Get a handle for the SDP dissector. */
-		sdp_handle = find_dissector("sdp");
-		mgcp_handle = new_create_dissector_handle(dissect_mgcp, proto_mgcp);
-		mgcp_tpkt_handle = new_create_dissector_handle(dissect_tpkt_mgcp, proto_mgcp);
-		mgcp_prefs_initialized = TRUE;
-	}
-	else
-	{
-		dissector_delete_uint("tcp.port", gateway_tcp_port,   mgcp_tpkt_handle);
-		dissector_delete_uint("udp.port", gateway_udp_port,   mgcp_handle);
-		dissector_delete_uint("tcp.port", callagent_tcp_port, mgcp_tpkt_handle);
-		dissector_delete_uint("udp.port", callagent_udp_port, mgcp_handle);
-	}
-
-	/* Set our port number for future use */
-	gateway_tcp_port = global_mgcp_gateway_tcp_port;
-	gateway_udp_port = global_mgcp_gateway_udp_port;
-
-	callagent_tcp_port = global_mgcp_callagent_tcp_port;
-	callagent_udp_port = global_mgcp_callagent_udp_port;
-
-	dissector_add_uint("tcp.port", global_mgcp_gateway_tcp_port,   mgcp_tpkt_handle);
-	dissector_add_uint("udp.port", global_mgcp_gateway_udp_port,   mgcp_handle);
-	dissector_add_uint("tcp.port", global_mgcp_callagent_tcp_port, mgcp_tpkt_handle);
-	dissector_add_uint("udp.port", global_mgcp_callagent_udp_port, mgcp_handle);
-}
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

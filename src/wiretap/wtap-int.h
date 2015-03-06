@@ -68,18 +68,10 @@ struct wtap {
     int                         file_encap;    /* per-file, for those
                                                 * file formats that have
                                                 * per-file encapsulation
-                                                * types rather than per-packet
-                                                * encapsulation types
+                                                * types
                                                 */
-    int                         file_tsprec;   /* per-file timestamp precision
-                                                * of the fractional part of
-                                                * the time stamp, for those
-                                                * file formats that have
-                                                * per-file timestamp
-                                                * precision rather than
-                                                * per-packet timestamp
-                                                * precision
-                                                * e.g. WTAP_TSPREC_USEC
+    int                         tsprecision;   /* timestamp precision of the lower 32bits
+                                                * e.g. WTAP_FILE_TSPREC_USEC
                                                 */
     wtap_new_ipv4_callback_t    add_new_ipv4;
     wtap_new_ipv6_callback_t    add_new_ipv6;
@@ -95,7 +87,7 @@ typedef void *WFILE_T;
 
 typedef gboolean (*subtype_write_func)(struct wtap_dumper*,
                                        const struct wtap_pkthdr*,
-                                       const guint8*, int*, gchar**);
+                                       const guint8*, int*);
 typedef gboolean (*subtype_close_func)(struct wtap_dumper*, int*);
 
 struct wtap_dumper {
@@ -113,7 +105,7 @@ struct wtap_dumper {
     subtype_close_func      subtype_close;
 
     int                     tsprecision;    /**< timestamp precision of the lower 32bits
-                                             * e.g. WTAP_TSPREC_USEC
+                                             * e.g. WTAP_FILE_TSPREC_USEC
                                              */
     addrinfo_lists_t        *addrinfo_lists;        /**< Struct containing lists of resolved addresses */
     struct wtapng_section_s *shb_hdr;
@@ -245,6 +237,33 @@ extern gint wtap_num_file_types;
     }
 #endif
 
+#define wtap_file_read_unknown_bytes(target, num_bytes, fh, err, err_info) \
+    G_STMT_START \
+    { \
+        int _bytes_read; \
+        _bytes_read = file_read((target), (num_bytes), (fh)); \
+        if (_bytes_read != (int) (num_bytes)) { \
+            *(err) = file_error((fh), (err_info)); \
+            return FALSE; \
+        } \
+    } \
+    G_STMT_END
+
+#define wtap_file_read_expected_bytes(target, num_bytes, fh, err, err_info) \
+    G_STMT_START \
+    { \
+        int _bytes_read; \
+        _bytes_read = file_read((target), (num_bytes), (fh)); \
+        if (_bytes_read != (int) (num_bytes)) { \
+            *(err) = file_error((fh), (err_info)); \
+            if (*(err) == 0 && _bytes_read > 0) { \
+                *(err) = WTAP_ERR_SHORT_READ; \
+            } \
+            return FALSE; \
+        } \
+    } \
+    G_STMT_END
+
 /* glib doesn't have g_ptr_array_len of all things!*/
 #ifndef g_ptr_array_len
 #define g_ptr_array_len(a)      ((a)->len)
@@ -252,43 +271,6 @@ extern gint wtap_num_file_types;
 
 /*** get GSList of all compressed file extensions ***/
 GSList *wtap_get_compressed_file_extensions(void);
-
-/*
- * Read a given number of bytes from a file.
- *
- * If we succeed, return TRUE.
- *
- * If we get an EOF, return FALSE with *err set to 0, reporting this
- * as an EOF.
- *
- * If we get fewer bytes than the specified number, return FALSE with
- * *err set to WTAP_ERR_SHORT_READ, reporting this as a short read
- * error.
- *
- * If we get a read error, return FALSE with *err and *err_info set
- * appropriately.
- */
-WS_DLL_PUBLIC
-gboolean
-wtap_read_bytes_or_eof(FILE_T fh, void *buf, unsigned int count, int *err,
-    gchar **err_info);
-
-/*
- * Read a given number of bytes from a file.
- *
- * If we succeed, return TRUE.
- *
- * If we get fewer bytes than the specified number, including getting
- * an EOF, return FALSE with *err set to WTAP_ERR_SHORT_READ, reporting
- * this as a short read error.
- *
- * If we get a read error, return FALSE with *err and *err_info set
- * appropriately.
- */
-WS_DLL_PUBLIC
-gboolean
-wtap_read_bytes(FILE_T fh, void *buf, unsigned int count, int *err,
-    gchar **err_info);
 
 /*
  * Read packet data into a Buffer, growing the buffer as necessary.

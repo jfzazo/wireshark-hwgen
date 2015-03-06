@@ -32,14 +32,17 @@
 #include <string.h>
 
 #include <gtk/gtk.h>
+#include <glib.h>
 
 #include "packet_list_store.h"
 
 #include "ui/progress_dlg.h"
 #include "ui/ui_util.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 #include <epan/epan_dissect.h>
+#include <epan/column-info.h>
 #include <epan/column.h>
 
 #include "color.h"
@@ -599,7 +602,7 @@ packet_list_append_record(PacketList *packet_list, frame_data *fdata)
 
 	g_return_val_if_fail(PACKETLIST_IS_LIST(packet_list), -1);
 
-	newrecord = wmem_new(wmem_file_scope(), PacketListRecord);
+	newrecord = se_new(PacketListRecord);
 	newrecord->colorized    = FALSE;
 	newrecord->col_text_len = NULL;
 	newrecord->col_text     = NULL;
@@ -1101,19 +1104,19 @@ packet_list_dissect_and_cache_record(PacketList *packet_list, PacketListRecord *
 	g_return_if_fail(packet_list);
 	g_return_if_fail(PACKETLIST_IS_LIST(packet_list));
 
-	wtap_phdr_init(&phdr);
+	memset(&phdr, 0, sizeof(struct wtap_pkthdr));
 
 	fdata = record->fdata;
 
 	if (dissect_columns) {
 		cinfo = &cfile.cinfo;
 
-		record->col_text     = (const gchar **)wmem_alloc0(wmem_file_scope(), sizeof(*record->col_text) * packet_list->n_text_cols);
-		record->col_text_len = (gushort *)wmem_alloc0(wmem_file_scope(), sizeof(*record->col_text_len) * packet_list->n_text_cols);
+		record->col_text     = (const gchar **)se_alloc0(sizeof(*record->col_text) * packet_list->n_text_cols);
+		record->col_text_len = (gushort *)se_alloc0(sizeof(*record->col_text_len) * packet_list->n_text_cols);
 	} else
 		cinfo = NULL;
 
-	ws_buffer_init(&buf, 1500);
+	buffer_init(&buf, 1500);
 	if (!cf_read_record_r(&cfile, fdata, &phdr, &buf)) {
 		/*
 		 * Error reading the record.
@@ -1135,7 +1138,7 @@ packet_list_dissect_and_cache_record(PacketList *packet_list, PacketListRecord *
 			fdata->color_filter = NULL;
 			record->colorized = TRUE;
 		}
-		ws_buffer_free(&buf);
+		buffer_free(&buf);
 		return;	/* error reading the record */
 	}
 
@@ -1172,8 +1175,7 @@ packet_list_dissect_and_cache_record(PacketList *packet_list, PacketListRecord *
 		record->colorized = TRUE;
 
 	epan_dissect_cleanup(&edt);
-	wtap_phdr_cleanup(&phdr);
-	ws_buffer_free(&buf);
+	buffer_free(&buf);
 }
 
 void

@@ -22,15 +22,15 @@
 #ifndef INTERFACE_TREE_H
 #define INTERFACE_TREE_H
 
-#include <config.h>
+#include "config.h"
 
 #include <glib.h>
 
 #ifdef HAVE_LIBPCAP
-#include "ui/capture.h"
-#include "caputils/capture-pcap-util.h"
+#include "capture.h"
+#include "capture-pcap-util.h"
 #include "capture_opts.h"
-#include "ui/capture_ui_utils.h"
+#include "capture_ui_utils.h"
 #endif
 
 #include <QTreeWidget>
@@ -48,7 +48,6 @@ protected:
     void hideEvent(QHideEvent *evt);
     void showEvent(QShowEvent *evt);
     void resizeEvent(QResizeEvent *evt);
-    void display();
 
 private:
 #ifdef HAVE_LIBPCAP
@@ -65,8 +64,6 @@ public slots:
     // change_interface_selection_for_all
     //void getPoints(int row, QList<int> *pts);
     void getPoints(int row, PointList *pts);
-    void setSelectedInterfaces();
-    void interfaceListChanged();
 
 private slots:
     void getInterfaceList();

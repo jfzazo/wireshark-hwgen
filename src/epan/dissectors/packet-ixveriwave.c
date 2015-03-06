@@ -24,9 +24,14 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 #include <epan/crc32-tvb.h>
+#include <epan/wmem/wmem.h>
+
+#include "packet-eth.h"
 
 void proto_register_ixveriwave(void);
 void proto_reg_handoff_ixveriwave(void);
@@ -508,7 +513,7 @@ dissect_ixveriwave(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     }
 
     /* Grab the rest of the frame. */
-    next_tvb = tvb_new_subset_remaining(tvb, length);
+    next_tvb = tvb_new_subset(tvb, length, -1, -1);
 
     /* dissect the ethernet or wlan header next */
     if (version == ETHERNET_PORT)
@@ -667,7 +672,7 @@ ethernettap_dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_t
     }
 
     /* Grab the rest of the frame. */
-    next_tvb = tvb_new_subset_remaining(tvb, length);
+    next_tvb = tvb_new_subset(tvb, length, -1, -1);
 
     /* dissect the ethernet header next */
     call_dissector(ethernet_handle, next_tvb, pinfo, tree);
@@ -948,7 +953,7 @@ wlantap_dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_tree 
         pinfo->pseudo_header->ieee_802_11.fcs_len = 0;
 
     /* Grab the rest of the frame. */
-    next_tvb = tvb_new_subset_remaining(tvb, length);
+    next_tvb = tvb_new_subset(tvb, length, -1, -1);
 
     /* If we had an in-header FCS, check it. */
     if (hdr_fcs_ti) {
@@ -1455,15 +1460,3 @@ void proto_reg_handoff_ixveriwave(void)
     dissector_add_uint("wtap_encap", WTAP_ENCAP_IXVERIWAVE, ixveriwave_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

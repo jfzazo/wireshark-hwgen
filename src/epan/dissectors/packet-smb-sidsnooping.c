@@ -24,14 +24,17 @@
 #include "config.h"
 
 #include <stdio.h>
-
-#include <epan/packet.h>
+#include <string.h>
+#include <epan/packet_info.h>
 #include <epan/epan_dissect.h>
+#include <epan/proto.h>
 #include <epan/tap.h>
-#include <wsutil/report_err.h>
+#include <epan/emem.h>
+#include <epan/strutil.h>
 #include "packet-dcerpc.h"
 #include "packet-dcerpc-nt.h"
-#include "packet-smb.h"
+#include "register.h"
+#include <epan/dissectors/packet-smb.h>
 #include "packet-smb-sidsnooping.h"
 
 void proto_register_smb_sidsnooping(void);
@@ -63,7 +66,7 @@ char *
 find_sid_name(const char *sid)
 {
 	sid_name *sn;
-	sid_name  old_sn;
+	sid_name old_sn;
 
 	old_sn.sid=(char*)sid;
 	sn=(sid_name *)g_hash_table_lookup(sid_name_table, &old_sn);
@@ -77,7 +80,7 @@ static void
 add_sid_name_mapping(char *sid, char *name)
 {
 	sid_name *sn;
-	sid_name  old_sn;
+	sid_name old_sn;
 
 	old_sn.sid=sid;
 	sn=(sid_name *)g_hash_table_lookup(sid_name_table, &old_sn);
@@ -346,10 +349,10 @@ sid_snooping_init(void)
 
 
 /* this code needs to be rewritten from scratch
-   disabling it now so that it won't cause wireshark to abort due to
+   disabling it now so that it wont cause wireshark to abort due to
    unknown hf fields
  */
-sid_name_snooping=FALSE;
+sid_name_snooping=0;
 
 	if(!sid_name_snooping){
 		return;
@@ -381,7 +384,7 @@ sid_name_snooping=FALSE;
 	if(error_string){
 		/* error, we failed to attach to the tap. clean up */
 
-		report_failure( "Couldn't register proto_reg_handoff_smb_sidsnooping()/lsa_policy_information tap: %s\n",
+		fprintf(stderr, "tshark: Couldn't register proto_reg_handoff_smb_sidsnooping()/lsa_policy_information tap: %s\n",
 		    error_string->str);
 		g_string_free(error_string, TRUE);
 		return;
@@ -395,7 +398,7 @@ sid_name_snooping=FALSE;
 	if(error_string){
 		/* error, we failed to attach to the tap. clean up */
 
-		report_failure( "Couldn't register proto_reg_handoff_smb_sidsnooping()/samr_query_dispinfo tap: %s\n",
+		fprintf(stderr, "tshark: Couldn't register proto_reg_handoff_smb_sidsnooping()/samr_query_dispinfo tap: %s\n",
 		    error_string->str);
 		g_string_free(error_string, TRUE);
 		return;
@@ -406,18 +409,5 @@ sid_name_snooping=FALSE;
 void
 proto_register_smb_sidsnooping(void)
 {
-	register_init_routine(sid_snooping_init);
+  	register_init_routine(sid_snooping_init);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

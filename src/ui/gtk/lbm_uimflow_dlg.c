@@ -23,12 +23,16 @@
  */
 
 #include "config.h"
+#include <glib.h>
 #include <epan/to_str.h>
+#include <stat_menu.h>
+#include <epan/funnel.h>
 #include <epan/packet.h>
 #include <epan/tap.h>
 #include <gtk/gtk.h>
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
+#include <cfile.h>
 #include <globals.h>
 #include "ui/gtk/graph_analysis.h"
 #include <epan/dissectors/packet-lbm.h>
@@ -56,10 +60,14 @@ static lbm_uimflow_dialog_t dialog_data = { FALSE, -1, NULL, NULL, NULL, select_
 
 static void lbmc_uim_flow_graph_data_init(void)
 {
-    dialog_data.graph_analysis = sequence_analysis_info_new();
+    dialog_data.graph_analysis = (seq_analysis_info_t *)g_malloc0(sizeof(seq_analysis_info_t));
     dialog_data.graph_analysis->type = SEQ_ANALYSIS_ANY;
     dialog_data.graph_analysis->all_packets = TRUE;
     dialog_data.graph_analysis->any_addr = TRUE;
+    dialog_data.graph_analysis->nconv = 0;
+    dialog_data.graph_analysis->list = NULL;
+    dialog_data.graph_analysis->ht = NULL;
+    dialog_data.graph_analysis->num_nodes = 0;
 }
 
 static void lbmc_uim_flow_toggle_select_all_cb(GtkWidget * widget _U_, gpointer user_data _U_)
@@ -82,10 +90,25 @@ static void lbmc_uim_flow_toggle_select_displayed_cb(GtkWidget * widget _U_, gpo
 
 static void lbmc_uim_flow_tap_reset(void * tap_data _U_)
 {
+    seq_analysis_item_t * graph_item;
+    GList * list;
+
     if (dialog_data.graph_analysis != NULL)
     {
         /* free the graph data items */
-        sequence_analysis_list_free(dialog_data.graph_analysis);
+        list = g_list_first(dialog_data.graph_analysis->list);
+        while (list)
+        {
+            graph_item = (seq_analysis_item_t *)list->data;
+            g_free(graph_item->frame_label);
+            g_free(graph_item->time_str);
+            g_free(graph_item->comment);
+            g_free(list->data);
+            list = g_list_next(list);
+        }
+        g_list_free(dialog_data.graph_analysis->list);
+        dialog_data.graph_analysis->nconv = 0;
+        dialog_data.graph_analysis->list = NULL;
     }
 }
 
@@ -94,8 +117,8 @@ static int lbmc_uim_flow_graph_add_to_graph(packet_info * pinfo, const lbm_uim_s
     lbm_uim_stream_endpoint_t epa;
     lbm_uim_stream_endpoint_t epb;
     seq_analysis_item_t * item;
-    gchar * ctxinst1;
-    gchar * ctxinst2;
+    gchar * ctxinst1 = NULL;
+    gchar * ctxinst2 = NULL;
     gboolean swap_endpoints = FALSE;
     int rc;
 
@@ -179,8 +202,8 @@ static int lbmc_uim_flow_graph_add_to_graph(packet_info * pinfo, const lbm_uim_s
     }
     if (epa.type == lbm_uim_instance_stream)
     {
-        ctxinst1 = bytes_to_str(pinfo->pool, epa.stream_info.ctxinst.ctxinst, sizeof(epa.stream_info.ctxinst.ctxinst));
-        ctxinst2 = bytes_to_str(pinfo->pool, epb.stream_info.ctxinst.ctxinst, sizeof(epb.stream_info.ctxinst.ctxinst));
+        ctxinst1 = bytes_to_ep_str(epa.stream_info.ctxinst.ctxinst, sizeof(epa.stream_info.ctxinst.ctxinst));
+        ctxinst2 = bytes_to_ep_str(epb.stream_info.ctxinst.ctxinst, sizeof(epb.stream_info.ctxinst.ctxinst));
         item->comment = g_strdup_printf("%s <-> %s [%" G_GUINT64_FORMAT "]",
             ctxinst1,
             ctxinst2,
@@ -190,17 +213,17 @@ static int lbmc_uim_flow_graph_add_to_graph(packet_info * pinfo, const lbm_uim_s
     {
         item->comment = g_strdup_printf("%" G_GUINT32_FORMAT ":%s:%" G_GUINT16_FORMAT " <-> %" G_GUINT32_FORMAT ":%s:%" G_GUINT16_FORMAT " [%" G_GUINT64_FORMAT "]",
             epa.stream_info.dest.domain,
-            address_to_str(pinfo->pool, &(epa.stream_info.dest.addr)),
+            address_to_str(wmem_packet_scope(), &(epa.stream_info.dest.addr)),
             epa.stream_info.dest.port,
             epb.stream_info.dest.domain,
-            address_to_str(pinfo->pool, &(epb.stream_info.dest.addr)),
+            address_to_str(wmem_packet_scope(), &(epb.stream_info.dest.addr)),
             epb.stream_info.dest.port,
             stream_info->channel);
     }
     item->conv_num = (guint16)LBM_CHANNEL_ID(stream_info->channel);
     item->display = TRUE;
     item->line_style = 1;
-    g_queue_push_tail(dialog_data.graph_analysis->items, item);
+    dialog_data.graph_analysis->list = g_list_prepend(dialog_data.graph_analysis->list, (gpointer)item);
     return (1);
 }
 
@@ -257,8 +280,9 @@ static void lbmc_uim_flow_graph_on_ok_cb(GtkButton * button _U_, gpointer user_d
         dialog_data.have_tap_listener = TRUE;
     }
     cf_retap_packets(&cfile);
+    dialog_data.graph_analysis->list = g_list_reverse(dialog_data.graph_analysis->list);
     /* Fill in the timestamps. */
-    list = g_queue_peek_nth_link(dialog_data.graph_analysis->items, 0);
+    list = g_list_first(dialog_data.graph_analysis->list);
     while (list != NULL)
     {
         seq_analysis_item_t * seq_item = (seq_analysis_item_t *)list->data;
@@ -288,7 +312,7 @@ static void lbmc_uim_flow_graph_on_destroy_cb(GtkWidget * widget _U_, gpointer u
     g_assert(dialog_data.graph_analysis != NULL);
     g_assert(dialog_data.graph_analysis_data != NULL);
 
-    sequence_analysis_info_free(dialog_data.graph_analysis);
+    g_free(dialog_data.graph_analysis);
     dialog_data.graph_analysis = NULL;
 
     g_free(dialog_data.graph_analysis_data);

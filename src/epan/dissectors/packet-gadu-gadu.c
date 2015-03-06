@@ -27,9 +27,13 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
-#include "packet-tcp.h"
+#include <epan/wmem/wmem.h>
+
+#include <epan/dissectors/packet-tcp.h>
 
 void proto_register_gadu_gadu(void);
 void proto_reg_handoff_gadu_gadu(void);
@@ -492,10 +496,6 @@ static header_field_info hfi_gadu_gadu_userlist_format GADU_GADU_HFI_INIT =
 
 static header_field_info hfi_gadu_gadu_userlist_reply_type GADU_GADU_HFI_INIT =
 	{ "Reply type", "gadu-gadu.userlist.reply_type", FT_UINT32, BASE_HEX, gadu_gadu_userlist_reply_type_vals, 0x00, NULL, HFILL };
-
-static header_field_info hfi_gadu_gadu_userlist GADU_GADU_HFI_INIT =
-	{ "Userlist XML data", "gadu-gadu.userlist", FT_BYTES, BASE_NONE, NULL, 0x00, NULL, HFILL };
-
 
 /* Public Directory (gadu-gadu.pubdir.*) */
 static header_field_info hfi_gadu_gadu_pubdir_request_type GADU_GADU_HFI_INIT =
@@ -1352,12 +1352,13 @@ static int
 dissect_gadu_gadu_notify_common(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset)
 {
 	proto_tree *contact_tree;
+	proto_item *ti;
 
 	while (tvb_reported_length_remaining(tvb, offset) >= 4+1) {
 		guint32 uin = tvb_get_letohl(tvb, offset);
 
-		contact_tree = proto_tree_add_subtree_format(tree, tvb, offset, 5,
-								ett_gadu_gadu_contact, NULL, "Contact: %u", uin);
+		ti = proto_tree_add_text(tree, tvb, offset, 5, "Contact: %u", uin);
+		contact_tree = proto_item_add_subtree(ti, ett_gadu_gadu_contact);
 
 		proto_tree_add_item(contact_tree, &hfi_gadu_gadu_contact_uin, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 		offset += 4;
@@ -1398,7 +1399,8 @@ dissect_gadu_gadu_notify105(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
 		char *uin;
 
-		contact_tree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_gadu_gadu_contact, &ti, "Contact: ");
+		ti = proto_tree_add_text(tree, tvb, offset, 0, "Contact: ");
+		contact_tree = proto_item_add_subtree(ti, ett_gadu_gadu_contact);
 
 		offset = dissect_gadu_gadu_notify105_common(tvb, contact_tree, offset, &uin);
 		proto_item_append_text(ti, "%s", uin);
@@ -1440,14 +1442,14 @@ dissect_gadu_gadu_userlist_xml_compressed(tvbuff_t *tvb, packet_info *pinfo, pro
 		return offset;
 
 	if ((uncomp_tvb = tvb_child_uncompress(tvb, tvb, offset, remain))) {
-		proto_tree_add_bytes_format_value(tree, hfi_gadu_gadu_userlist.id, tvb, offset, remain, NULL, "[Decompression succeeded]");
+		proto_tree_add_text(tree, tvb, offset, remain, "Userlist XML data: [Decompression succeeded]");
 
 		add_new_data_source(pinfo, uncomp_tvb, "Uncompressed userlist");
 
 		/* XXX add DTD (pinfo->match_string) */
 		call_dissector_only(xml_handle, uncomp_tvb, pinfo, tree, NULL);
 	} else
-		proto_tree_add_bytes_format_value(tree, hfi_gadu_gadu_userlist.id, tvb, offset, remain, NULL, "[Error: Decompression failed] (or no libz)");
+		proto_tree_add_text(tree, tvb, offset, remain, "Userlist XML data: [Error: Decompression failed] (or no libz)");
 
 	offset += remain;
 
@@ -1975,8 +1977,7 @@ dissect_gadu_gadu_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void*
 }
 
 static guint
-get_gadu_gadu_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                      int offset, void *data _U_)
+get_gadu_gadu_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
 	guint32 len = tvb_get_letohl(tvb, offset + 4);
 
@@ -2025,7 +2026,6 @@ proto_register_gadu_gadu(void)
 		&hfi_gadu_gadu_userdata_attr_name,
 		&hfi_gadu_gadu_userdata_attr_type,
 		&hfi_gadu_gadu_userdata_attr_value,
-	/* Typing notify */
 		&hfi_gadu_gadu_typing_notify_type,
 		&hfi_gadu_gadu_typing_notify_uin,
 	/* Message common */
@@ -2039,10 +2039,10 @@ proto_register_gadu_gadu(void)
 	/* GG_RECV_MSG80, GG_SEND_MSG80 */
 		&hfi_gadu_gadu_msg80_offset_plain,
 		&hfi_gadu_gadu_msg80_offset_attr,
-	/* GG_SEND_MSG_ACK */
-		&hfi_gadu_gadu_msg_ack_status,
-		&hfi_gadu_gadu_msg_ack_recipient,
-		&hfi_gadu_gadu_msg_ack_seq,
+	/* Contact (notify) common */
+		&hfi_gadu_gadu_contact_uin,
+		&hfi_gadu_gadu_contact_uin_str,
+		&hfi_gadu_gadu_contact_type,
 	/* Status common */
 		&hfi_gadu_gadu_status_uin,
 		&hfi_gadu_gadu_status_status,
@@ -2051,12 +2051,6 @@ proto_register_gadu_gadu(void)
 		&hfi_gadu_gadu_status_version,
 		&hfi_gadu_gadu_status_img_size,
 		&hfi_gadu_gadu_status_descr,
-	/* Direct Connection */
-		&hfi_dcc_type,
-		&hfi_dcc_id,
-		&hfi_dcc_uin_to,
-		&hfi_dcc_uin_from,
-		&hfi_dcc_filename,
 	/* New status (setting status) common */
 		&hfi_gadu_gadu_new_status_status,
 		&hfi_gadu_gadu_new_status_desc,
@@ -2065,7 +2059,12 @@ proto_register_gadu_gadu(void)
 		&hfi_gadu_gadu_userlist_version,
 		&hfi_gadu_gadu_userlist_format,
 		&hfi_gadu_gadu_userlist_reply_type,
-		&hfi_gadu_gadu_userlist,
+	/* Direct Connection */
+		&hfi_dcc_type,
+		&hfi_dcc_id,
+		&hfi_dcc_uin_to,
+		&hfi_dcc_uin_from,
+		&hfi_dcc_filename,
 	/* Public Directory */
 		&hfi_gadu_gadu_pubdir_request_type,
 		&hfi_gadu_gadu_pubdir_request_seq,
@@ -2073,12 +2072,12 @@ proto_register_gadu_gadu(void)
 		&hfi_gadu_gadu_pubdir_reply_type,
 		&hfi_gadu_gadu_pubdir_reply_seq,
 		&hfi_gadu_gadu_pubdir_reply_str,
-	/* Contact (notify) common */
-		&hfi_gadu_gadu_contact_uin,
-		&hfi_gadu_gadu_contact_uin_str,
-		&hfi_gadu_gadu_contact_type,
 	/* GG_WELCOME */
 		&hfi_gadu_gadu_welcome_seed,
+	/* GG_SEND_MSG_ACK */
+		&hfi_gadu_gadu_msg_ack_status,
+		&hfi_gadu_gadu_msg_ack_recipient,
+		&hfi_gadu_gadu_msg_ack_seq,
 	/* Not dissected data */
 		&hfi_gadu_gadu_data,
 	};
@@ -2117,15 +2116,3 @@ proto_reg_handoff_gadu_gadu(void)
 	xml_handle = find_dissector("xml");
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

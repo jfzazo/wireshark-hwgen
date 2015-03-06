@@ -28,21 +28,26 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/epan.h>
+#include <epan/stat_cmd_args.h>
 #include <epan/tap.h>
 #include <epan/dissectors/packet-rpc.h>
 
+#include "../stat_menu.h"
+#include "../globals.h"
 
 #include "ui/gtk/gui_stat_menu.h"
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/main.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 #define NANOSECS_PER_SEC 1000000000
 
@@ -421,18 +426,8 @@ gtk_rpcprogs_cb(GtkWidget *w _U_, gpointer data _U_)
 	gtk_rpcprogs_init("", NULL);
 }
 
-static stat_tap_ui rpcprogs_ui = {
-	REGISTER_STAT_GROUP_GENERIC,
-	NULL,
-	"rpc,programs",
-	gtk_rpcprogs_init,
-	-1,
-	0,
-	NULL
-};
-
 void
 register_tap_listener_gtkrpcprogs(void)
 {
-	register_stat_tap_ui(&rpcprogs_ui, NULL);
+	register_stat_cmd_arg("rpc,programs", gtk_rpcprogs_init, NULL);
 }

@@ -25,69 +25,6 @@
 #ifndef PACKET_LBM_H_INCLUDED
 #define PACKET_LBM_H_INCLUDED
 
-/* A list of the taps etc. made available by these dissectors:
-   Taps:
-     lbm_stream
-       - A packet is queued for each UIM (unicast immediate message) LBMC message (or fragment)
-       - The data associated with each tap entry is described by lbm_uim_stream_tap_info_t
-       - A single packet may generate multiple tap entries (in the case that a single packet
-         contains multiple LBMC messages)
-       - An LBMC message that spans multiple packets will cause a single entry to be queued,
-         corresponding to the last packet spanned
-     lbm_uim
-       - A packet is queued for each complete (possibly reassembled) UIM message
-       - The data associated with each tap entry is described by lbm_uim_stream_info_t
-       - A single packet may generate multiple tap entries (in the case that a single packet
-         contains multiple complete UIM messages)
-       - An complete UIM message that spans multiple packets will cause a single entry to be queued,
-         corresponding to the last packet spanned
-     lbm_lbmr_topic_advertisement
-       - A packet is queued for each LBMR topic advertisement (TIR)
-       - The data associated with each tap entry is described by lbm_lbmr_topic_advertisement_tap_info_t
-       - A single LBMR message (which may span multiple IP frames, reassembled into a single UDP packet)
-         may generate multiple tap entries (in the case that a single LBMR message contains multiple topic
-         advertisements)
-     lbm_lbmr_topic_query
-       - A packet is queued for each LBMR topic query (TQR)
-       - The data associated with each tap entry is described by lbm_lbmr_topic_query_tap_info_t
-       - A single LBMR message (which may span multiple IP frames, reassembled into a single UDP packet)
-         may generate multiple tap entries (in the case that a single LBMR message contains multiple topic
-         queries)
-     lbm_lbmr_pattern_query
-       - A packet is queued for each LBMR pattern query (TQR specifying a pattern)
-       - The data associated with each tap entry is described by lbm_lbmr_pattern_query_tap_info_t
-       - A single LBMR message (which may span multiple IP frames, reassembled into a single UDP packet)
-         may generate multiple tap entries (in the case that a single LBMR message contains multiple pattern
-         queries)
-     lbm_lbmr_queue_advertisement
-       - A packet is queued for each LBMR queue advertisement (QIR)
-       - The data associated with each tap entry is described by lbm_lbmr_queue_advertisement_tap_info_t
-       - A single LBMR message (which may span multiple IP frames, reassembled into a single UDP packet)
-         may generate multiple tap entries (in the case that a single LBMR message contains multiple queue
-         advertisements)
-     lbm_lbmr_queue_query
-       - A packet is queued for each LBMR queue query (QQR)
-       - The data associated with each tap entry is described by lbm_lbmr_queue_query_tap_info_t
-       - A single LBMR message (which may span multiple IP frames, reassembled into a single UDP packet)
-         may generate multiple tap entries (in the case that a single LBMR message contains multiple queue
-         queries)
-     lbm_lbtrm
-       - A packet is queued for each LBTRM transport message
-       - The data associated with each tap entry is described by lbm_lbtrm_tap_info_t
-       - A single LBTRM transport message (which may span multiple IP frames, reassembled into a single UDP
-         packet) will generate a single tap entry
-     lbm_lbtru
-       - A packet is queued for each LBTRU transport message
-       - The data associated with each tap entry is described by lbm_lbtru_tap_info_t
-       - A single LBTRU transport message (which may span multiple IP frames, reassembled into a single UDP
-         packet) will generate a single tap entry
-   Heuristic subdissector tables:
-     lbm_msg_payload
-       - If the LBMC preference "Use heuristic sub-dissectors" is enabled, the dissector will call any dissector
-         registered in this table via heur_dissector_add(). This allows a customer plugin to dissect the
-         actual payload of their messages.
-*/
-
 #if defined(__FreeBSD__)
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -98,7 +35,7 @@ typedef guint16 lbm_uint16_t;
 typedef guint32 lbm_uint32_t;
 typedef guint64 lbm_uint64_t;
 #define SIZEOF(TYPE, MEMBER) (gint)(sizeof(((TYPE *)0)->MEMBER))
-#define OFFSETOF(TYPE, MEMBER) ((gint)G_STRUCT_OFFSET(TYPE, MEMBER))
+#define OFFSETOF(TYPE, MEMBER) (gint)((size_t) &((TYPE *)0)->MEMBER)
 #define STRINGIZE(a) #a
 #define MAKESTRING(a) STRINGIZE(a)
 #define LBM_OTID_BLOCK_SZ 32
@@ -107,12 +44,12 @@ typedef guint64 lbm_uint64_t;
 
 /* UAT macros for IPV4 fields. */
 #define UAT_IPV4_CB_DEF(basename,field_name,rec_t) \
-    static gboolean basename ## _ ## field_name ## _chk_cb(void * u1 _U_, const char * strptr, unsigned len _U_, const void * u2 _U_, const void * u3 _U_, char ** err) \
+    static gboolean basename ## _ ## field_name ## _chk_cb(void * u1 _U_, const char * strptr, unsigned len _U_, const void * u2 _U_, const void * u3 _U_, const char ** err) \
     { \
         struct in_addr addr; \
         if (inet_aton(strptr, &addr) == 0) \
         { \
-            *err = g_strdup("invalid address"); \
+            *err = "invalid address"; \
             return (FALSE); \
         } \
         return (TRUE); \
@@ -130,12 +67,12 @@ typedef guint64 lbm_uint64_t;
     {\
         if (((rec_t*)rec)->field_name ) \
         { \
-            *out_ptr = g_strdup((((rec_t*)rec)->field_name)); \
+            *out_ptr = (((rec_t*)rec)->field_name); \
             *out_len = (unsigned)strlen((((rec_t*)rec)->field_name)); \
         } \
         else \
         { \
-            *out_ptr = g_strdup(""); \
+            *out_ptr = ""; \
             *out_len = 0; \
         } \
     }
@@ -145,17 +82,17 @@ typedef guint64 lbm_uint64_t;
 
 /* UAT macros for IPV4 Multicast fields. */
 #define UAT_IPV4_MC_CB_DEF(basename,field_name,rec_t) \
-    static gboolean basename ## _ ## field_name ## _chk_cb(void * u1 _U_, const char * strptr, unsigned len _U_, const void * u2 _U_, const void * u3 _U_, char ** err) \
+    static gboolean basename ## _ ## field_name ## _chk_cb(void * u1 _U_, const char * strptr, unsigned len _U_, const void * u2 _U_, const void * u3 _U_, const char ** err) \
     { \
         struct in_addr addr; \
         if (inet_aton(strptr, &addr) == 0) \
         { \
-            *err = g_strdup("invalid address"); \
+            *err = "invalid address"; \
             return (FALSE); \
         } \
         if (!IN_MULTICAST(g_ntohl(addr.s_addr)) && (g_ntohl(addr.s_addr) != 0)) \
         { \
-            *err = g_strdup("invalid multicast address"); \
+            *err = "invalid multicast address"; \
             return (FALSE); \
         } \
         return (TRUE); \
@@ -173,12 +110,12 @@ typedef guint64 lbm_uint64_t;
     {\
         if (((rec_t*)rec)->field_name ) \
         { \
-            *out_ptr = g_strdup((((rec_t*)rec)->field_name)); \
+            *out_ptr = (((rec_t*)rec)->field_name); \
             *out_len = (unsigned)strlen((((rec_t*)rec)->field_name)); \
         } \
         else \
         { \
-            *out_ptr = g_strdup(""); \
+            *out_ptr = ""; \
             *out_len = 0; \
         } \
     }
@@ -255,51 +192,6 @@ typedef struct
     guint16 rst_type;
     guint32 * sqns;
 } lbm_lbtru_tap_info_t;
-
-typedef struct
-{
-    guint16 size;
-    guint8 topic_length;
-    guint8 source_length;
-    guint32 topic_index;
-    char topic[256];
-    char source[256];
-} lbm_lbmr_topic_advertisement_tap_info_t;
-
-typedef struct
-{
-    guint16 size;
-    guint8 topic_length;
-    char topic[256];
-} lbm_lbmr_topic_query_tap_info_t;
-
-typedef struct
-{
-    guint16 size;
-    guint8 type;
-    guint8 pattern_length;
-    char pattern[256];
-} lbm_lbmr_pattern_query_tap_info_t;
-
-#define LBMR_WILDCARD_PATTERN_TYPE_PCRE 1
-#define LBMR_WILDCARD_PATTERN_TYPE_REGEX 2
-
-typedef struct
-{
-    guint16 size;
-    guint16 port;
-    guint8 queue_length;
-    guint8 topic_length;
-    char queue[256];
-    char topic[256];
-} lbm_lbmr_queue_advertisement_tap_info_t;
-
-typedef struct
-{
-    guint16 size;
-    guint8 queue_length;
-    char queue[256];
-} lbm_lbmr_queue_query_tap_info_t;
 
 #define LBM_TOPIC_OPT_EXFUNC_FFLAG_LJ  0x00000001
 #define LBM_TOPIC_OPT_EXFUNC_FFLAG_UME 0x00000002

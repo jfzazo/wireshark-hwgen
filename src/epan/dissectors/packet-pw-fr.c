@@ -31,6 +31,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 
@@ -51,7 +52,6 @@ static int hf_cw_cr = -1;
 static int hf_cw_frg = -1;
 static int hf_cw_len = -1;
 static int hf_cw_seq = -1;
-static int hf_cw_padding = -1;
 
 static expert_field ei_payload_size_invalid = EI_INIT;
 static expert_field ei_cw_bits03 = EI_INIT;
@@ -225,8 +225,9 @@ dissect_pw_fr( tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree )
 
 		if (payload_padding > 0)
 		{
-			proto_tree_add_item(subtree, hf_cw_padding, tvb,
-				encaps_size+payload_size, payload_padding, ENC_NA);
+			proto_tree_add_text(subtree, tvb,
+				encaps_size+payload_size, payload_padding,
+				"[Padding: %d octets]",(int)payload_padding);
 		}
 
 		if (packet_quality & PQ_PAYLOAD_SIZE_ZERO)
@@ -239,7 +240,7 @@ dissect_pw_fr( tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree )
 	if (payload_size > 0)
 	{
 		tvbuff_t *tvb_payload;
-		tvb_payload = tvb_new_subset_length(tvb, encaps_size, payload_size);
+		tvb_payload = tvb_new_subset(tvb, encaps_size, payload_size, payload_size);
 		call_dissector( fr_stripped_address_handle, tvb_payload, pinfo, tree );
 	}
 	return;
@@ -271,7 +272,7 @@ static hf_register_info hf[] = {
 			  ,HFILL}},
 
 	{&hf_cw_frg	,{"Fragmentation"	,"pwfr.frag"	,FT_UINT8	,BASE_DEC
-			  ,VALS(vals_frg)	,0xc0		,NULL
+			  ,vals_frg		,0xc0		,NULL
 			  ,HFILL}},
 
 	{&hf_cw_len	,{"Length"		,"pwfr.length"	,FT_UINT8	,BASE_DEC
@@ -279,10 +280,6 @@ static hf_register_info hf[] = {
 			  ,HFILL}},
 
 	{&hf_cw_seq	,{"Sequence number"	,"pwfr.length"	,FT_UINT16	,BASE_DEC
-			  ,NULL			,0		,NULL
-			  ,HFILL}},
-
-	{&hf_cw_padding,{"Padding"	,"pwfr.padding"	,FT_BYTES, BASE_NONE
 			  ,NULL			,0		,NULL
 			  ,HFILL}}
 };
@@ -314,19 +311,6 @@ proto_reg_handoff_pw_fr(void)
 {
 	dissector_handle_t h;
 	h = find_dissector("pw_fr");
-	dissector_add_for_decode_as("mpls.label", h);
+	dissector_add_uint("mpls.label", MPLS_LABEL_INVALID, h);
 	fr_stripped_address_handle = find_dissector("fr_stripped_address");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

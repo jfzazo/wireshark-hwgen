@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 #
-# Copyright 2006, Jeff Morriss <jeff.morriss.ws[AT]gmail.com>
+# Copyright 2006, Jeff Morriss <jeff.morriss[AT]ulticom.com>
 #
 # A simple tool to check source code for function calls that should not
 # be called by Wireshark code and to perform certain other checks.
@@ -81,7 +81,7 @@ my %APIs = (
                 # The MSDN page for ZeroMemory recommends SecureZeroMemory
                 # instead.
                 'ZeroMemory',
-                # use wmem_*, ep_*, or g_* functions instead of these:
+                # use ep_*, se_*, or g_* functions instead of these:
                 # (One thing to be aware of is that space allocated with malloc()
                 # may not be freeable--at least on Windows--with g_free() and
                 # vice-versa.)
@@ -96,19 +96,6 @@ my %APIs = (
                 # "I" isn't always the upper-case form of "i", and "i" isn't
                 # always the lower-case form of "I").  Use the g_ascii_* version
                 # instead.
-                'isalnum',
-                'isascii',
-                'isalpha',
-                'iscntrl',
-                'isdigit',
-                'islower',
-                'isgraph',
-                'isprint',
-                'ispunct',
-                'isspace',
-                'isupper',
-                'isxdigit',
-                'tolower',
                 'strtod',
                 'strcasecmp',
                 'strncasecmp',
@@ -132,8 +119,6 @@ my %APIs = (
                 'remove',
                 'fopen',
                 'freopen',
-                'fstat',
-                'lseek',
                 # Misc
                 'tmpnam',       # use mkstemp
                 '_snwprintf'    # use StringCchPrintf
@@ -148,15 +133,63 @@ my %APIs = (
                 'tvb_ensure_length_remaining', # replaced with tvb_ensure_captured_length_remaining
                 'tvb_get_string', # replaced with tvb_get_string_enc
                 'tvb_get_stringz', # replaced with tvb_get_stringz_enc
-                'proto_tree_add_text', # replaced with proto_tree_add_subtree[_format], expert_add_info[_format], or proto_tree_add_expert[_format]
-                'proto_tree_add_text_valist', # replaced with proto_tree_add_subtree_format, expert_add_info_format, or proto_tree_add_expert_format
 
-                # Locale-unsafe APIs
-                # These may have unexpected behaviors in some locales (e.g.,
-                # "I" isn't always the upper-case form of "i", and "i" isn't
-                # always the lower-case form of "I").  Use the g_ascii_* version
-                # instead.
-                'toupper'
+                # wmem calls should replace all emem calls (see doc/README.wmem)
+                'ep_alloc',
+                'ep_new',
+                'ep_alloc0',
+                'ep_new0',
+                'ep_strdup',
+                'ep_strndup',
+                'ep_memdup',
+                'ep_strdup_vprintf',
+                'ep_strdup_printf',
+                'ep_strconcat',
+                'ep_alloc_array',
+                'ep_alloc_array0',
+                'ep_strsplit',
+                'ep_stack_new',
+                'ep_stack_push',
+                'ep_stack_pop',
+                'ep_stack_peek',
+                'ep_address_to_str',
+                'se_alloc',
+                'se_new',
+                'se_alloc0',
+                'se_new0',
+                'se_strdup',
+                'se_strndup',
+                'se_memdup',
+                'se_strdup_vprintf',
+                'se_strdup_printf',
+                'se_alloc_array',
+                'se_tree_create',
+                'se_tree_insert32',
+                'se_tree_lookup32',
+                'se_tree_lookup32_le',
+                'se_tree_insert32_array',
+                'se_tree_lookup32_array',
+                'se_tree_lookup32_array_le',
+                'emem_tree_insert32',
+                'emem_tree_lookup32',
+                'emem_tree_lookup32_le',
+                'emem_tree_insert32_array',
+                'emem_tree_lookup32_array',
+                'emem_tree_lookup32_array_le',
+                'emem_tree_insert_string',
+                'emem_tree_lookup_string',
+                'emem_tree_foreach',
+                'ep_strbuf_new',
+                'ep_strbuf_new_label',
+                'ep_strbuf_sized_new',
+                'ep_strbuf_append_vprintf',
+                'ep_strbuf_printf',
+                'ep_strbuf_append_printf',
+                'ep_strbuf_append',
+                'ep_strbuf_append_c',
+                'ep_strbuf_append_unichar',
+                'ep_strbuf_truncate',
+                'emem_print_tree'
             ] },
 
         # APIs that SHOULD NOT be used in Wireshark (any more)
@@ -303,7 +336,6 @@ my %APIs = (
 );
 
 my @apiGroups = qw(prohibited deprecated soft-deprecated);
-
 
 # Deprecated GTK+ (and GDK) functions/macros with (E)rror or (W)arning flag:
 # (The list is based upon the GTK+ 2.24.8 documentation;
@@ -1351,7 +1383,7 @@ sub checkAddTextCalls($$)
         my $okay_add_text_count = 0;
         my $add_xxx_count = 0;
         my $total_count = 0;
-        my $aggressive = 1;
+        my $aggressive = 0;
         my $percentage = 100;
 
         # The 3 loops here are slow, but trying a single loop with capturing
@@ -1391,12 +1423,12 @@ sub checkAddTextCalls($$)
                 (($total_count > 50) && ($total_count <= 100) && ($percentage > 40)) ||
                 (($total_count > 100) && ($total_count <= 200) && ($percentage > 30)) ||
                 (($total_count > 200) && ($percentage > 20))) {
-                    printf STDERR "%s: found %d useless add_text() vs. %d add_<something else>() calls (%.2f%%)\n",
+                    printf "%s: found %d useless add_text() vs. %d add_<something else>() calls (%.2f%%)\n",
                         $filename, $add_text_count, $add_xxx_count, $percentage;
             }
         } else {
             if ($percentage > 50) {
-                printf STDERR "%s: found %d useless add_text() vs. %d add_<something else>() calls (%.2f%%)\n",
+                printf "%s: found %d useless add_text() vs. %d add_<something else>() calls (%.2f%%)\n",
                         $filename, $add_text_count, $add_xxx_count, $percentage;
             }
         }
@@ -1410,6 +1442,11 @@ my @TvbPtrAPIs = (
         'proto_tree_add_bytes_format_value',
         'proto_tree_add_ether',
         # Use the tvb_* version of these:
+        'ether_to_str',
+        'ip_to_str',
+        'ip6_to_str',
+        'fc_to_str',
+        'fcwwn_to_str',
         # Use tvb_bytes_to_str[_punct] instead of:
         'bytes_to_str',
         'bytes_to_str_punct',
@@ -1635,7 +1672,7 @@ sub check_ett_registration($$)
         }xgiom);
 
         if (!@ett_declarations) {
-                print STDERR "Found no etts in ".$filename."\n";
+                print "Found no etts in ".$filename."\n";
                 return;
         }
 
@@ -1664,7 +1701,7 @@ sub check_ett_registration($$)
         #print "Found this ett registration block in ".$filename.": ".join(',', @reg_blocks)."\n";
 
         if (@reg_blocks == 0) {
-                print STDERR "Hmm, found ".@reg_blocks." ett registration blocks in ".$filename."\n";
+                print "Hmm, found ".@reg_blocks." ett registration blocks in ".$filename."\n";
                 # For now...
                 return;
         }
@@ -1728,7 +1765,7 @@ sub check_hf_entries($$)
                                   \s*,\s*
                                   ([A-Z0-9x\|_]+)               # display
                                   \s*,\s*
-                                  ([^,]+?)                      # convert
+                                  ([A-Z0-9&_\(\)' -]+)          # convert
                                   \s*,\s*
                                   ([A-Z0-9_]+)                  # bitmask
                                   \s*,\s*
@@ -1739,11 +1776,10 @@ sub check_hf_entries($$)
 
         #print "Found @items items\n";
         while (@items) {
-                ##my $errorCount_save = $errorCount;
                 my ($hf, $name, $abbrev, $ft, $display, $convert, $bitmask, $blurb) = @items;
                 shift @items; shift @items; shift @items; shift @items; shift @items; shift @items; shift @items; shift @items;
 
-                #print "name=$name, abbrev=$abbrev, ft=$ft, display=$display, convert=>$convert<, bitmask=$bitmask, blurb=$blurb\n";
+                #print "name=$name, abbrev=$abbrev, ft=$ft, display=$display, convert=$convert, bitmask=$bitmask, blurb=$blurb\n";
 
                 if ($abbrev eq '""' || $abbrev eq "NULL") {
                         print STDERR "Error: $hf does not have an abbreviation in $filename\n";
@@ -1801,35 +1837,23 @@ sub check_hf_entries($$)
                         print STDERR "Error: $hf: FT_BOOLEAN with a bitmask must specify a 'parent field width' for 'display' in $filename\n";
                         $errorCount++;
                 }
-                if (($ft eq "FT_BOOLEAN") && ($convert !~ m/^((0[xX]0?)?0$|NULL$|TFS)/)) {
-                        print STDERR "Error: $hf: FT_BOOLEAN with non-null 'convert' field missing TFS in $filename\n";
-                        $errorCount++;
-                }
                 if ($convert =~ m/RVALS/ && $display !~ m/BASE_RANGE_STRING/) {
                         print STDERR "Error: $hf uses RVALS but 'display' does not include BASE_RANGE_STRING in $filename\n";
                         $errorCount++;
                 }
-                if ($convert =~ m/^VALS\(&.*\)/) {
+		if ($convert =~ m/^VALS\(&.*\)/) {
                         print STDERR "Error: $hf is passing the address of a pointer to VALS in $filename\n";
                         $errorCount++;
-                }
-                if ($convert =~ m/^RVALS\(&.*\)/) {
+		}
+		if ($convert =~ m/^RVALS\(&.*\)/) {
                         print STDERR "Error: $hf is passing the address of a pointer to RVALS in $filename\n";
                         $errorCount++;
-                }
-                if ($convert !~ m/^((0[xX]0?)?0$|NULL$|VALS|VALS64|RVALS|TFS|&)/ && $display !~ /BASE_CUSTOM/) {
-                        print STDERR "Error: non-null $hf 'convert' field missing 'VALS|VALS64|RVALS|TFS|&' in $filename ?\n";
-                        $errorCount++;
-                }
+		}
 ## Benign...
 ##              if (($ft eq "FT_BOOLEAN") && ($bitmask =~ /^(0x)?0+$/) && ($display ne "BASE_NONE")) {
 ##                      print STDERR "Error: $abbrev: FT_BOOLEAN with no bitmask must use BASE_NONE for 'display' in $filename\n";
 ##                      $errorCount++;
 ##              }
-                ##if ($errorCount != $errorCount_save) {
-                ##        print STDERR "name=$name, abbrev=$abbrev, ft=$ft, display=$display, convert=>$convert<, bitmask=$bitmask, blurb=$blurb\n";
-                ##}
-
         }
 
         return $errorCount;
@@ -2034,11 +2058,10 @@ while ($_ = $ARGV[0])
         my $fileContents = '';
         my @foundAPIs = ();
         my $line;
-        my $prohibit_cpp_comments = 1;
 
         if ($source_dir and ! -e $filename) {
-                $filename = $source_dir . '/' . $filename;
-        }
+		$filename = $source_dir . '/' . $filename;
+	}
         if (! -e $filename) {
                 warn "No such file: \"$filename\"";
                 next;
@@ -2050,11 +2073,6 @@ while ($_ = $ARGV[0])
                 print STDERR "Warning: $filename is not of type file - skipping.\n";
                 next;
         }
-
-        # Establish or remove local taboos
-        if ($filename =~ m{ ui/qt/ }x) { $prohibit_cpp_comments = 0; }
-        if ($filename =~ m{ image/*.rc }x) { $prohibit_cpp_comments = 0; }
-
         # Read in the file (ouch, but it's easier that way)
         open(FC, $filename) || die("Couldn't open $filename");
         $line = 1;
@@ -2082,16 +2100,10 @@ while ($_ = $ARGV[0])
                 print STDERR "Error: Found %hh in " .$filename."\n";
                 $errorCount++;
         }
-        if ($fileContents =~ m{ __func__ }xo)
-        {
-                print STDERR "Error: Found __func__ (which is not portable, use G_STRFUNC) in " .$filename."\n";
-                $errorCount++;
-        }
         if (($fileContents =~ m{ \$Id .* \$ }xo))
         {
-                print STDERR "Warning: ".$filename." has an SVN Id tag. Please remove it!\n";
+                print STDERR "Warning: ".$filename." does have an SVN Id tag. Please remove !\n";
         }
-
         # Remove all the C-comments
         $fileContents =~ s{ $CComment } []xog;
 
@@ -2115,7 +2127,7 @@ while ($_ = $ARGV[0])
 
         #$errorCount += check_ett_registration(\$fileContents, $filename);
 
-        if ($prohibit_cpp_comments && $fileContents =~ m{ \s// }xo)
+        if ($fileContents =~ m{ \s// }xo)
         {
                 print STDERR "Error: Found C++ style comments in " .$filename."\n";
                 $errorCount++;

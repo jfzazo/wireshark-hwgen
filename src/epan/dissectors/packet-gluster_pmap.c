@@ -33,6 +33,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 #include "packet-rpc.h"
@@ -98,13 +100,16 @@ gluster_dump_reply_detail(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
 	proto_tree *detail_tree;
 	const gchar *progname = NULL;
 
-	detail_tree = proto_tree_add_subtree(tree, tvb, offset, -1,
-							ett_gluster_dump_detail, &detail_item, "Available Progam: ");
+	detail_item = proto_tree_add_text(tree, tvb, offset, -1,
+							"Available Progam: ");
+	detail_tree = proto_item_add_subtree(detail_item,
+						ett_gluster_dump_detail);
 
 	/* progname */
 	offset = dissect_rpc_string(tvb, detail_tree, hf_gluster_progname,
 							offset, &progname);
-	proto_item_append_text(detail_item, "%s", progname);
+	if (tree)
+		proto_item_append_text(detail_item, "%s", progname);
 
 	/* prognumber (marked as uint64) */
 	offset = dissect_rpc_uint64(tvb, detail_tree, hf_gluster_prognum,
@@ -269,15 +274,3 @@ proto_reg_handoff_gluster_dump(void)
 							hf_gluster_dump_proc);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -26,7 +26,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/emem.h>
+#include <epan/lapd_sapi.h>
+#include <epan/prefs.h>
 
 void proto_register_gsm_sim(void);
 void proto_reg_handoff_gsm_sim(void);
@@ -34,12 +39,7 @@ void proto_reg_handoff_gsm_sim(void);
 static int proto_gsm_sim = -1;
 
 /* ISO 7816-4 APDU */
-static int hf_apdu_cla_coding = -1;
-static int hf_apdu_cla_coding_ext = -1;
-static int hf_apdu_cla_secure_messaging_ind = -1;
-static int hf_apdu_cla_secure_messaging_ind_ext = -1;
-static int hf_apdu_cla_log_chan = -1;
-static int hf_apdu_cla_log_chan_ext = -1;
+static int hf_apdu_cla = -1;
 static int hf_apdu_ins = -1;
 static int hf_apdu_p1 = -1;
 static int hf_apdu_p2 = -1;
@@ -91,8 +91,6 @@ static int hf_tprof_b29 = -1;
 static int hf_tprof_b30 = -1;
 static int hf_tprof_b31 = -1;
 static int hf_tprof_b32 = -1;
-static int hf_tprof_b33 = -1;
-static int hf_tprof_unknown_byte = -1;
 /* First byte */
 static int hf_tp_prof_dld = -1;
 static int hf_tp_sms_data_dld = -1;
@@ -315,12 +313,6 @@ static int hf_tp_pa_prov_loci_henb_ip_addr = -1;
 static int hf_tp_pa_prov_loci_henb_surround_macro = -1;
 static int hf_tp_launch_params_support_open_chan_server_mode = -1;
 static int hf_tp_direct_com_support_open_chan_server_mode = -1;
-static int hf_tp_pa_sec_prof_env_cont = -1;
-static int hf_tp_cat_serv_list_ecat_client = -1;
-static int hf_tp_support_refresh_enforcement_policy = -1;
-/* 33th byte */
-static int hf_tp_support_dns_addr_req = -1;
-static int hf_tp_support_nw_access_name_reuse = -1;
 static int hf_tp_rfu11 = -1;
 
 static int hf_cat_ber_tag = -1;
@@ -362,7 +354,6 @@ static int ett_tprof_b29 = -1;
 static int ett_tprof_b30 = -1;
 static int ett_tprof_b31 = -1;
 static int ett_tprof_b32 = -1;
-static int ett_tprof_b33 = -1;
 
 static dissector_handle_t sub_handle_cap;
 
@@ -679,15 +670,6 @@ static const int *tprof_b32_fields[] = {
 	&hf_tp_pa_prov_loci_henb_surround_macro,
 	&hf_tp_launch_params_support_open_chan_server_mode,
 	&hf_tp_direct_com_support_open_chan_server_mode,
-	&hf_tp_pa_sec_prof_env_cont,
-	&hf_tp_cat_serv_list_ecat_client,
-	&hf_tp_support_refresh_enforcement_policy,
-	NULL
-};
-
-static const int *tprof_b33_fields[] = {
-	&hf_tp_support_dns_addr_req,
-	&hf_tp_support_nw_access_name_reuse,
 	&hf_tp_rfu11,
 	NULL
 };
@@ -719,30 +701,9 @@ static const value_string chan_op_vals[] = {
 	{ 0, NULL }
 };
 
-static const value_string apdu_cla_coding_vals[] = {
-	{ 0x00,	"ISO/IEC 7816-4" },
-	{ 0x08,	"ETSI TS 102.221" },
-	{ 0x0a,	"ISO/IEC 7816-4 unless stated otherwise" },
+static const value_string apdu_cla_vals[] = {
+	{ 0xa0,	"GSM" },
 	{ 0, NULL }
-};
-
-static const value_string apdu_cla_coding_ext_vals[] = {
-	{ 0x01,	"ISO/IEC 7816-4" },
-	{ 0x03,	"ETSI TS 102.221" },
-	{ 0, NULL }
-};
-
-static const value_string apdu_cla_secure_messaging_ind_vals[] = {
-	{ 0x00,	"No SM used between terminal and card" },
-	{ 0x01,	"Proprietary SM format" },
-	{ 0x02,	"Command header not authenticated" },
-	{ 0x03,	"Command header authenticated" },
-	{ 0, NULL }
-};
-
-static const true_false_string apdu_cla_secure_messaging_ind_ext_val = {
-	"Command header not authenticated",
-	"No SM used between terminal and card"
 };
 
 /* Table 9 of GSM TS 11.11 */
@@ -1170,7 +1131,7 @@ dissect_bertlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			break;
 		}
 
-		subtvb = tvb_new_subset_length(tvb, pos, len);
+		subtvb = tvb_new_subset(tvb, pos, len, len);
 		switch (tag) {
 		case 0xD0:	/* proactive command */
 		case 0xD1:	/* sms-pp download */
@@ -1216,7 +1177,7 @@ dissect_gsm_apdu(guint8 ins, guint8 p1, guint8 p2, guint8 p3, tvbuff_t *tvb,
 			break;
 		case 0x04:	/* select by AID */
 			col_append_fstr(pinfo->cinfo, COL_INFO, "Application %s ",
-					tvb_bytes_to_str(wmem_packet_scope(), tvb, offset+DATA_OFFS, p3));
+					tvb_bytes_to_ep_str(tvb, offset+DATA_OFFS, p3));
 			proto_tree_add_item(tree, hf_aid, tvb, offset+DATA_OFFS, p3, ENC_NA);
 			break;
 
@@ -1272,13 +1233,13 @@ dissect_gsm_apdu(guint8 ins, guint8 p1, guint8 p2, guint8 p3, tvbuff_t *tvb,
 		proto_tree_add_item(tree, hf_apdu_data, tvb, offset+DATA_OFFS, p3, ENC_NA);
 		break;
 	case 0xA2: /* SEARCH RECORD */
-		proto_tree_add_item(tree, hf_seek_mode, tvb, offset+P2_OFFS, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(tree, hf_seek_type, tvb, offset+P2_OFFS, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_item(tree, hf_seek_mode, tvb, offset+P2_OFFS, 1, ENC_NA);
+		proto_tree_add_item(tree, hf_seek_type, tvb, offset+P2_OFFS, 1, ENC_NA);
 		offset += DATA_OFFS;
 		proto_tree_add_item(tree, hf_apdu_data, tvb, offset, p3, ENC_NA);
 		offset += p3;
 		if ((p2 & 0xF0) == 0x20)
-			proto_tree_add_item(tree, hf_seek_rec_nr, tvb, offset++, 1, ENC_BIG_ENDIAN);
+			proto_tree_add_item(tree, hf_seek_rec_nr, tvb, offset++, 1, ENC_NA);
 		break;
 	case 0x32: /* INCREASE */
 		break;
@@ -1337,20 +1298,16 @@ dissect_gsm_apdu(guint8 ins, guint8 p1, guint8 p2, guint8 p3, tvbuff_t *tvb,
 		ADD_TP_BYTE(30);
 		ADD_TP_BYTE(31);
 		ADD_TP_BYTE(32);
-		ADD_TP_BYTE(33);
-		while ((offset - start_offset) < p3) {
-			proto_tree_add_item(tree, hf_tprof_unknown_byte, tvb, offset++, 1, ENC_BIG_ENDIAN);
-		}
 		break;
 	case 0x12: /* FETCH */
 		proto_tree_add_item(tree, hf_le, tvb, offset+P3_OFFS, 1, ENC_BIG_ENDIAN);
 		if (isSIMtrace) {
-			subtvb = tvb_new_subset_length(tvb, offset+DATA_OFFS, (p3 == 0) ? 256 : p3);
+			subtvb = tvb_new_subset(tvb, offset+DATA_OFFS, p3, p3);
 			dissect_bertlv(subtvb, pinfo, tree);
 		}
 		break;
 	case 0x14: /* TERMINAL RESPONSE */
-		subtvb = tvb_new_subset_length(tvb, offset+DATA_OFFS, p3);
+		subtvb = tvb_new_subset(tvb, offset+DATA_OFFS, p3, p3);
 		call_dissector_with_data(sub_handle_cap, subtvb, pinfo, tree, GUINT_TO_POINTER(0x14));
 		break;
 	case 0x70: /* MANAGE CHANNEL */
@@ -1379,7 +1336,7 @@ dissect_gsm_apdu(guint8 ins, guint8 p1, guint8 p2, guint8 p3, tvbuff_t *tvb,
 		break;
 	case 0xC2: /* ENVELOPE */
 		proto_tree_add_item(tree, hf_le, tvb, offset+P3_OFFS, 1, ENC_BIG_ENDIAN);
-		subtvb = tvb_new_subset_length(tvb, offset+DATA_OFFS, p3);
+		subtvb = tvb_new_subset(tvb, offset+DATA_OFFS, p3, p3);
 		dissect_bertlv(subtvb, pinfo, tree);
 		break;
 	/* FIXME: Missing SLEEP */
@@ -1451,28 +1408,16 @@ dissect_cmd_apdu_tvb(tvbuff_t *tvb, gint offset, packet_info *pinfo, proto_tree 
 		ti = proto_tree_add_item(tree, proto_gsm_sim, tvb, 0, -1, ENC_NA);
 		sim_tree = proto_item_add_subtree(ti, ett_sim);
 
-		if ((cla & 0x50) == 0x40) {
-			proto_tree_add_item(sim_tree, hf_apdu_cla_coding_ext, tvb, offset, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(sim_tree, hf_apdu_cla_secure_messaging_ind_ext, tvb, offset, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(sim_tree, hf_apdu_cla_log_chan_ext, tvb, offset, 1, ENC_BIG_ENDIAN);
-		} else {
-			proto_tree_add_item(sim_tree, hf_apdu_cla_coding, tvb, offset, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(sim_tree, hf_apdu_cla_secure_messaging_ind, tvb, offset, 1, ENC_BIG_ENDIAN);
-			proto_tree_add_item(sim_tree, hf_apdu_cla_log_chan, tvb, offset, 1, ENC_BIG_ENDIAN);
-		}
+		proto_tree_add_item(sim_tree, hf_apdu_cla, tvb, offset, 1, ENC_BIG_ENDIAN);
 		proto_tree_add_item(sim_tree, hf_apdu_ins, tvb, offset+1, 1, ENC_BIG_ENDIAN);
 	}
 	offset += 2;
 
-	if ((cla & 0x50) == 0x40) {
-		col_append_fstr(pinfo->cinfo, COL_INFO, "%s ",
-				val_to_str(cla>>6, apdu_cla_coding_ext_vals, "%01x"));
-	} else {
-		col_append_fstr(pinfo->cinfo, COL_INFO, "%s ",
-				val_to_str(cla>>4, apdu_cla_coding_vals, "%01x"));
-	}
+	col_append_fstr(pinfo->cinfo, COL_INFO, "%s ",
+			val_to_str(cla, apdu_cla_vals, "%02x"));
 
-	rc = dissect_gsm_apdu(ins, p1, p2, p3, tvb, offset, pinfo, sim_tree, isSIMtrace);
+	/* if (cla == 0xA0) */
+		rc = dissect_gsm_apdu(ins, p1, p2, p3, tvb, offset, pinfo, sim_tree, isSIMtrace);
 
 	if (rc == -1 && sim_tree) {
 		/* default dissector */
@@ -1517,34 +1462,9 @@ void
 proto_register_gsm_sim(void)
 {
 	static hf_register_info hf[] = {
-		{ &hf_apdu_cla_coding,
-			{ "Class Coding", "gsm_sim.apdu.cla.coding",
-			  FT_UINT8, BASE_HEX, VALS(apdu_cla_coding_vals), 0xf0,
-			  "ISO 7816-4 APDU CLA (Class) Byte", HFILL }
-		},
-		{ &hf_apdu_cla_coding_ext,
-			{ "Class Coding", "gsm_sim.apdu.cla.coding",
-			  FT_UINT8, BASE_HEX, VALS(apdu_cla_coding_ext_vals), 0xc0,
-			  "ISO 7816-4 APDU CLA (Class) Byte", HFILL }
-		},
-		{ &hf_apdu_cla_secure_messaging_ind,
-			{ "Secure Messaging Indication", "gsm_sim.apdu.cla.secure_messaging_ind",
-			  FT_UINT8, BASE_HEX, VALS(apdu_cla_secure_messaging_ind_vals), 0x0c,
-			  "ISO 7816-4 APDU CLA (Class) Byte", HFILL }
-		},
-		{ &hf_apdu_cla_secure_messaging_ind_ext,
-			{ "Secure Messaging Indication", "gsm_sim.apdu.cla.secure_messaging_ind",
-			  FT_BOOLEAN, 8, TFS(&apdu_cla_secure_messaging_ind_ext_val), 0x20,
-			  "ISO 7816-4 APDU CLA (Class) Byte", HFILL }
-		},
-		{ &hf_apdu_cla_log_chan,
-			{ "Logical Channel number", "gsm_sim.apdu.cla.log_chan",
-			  FT_UINT8, BASE_DEC, NULL, 0x03,
-			  "ISO 7816-4 APDU CLA (Class) Byte", HFILL }
-		},
-		{ &hf_apdu_cla_log_chan_ext,
-			{ "Logical Channel number", "gsm_sim.apdu.cla.log_chan",
-			  FT_UINT8, BASE_DEC, NULL, 0x0f,
+		{ &hf_apdu_cla,
+			{ "Class", "gsm_sim.apdu.cla",
+			  FT_UINT8, BASE_HEX, VALS(apdu_cla_vals), 0,
 			  "ISO 7816-4 APDU CLA (Class) Byte", HFILL }
 		},
 		{ &hf_apdu_ins,
@@ -2804,47 +2724,9 @@ proto_register_gsm_sim(void)
 			  FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x10,
 			  NULL, HFILL }
 		},
-		{ &hf_tp_pa_sec_prof_env_cont,
-			{ "Proactive SIM: Security for Profile Container, Envelope Container, COMMAND CONTAINER and ENCAPSULATED SESSION CONTROL", "gsm_sim.tp.sec_prof_env_cont",
-			  FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x20,
-			  NULL, HFILL }
-		},
-		{ &hf_tp_cat_serv_list_ecat_client,
-			{ "CAT service list for eCAT client", "gsm_sim.tp.serv_list_ecat_client",
-			  FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x40,
-			  NULL, HFILL }
-		},
-		{ &hf_tp_support_refresh_enforcement_policy,
-			{ "Support of refresh enforcement policy", "gsm_sim.tp.refresh_enforcement_policy",
-			  FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x80,
-			  NULL, HFILL }
-		},
-
-		/* Terminal Profile Byte 33 */
-		{ &hf_tprof_b33,
-			{ "Terminal Profile Byte 33", "gsm_sim.tp.b33",
-			  FT_UINT8, BASE_HEX, NULL, 0,
-			  NULL, HFILL },
-		},
-		{ &hf_tp_support_dns_addr_req,
-			{ "Support of DNS server address request for OPEN CHANNEL related to packet data service bearer", "gsm_sim.tp.support_dns_addr_req",
-			  FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x01,
-			  NULL, HFILL }
-		},
-		{ &hf_tp_support_nw_access_name_reuse,
-			{ "Support of Network Access Name reuse indication for CLOSE CHANNEL related to packet data service bearer", "gsm_sim.tp.nw_access_name_reuse",
-			  FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x02,
-			  NULL, HFILL }
-		},
 		{ &hf_tp_rfu11,
 			{ "RFU", "gsm_sim.tp.rfu",
-			  FT_UINT8, BASE_HEX, NULL, 0xfc,
-			  NULL, HFILL },
-		},
-
-		{ &hf_tprof_unknown_byte,
-			{ "Unknown Terminal Profile Byte", "gsm_sim.tp.unknown_byte",
-			  FT_UINT8, BASE_HEX, NULL, 0,
+			  FT_UINT8, BASE_HEX, NULL, 0xe0,
 			  NULL, HFILL },
 		},
 
@@ -2903,7 +2785,6 @@ proto_register_gsm_sim(void)
 		&ett_tprof_b30,
 		&ett_tprof_b31,
 		&ett_tprof_b32,
-		&ett_tprof_b33
 	};
 
 	proto_gsm_sim = proto_register_protocol("GSM SIM 11.11", "GSM SIM",
@@ -2919,25 +2800,20 @@ proto_register_gsm_sim(void)
 	register_dissector("gsm_sim.bertlv", dissect_bertlv, proto_gsm_sim);
 }
 
+/* This function is called once at startup and every time the user hits
+ * 'apply' in the preferences dialogue */
 void
 proto_reg_handoff_gsm_sim(void)
 {
-	dissector_handle_t sim_handle;
-	sim_handle = find_dissector("gsm_sim");
-	dissector_add_uint("gsmtap.type", 4, sim_handle);
+	static gboolean initialized = FALSE;
 
-	sub_handle_cap = find_dissector("etsi_cat");
+	if (!initialized) {
+		dissector_handle_t sim_handle;
+		sim_handle = find_dissector("gsm_sim");
+		dissector_add_uint("gsmtap.type", 4, sim_handle);
+
+		sub_handle_cap = find_dissector("etsi_cat");
+	} else {
+		/* preferences have been changed */
+	}
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

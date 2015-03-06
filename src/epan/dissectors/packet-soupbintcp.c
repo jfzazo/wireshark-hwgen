@@ -56,8 +56,11 @@
 
 #include <stdlib.h>
 
+#include <epan/conversation.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
+
 /* For tcp_dissect_pdus() */
 #include "packet-tcp.h"
 
@@ -142,12 +145,10 @@ format_packet_type(
     gchar   *buf,
     guint32  value)
 {
-    gchar* tmp_str;
-
-    tmp_str = val_to_str_wmem(NULL, value, pkt_type_val, "Unknown packet");
     g_snprintf(buf, ITEM_LABEL_LENGTH,
-               "%s (%c)", tmp_str, (char)(value & 0xff));
-    wmem_free(NULL, tmp_str);
+               "%s (%c)",
+               val_to_str(value, pkt_type_val, "Unknown packet"),
+               (char)(value & 0xff));
 }
 
 
@@ -162,12 +163,10 @@ format_reject_code(
     gchar   *buf,
     guint32  value)
 {
-    gchar* tmp_str;
-
-    tmp_str = val_to_str_wmem(NULL, value, reject_code_val, "Unknown reject code");
     g_snprintf(buf, ITEM_LABEL_LENGTH,
-               "%s (%c)", tmp_str, (char)(value & 0xff));
-    wmem_free(NULL, tmp_str);
+               "%s (%c)",
+               val_to_str(value, reject_code_val, "Unknown reject code"),
+               (char)(value & 0xff));
 }
 
 
@@ -235,7 +234,7 @@ dissect_soupbintcp_common(
 
     /* If first dissection of Login Accept, save sequence number */
     if (pkt_type == 'A' && !PINFO_FD_VISITED(pinfo)) {
-        tmp_buf = tvb_get_string_enc(wmem_packet_scope(), tvb, 13, 20, ENC_ASCII);
+        tmp_buf = tvb_get_string(wmem_packet_scope(), tvb, 13, 20);
         next_seq = atoi(tmp_buf);
 
         /* Create new conversation for this session */
@@ -329,7 +328,7 @@ dissect_soupbintcp_common(
                                 tvb, offset, 10, ENC_ASCII|ENC_NA);
             offset += 10;
 
-            tmp_buf = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 20, ENC_ASCII);
+            tmp_buf = tvb_get_string(wmem_packet_scope(), tvb, offset, 20);
             proto_tree_add_string_format_value(soupbintcp_tree,
                                                hf_soupbintcp_next_seq_num,
                                                tvb, offset, 20,
@@ -374,7 +373,7 @@ dissect_soupbintcp_common(
                                 tvb, offset, 10, ENC_ASCII|ENC_NA);
             offset += 10;
 
-            tmp_buf = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 20, ENC_ASCII);
+            tmp_buf = tvb_get_string(wmem_packet_scope(), tvb, offset, 20);
             proto_tree_add_string_format_value(soupbintcp_tree,
                                                hf_soupbintcp_req_seq_num,
                                                tvb, offset, 20,
@@ -397,7 +396,7 @@ dissect_soupbintcp_common(
             /* Unknown */
             proto_tree_add_item(tree,
                                 hf_soupbintcp_message,
-                                tvb, offset, -1, ENC_NA);
+                                tvb, offset, -1, ENC_ASCII|ENC_NA);
             break;
         }
     }
@@ -440,7 +439,7 @@ dissect_soupbintcp_common(
             proto_tree_add_item(soupbintcp_tree,
                                 hf_soupbintcp_message,
                                 sub_tvb, 0, -1,
-                                ENC_NA);
+                                ENC_ASCII|ENC_NA);
         }
     }
 }
@@ -451,8 +450,7 @@ static guint
 get_soupbintcp_pdu_len(
     packet_info *pinfo _U_,
     tvbuff_t    *tvb,
-    int          offset,
-    void        *data _U_)
+    int          offset)
 {
     /* Determine the length of the PDU using the SOUP header's 16-bit
        big-endian length (at offset zero).  We're guaranteed to get at
@@ -610,7 +608,7 @@ proto_register_soupbintcp(void)
 
     soupbintcp_range = range_empty();
 
-    heur_subdissector_list = register_heur_dissector_list("soupbintcp");
+    register_heur_dissector_list("soupbintcp", &heur_subdissector_list);
 }
 
 
@@ -621,7 +619,7 @@ proto_reg_handoff_soupbintcp(void)
                                                 proto_soupbintcp);
 
     /* For "decode-as" */
-    dissector_add_for_decode_as("tcp.port", soupbintcp_handle);
+    dissector_add_handle("tcp.port", soupbintcp_handle);
 }
 
 

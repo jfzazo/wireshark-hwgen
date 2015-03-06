@@ -23,22 +23,22 @@
 #include "ui_preferences_dialog.h"
 
 #include "module_preferences_scroll_area.h"
+#include "wireshark_application.h"
 
 #ifdef HAVE_LIBPCAP
 #ifdef _WIN32
-#include "caputils/capture-wpcap.h"
+#include "capture-wpcap.h"
 #endif /* _WIN32 */
 #endif /* HAVE_LIBPCAP */
 
 #include <epan/prefs-int.h>
-#include <ui/language.h>
-#include <ui/preference_utils.h>
-#include <main_window.h>
 
+#include <ui/preference_utils.h>
+
+#include "module_preferences_scroll_area.h"
 #include "syntax_line_edit.h"
 #include "qt_ui_utils.h"
 #include "uat_dialog.h"
-#include "wireshark_application.h"
 
 #include <QColorDialog>
 #include <QFileDialog>
@@ -260,7 +260,7 @@ const int capture_item_    = 1;
 // We store the saved and current preference values in the "Advanced" tree columns
 const int pref_ptr_col_ = 0;
 
-PreferencesDialog::PreferencesDialog(QWidget *parent, PreferencesPane start_pane) :
+PreferencesDialog::PreferencesDialog(QWidget *parent) :
     QDialog(parent),
     pd_ui_(new Ui::PreferencesDialog),
     cur_line_edit_(NULL),
@@ -272,7 +272,6 @@ PreferencesDialog::PreferencesDialog(QWidget *parent, PreferencesPane start_pane
     // Some classes depend on pref_ptr_to_pref_ so this MUST be called after
     // fill_advanced_prefs.
     pd_ui_->setupUi(this);
-    setWindowTitle(wsApp->windowTitleString(tr("Preferences")));
     pd_ui_->advancedTree->invisibleRootItem()->addChildren(tmp_item.takeChildren());
     QTreeWidgetItemIterator pref_it(pd_ui_->advancedTree, QTreeWidgetItemIterator::NoChildren);
     while (*pref_it) {
@@ -285,6 +284,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent, PreferencesPane start_pane
     pd_ui_->splitter->setStretchFactor(1, 5);
 
     pd_ui_->prefsTree->invisibleRootItem()->child(appearance_item_)->setExpanded(true);
+    pd_ui_->prefsTree->setCurrentItem(pd_ui_->prefsTree->invisibleRootItem()->child(appearance_item_));
 
     bool disable_capture = true;
 #ifdef HAVE_LIBPCAP
@@ -299,19 +299,15 @@ PreferencesDialog::PreferencesDialog(QWidget *parent, PreferencesPane start_pane
 #endif /* HAVE_LIBPCAP */
     pd_ui_->prefsTree->invisibleRootItem()->child(capture_item_)->setDisabled(disable_capture);
 
-    // PreferencesPane, prefsTree, and stackedWidget must all correspond to each other.
+    // This assumes that the prefs tree and stacked widget contents exactly
+    // correspond to each other.
     QTreeWidgetItem *item = pd_ui_->prefsTree->itemAt(0,0);
-    QTreeWidgetItem *start_item = pd_ui_->prefsTree->invisibleRootItem()->child(0);
     item->setSelected(true);
     pd_ui_->stackedWidget->setCurrentIndex(0);
     for (int i = 0; i < pd_ui_->stackedWidget->count() && item; i++) {
         item->setData(0, Qt::UserRole, qVariantFromValue(pd_ui_->stackedWidget->widget(i)));
-        if (i == start_pane) {
-            start_item = item;
-        }
         item = pd_ui_->prefsTree->itemBelow(item);
     }
-    pd_ui_->prefsTree->setCurrentItem(start_item);
 
     // Printing prefs don't apply here.
     module_t *print_module = prefs_find_module("print");
@@ -366,7 +362,6 @@ void PreferencesDialog::keyPressEvent(QKeyEvent *evt)
         switch (evt->key()) {
         case Qt::Key_Escape:
             cur_line_edit_->setText(saved_string_pref_);
-            /* Fall Through */
         case Qt::Key_Enter:
         case Qt::Key_Return:
             switch (cur_pref_type_) {
@@ -392,7 +387,6 @@ void PreferencesDialog::keyPressEvent(QKeyEvent *evt)
         switch (evt->key()) {
         case Qt::Key_Escape:
             cur_combo_box_->setCurrentIndex(saved_combo_idx_);
-            /* Fall Through */
         case Qt::Key_Enter:
         case Qt::Key_Return:
             // XXX The combo box eats enter and return
@@ -607,10 +601,12 @@ void PreferencesDialog::on_advancedTree_itemActivated(QTreeWidgetItem *item, int
             QString filename;
 
             if (pref->type == PREF_FILENAME) {
-                filename = QFileDialog::getSaveFileName(this, wsApp->windowTitleString(pref->title),
+                filename = QFileDialog::getSaveFileName(this,
+                                                        QString(tr("Wireshark: ")) + pref->description,
                                                         pref->stashed_val.string);
             } else {
-                filename = QFileDialog::getExistingDirectory(this, wsApp->windowTitleString(pref->title),
+                filename = QFileDialog::getExistingDirectory(this,
+                                                             QString(tr("Wireshark: ")) + pref->description,
                                                              pref->stashed_val.string);
             }
             if (!filename.isEmpty()) {
@@ -792,7 +788,6 @@ void PreferencesDialog::on_buttonBox_accepted()
     gboolean must_redissect = FALSE;
 
     // XXX - We should validate preferences as the user changes them, not here.
-    // XXX - We're also too enthusiastic about setting must_redissect.
 //    if (!prefs_main_fetch_all(parent_w, &must_redissect))
 //        return; /* Errors in some preference setting - already reported */
     prefs_modules_foreach_submodules(NULL, module_prefs_unstash, (gpointer) &must_redissect);
@@ -801,9 +796,6 @@ void PreferencesDialog::on_buttonBox_accepted()
     pd_ui_->filterExpressonsFrame->unstash();
 
     prefs_main_write();
-
-    write_language_prefs();
-    wsApp->loadLanguage(QString(language));
 
 #ifdef HAVE_AIRPCAP
   /*
@@ -821,15 +813,15 @@ void PreferencesDialog::on_buttonBox_accepted()
 #endif
 
     wsApp->setMonospaceFont(prefs.gui_qt_font_name);
+    wsApp->emitAppSignal(WiresharkApplication::PreferencesChanged);
 
     /* Now destroy the "Preferences" dialog. */
 //    window_destroy(GTK_WIDGET(parent_w));
 
     if (must_redissect) {
         /* Redissect all the packets, and re-evaluate the display filter. */
-        app_signals_ << WiresharkApplication::PacketDissectionChanged;
+        wsApp->emitAppSignal(WiresharkApplication::PacketDissectionChanged);
     }
-    app_signals_ << WiresharkApplication::PreferencesChanged;
 }
 
 void PreferencesDialog::on_buttonBox_helpRequested()

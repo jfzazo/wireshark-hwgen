@@ -23,7 +23,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,16 +36,8 @@
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_GETOPT_H
-#include <getopt.h>
-#endif
-
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
-#endif
-
-#ifdef HAVE_LIBZ
-#include <zlib.h>     /* to get the libz version number */
 #endif
 
 #include <glib.h>
@@ -53,8 +45,6 @@
 #include <wsutil/privileges.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/file_util.h>
-#include <wsutil/crash_info.h>
-#include <wsutil/ws_version_info.h>
 
 #ifdef HAVE_PLUGINS
 #include <wsutil/plugins.h>
@@ -62,21 +52,27 @@
 
 #include "wtap.h"
 #include <wsutil/report_err.h>
+#include <wsutil/privileges.h>
 #include <wsutil/str_util.h>
 
 #ifdef _WIN32
 #include <wsutil/unicode-utils.h>
 #endif /* _WIN32 */
 
-#ifndef HAVE_GETOPT_LONG
-#include "wsutil/wsgetopt.h"
-#endif
+#include "version.h"
 
 static void
-print_usage(FILE *output)
+usage(void)
 {
-  fprintf(output, "\n");
-  fprintf(output, "Usage: captype <infile> ...\n");
+  fprintf(stderr, "Captype %s"
+#ifdef GITVERSION
+      " (" GITVERSION " from " GITBRANCH ")"
+#endif
+      "\n", VERSION);
+  fprintf(stderr, "Prints the file types of capture files.\n");
+  fprintf(stderr, "See http://www.wireshark.org for more information.\n");
+  fprintf(stderr, "\n");
+  fprintf(stderr, "Usage: captype <infile> ...\n");
 }
 
 #ifdef HAVE_PLUGINS
@@ -92,69 +88,18 @@ failure_message(const char *msg_format _U_, va_list ap _U_)
 }
 #endif
 
-static void
-get_captype_compiled_info(GString *str)
-{
-  /* LIBZ */
-  g_string_append(str, ", ");
-#ifdef HAVE_LIBZ
-  g_string_append(str, "with libz ");
-#ifdef ZLIB_VERSION
-  g_string_append(str, ZLIB_VERSION);
-#else /* ZLIB_VERSION */
-  g_string_append(str, "(version unknown)");
-#endif /* ZLIB_VERSION */
-#else /* HAVE_LIBZ */
-  g_string_append(str, "without libz");
-#endif /* HAVE_LIBZ */
-}
-
-static void
-get_captype_runtime_info(GString *str)
-{
-  /* zlib */
-#if defined(HAVE_LIBZ) && !defined(_WIN32)
-  g_string_append_printf(str, ", with libz %s", zlibVersion());
-#endif
-}
-
 int
 main(int argc, char *argv[])
 {
-  GString *comp_info_str;
-  GString *runtime_info_str;
   wtap  *wth;
   int    err;
   gchar *err_info;
   int    i;
-  int    opt;
   int    overall_error_status;
-  static const struct option long_options[] = {
-      {(char *)"help", no_argument, NULL, 'h'},
-      {(char *)"version", no_argument, NULL, 'v'},
-      {0, 0, 0, 0 }
-  };
 
 #ifdef HAVE_PLUGINS
   char  *init_progfile_dir_error;
 #endif
-
-  /* Set the C-language locale to the native environment. */
-  setlocale(LC_ALL, "");
-
-  /* Get the compile-time version information string */
-  comp_info_str = get_compiled_version_info(NULL, get_captype_compiled_info);
-
-  /* Get the run-time version information string */
-  runtime_info_str = get_runtime_version_info(get_captype_runtime_info);
-
-  /* Add it to the information to be reported on a crash. */
-  ws_add_crash_info("Captype (Wireshark) %s\n"
-         "\n"
-         "%s"
-         "\n"
-         "%s",
-      get_ws_vcs_version_info(), comp_info_str->str, runtime_info_str->str);
 
 #ifdef _WIN32
   arg_list_utf_16to8(argc, argv);
@@ -186,36 +131,11 @@ main(int argc, char *argv[])
   }
 #endif
 
-  /* Process the options */
-  while ((opt = getopt_long(argc, argv, "hv", long_options, NULL)) !=-1) {
-
-    switch (opt) {
-
-      case 'h':
-        printf("Captype (Wireshark) %s\n"
-               "Print the file types of capture files.\n"
-               "See http://www.wireshark.org for more information.\n",
-               get_ws_vcs_version_info());
-        print_usage(stdout);
-        exit(0);
-        break;
-
-      case 'v':
-        show_version("Captype (Wireshark)", comp_info_str, runtime_info_str);
-        g_string_free(comp_info_str, TRUE);
-        g_string_free(runtime_info_str, TRUE);
-        exit(0);
-        break;
-
-      case '?':              /* Bad flag - print usage message */
-        print_usage(stderr);
-        exit(1);
-        break;
-    }
-  }
+  /* Set the C-language locale to the native environment. */
+  setlocale(LC_ALL, "");
 
   if (argc < 2) {
-    print_usage(stderr);
+    usage();
     return 1;
   }
 
@@ -233,9 +153,14 @@ main(int argc, char *argv[])
       else {
         fprintf(stderr, "captype: Can't open %s: %s\n", argv[i],
                 wtap_strerror(err));
-        if (err_info != NULL) {
+        switch (err) {
+
+        case WTAP_ERR_UNSUPPORTED:
+        case WTAP_ERR_UNSUPPORTED_ENCAP:
+        case WTAP_ERR_BAD_FILE:
           fprintf(stderr, "(%s)\n", err_info);
           g_free(err_info);
+          break;
         }
         overall_error_status = 1; /* remember that an error has occurred */
       }

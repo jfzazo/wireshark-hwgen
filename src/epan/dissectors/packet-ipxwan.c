@@ -22,6 +22,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include "packet-ipx.h"
@@ -158,7 +159,7 @@ dissect_ipxwan(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		    val_to_str(packet_type, ipxwan_packet_type_vals,
 		        "Unknown packet type %u"));
 
-	if (tree) {
+    if (tree) {
 		proto_tree_add_uint(ipxwan_tree, hf_ipxwan_packet_type, tvb,
 			offset, 1, packet_type);
 		offset += 1;
@@ -175,10 +176,12 @@ dissect_ipxwan(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 		while (num_options != 0) {
 			option_number = tvb_get_guint8(tvb, offset);
-			option_tree = proto_tree_add_subtree_format(ipxwan_tree, tvb, offset, -1,
-			    ett_ipxwan_option, &ti, "Option: %s",
+			ti = proto_tree_add_text(ipxwan_tree, tvb, offset, -1,
+			    "Option: %s",
 			    val_to_str(option_number, ipxwan_option_num_vals,
 			        "Unknown (%u)"));
+			option_tree = proto_item_add_subtree(ti,
+			    ett_ipxwan_option);
 
 			proto_tree_add_uint(option_tree, hf_ipxwan_option_num,
 			    tvb, offset, 1, option_number);
@@ -462,16 +465,3 @@ proto_reg_handoff_ipxwan(void)
 	    proto_ipxwan);
 	dissector_add_uint("ipx.socket", IPX_SOCKET_IPXWAN, ipxwan_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

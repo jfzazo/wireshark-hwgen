@@ -28,10 +28,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <packet-ip.h>
 
 void proto_register_mpls_psc(void);
-void proto_reg_handoff_mpls_psc(void);
 
 static gint proto_mpls_psc = -1;
 
@@ -139,21 +141,21 @@ dissect_mpls_psc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     ti = proto_tree_add_item(tree, proto_mpls_psc,    tvb, 0, -1, ENC_NA);
     psc_tree = proto_item_add_subtree(ti, ett_mpls_psc);
     /* version */
-    proto_tree_add_item(psc_tree, hf_mpls_psc_ver,    tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(psc_tree, hf_mpls_psc_ver,    tvb, offset, 1, ENC_NA);
     /* request */
-    proto_tree_add_item(psc_tree, hf_mpls_psc_req,    tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(psc_tree, hf_mpls_psc_req,    tvb, offset, 1, ENC_NA);
     /* prot type */
-    proto_tree_add_item(psc_tree, hf_mpls_psc_pt,     tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(psc_tree, hf_mpls_psc_pt,     tvb, offset, 1, ENC_NA);
     offset += 1;
     /* prot type */
-    proto_tree_add_item(psc_tree, hf_mpls_psc_rev,    tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(psc_tree, hf_mpls_psc_rev,    tvb, offset, 1, ENC_NA);
     /* skip reserved1 */
     offset += 1;
     /* fpath */
-    proto_tree_add_item(psc_tree, hf_mpls_psc_fpath,  tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(psc_tree, hf_mpls_psc_fpath,  tvb, offset, 1, ENC_NA);
     offset += 1;
     /* path */
-    proto_tree_add_item(psc_tree, hf_mpls_psc_dpath,  tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(psc_tree, hf_mpls_psc_dpath,  tvb, offset, 1, ENC_NA);
     offset += 1;
     /* tlv len */
     proto_tree_add_item(psc_tree, hf_mpls_psc_tlvlen, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -232,15 +234,8 @@ proto_register_mpls_psc(void)
 
     proto_register_field_array(proto_mpls_psc, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-}
 
-void
-proto_reg_handoff_mpls_psc(void)
-{
-	dissector_handle_t mpls_psc_handle;
-
-    mpls_psc_handle    = create_dissector_handle( dissect_mpls_psc, proto_mpls_psc );
-    dissector_add_uint("pwach.channel_type", 0x0024, mpls_psc_handle); /* FF: PSC, RFC 6378 */
+    register_dissector("mpls_psc", dissect_mpls_psc, proto_mpls_psc);
 }
 
 /*

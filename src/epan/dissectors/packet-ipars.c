@@ -27,7 +27,10 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
+
 void proto_register_ipars(void);
 
 static int      proto_ipars     = -1;

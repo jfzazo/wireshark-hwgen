@@ -6,8 +6,8 @@
 # Define variables for the components of the Wireshark version number.
 #
 m4_define([version_major], [1])
-m4_define([version_minor], [99])
-m4_define([version_micro], [2])
+m4_define([version_minor], [12])
+m4_define([version_micro], [4])
 m4_define([version_micro_extra], version_micro)
 m4_append([version_micro_extra], [])
 
@@ -20,10 +20,6 @@ AC_PREREQ(2.60)
 # Variable expansion doesn't work in AC_PREREQ()
 AC_MIN_VERSION=2.60
 AC_SUBST(AC_MIN_VERSION)
-
-dnl Make sure to keep ACLOCAL_AMFLAGS in Makefile.am and AC_CONFIG_MACRO_DIRS
-dnl in configure.ac in sync, otherwise there will be an error running autogen.sh.
-m4_ifdef([AC_CONFIG_MACRO_DIRS],AC_CONFIG_MACRO_DIRS([./aclocal-fallback]))
 
 dnl Check for CPU / vendor / OS
 dnl The user is encouraged to use either `AC_CANONICAL_BUILD', or
@@ -45,7 +41,7 @@ dnl AC_CANONICAL_BUILD
 dnl AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
-AM_INIT_AUTOMAKE([1.9 tar-ustar dist-bzip2 no-dist-gzip subdir-objects])
+AM_INIT_AUTOMAKE([1.9 tar-ustar dist-bzip2 no-dist-gzip])
 
 # Make Wireshark's version available in config.h
 AC_DEFINE(VERSION_MAJOR, version_major, [Wireshark's major version])
@@ -62,6 +58,7 @@ AM_PROG_CC_C_O
 AC_PROG_CXX
 AC_PROG_CPP
 AC_PROG_MKDIR_P
+AC_WIRESHARK_CLANG_CHECK
 
 dnl Work around libtool bug (fixed in the version 1.5a?)
 AC_DEFUN([AC_PROVIDE_AC_LIBTOOL_DLOPEN], )
@@ -106,7 +103,7 @@ fi
 AC_PATH_PROG(PERL, perl)
 
 # Check for Python.
-AC_PATH_PROGS(PYTHON, python, python3)
+AC_PATH_PROG(PYTHON, python)
 if test ! -z "$PYTHON"; then
 	#
 	# OK, we found Python; is it Python 2.5 or later?
@@ -123,8 +120,6 @@ if test ! -z "$PYTHON"; then
 	else
 		AC_MSG_RESULT(yes)
 	fi
-else
-	AC_MSG_ERROR(I couldn't find python; make sure it's installed and in your path)
 fi
 
 #
@@ -222,6 +217,28 @@ if test "x$GCC" = "xyes" -o "x$CC" = "xclang" ; then
 	ac_supports_gcc_flags=yes
 fi
 
+#
+# Set "ac_supports_W_linker_passthrough" if the compiler is known to
+# support "-Wl,{options}" to pass options through to the linker.
+# Currently, we assume GCC, xlc, and clang do; other compilers should
+# be added here.
+#
+if test "x$GCC" = "xyes" -o "x$CC" = "xxlc" -o "x$CC" = "xclang" ; then
+	ac_supports_W_linker_passthrough=yes
+fi
+
+#
+# Set "ac_supports_attribute_unused" if the compiler is known to
+# support "__attribute__(unused)".
+# Currently, we assume GCC and clang do; other compilers should
+# be added here.
+#
+# XXX - do this with a compiler test?
+#
+if test "x$GCC" = "xyes" -o "x$CC" = "xclang" ; then
+	ac_supports_W_linker_passthrough=yes
+fi
+
 if test "x$CC_FOR_BUILD" = x
 then
        CC_FOR_BUILD=$CC
@@ -243,9 +260,6 @@ AM_CONDITIONAL(HAVE_DOXYGEN, test x$HAVE_DOXYGEN = xyes)
 # the comments in acolocal.m4
 #
 PKG_PROG_PKG_CONFIG
-if test -z "$PKG_CONFIG"; then
-	AC_MSG_ERROR(I couldn't find pkg-config; make sure it's installed and in your path)
-fi
 
 AC_ARG_ENABLE(osx-deploy-target,
   AC_HELP_STRING( [--enable-osx-deploy-target],
@@ -365,81 +379,28 @@ then
 
 	*)
 		#
-		# Look for the oldest SDK we can find that's
-		# for an OS equal to or later than this one.
-		#
 		# XXX - for 10.4, do we need 10.4u?  We're
 		# not currently doing fat builds (we'd need
 		# fat versions of the support libraries for
 		# that to be useful), but, if we do, we'd
 		# need to use 10.4u.
 		#
-
-		#
-		# Get the real version - strip off the "10.".
-		# We'll worry about that if, as, and when there's ever
-		# an OS XI.
-		#
-		deploy_real_version=`echo "$deploy_target" | sed -n 's/10\.\(.*\)/\1/p'`
-
-		#
-		# Search each directory that might contain SDKs.
-		#
-		sdkpath=""
-		for sdksdir in /Developer/SDKs \
+		for i in /Developer/SDKs \
 		    /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs \
 		    /Library/Developer/CommandLineTools/SDKs
 		do
-			#
-			# Get a list of all the SDKs.
-			#
-			if ! test -d "$sdksdir"
+			if test -d "$i"/"MacOSX$deploy_target.sdk"
 			then
-				#
-				# There is no directory with that name.
-				# Move on to the next one in the list,
-				# if any.
-				#
-				continue
+				SDKPATH="$i"/"MacOSX$deploy_target.sdk"
+				break
 			fi
-
-			#
-			# Get a list of all the SDKs in that directory,
-			# if any.
-			#
-			# We have to use @<:@ for [ and @:>@ for ] to
-			# avoid m4 removing the square brackets.
-			#
-			sdklist=`(cd "$sdksdir"; ls -d MacOSX10.@<:@0-9@:>@*.sdk 2>/dev/null)`
-
-			for sdk in $sdklist
-			do
-				#
-				# Get the real version for this SDK.
-				#
-				sdk_real_version=`echo "$sdk" | sed -n 's/MacOSX10\.\(.*\)\.sdk/\1/p'`
-
-				#
-				# Is it for the deployment target or
-				# some later release?
-				#
-				if test "$sdk_real_version" -ge "$deploy_real_version"
-				then
-					#
-					# Yes, use it.
-					#
-					sdkpath="$sdksdir/$sdk"
-					break 2
-				fi
-			done
 		done
-		if test -z "$sdkpath"
+		if test -z "$SDKPATH"
 		then
 			AC_MSG_RESULT(no)
-			AC_MSG_ERROR([We couldn't find an SDK for OS X $deploy_target or later])
+			AC_MSG_ERROR([We couldn't find the SDK for OS X $deploy_target])
 		fi
-		SDKPATH="$sdkpath"
-		AC_MSG_RESULT([yes, with the 10.$sdk_real_version SDK])
+		AC_MSG_RESULT(yes)
 		;;
 	esac
 
@@ -512,23 +473,6 @@ AC_SUBST(OSX_MIN_VERSION)
 # Try to arrange for large file support.
 #
 AC_SYS_LARGEFILE
-
-#
-# Look for math functions; use libm if necessary.
-#
-AC_SEARCH_LIBS(floor, m)
-AC_SEARCH_LIBS(ceil, m)
-AC_SEARCH_LIBS(exp, m)
-AC_SEARCH_LIBS(log, m)
-AC_SEARCH_LIBS(log10, m)
-AC_SEARCH_LIBS(floorl, m,
-  [
-    FLOORL_LO=""
-    AC_DEFINE(HAVE_FLOORL, 1, [Define if you have the floorl function.])
-  ],
-  FLOORL_LO="floorl.lo")
-AC_SUBST(FLOORL_LO)
-
 
 #
 # GUI toolkit options
@@ -730,12 +674,6 @@ linux*)
 	    [enum nl80211_commands x = NL80211_CMD_SET_CHANNEL;],
 	    [AC_MSG_RESULT(yes) AC_DEFINE(HAVE_NL80211_CMD_SET_CHANNEL, 1, [SET_CHANNEL is supported])],
 	    [AC_MSG_RESULT(no)])
-
-	AC_MSG_CHECKING([for NL80211_SPLIT_WIPHY_DUMP])
-	  AC_TRY_COMPILE([#include <linux/nl80211.h>],
-	    [enum nl80211_protocol_features x = NL80211_PROTOCOL_FEATURE_SPLIT_WIPHY_DUMP;],
-	    [AC_MSG_RESULT(yes) AC_DEFINE(HAVE_NL80211_SPLIT_WIPHY_DUMP, 1, [SPLIT_WIPHY_DUMP is supported])],
-	    [AC_MSG_RESULT(no)])
 	;;
 
 *)
@@ -833,14 +771,6 @@ fi
 AC_SUBST(HAVE_OSX_PACKAGING)
 
 #
-# Use this as a proxy for "is this OS X" (just in case somebody actually
-# built and installed Darwin as an OS, perhaps with some X11-based GUI,
-# don't look for Darwin).
-#
-AC_CHECK_PROG(have_sw_vers, sw_vers, "yes", "no")
-AM_CONDITIONAL(NOT_OS_X, test "x$have_sw_vers" = "xno")
-
-#
 # Some compilers have to be told to fail when passed an unknown -W flag;
 # make sure we do that.
 #
@@ -864,9 +794,6 @@ AC_ARG_ENABLE(extra-compiler-warnings,
 	wireshark_extra_flags=$enableval
 	if test $enableval != no
 	then
-		#
-		# The following are for C and C++
-		#
 		AC_WIRESHARK_COMPILER_FLAGS_CHECK(-pedantic)
 		#
 		# Various code blocks this one.
@@ -876,9 +803,10 @@ AC_ARG_ENABLE(extra-compiler-warnings,
 		#
 		# Due to various places where APIs we don't control
 		# require us to cast away constness, we can probably
-		# never enable this one with -Werror.
+		# never enable these ones with -Werror.
 		#
 		AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wcast-qual)
+		AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wbad-function-cast, C)
 		#
 		# Some generated ASN.1 dissectors block this one;
 		# multiple function declarations for the same
@@ -909,30 +837,26 @@ AC_ARG_ENABLE(extra-compiler-warnings,
 		# (about glib library not using Doxygen)
 		#
 		AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wdocumentation)
-
-		#
-		# The following are C only, not C++
-		#
-		# Due to various places where APIs we don't control
-		# require us to cast away constness, we can probably
-		# never enable this one with -Werror.
-		#
-		AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wbad-function-cast, C)
 	fi
 ],)
 
-#
-# The following are for C and C++
-#
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wall -W) # -W is now known as -Wextra
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wextra) # -W is now known as -Wextra
+AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wdeclaration-after-statement, C)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wendif-labels)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wpointer-arith)
+AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wno-pointer-sign, C)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Warray-bounds)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wformat-security)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-fwrapv)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-fno-strict-overflow)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-fno-delete-null-pointer-checks)
+AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wold-style-definition, C)
+# The Qt headers generate a ton of shortening errors on 64-bit systems
+# so only enable this for C for now.
+AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wshorten-64-to-32, C)
+AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wstrict-prototypes, C)
+AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wjump-misses-init, C)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wvla)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Waddress)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wattributes)
@@ -942,13 +866,8 @@ AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wpragmas)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wno-overlength-strings)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wwrite-strings)
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wno-long-long)
-AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wheader-guard)
-AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wunused-const-variable)
-#
-# The following are C only, not C++
-#
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wc++-compat, C)
-AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wdeclaration-after-statement, C)
+AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wheader-guard)
 
 #
 # XXX - OK for C++?
@@ -973,10 +892,6 @@ foo(int a)
 }
   ],
   [warns about variables in function declarations shadowing other variables])
-
-AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wno-pointer-sign, C)
-AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wold-style-definition, C)
-AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wstrict-prototypes, C)
 
 # Unfortunately some versions of gcc generate logical-op warnings when strchr()
 # is given a constant string.
@@ -1005,39 +920,32 @@ bar(void)
   ],
   [generates warnings from strchr()])
 
-AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wjump-misses-init, C)
-# The Qt headers generate a ton of shortening errors on 64-bit systems
-# so only enable this for C for now.
-AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wshorten-64-to-32, C)
+
+#
+# On OS X, suppress warnings about deprecated declarations, because
+# they apparently think everything on OS X is Shiny Happy Apple-
+# Framework-Based Apps and are deprecating some perfectly OK
+# multi-platform open-source libraries that we use in our multi-platform
+# open-source application in favor of various frameworks that are
+# OS X-only.
+#
+case "$host_os" in
+darwin*)
+	AC_WIRESHARK_COMPILER_FLAGS_CHECK(-Wno-deprecated-declarations)
+	;;
+esac
 
 #
 # Use the faster pre gcc 4.5 floating point precision if available.
 #
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-fexcess-precision=fast)
 
-#
-# Try to have the compiler default to hiding symbols, so that only
-# symbols explicitly exported with WS_DLL_PUBLIC will be visible
-# outside (shared) libraries; that way, more UN*X builds will catch
-# failures to export symbols, rather than having that fail only on
-# Windows.
-#
 CFLAGS_before_fvhidden="$CFLAGS"
-#
-# GCC and GCC-compatible compilers
-#
 AC_WIRESHARK_COMPILER_FLAGS_CHECK(-fvisibility=hidden)
 if test "x$CFLAGS" = "x$CFLAGS_before_fvhidden"
 then
-	#
-	# Sun^WOracle C.
-	#
-	AC_WIRESHARK_COMPILER_FLAGS_CHECK(-xldscope=hidden)
-	if test "x$CFLAGS" = "x$CFLAGS_before_fvhidden"
-	then
-		# TODO add other ways of hiding symbols
-		AC_MSG_WARN(Compiler will export all symbols from shared libraries)
-	fi
+	# TODO add other ways of hiding symbols
+	AC_MSG_WARN(Compiler will export all symbols from shared libraries)
 fi
 
 AC_WIRESHARK_LDFLAGS_CHECK([-Wl,--as-needed])
@@ -1076,79 +984,6 @@ fi
 AC_SUBST(PIE_CFLAGS)
 AC_SUBST(PIE_LDFLAGS)
 
-CFLAGS_before_simd="$CFLAGS"
-AC_WIRESHARK_COMPILER_FLAGS_CHECK(-msse4.2, C)
-if test "x$CFLAGS" != "x$CFLAGS_before_simd"
-then
-	#
-	# The compiler supports -msse4.2; use that to enable SSE 4.2.
-	#
-	# Restore CFLAGS.  We only want to apply -msse4.2 to
-	# wsutil/ws_mempbrk_sse42.c, as the SSE4.2 code there
-	# is run only if the hardware supports it, but other
-	# code would do no such checks.
-	#
-	CFLAGS="$CFLAGS_before_simd"
-	ac_sse4_2_flag=-msse4.2
-else
-	#
-	# Try -xarch=sse4_2; that's the flag for Sun's compiler.
-	#
-	AC_WIRESHARK_COMPILER_FLAGS_CHECK(-xarch=sse4_2, C)
-	if test "x$CFLAGS" != "x$CFLAGS_before_simd"
-	then
-		#
-		# The compiler supports -xarch=sse4_2; use that to
-		# enable SSE 4.2.
-		#
-		# Restore CFLAGS; see above.
-		#
-		CFLAGS="$CFLAGS_before_simd"
-		ac_sse4_2_flag=-xarch=sse4_2
-	fi
-fi
-
-if test "x$ac_sse4_2_flag" != x; then
-	#
-	# OK, we have a compiler flag to enable SSE 4.2.
-	#
-	# Make sure we have the necessary header for the SSE4.2 intrinsics
-	# and that we can use it.
-	#
-	AC_MSG_CHECKING([whether there is nmmintrin.h header and we can use it])
-
-	#
-	# Add the SSE4.2 flags to the beginning of CFLAGS, in case the
-	# user explicitly specified -mno-sse4.2 (or in case Gentoo's build
-	# tools did so); if they did so, we only want this to work if
-	# we can use the #pragma to override that for ws_mempbrk_sse42.c,
-	# and putting it at the beginning means that the CFLAGS setting
-	# in the environment will come later and override it.
-	#
-	saved_CFLAGS="$CFLAGS"
-	CFLAGS="$ac_sse4_2_flag $CFLAGS"
-	AC_TRY_COMPILE(
-		[#include <nmmintrin.h>],
-		[return 0;],
-		[
-		        have_sse42=yes
-		        AC_DEFINE(HAVE_SSE4_2, 1, [Support SSSE4.2 (Streaming SIMD Extensions 4.2) instructions])
-			CFLAGS_SSE42="$ac_sse4_2_flag"
-		        AC_MSG_RESULT([yes])
-		],
-		[
-		        have_sse42=no
-		        AC_MSG_RESULT([no])
-		]
-	)
-	CFLAGS="$saved_CFLAGS"
-else
-	have_sse42=no
-fi
-dnl build libwsutil_sse42 only if there is SSE4.2
-AM_CONDITIONAL(SSE42_SUPPORTED, test "x$have_sse42" = "xyes")
-AC_SUBST(CFLAGS_SSE42)
-
 #
 # If we're running GCC or clang define _U_ to be "__attribute__((unused))"
 # so we can use _U_ to flag unused function parameters and not get warnings
@@ -1178,11 +1013,11 @@ AC_WIRESHARK_GCC_FORTIFY_SOURCE_CHECK
 # This barrier is set for a very large part of the code. However, it is
 # typically not set for "generated" code  (flex, ans2wrs, idl2wrs, ...)
 #
-warnings_as_errors_default="yes"
+warnings_as_errors_default="no"
 AC_MSG_CHECKING(whether we should treat compiler warnings as errors)
 AC_ARG_ENABLE(warnings-as-errors,
   AC_HELP_STRING( [--enable-warnings-as-errors],
-		  [treat warnings as errors (only for GCC or clang) @<:@default=yes, unless extra compiler warnings are enabled@:>@]),
+		  [treat warnings as errors (only for GCC or clang) @<:@default=no@:>@]),
 [
   if test "x$ac_supports_gcc_flags" = "xyes" -a "x$enableval" = "xyes"; then
     with_warnings_as_errors="yes"
@@ -1265,9 +1100,6 @@ darwin*)
 	#
 	LDFLAGS_SHAREDLIB="-Wl,-single_module"
 	#
-	# Add -Wl,-headerpad_max_install_names to the LDFLAGS, as
-	# code-signing issues is running out of padding space.
-	#
 	# Add -Wl,-search_paths_first to make sure that if we search
 	# directories A and B, in that order, for a given library, a
 	# non-shared version in directory A, rather than a shared
@@ -1283,8 +1115,8 @@ darwin*)
 	# libraries in the rpath, rather than having a script tweak
 	# DYLD_LIBRARY_PATH.
 	#
-	LDFLAGS="-Wl,-headerpad_max_install_names -Wl,-search_paths_first -Wl,-rpath,@executable_path/../lib -Wl,-rpath,@executable_path/../Frameworks -Wl,-rpath,/usr/local/lib $LDFLAGS"
-	AC_MSG_RESULT([Apple linker - added -Wl,-single_module to shared library linker flags and -Wl,-headerpad_max_install_names -Wl,-search_paths_first and rpaths to all linker flags])
+	LDFLAGS="-Wl,-search_paths_first -Wl,-rpath,@executable_path/../lib -Wl,-rpath,@executable_path/../Frameworks -Wl,-rpath,/usr/local/lib $LDFLAGS"
+	AC_MSG_RESULT([Apple linker - added -Wl,-single_module and -Wl,-search_paths_first, and rpaths])
 	;;
 cygwin*)
 	#
@@ -1448,7 +1280,6 @@ AC_ARG_ENABLE(wireshark,
   AC_HELP_STRING( [--enable-wireshark],
                   [build the Wireshark GUI (with Gtk+, Qt, or both) @<:@default=yes@:>@]),
     enable_wireshark=$enableval,enable_wireshark=yes)
-AM_CONDITIONAL(BUILDING_WIRESHARK, test x$enable_wireshark = xyes)
 
 AC_ARG_ENABLE(packet-editor,
   AC_HELP_STRING( [--enable-packet-editor],
@@ -1541,7 +1372,6 @@ AC_SUBST(QT_MIN_VERSION)
 # 5.0.0:  19 Dec 2012
 # 5.1.0:  03 Jul 2013
 # 5.2.0:  12 Dec 2013
-# 5.3.0:  20 May 2014
 
 have_qt=no
 have_gtk=no
@@ -1573,6 +1403,8 @@ if test "x$enable_wireshark" = "xyes"; then
 			CXXFLAGS="$CXXFLAGS $Qt_CFLAGS"
 			have_qt=yes
 			GUI_CONFIGURE_FLAGS="$GUI_CONFIGURE_FLAGS --with-qt"
+			OSX_APP_FLAGS="$OSX_APP_FLAGS -qt"
+			OSX_DMG_FLAGS="-qt"
 		],
 		[AC_MSG_ERROR([Qt is not available])])
 
@@ -1655,28 +1487,26 @@ AC_SUBST(GLIB_MIN_VERSION)
 use_glib_cflags="true"
 if test "$have_gtk" = "yes" -a "$have_qt" = "yes" ; then
 	# We have both GTK and Qt and thus will be building both wireshark
-	# and wireshark-gtk.
+	# and wireshark-qt.
 
-	wireshark_bin="wireshark\$(EXEEXT) wireshark-gtk\$(EXEEXT)"
+	wireshark_bin="wireshark\$(EXEEXT) wireshark-qt\$(EXEEXT)"
 	wireshark_man="wireshark.1"
 	wireshark_SUBDIRS="codecs ui/qt ui/gtk"
 fi
 if test "$have_gtk" = "no" -a "$have_qt" = "yes" ; then
 	# We don't have GTK+ but we have Qt.
 
-	wireshark_bin="wireshark\$(EXEEXT)"
+	wireshark_bin="wireshark-qt\$(EXEEXT)"
 	wireshark_man="wireshark.1"
 	wireshark_SUBDIRS="codecs ui/qt"
 fi
 if test "$have_gtk" = "yes" -a "$have_qt" = "no" ; then
 	# We have GTK+ but not Qt.
 
-	wireshark_bin="wireshark-gtk\$(EXEEXT)"
+	wireshark_bin="wireshark\$(EXEEXT)"
 	wireshark_man="wireshark.1"
 	wireshark_SUBDIRS="codecs ui/gtk"
 	use_glib_cflags="false"
-	OSX_APP_FLAGS="$OSX_APP_FLAGS -gtk"
-	OSX_DMG_FLAGS="-gtk"
 fi
 if test "$have_gtk" = "no" -a "$have_qt" = "no" ; then
 	# We have neither GTK+ nor Qt.
@@ -1791,32 +1621,6 @@ then
 	fi
 fi
 AC_SUBST(MOC)
-AC_PATH_PROG(RCC, rcc)
-if test "x$RCC" = x
-then
-	AC_PATH_PROG(RCC, rcc)
-	if test "x$RCC" = x
-	then
-		if test "x$with_qt" = "xyes"; then
-			#
-			# If you want to build with Qt, you'd better
-			# have moc.
-			#
-			AC_MSG_ERROR(I couldn't find rcc; make sure it's installed and in your path)
-		else
-			#
-			# We shouldn't fail here, as the user's not
-			# building with Qt, and we shouldn't force them
-			# to have Qt installed if they're not doing so.
-			# "make dist" will fail if they do that, but
-			# we don't know whether they'll be doing that,
-			# so this is the best we can do.
-			#
-			RCC=rcc
-		fi
-	fi
-fi
-AC_SUBST(RCC)
 
 # Error out if a glib header other than a "top level" header
 #  (glib.h, glib-object.h, gio.h) or certain other headers( e.g.,gmodule.h)
@@ -1857,13 +1661,10 @@ LIBS="$ac_save_LIBS"
 if test "$ac_cv_glib_supports_modules" = yes ; then
   AC_MSG_RESULT(yes)
   have_plugins=yes
-  plugins_dir="plugins"
 else
   AC_MSG_RESULT(no)
   have_plugins=no
-  plugins_dir=""
 fi
-AC_SUBST(plugins_dir)
 
 #
 # If we have <dlfcn.h>, check whether we have dladdr.
@@ -1927,7 +1728,7 @@ CFLAGS="$ac_save_CFLAGS"
 LIBS="$ac_save_LIBS"
 if test "$ac_cv_glib_supports_printf_grouping" = yes ; then
   AC_MSG_RESULT(yes)
-  AC_DEFINE(HAVE_GLIB_PRINTF_GROUPING, 1, [Define if GLib's printf functions support thousands grouping.])
+  AC_DEFINE(HAVE_GLIB_PRINTF_GROUPING, 1, [Define if your printf() function supports thousands grouping.])
 else
   AC_MSG_RESULT(no)
 fi
@@ -2247,39 +2048,39 @@ AC_SUBST(rawshark_man)
 
 
 # Enable/disable echld
-AC_ARG_ENABLE(echld,
-  AC_HELP_STRING( [--enable-echld],
-                  [support echld (Experimental) @<:@default=no@:>@]),
-    have_echld=$enableval,have_echld=no)
+#AC_ARG_ENABLE(echld,
+#  AC_HELP_STRING( [--enable-echld],
+#                  [support echld (Experimental) @<:@default=no@:>@]),
+#    have_echld=$enableval,have_echld=no)
 
 AM_CONDITIONAL(HAVE_ECHLD, test "x$have_echld" = "xyes")
-if test "x$have_echld" = "xyes"
-then
-  AC_DEFINE(HAVE_ECHLD, 1, [Define if echld is enabled])
-  echld_test_bin="echld_test\$(EXEEXT)"
-  echld_dir="echld"
-else
-  have_echld="no"
-  echld_test_bin=""
-  echld_dir=""
-fi
+#if test "x$have_echld" = "xyes"
+#then
+#  AC_DEFINE(HAVE_ECHLD, 1, [Define if echld is enabled])
+#  echld_test_bin="echld_test\$(EXEEXT)"
+#  echld_dir="echld"
+#else
+#  have_echld="no"
+#  echld_test_bin=""
+#  echld_dir=""
+#fi
 AC_SUBST(echld_test_bin)
 AC_SUBST(echld_dir)
 
 # Enable/disable tfshark
-AC_ARG_ENABLE(tfshark,
-  AC_HELP_STRING( [--enable-tfshark],
-                  [build tfshark (Experimental) @<:@default=no@:>@]),
-    tfshark=$enableval,enable_tfshark=no)
+#AC_ARG_ENABLE(tfshark,
+#  AC_HELP_STRING( [--enable-tfshark],
+#                  [build tfshark (Experimental) @<:@default=no@:>@]),
+#    tfshark=$enableval,enable_tfshark=no)
 
-if test "x$enable_tfshark" = "xyes" ; then
-	tfshark_bin="tfshark\$(EXEEXT)"
-	tfshark_man="tfshark.1"
-	wiresharkfilter_man="wireshark-filter.4"
-else
-	tfshark_bin=""
-	tfshark_man=""
-fi
+#if test "x$enable_tfshark" = "xyes" ; then
+#	tfshark_bin="tfshark\$(EXEEXT)"
+#	tfshark_man="tfshark.1"
+#	wiresharkfilter_man="wireshark-filter.4"
+#else
+#	tfshark_bin=""
+#	tfshark_man=""
+#fi
 AC_SUBST(tfshark_bin)
 AC_SUBST(tfshark_man)
 
@@ -2355,6 +2156,8 @@ else
 fi
 
 dnl Lua check
+AC_MSG_CHECKING(whether to use liblua for the Lua scripting plugin)
+
 AC_ARG_WITH(lua,
   AC_HELP_STRING( [--with-lua@<:@=DIR@:>@],
                   [use liblua (located in directory DIR, if supplied) for the Lua scripting plugin @<:@default=yes, if available@:>@]),
@@ -2367,28 +2170,25 @@ AC_ARG_WITH(lua,
 		want_lua=yes
 	else
 		want_lua=yes
-		want_lua_dir=$withval
+		lua_dir=$withval
 	fi
 ],[
-	# By default use Lua if we can find it
+	#
+	# Use liblua by default
+	#
 	want_lua=ifavailable
 	lua_dir=
 ])
-if test "x$want_lua" != "xno" ; then
+if test "x$want_lua" = "xno" ; then
+	AC_MSG_RESULT(no)
+else
+	AC_MSG_RESULT(yes)
 	AC_WIRESHARK_LIBLUA_CHECK
-
-	if test "x$want_lua" = "xyes" -a "x$have_lua" = "xno"
-	then
-                AC_MSG_ERROR([Lua support was requested, but is not available])
+	if test "x$want_lua" = "xno" ; then
+		AC_MSG_RESULT(liblua not found - disabling support for the lua scripting plugin)
 	fi
 fi
-if test "x$have_lua" = "xyes"
-then
-	AC_DEFINE(HAVE_LUA, 1, [Define to use Lua])
-fi
-AM_CONDITIONAL(HAVE_LIBLUA, test x$have_lua = xyes)
-AC_SUBST(LUA_LIBS)
-AC_SUBST(LUA_CFLAGS)
+AM_CONDITIONAL(HAVE_LIBLUA, test x$want_lua = xyes)
 
 
 dnl portaudio check
@@ -2454,11 +2254,9 @@ if test "x$enable_setcap_install" = "xno" ; then
 	AC_MSG_RESULT(no)
 else
 	if test "x$SETCAP" = "x" ; then
-		AC_MSG_RESULT(setcap not found)
-		AC_MSG_ERROR([Setcap install was requested, but setcap was not found])
+		AC_MSG_RESULT(no. Setcap not found)
 	elif test "x$enable_dumpcap" = "xno" ; then
-		AC_MSG_RESULT(dumpcap disabled)
-		AC_MSG_ERROR([Setcap install works only with dumpcap, but dumpcap is disabled])
+		AC_MSG_ERROR(Setcap install works only with dumpcap but dumpcap is disabled)
 	else
 		AC_MSG_RESULT(yes)
 	fi
@@ -2478,11 +2276,9 @@ if test "x$enable_setuid_install" = "xno" ; then
 else
 	if test "x$enable_setcap_install" = "xyes" ; then
 		enable_setuid_install=no
-		AC_MSG_RESULT(setcap and setuid both selected)
-		AC_MSG_ERROR(You must choose one of setcap install and setuid install)
+		AC_MSG_RESULT(no; using setcap instead)
 	elif test "x$enable_dumpcap" = "xno" ; then
-		AC_MSG_RESULT(dumpcap disabled)
-		AC_MSG_ERROR([Setuid install works only with dumpcap, but dumpcap is disabled])
+		AC_MSG_ERROR(Setuid install works only with dumpcap but dumpcap is disabled)
 	else
 		AC_MSG_RESULT(yes)
 	fi
@@ -2682,6 +2478,46 @@ else
 fi
 AC_SUBST(GEOIP_LIBS)
 
+# Warning: this Python scripting appears to be broken (does not work at all).
+# Running it also causes Valgrind to complain about all sorts of memory errors.
+# Suggestion: do not enable it unless you are working on fixing it.
+#
+# An alternative might be https://code.google.com/p/pyreshark/
+#
+dnl Python devel Check
+AC_MSG_CHECKING(whether to use the Python interpreter for scripting)
+
+AC_ARG_WITH(broken-python,
+    AC_HELP_STRING( [--with-broken-python@<:@=DIR@:>@],
+                    [use the (BROKEN) Python interpreter (installed in DIR, if supplied) @<:@default=no@:>@]),
+[
+	pythondir='${libdir}/wireshark/python/${VERSION}'
+	if test "x$withval" = "xno"
+	then
+		want_python=no
+	elif test "x$withval" = "xyes"
+	then
+		want_python=yes
+	else
+		want_python=yes
+		pythondir="$withval"
+	fi
+],[
+	# By default (user didn't explicitly enable Python), don't enable
+	# Python support.
+	#
+	want_python=no
+	#pythondir='${libdir}/wireshark/python/${VERSION}'
+])
+if test "x$want_python" = "xno" ; then
+        AC_MSG_RESULT(no)
+else
+        AC_MSG_RESULT(yes)
+	AC_WIRESHARK_PYTHON_CHECK
+fi
+AM_CONDITIONAL(HAVE_LIBPY, test x$want_python != xno)
+AC_SUBST(pythondir)
+
 #
 # Define WS_MSVC_NORETURN appropriately for declarations of routines that
 # never return (just like Charlie on the MTA).
@@ -2716,6 +2552,7 @@ AC_C_BIGENDIAN
 # XXX - do we need this?
 AC_PROG_GCC_TRADITIONAL
 
+GETOPT_LO=""
 AC_CHECK_FUNC(getopt_long,
   [
     GETOPT_LO=""
@@ -2740,17 +2577,33 @@ AC_CHECK_FUNC(getopt_long,
       AC_MSG_RESULT(no)
     fi
   ],
-  GETOPT_LO="wsgetopt.lo")
+  GETOPT_LO="wsgetopt.lo"
+)
+if test "$ac_cv_func_getopt" = no ; then
+  GETOPT_LO="wsgetopt.lo"
+fi
+AM_CONDITIONAL(NEED_GETOPT_LO, test "x$ac_cv_func_getopt" = "xno")
 AC_SUBST(GETOPT_LO)
+
+AC_CHECK_FUNC(strncasecmp, STRNCASECMP_LO="",
+  STRNCASECMP_LO="strncasecmp.lo")
+if test "$ac_cv_func_strncasecmp" = no ; then
+  STRNCASECMP_LO="strncasecmp.lo"
+fi
+AM_CONDITIONAL(NEED_STRNCASECMP_LO, test "x$ac_cv_func_strncasecmp" = "xno")
+AC_SUBST(STRNCASECMP_LO)
 
 AC_CHECK_FUNCS(mkstemp mkdtemp)
 
-AC_SEARCH_LIBS(inet_aton, [socket nsl],
-  [
-    INET_ATON_LO=""
-    AC_DEFINE(HAVE_INET_ATON, 0, [Define to 1 if you have the inet_aton function.])
-  ],
-  INET_ATON_LO="inet_aton.lo")
+AC_SEARCH_LIBS(inet_aton, [socket nsl], have_inet_aton=yes,
+    have_inet_aton=no)
+if test "$have_inet_aton" = no; then
+  INET_ATON_LO="inet_aton.lo"
+  AC_DEFINE(HAVE_INET_ATON_H, 0, [Define unless inet/aton.h needs to be included])
+else
+  INET_ATON_LO=""
+fi
+AM_CONDITIONAL(NEED_INET_ATON_LO, test "x$have_inet_aton" = "xno")
 AC_SUBST(INET_ATON_LO)
 
 AC_SEARCH_LIBS(inet_pton, [socket nsl], [
@@ -2812,21 +2665,16 @@ extern const char *inet_ntop(int, const void *, char *, socklen_t);],, [
 AM_CONDITIONAL(NEED_INET_NTOP_LO, test "x$INET_NTOP_LO" != "x")
 AC_SUBST(INET_NTOP_LO)
 
-AC_CHECK_FUNC(strptime,
-  [
-    STRPTIME_LO=""
-    AC_DEFINE(HAVE_STRPTIME, 1, [Define if you have the strptime function.])
-  ],
-  STRPTIME_LO="strptime.lo")
+AC_CHECK_FUNC(strptime, STRPTIME_LO="",
+  [STRPTIME_LO="strptime.lo"
+   AC_DEFINE(NEED_STRPTIME_H, 1, [Define if strptime.h needs to be included])
+])
+if test "$ac_cv_func_strptime" = no ; then
+  STRPTIME_LO="strptime.lo"
+fi
+AC_SUBST(STRPTIME_C)
+AM_CONDITIONAL(NEED_STRPTIME_LO, test "x$ac_cv_func_strptime" = "no")
 AC_SUBST(STRPTIME_LO)
-
-AC_CHECK_FUNC(popcount,
-  [
-    POPCOUNT_LO=""
-    AC_DEFINE(HAVE_POPCOUNT, 1, [Define if you have the popcount function.])
-  ],
-  POPCOUNT_LO="popcount.lo")
-AC_SUBST(POPCOUNT_LO)
 
 AC_CHECK_FUNCS(getprotobynumber gethostbyname2)
 AC_CHECK_FUNCS(issetugid)
@@ -2837,21 +2685,11 @@ AC_SUBST(wireshark_SUBDIRS)
 
 # Check Bluetooth SBC codec for RTP Player
 # git://git.kernel.org/pub/scm/bluetooth/sbc.git
-AC_ARG_WITH([sbc],
-  AC_HELP_STRING( [--with-sbc=@<:@yes/no@:>@],
-                  [use SBC codec to play Bluetooth A2DP stream @<:@default=yes, if available@:>@]),
-  with_sbc="$withval"; want_sbc="yes", with_sbc="yes")
-
 PKG_CHECK_MODULES(SBC, sbc >= 1.0, [have_sbc=yes], [have_sbc=no])
-if test "x$with_sbc" != "xno"; then
-    if (test "${have_sbc}" = "yes"); then
-        AC_DEFINE(HAVE_SBC, 1, [Define to support playing SBC by standalone BlueZ SBC library])
-    elif test "x$want_sbc" = "xyes"; then
-	# Error out if the user explicitly requested the sbc library
-	AC_MSG_ERROR([SBC codec library was requested, but is not available])
-    fi
-else
-    have_sbc=no
+if (test "${have_sbc}" = "yes"); then
+    AC_DEFINE(HAVE_SBC, 1, [Define to support playing SBC by standalone BlueZ SBC library])
+    CFLAGS="$CFLAGS $(pkg-config sbc --cflags)"
+    LIBS="$LIBS $(pkg-config sbc --libs)"
 fi
 
 dnl
@@ -2886,32 +2724,6 @@ CPPFLAGS="$CPPFLAGS '-DPLUGIN_INSTALL_DIR=\"\$(plugindir)\"'"
 PLUGIN_LIBS=""
 AC_SUBST(PLUGIN_LIBS)
 
-
-dnl Use extcap by default
-extcapdir='${datadir}/wireshark/extcap/'
-AC_ARG_WITH(extcap,
-  AC_HELP_STRING( [--with-extcap@<:@=DIR@:>@],
-                  [use extcap for external capture sources (installed in DIR, if supplied) @<:@default=yes, if possible@:>@]),
-[
-  if test "x$withval" = "xno"; then
-      have_extcap=no
-  elif test "x$withval" = "xyes"; then
-      have_extcap=yes
-  elif test "x$withval" != "xyes"; then
-      have_extcap=yes
-      extcapdir ="$withval"
-  fi
-],[
-    have_extcap=yes
-])
-AM_CONDITIONAL(HAVE_EXTCAP, test "x$have_extcap" = "xyes")
-if test "x$have_extcap" = "xyes"
-then
-  AC_DEFINE(HAVE_EXTCAP, 1, [Define if external capture sources should be enabled])
-  AC_DEFINE_UNQUOTED(EXTCAP_DIR,"$extcapdir", [Directory for extcap plugins])
-fi
-AC_SUBST(extcapdir)
-
 #
 # Check if (emem) memory allocations must be 8-byte aligned.
 # I haven't been able to write C code that reliably makes that determination
@@ -2934,6 +2746,43 @@ case $host_cpu in
 		;;
 esac
 
+# Gather only the "--with*" arguments and also a list of --with arguments for rpmbuild
+for f in $CONFIG_ARGS
+do
+	case $f in
+	--with-gtk2*)
+		CONFIG_WITH_ARGS="$CONFIG_WITH_ARGS $f"
+		RPMBUILD_WITH_ARGS="$RPMBUILD_WITH_ARGS --with gtk2"
+		;;
+	--without-gtk2*)
+		CONFIG_WITH_ARGS="$CONFIG_WITH_ARGS $f"
+		RPMBUILD_WITH_ARGS="$RPMBUILD_WITH_ARGS --without gtk2"
+		;;
+	--with-gtk3*)
+		CONFIG_WITH_ARGS="$CONFIG_WITH_ARGS $f"
+		RPMBUILD_WITH_ARGS="$RPMBUILD_WITH_ARGS --with gtk3"
+		;;
+	--without-gtk3*)
+		CONFIG_WITH_ARGS="$CONFIG_WITH_ARGS $f"
+		RPMBUILD_WITH_ARGS="$RPMBUILD_WITH_ARGS --without gtk3"
+		;;
+	--with-qt*)
+		CONFIG_WITH_ARGS="$CONFIG_WITH_ARGS $f"
+		RPMBUILD_WITH_ARGS="$RPMBUILD_WITH_ARGS --with qt"
+		;;
+	--without-qt*)
+		CONFIG_WITH_ARGS="$CONFIG_WITH_ARGS $f"
+		RPMBUILD_WITH_ARGS="$RPMBUILD_WITH_ARGS --without qt"
+		;;
+	--with*)
+		CONFIG_WITH_ARGS="$CONFIG_WITH_ARGS $f"
+		;;
+	esac
+
+done
+AC_SUBST(CONFIG_WITH_ARGS)
+AC_SUBST(RPMBUILD_WITH_ARGS)
+
 dnl libtool defs
 #
 # Yes, AM_PROG_LIBTOOL is redundant with newer version(s) of some tool(s)
@@ -2952,23 +2801,6 @@ then
   AC_DEFINE(ENABLE_STATIC, 1, [Link plugins statically into Wireshark])
 fi
 AC_SUBST(ENABLE_STATIC)
-
-# Gather which GUI we're building for rpmbuild
-if test "x$have_gtk" = "xyes"; then
-	if test "x$with_gtk3" = "xyes"; then
-		RPMBUILD_WITH_ARGS="--with gtk3 --without gtk2"
-	else
-		RPMBUILD_WITH_ARGS="--without gtk3 --with gtk2"
-	fi
-else
-	RPMBUILD_WITH_ARGS="--without gtk2 --without gtk3"
-fi
-if test "x$have_qt" = "xyes" ; then
-	RPMBUILD_WITH_ARGS="$RPMBUILD_WITH_ARGS --with qt"
-else
-	RPMBUILD_WITH_ARGS="$RPMBUILD_WITH_ARGS --without qt"
-fi
-AC_SUBST(RPMBUILD_WITH_ARGS)
 
 dnl Save the cacheable configure results to config.cache before recursing
 AC_CACHE_SAVE
@@ -3007,6 +2839,7 @@ AC_OUTPUT(
   asn1/dsp/Makefile
   asn1/ess/Makefile
   asn1/ftam/Makefile
+  asn1/gnm/Makefile
   asn1/goose/Makefile
   asn1/gprscdr/Makefile
   asn1/gsm_map/Makefile
@@ -3088,14 +2921,9 @@ AC_OUTPUT(
   asn1/x509if/Makefile
   asn1/x509sat/Makefile
   asn1/x721/Makefile
-  capchild/Makefile
-  capchild/doxygen.cfg
-  caputils/Makefile
-  caputils/doxygen.cfg
   doc/Makefile
   docbook/Makefile
   epan/Makefile
-  epan/compress/Makefile
   epan/crypt/Makefile
   epan/doxygen.cfg
   epan/dfilter/Makefile
@@ -3103,10 +2931,11 @@ AC_OUTPUT(
   epan/dissectors/dcerpc/Makefile
   epan/dissectors/pidl/Makefile
   epan/ftypes/Makefile
-  epan/jsmn/Makefile
   epan/nghttp2/Makefile
   epan/wmem/Makefile
   epan/wslua/Makefile
+  epan/wspython/Makefile
+  filetap/Makefile
   codecs/Makefile
   ui/Makefile
   ui/doxygen.cfg
@@ -3130,7 +2959,6 @@ AC_OUTPUT(
   packaging/svr4/pkginfo
   plugins/Makefile
   plugins/docsis/Makefile
-  plugins/easy_codec/Makefile
   plugins/ethercat/Makefile
   plugins/gryphon/Makefile
   plugins/irda/Makefile
@@ -3169,9 +2997,9 @@ if test "x$have_gtk" = "xyes"; then
 fi
 
 if test "x$have_qt" = "xyes" ; then
-	enable_wireshark_qt="yes"
+	enable_qtshark="yes"
 else
-	enable_wireshark_qt="no"
+	enable_qtshark="no"
 fi
 
 if test "x$enable_setcap_install" = "xyes" ; then
@@ -3198,10 +3026,16 @@ else
 	zlib_message="yes"
 fi
 
-if test "x$have_lua" = "xyes" ; then
+if test "x$want_lua" = "xyes" ; then
 	lua_message="yes"
 else
 	lua_message="no"
+fi
+
+if test "x$want_python" = "xno"; then
+        python_message="no"
+else
+        python_message="yes"
 fi
 
 if test "x$want_portaudio" = "xyes" ; then
@@ -3252,10 +3086,10 @@ fi
 
 echo ""
 echo "The Wireshark package has been configured with the following options."
-echo "                    Build wireshark : $enable_wireshark_qt"
-echo "                Build wireshark-gtk : $have_gtk""$gtk_lib_message"
+echo "             Build wireshark (Gtk+) : $have_gtk""$gtk_lib_message"
+echo "                 Build wireshark-qt : $enable_qtshark"
 echo "                       Build tshark : $enable_tshark"
-echo "                      Build tfshark : $enable_tfshark"
+#echo "                      Build tfshark : $enable_tfshark"
 echo "                     Build capinfos : $enable_capinfos"
 echo "                      Build captype : $enable_captype"
 echo "                      Build editcap : $enable_editcap"
@@ -3266,15 +3100,15 @@ echo "                    Build text2pcap : $enable_text2pcap"
 echo "                      Build randpkt : $enable_randpkt"
 echo "                       Build dftest : $enable_dftest"
 echo "                     Build rawshark : $enable_rawshark"
-echo "                        Build echld : $have_echld"
+#echo "                        Build echld : $have_echld"
 echo ""
 echo "   Save files as pcap-ng by default : $enable_pcap_ng_default"
 echo "  Install dumpcap with capabilities : $setcap_message"
 echo "             Install dumpcap setuid : $setuid_message"
 echo "                  Use dumpcap group : $dumpcap_group_message"
 echo "                        Use plugins : $have_plugins"
-echo "       Use external capture sources : $have_extcap"
 echo "                    Use Lua library : $lua_message"
+echo "                 Use Python binding : $python_message"
 echo "                   Build rtp_player : $portaudio_message"
 echo "             Build profile binaries : $enable_profile_build"
 echo "                   Use pcap library : $want_pcap"

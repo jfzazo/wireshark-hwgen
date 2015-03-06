@@ -21,11 +21,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <locale.h>
 #include <limits.h>
 
@@ -43,12 +44,10 @@
 #include <fcntl.h>
 #endif
 
+#include <signal.h>
+
 #ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
-#endif
-
-#ifdef HAVE_LIBZ
-#include <zlib.h>      /* to get the libz version number */
 #endif
 
 #ifndef HAVE_GETOPT_LONG
@@ -60,15 +59,11 @@
 #include <epan/exceptions.h>
 #include <epan/epan-int.h>
 #include <epan/epan.h>
-
-#include <wsutil/clopts_common.h>
-#include <wsutil/cmdarg_err.h>
 #include <wsutil/crash_info.h>
 #include <wsutil/privileges.h>
 #include <wsutil/file_util.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/report_err.h>
-#include <wsutil/ws_version_info.h>
 
 #include "globals.h"
 #include <epan/timestamp.h>
@@ -84,17 +79,16 @@
 #include <epan/print.h>
 #include <epan/addr_resolv.h>
 #include "ui/util.h"
+#include "clopts_common.h"
+#include "cmdarg_err.h"
+#include "version_info.h"
 #include "register.h"
 #include <epan/epan_dissect.h>
 #include <epan/tap.h>
-#include <epan/stat_tap_ui.h>
+#include <epan/stat_cmd_args.h>
+#include <epan/timestamp.h>
 #include <epan/ex-opt.h>
-
-#if defined(HAVE_HEIMDAL_KERBEROS) || defined(HAVE_MIT_KERBEROS)
-#include <epan/asn1.h>
-#include <epan/dissectors/packet-kerberos.h>
-#endif
-
+#include <filetap/ftap.h>
 #include <wiretap/wtap-int.h>
 #include <wiretap/file_wrappers.h>
 
@@ -169,11 +163,8 @@ static void open_failure_message(const char *filename, int err,
 static void failure_message(const char *msg_format, va_list ap);
 static void read_failure_message(const char *filename, int err);
 static void write_failure_message(const char *filename, int err);
-static void failure_message_cont(const char *msg_format, va_list ap);
 
 capture_file cfile;
-
-static GHashTable *output_only_tables = NULL;
 
 #if 0
 struct string_elem {
@@ -198,8 +189,22 @@ string_elem_print(gpointer data, gpointer not_used _U_)
 #endif
 
 static void
-print_usage(FILE *output)
+print_usage(gboolean print_ver)
 {
+  FILE *output;
+
+  if (print_ver) {
+    output = stdout;
+    fprintf(output,
+        "TFShark " VERSION "%s\n"
+        "Dump and analyze network traffic.\n"
+        "See http://www.wireshark.org for more information.\n"
+        "\n"
+        "%s",
+         wireshark_gitversion, get_copyright_info());
+  } else {
+    output = stderr;
+  }
   fprintf(output, "\n");
   fprintf(output, "Usage: tfshark [options] ...\n");
   fprintf(output, "\n");
@@ -264,7 +269,7 @@ glossary_option_help(void)
 
   output = stdout;
 
-  fprintf(output, "TFShark (Wireshark) %s\n", get_ws_vcs_version_info());
+  fprintf(output, "TFShark " VERSION "%s\n", wireshark_gitversion);
 
   fprintf(output, "\n");
   fprintf(output, "Usage: tfshark -G [report]\n");
@@ -272,7 +277,6 @@ glossary_option_help(void)
   fprintf(output, "Glossary table reports:\n");
   fprintf(output, "  -G column-formats        dump column format codes and exit\n");
   fprintf(output, "  -G decodes               dump \"layer type\"/\"decode as\" associations and exit\n");
-  fprintf(output, "  -G dissector-tables      dump dissector table names, types, and properties\n");
   fprintf(output, "  -G fields                dump fields glossary and exit\n");
   fprintf(output, "  -G ftypes                dump field type basic and descriptive names\n");
   fprintf(output, "  -G heuristic-decodes     dump heuristic dissector tables\n");
@@ -738,31 +742,17 @@ print_current_user(void) {
 }
 
 static void
-get_tfshark_compiled_version_info(GString *str)
+show_version(GString *comp_info_str, GString *runtime_info_str)
 {
-  /* LIBZ */
-#ifdef HAVE_LIBZ
-  g_string_append(str, "with libz ");
-#ifdef ZLIB_VERSION
-  g_string_append(str, ZLIB_VERSION);
-#else /* ZLIB_VERSION */
-  g_string_append(str, "(version unknown)");
-#endif /* ZLIB_VERSION */
-#else /* HAVE_LIBZ */
-  g_string_append(str, "without libz");
-#endif /* HAVE_LIBZ */
-}
-
-static void
-get_tfshark_runtime_version_info(GString *str)
-{
-  /* zlib */
-#if defined(HAVE_LIBZ) && !defined(_WIN32)
-  g_string_append_printf(str, ", with libz %s", zlibVersion());
-#endif
-
-  /* stuff used by libwireshark */
-  epan_get_runtime_version_info(str);
+  printf("TFShark " VERSION "%s\n"
+         "\n"
+         "%s"
+         "\n"
+         "%s"
+         "\n"
+         "%s",
+         wireshark_gitversion, get_copyright_info(), comp_info_str->str,
+         runtime_info_str->str);
 }
 
 int
@@ -772,9 +762,7 @@ main(int argc, char *argv[])
   GString             *runtime_info_str;
   char                *init_progfile_dir_error;
   int                  opt;
-  static const struct option long_options[] = {
-    {(char *)"help", no_argument, NULL, 'h'},
-    {(char *)"version", no_argument, NULL, 'v'},
+  struct option        long_options[] = {
     {0, 0, 0, 0 }
   };
   gboolean             arg_error = FALSE;
@@ -793,7 +781,6 @@ main(int argc, char *argv[])
   gchar               *dfilter = NULL;
   dfilter_t           *rfcode = NULL;
   dfilter_t           *dfcode = NULL;
-  gchar               *err_msg;
   e_prefs             *prefs_p;
   int                  log_flags;
   gchar               *output_only = NULL;
@@ -821,10 +808,21 @@ main(int argc, char *argv[])
 
   static const char    optstring[] = OPTSTRING;
 
-  /* Set the C-language locale to the native environment. */
-  setlocale(LC_ALL, "");
+  /* Assemble the compile-time version information string */
+  comp_info_str = g_string_new("Compiled ");
+  get_compiled_version_info(comp_info_str, NULL, epan_get_compiled_version_info);
 
-  cmdarg_err_init(failure_message, failure_message_cont);
+  /* Assemble the run-time version information string */
+  runtime_info_str = g_string_new("Running ");
+  get_runtime_version_info(runtime_info_str, NULL);
+
+  /* Add it to the information to be reported on a crash. */
+  ws_add_crash_info("TFShark " VERSION "%s\n"
+         "\n"
+         "%s"
+         "\n"
+         "%s",
+      wireshark_gitversion, comp_info_str->str, runtime_info_str->str);
 
 #ifdef _WIN32
   arg_list_utf_16to8(argc, argv);
@@ -835,13 +833,9 @@ main(int argc, char *argv[])
 #endif /* _WIN32 */
 
   /*
-   * Get credential information for later use, and drop privileges
-   * before doing anything else.
-   * Let the user know if anything happened.
+   * Get credential information for later use.
    */
   init_process_policies();
-  relinquish_special_privs_perm();
-  print_current_user();
 
   /*
    * Attempt to get the pathname of the executable file.
@@ -852,26 +846,9 @@ main(int argc, char *argv[])
             init_progfile_dir_error);
   }
 
-  initialize_funnel_ops();
-
-  /* Get the compile-time version information string */
-  comp_info_str = get_compiled_version_info(get_tfshark_compiled_version_info,
-                                            epan_get_compiled_version_info);
-
-  /* Get the run-time version information string */
-  runtime_info_str = get_runtime_version_info(get_tfshark_runtime_version_info);
-
-  /* Add it to the information to be reported on a crash. */
-  ws_add_crash_info("TFShark (Wireshark) %s\n"
-         "\n"
-         "%s"
-         "\n"
-         "%s",
-      get_ws_vcs_version_info(), comp_info_str->str, runtime_info_str->str);
-
   /*
    * In order to have the -X opts assigned before the wslua machine starts
-   * we need to call getopts before epan_init() gets called.
+   * we need to call getopt_long before epan_init() gets called.
    *
    * In order to handle, for example, -o options, we also need to call it
    * *after* epan_init() gets called, so that the dissectors have had a
@@ -942,6 +919,8 @@ main(int argc, char *argv[])
                     (GLogLevelFlags)log_flags,
                     tfshark_log_handler, NULL /* user_data */);
 
+  initialize_funnel_ops();
+
   init_report_err(failure_message, open_failure_message, read_failure_message,
                   write_failure_message);
 
@@ -954,10 +933,14 @@ main(int argc, char *argv[])
 #ifdef HAVE_PLUGINS
   /* Register all the plugin types we have. */
   epan_register_plugin_types(); /* Types known to libwireshark */
+  ftap_register_plugin_types(); /* Types known to libfiletap */
 
   /* Scan for plugins.  This does *not* call their registration routines;
      that's done later. */
   scan_plugins();
+
+  /* Register all libfiletap plugin modules. */
+  register_all_filetap_modules();
 
 #endif
 
@@ -1007,8 +990,6 @@ main(int argc, char *argv[])
         dissector_dump_decodes();
       else if (strcmp(argv[2], "defaultprefs") == 0)
         write_prefs(NULL);
-      else if (strcmp(argv[2], "dissector-tables") == 0)
-        dissector_dump_dissector_tables();
       else if (strcmp(argv[2], "fields") == 0)
         proto_registrar_dump_fields();
       else if (strcmp(argv[2], "ftypes") == 0)
@@ -1038,6 +1019,9 @@ main(int argc, char *argv[])
     }
     return 0;
   }
+
+  /* Set the C-language locale to the native environment. */
+  setlocale(LC_ALL, "");
 
   prefs_p = read_prefs(&gpf_open_errno, &gpf_read_errno, &gpf_path,
                      &pf_open_errno, &pf_read_errno, &pf_path);
@@ -1153,11 +1137,7 @@ main(int argc, char *argv[])
       break;
 
     case 'h':        /* Print help and exit */
-      printf("TFShark (Wireshark) %s\n"
-             "Dump and analyze network traffic.\n"
-             "See http://www.wireshark.org for more information.\n",
-             get_ws_vcs_version_info());
-      print_usage(stdout);
+      print_usage(TRUE);
       return 0;
       break;
     case 'l':        /* "Line-buffer" standard output */
@@ -1207,7 +1187,7 @@ main(int argc, char *argv[])
       rfilter = optarg;
       break;
     case 'S':        /* Set the line Separator to be printed between packets */
-      separator = g_strdup(optarg);
+      separator = strdup(optarg);
       break;
     case 't':        /* Time stamp type */
       if (strcmp(optarg, "r") == 0)
@@ -1299,7 +1279,7 @@ main(int argc, char *argv[])
       break;
     case 'v':         /* Show version and exit */
     {
-      show_version("TFShark (Wireshark)", comp_info_str, runtime_info_str);
+      show_version(comp_info_str, runtime_info_str);
       g_string_free(comp_info_str, TRUE);
       g_string_free(runtime_info_str, TRUE);
       /* We don't really have to cleanup here, but it's a convenient way to test
@@ -1331,12 +1311,12 @@ main(int argc, char *argv[])
          by the preferences set callback) from being used as
          part of a tap filter.  Instead, we just add the argument
          to a list of stat arguments. */
-      if (strcmp("help", optarg) == 0) {
-        fprintf(stderr, "tfshark: The available statistics for the \"-z\" option are:\n");
-        list_stat_cmd_args();
-        return 0;
-      }
       if (!process_stat_cmd_arg(optarg)) {
+        if (strcmp("help", optarg)==0) {
+          fprintf(stderr, "tfshark: The available statistics for the \"-z\" option are:\n");
+          list_stat_cmd_args();
+          return 0;
+        }
         cmdarg_err("Invalid -z argument \"%s\"; it must be one of:", optarg);
         list_stat_cmd_args();
         return 1;
@@ -1344,7 +1324,7 @@ main(int argc, char *argv[])
       break;
     default:
     case '?':        /* Bad flag - print usage message */
-      print_usage(stderr);
+      print_usage(TRUE);
       return 1;
       break;
     }
@@ -1382,7 +1362,7 @@ main(int argc, char *argv[])
     print_packet_info = TRUE;
 
   if (arg_error) {
-    print_usage(stderr);
+    print_usage(FALSE);
     return 1;
   }
 
@@ -1431,9 +1411,8 @@ main(int argc, char *argv[])
   build_column_format_array(&cfile.cinfo, prefs_p->num_cols, TRUE);
 
   if (rfilter != NULL) {
-    if (!dfilter_compile(rfilter, &rfcode, &err_msg)) {
-      cmdarg_err("%s", err_msg);
-      g_free(err_msg);
+    if (!dfilter_compile(rfilter, &rfcode)) {
+      cmdarg_err("%s", dfilter_error_msg);
       epan_cleanup();
       return 2;
     }
@@ -1441,9 +1420,8 @@ main(int argc, char *argv[])
   cfile.rfcode = rfcode;
 
   if (dfilter != NULL) {
-    if (!dfilter_compile(dfilter, &dfcode, &err_msg)) {
-      cmdarg_err("%s", err_msg);
-      g_free(err_msg);
+    if (!dfilter_compile(dfilter, &dfcode)) {
+      cmdarg_err("%s", dfilter_error_msg);
       epan_cleanup();
       return 2;
     }
@@ -1485,6 +1463,14 @@ main(int argc, char *argv[])
     /*
      * We're reading a capture file.
      */
+
+    /*
+     * Immediately relinquish any special privileges we have; we must not
+     * be allowed to read any capture files the user running TShark
+     * can't open.
+     */
+    relinquish_special_privs_perm();
+    print_current_user();
 
     /* TODO: if tfshark is ever changed to give the user a choice of which
        open_routine reader to use, then the following needs to change. */
@@ -1742,15 +1728,14 @@ process_packet_second_pass(capture_file *cf, epan_dissect_t *edt, frame_data *fd
 }
 
 gboolean
-local_wtap_read(capture_file *cf, struct wtap_pkthdr* file_phdr _U_, int *err, gchar **err_info _U_, gint64 *data_offset _U_, guint8** data_buffer)
+local_wtap_read(capture_file *cf, struct wtap_pkthdr* file_phdr, int *err, gchar **err_info, gint64 *data_offset _U_, guint8** data_buffer)
 {
-    /* int bytes_read; */
+    int bytes_read;
     gint64 packet_size = wtap_file_size(cf->wth, err);
 
     *data_buffer = (guint8*)g_malloc((gsize)packet_size);
-    /* bytes_read =*/ file_read(*data_buffer, (unsigned int)packet_size, cf->wth->fh);
+    bytes_read = file_read(*data_buffer, (unsigned int)packet_size, cf->wth->fh);
 
-#if 0 /* no more filetap */
     if (bytes_read < 0) {
         *err = file_error(cf->wth->fh, err_info);
         if (*err == 0)
@@ -1766,6 +1751,7 @@ local_wtap_read(capture_file *cf, struct wtap_pkthdr* file_phdr _U_, int *err, g
     file_phdr->caplen = (guint32)packet_size;
     file_phdr->len = (guint32)packet_size;
 
+#if 0
     /*
      * Set the packet encapsulation to the file's encapsulation
      * value; if that's not WTAP_ENCAP_PER_PACKET, it's the
@@ -1838,7 +1824,7 @@ load_cap_file(capture_file *cf, int max_packet_count, gint64 max_byte_count)
   /* Get the union of the flags for all tap listeners. */
   tap_flags = union_of_tap_listener_flags();
 
-  wtap_phdr_init(&file_phdr);
+  memset(&file_phdr, 0, sizeof(file_phdr));
 
   /* XXX - TEMPORARY HACK TO ELF DISSECTOR */
   file_phdr.pkt_encap = 1234;
@@ -1893,7 +1879,7 @@ load_cap_file(capture_file *cf, int max_packet_count, gint64 max_byte_count)
 
     prev_dis = NULL;
     prev_cap = NULL;
-    ws_buffer_init(&buf, 1500);
+    buffer_init(&buf, 1500);
 
     if (do_dissection) {
       gboolean create_proto_tree;
@@ -1928,7 +1914,7 @@ load_cap_file(capture_file *cf, int max_packet_count, gint64 max_byte_count)
       edt = NULL;
     }
 
-    ws_buffer_free(&buf);
+    buffer_free(&buf);
   }
   else {
     framenum = 0;
@@ -1973,8 +1959,6 @@ load_cap_file(capture_file *cf, int max_packet_count, gint64 max_byte_count)
     }
   }
 
-  wtap_phdr_cleanup(&file_phdr);
-
   if (err != 0) {
     /*
      * Print a message noting that the read failed somewhere along the line.
@@ -1989,9 +1973,9 @@ load_cap_file(capture_file *cf, int max_packet_count, gint64 max_byte_count)
      */
 #ifndef _WIN32
     if (print_packet_info) {
-      ws_statb64 stat_stdout, stat_stderr;
+      struct stat stat_stdout, stat_stderr;
 
-      if (ws_fstat64(1, &stat_stdout) == 0 && ws_fstat64(2, &stat_stderr) == 0) {
+      if (fstat(1, &stat_stdout) == 0 && fstat(2, &stat_stderr) == 0) {
         if (stat_stdout.st_dev == stat_stderr.st_dev &&
             stat_stdout.st_ino == stat_stderr.st_ino) {
           fflush(stdout);
@@ -2000,7 +1984,6 @@ load_cap_file(capture_file *cf, int max_packet_count, gint64 max_byte_count)
       }
     }
 #endif
-#if 0
     switch (err) {
 
     case FTAP_ERR_UNSUPPORTED:
@@ -2041,7 +2024,6 @@ load_cap_file(capture_file *cf, int max_packet_count, gint64 max_byte_count)
                  cf->filename, ftap_strerror(err));
       break;
     }
-#endif
   } else {
     if (print_packet_info) {
       if (!write_finale()) {
@@ -2172,13 +2154,13 @@ write_preamble(capture_file *cf)
   switch (output_action) {
 
   case WRITE_TEXT:
-    return print_preamble(print_stream, cf->filename, get_ws_vcs_version_info());
+    return print_preamble(print_stream, cf ? cf->filename : NULL, wireshark_gitversion);
 
   case WRITE_XML:
     if (print_details)
-      write_pdml_preamble(stdout, cf->filename);
+      write_pdml_preamble(stdout, cf ? cf->filename : NULL);
     else
-      write_psml_preamble(&cf->cinfo, stdout);
+      write_psml_preamble(stdout);
     return !ferror(stdout);
 
   case WRITE_FIELDS:
@@ -2483,7 +2465,7 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
         break;
 
       case WRITE_XML:
-        write_psml_columns(edt, stdout);
+        proto_tree_write_psml(edt, stdout);
         return !ferror(stdout);
       case WRITE_FIELDS: /*No non-verbose "fields" format */
         g_assert_not_reached();
@@ -2508,7 +2490,7 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
       print_args.print_hex = print_hex;
       print_args.print_dissections = print_details ? print_dissections_expanded : print_dissections_none;
 
-      if (!proto_tree_print(&print_args, edt, output_only_tables, print_stream))
+      if (!proto_tree_print(&print_args, edt, print_stream))
         return FALSE;
       if (!print_hex) {
         if (!print_line(print_stream, 0, separator))
@@ -2517,11 +2499,11 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
       break;
 
     case WRITE_XML:
-      write_pdml_proto_tree(edt, stdout);
+      proto_tree_write_pdml(edt, stdout);
       printf("\n");
       return !ferror(stdout);
     case WRITE_FIELDS:
-      write_fields_proto_tree(output_fields, edt, &cf->cinfo, stdout);
+      proto_tree_write_fields(output_fields, edt, &cf->cinfo, stdout);
       printf("\n");
       return !ferror(stdout);
     }
@@ -2567,16 +2549,35 @@ write_finale(void)
 cf_status_t
 cf_open(capture_file *cf, const char *fname, unsigned int type, gboolean is_tempfile, int *err)
 {
+#if USE_FTAP
+  ftap  *fth;
+#else
+  wtap  *wth;
+#endif
   gchar *err_info;
   char   err_msg[2048+1];
 
-  /* The open isn't implemented yet.  Fill in the information for this file. */
+#if USE_FTAP
+  fth = ftap_open_offline(fname, err, &err_info, perform_two_pass_analysis);
+  if (fth == NULL)
+    goto fail;
+#else
+  wth = wtap_open_offline(fname, type, err, &err_info, perform_two_pass_analysis);
+  if (wth == NULL)
+    goto fail;
+#endif
+
+  /* The open succeeded.  Fill in the information for this file. */
 
   /* Create new epan session for dissection. */
   epan_free(cf->epan);
   cf->epan = tfshark_epan_new(cf);
 
-  cf->wth = NULL; /**** XXX - DOESN'T WORK RIGHT NOW!!!! */
+#if USE_FTAP
+  cf->wth = (struct wtap*)fth; /**** XXX - DOESN'T WORK RIGHT NOW!!!! */
+#else
+  cf->wth = wth;
+#endif
   cf->f_datalen = 0; /* not used, but set it anyway */
 
   /* Set the file name because we need it to set the follow stream filter.
@@ -2590,16 +2591,16 @@ cf_open(capture_file *cf, const char *fname, unsigned int type, gboolean is_temp
   /* No user changes yet. */
   cf->unsaved_changes = FALSE;
 
-  cf->cd_t      = 0; /**** XXX - DOESN'T WORK RIGHT NOW!!!! */
+  cf->cd_t      = ftap_file_type_subtype((struct ftap*)cf->wth); /**** XXX - DOESN'T WORK RIGHT NOW!!!! */
   cf->open_type = type;
   cf->count     = 0;
   cf->drops_known = FALSE;
   cf->drops     = 0;
-  cf->snap      = 0; /**** XXX - DOESN'T WORK RIGHT NOW!!!! */
+  cf->snap      = ftap_snapshot_length((struct ftap*)cf->wth); /**** XXX - DOESN'T WORK RIGHT NOW!!!! */
   if (cf->snap == 0) {
     /* Snapshot length not known. */
     cf->has_snap = FALSE;
-    cf->snap = 0;
+    cf->snap = FTAP_MAX_RECORD_SIZE;
   } else
     cf->has_snap = TRUE;
   nstime_set_zero(&cf->elapsed_time);
@@ -2611,7 +2612,7 @@ cf_open(capture_file *cf, const char *fname, unsigned int type, gboolean is_temp
 
   return CF_OK;
 
-/* fail: */
+fail:
   g_snprintf(err_msg, sizeof err_msg,
              cf_open_error_message(*err, err_info, FALSE, cf->cd_t), fname);
   cmdarg_err("%s", err_msg);
@@ -2643,13 +2644,12 @@ show_print_file_io_error(int err)
 }
 
 static const char *
-cf_open_error_message(int err, gchar *err_info _U_, gboolean for_writing,
-                      int file_type _U_)
+cf_open_error_message(int err, gchar *err_info, gboolean for_writing,
+                      int file_type)
 {
   const char *errmsg;
-  /* static char errmsg_errno[1024+1]; */
+  static char errmsg_errno[1024+1];
 
-#if 0
   if (err < 0) {
     /* Wiretap error. */
     switch (err) {
@@ -2761,7 +2761,6 @@ cf_open_error_message(int err, gchar *err_info _U_, gboolean for_writing,
       break;
     }
   } else
-#endif
     errmsg = file_open_error_message(err, for_writing);
   return errmsg;
 }
@@ -2810,14 +2809,32 @@ write_failure_message(const char *filename, int err)
 }
 
 /*
+ * Report an error in command-line arguments.
+ */
+void
+cmdarg_err(const char *fmt, ...)
+{
+  va_list ap;
+
+  va_start(ap, fmt);
+  failure_message(fmt, ap);
+  va_end(ap);
+}
+
+/*
  * Report additional information for an error in command-line arguments.
  */
-static void
-failure_message_cont(const char *msg_format, va_list ap)
+void
+cmdarg_err_cont(const char *fmt, ...)
 {
-  vfprintf(stderr, msg_format, ap);
+  va_list ap;
+
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
   fprintf(stderr, "\n");
+  va_end(ap);
 }
+
 
 /*
  * Editor modelines  -  http://www.wireshark.org/tools/modelines.html

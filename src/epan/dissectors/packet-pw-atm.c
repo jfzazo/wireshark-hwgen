@@ -26,7 +26,7 @@
  */
 
 /*
-   DONE:
+    DONE:
         - ATM N-to-One Cell Mode (with CW)
         - ATM N-to-One Cell Mode (no CW)
         - ATM One-to-One Cell Mode
@@ -36,6 +36,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
@@ -113,8 +114,6 @@ static expert_field ei_cell_h_m = EI_INIT;
 static expert_field ei_cw_bits03 = EI_INIT;
 static expert_field ei_pw_packet_size_too_small = EI_INIT;
 static expert_field ei_pref_cw_len = EI_INIT;
-static expert_field ei_gen_cw_atmbyte = EI_INIT;
-
 
 static dissector_handle_t dh_cell;
 static dissector_handle_t dh_cell_header;
@@ -650,7 +649,7 @@ dissect_11_or_aal5_pdu(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 
 	{
 		tvbuff_t* tvb_2;
-		tvb_2 = tvb_new_subset_length(tvb, 0, PWC_SIZEOF_CW);
+		tvb_2 = tvb_new_subset(tvb, 0, PWC_SIZEOF_CW, PWC_SIZEOF_CW);
 		call_dissector_with_data(dh_control_word, tvb_2, pinfo, tree, &pd);
 
 		tvb_2 = tvb_new_subset_remaining(tvb, (PWC_SIZEOF_CW-1));
@@ -858,7 +857,7 @@ dissect_aal5_sdu(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 
 	{
 		tvbuff_t* tvb_2;
-		tvb_2 = tvb_new_subset_length(tvb, 0, PWC_SIZEOF_CW);
+		tvb_2 = tvb_new_subset(tvb, 0, PWC_SIZEOF_CW, PWC_SIZEOF_CW);
 		call_dissector_with_data(dh_control_word, tvb_2, pinfo, tree, &pd);
 
 		tvb_2 = tvb_new_subset_remaining(tvb, PWC_SIZEOF_CW);
@@ -874,7 +873,7 @@ dissect_aal5_sdu(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 				union wtap_pseudo_header* pseudo_header_save;
 				union wtap_pseudo_header ph;
 
-				tvb_3 = tvb_new_subset_length(tvb_2, 0, payload_size);
+				tvb_3 = tvb_new_subset(tvb_2, 0, payload_size, payload_size);
 				/* prepare pseudo header for atm aal5 decoding */
 				pseudo_header_save = pinfo->pseudo_header;
 				pinfo->pseudo_header = &ph;
@@ -1040,7 +1039,7 @@ dissect_n1_cw(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 
 	{
 		tvbuff_t* tvb_2;
-		tvb_2 = tvb_new_subset_length(tvb, 0, PWC_SIZEOF_CW);
+		tvb_2 = tvb_new_subset(tvb, 0, PWC_SIZEOF_CW, PWC_SIZEOF_CW);
 		call_dissector_with_data(dh_control_word, tvb_2, pinfo, tree, &pd);
 
 		tvb_2 = tvb_new_subset_remaining(tvb, PWC_SIZEOF_CW);
@@ -1304,11 +1303,16 @@ dissect_control_word(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, voi
 		/* atm-specific byte */
 		if (MODE_11(pd->mode))
 		{
-			item = proto_tree_add_item(tree2, hf_gen_cw_atmbyte, tvb, 3, 1, ENC_BIG_ENDIAN);
-			expert_add_info_format(pinfo, item, &ei_gen_cw_atmbyte,
-						   "ATM-specific byte of CW is fully dissected below as %s%s"
+			proto_tree_add_item(tree2, hf_gen_cw_atmbyte, tvb, 3, 1, ENC_BIG_ENDIAN);
+			/*
+			 * no need to highlight item in the tree, therefore
+			 * expert_add_info_format() is not used here.
+			 */
+			item = proto_tree_add_text(tree2, tvb, 3, 1
+						   ,"ATM-specific byte of CW is fully dissected below as %s%s"
 						   ,(PWATM_MODE_11_VPC == pd->mode) ? "a part of "	: ""
 						   ,"PW ATM Cell Header [000]");
+			PROTO_ITEM_SET_GENERATED(item);
 			/*
 			 * Note: if atm-specific byte contains something wrong
 			 * (e.g. non-zero RSV or inadequate V), CW is not
@@ -1859,9 +1863,7 @@ proto_register_pw_atm_ata(void)
 		{ &ei_cell_h_v_not_zero, { "atm.pw_control_byte.v.not_one", PI_MALFORMED, PI_ERROR, "1:1 VPC mode: V bit must be 1 to indicate that VCI is present", EXPFILL }},
 		{ &ei_cell_h_v_not_one, { "atm.pw_control_byte.v.not_zero", PI_MALFORMED, PI_ERROR, "1:1 VCC mode: V bit must be 0 to indicate that VCI is absent", EXPFILL }},
 		{ &ei_cell_h_rsv, { "atm.pw_control_byte.rsv.not_zero", PI_MALFORMED, PI_ERROR, "Reserved bits in the 3rd byte of CW must be 0", EXPFILL }},
-		{ &ei_gen_cw_atmbyte, { "pw.cw.atmbyte", PI_PROTOCOL, PI_NOTE, "ATM-specific byte of CW is fully dissected below", EXPFILL }},
 	};
-
 	expert_module_t* expert_cell;
 
 	proto_n1_cw =
@@ -1964,13 +1966,13 @@ proto_reg_handoff_pw_atm_ata(void)
 {
 	dissector_handle_t h;
 	h = find_dissector("mpls_pw_atm_n1_cw");
-	dissector_add_for_decode_as( "mpls.label", h );
+	dissector_add_uint( "mpls.label", MPLS_LABEL_INVALID, h );
 	h = find_dissector("mpls_pw_atm_n1_nocw");
-	dissector_add_for_decode_as( "mpls.label", h );
+	dissector_add_uint( "mpls.label", MPLS_LABEL_INVALID, h );
 	h = find_dissector("mpls_pw_atm_11_or_aal5_pdu");
-	dissector_add_for_decode_as( "mpls.label", h );
+	dissector_add_uint( "mpls.label", MPLS_LABEL_INVALID, h );
 	h = find_dissector("mpls_pw_atm_aal5_sdu");
-	dissector_add_for_decode_as( "mpls.label", h );
+	dissector_add_uint( "mpls.label", MPLS_LABEL_INVALID, h );
 
 	dh_cell		   = find_dissector("mpls_pw_atm_cell");
 	dh_cell_header	   = find_dissector("mpls_pw_atm_cell_header");
@@ -1981,16 +1983,3 @@ proto_reg_handoff_pw_atm_ata(void)
 	dh_padding	   = find_dissector("pw_padding");
 	dh_data		   = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

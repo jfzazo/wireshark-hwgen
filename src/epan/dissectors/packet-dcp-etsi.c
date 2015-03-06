@@ -26,12 +26,12 @@
 
 #include "config.h"
 
-
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/reassemble.h>
-#include <epan/crc16-tvb.h>
+#include <wsutil/crcdrm.h>
 #include <epan/reedsolomon.h>
+#include <epan/wmem/wmem.h>
+#include <string.h>
 
 /* forward reference */
 void proto_register_dcp_etsi(void);
@@ -97,9 +97,6 @@ static gint ett_pft = -1;
 static gint ett_tpl = -1;
 static gint ett_edcp_fragment = -1;
 static gint ett_edcp_fragments = -1;
-
-static expert_field ei_edcp_reassembly = EI_INIT;
-static expert_field ei_edcp_reassembly_info = EI_INIT;
 
 static reassembly_table dcp_reassembly_table;
 
@@ -199,7 +196,7 @@ dissect_dcp_etsi (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void *
     dcp_tree = proto_item_add_subtree (ti, ett_edcp);
   }
 
-  sync = tvb_get_string_enc(wmem_packet_scope(), tvb, 0, 2, ENC_ASCII);
+  sync = tvb_get_string (wmem_packet_scope(), tvb, 0, 2);
   dissector_try_string(dcp_dissector_table, (char*)sync, tvb, pinfo, dcp_tree, NULL);
   return TRUE;
 }
@@ -269,7 +266,7 @@ dissect_pft_fec_detailed(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree,
   tvbuff_t *new_tvb=NULL;
 
   if (fcount > MAX_FRAGMENTS) {
-    proto_tree_add_expert_format(tree, pinfo, &ei_edcp_reassembly, tvb , 0, -1, "[Reassembly of %d fragments not attempted]", fcount);
+    proto_tree_add_text(tree, tvb , 0, -1, "[Reassembly of %d fragments not attempted]", fcount);
     return NULL;
   }
 
@@ -287,8 +284,10 @@ dissect_pft_fec_detailed(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree,
     fragment_item *fd;
     fragment_head *fd_head;
 
-    proto_tree_add_expert_format(tree, pinfo, &ei_edcp_reassembly_info, tvb, 0, -1, "want %d, got %d need %d",
-                           fcount, fragments, rx_min);
+    if(tree)
+      proto_tree_add_text (tree, tvb, 0, -1, "want %d, got %d need %d",
+                           fcount, fragments, rx_min
+        );
     got = (guint32 *)wmem_alloc(wmem_packet_scope(), fcount*sizeof(guint32));
 
     /* make a list of the findex (offset) numbers of the fragments we have */
@@ -305,18 +304,20 @@ dissect_pft_fec_detailed(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree,
       guint8 *dummy_data = (guint8*) wmem_alloc0 (wmem_packet_scope(), plen);
       tvbuff_t *dummytvb = tvb_new_real_data(dummy_data, plen, plen);
       /* try and decode with missing fragments */
-      proto_tree_add_expert_format(tree, pinfo, &ei_edcp_reassembly_info, tvb, 0, -1, "want %d, got %d need %d",
-                               fcount, fragments, rx_min);
+      if(tree)
+          proto_tree_add_text (tree, tvb, 0, -1, "want %d, got %d need %d",
+                               fcount, fragments, rx_min
+            );
       /* fill the fragment table with empty fragments */
       current_findex = 0;
       for(i=0; i<fragments; i++) {
         guint next_fragment_we_have = got[i];
         if (next_fragment_we_have > MAX_FRAGMENTS) {
-          proto_tree_add_expert_format(tree, pinfo, &ei_edcp_reassembly, tvb , 0, -1, "[Reassembly of %d fragments not attempted]", next_fragment_we_have);
+          proto_tree_add_text(tree, tvb , 0, -1, "[Reassembly of %d fragments not attempted]", next_fragment_we_have);
           return NULL;
         }
         if (next_fragment_we_have-current_findex > MAX_FRAG_GAP) {
-          proto_tree_add_expert_format(tree, pinfo, &ei_edcp_reassembly, tvb, 0, -1,
+          proto_tree_add_text(tree, tvb , 0, -1,
               "[Missing %d consecutive packets. Don't attempt reassembly]",
               next_fragment_we_have-current_findex);
           return NULL;
@@ -493,10 +494,11 @@ dissect_pft(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
   if (tree) {
     proto_item *ci = NULL;
     guint header_len = offset+2;
-    guint16 c = crc16_x25_ccitt_tvb(tvb, header_len);
+    const char *crc_buf = (const char *) tvb_get_ptr(tvb, 0, header_len);
+    unsigned long c = crc_drm(crc_buf, header_len, 16, 0x11021, 1);
     ci = proto_tree_add_item (pft_tree, hf_edcp_hcrc, tvb, offset, 2, ENC_BIG_ENDIAN);
-    proto_item_append_text(ci, " (%s)", (c==0x1D0F)?"Ok":"bad");
-    proto_tree_add_boolean(pft_tree, hf_edcp_hcrc_ok, tvb, offset, 2, c==0x1D0F);
+    proto_item_append_text(ci, " (%s)", (c==0xe2f0)?"Ok":"bad");
+    proto_tree_add_boolean(pft_tree, hf_edcp_hcrc_ok, tvb, offset, 2, c==0xe2f0);
   }
   offset += 2;
   if (fcount > 1) {             /* fragmented*/
@@ -578,9 +580,10 @@ dissect_af (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
   ci = proto_tree_add_item (af_tree, hf_edcp_crc, tvb, offset, 2, ENC_BIG_ENDIAN);
   if (ver & 0x80) { /* crc valid */
     guint len = offset+2;
-    guint16 c = crc16_x25_ccitt_tvb(tvb, len);
-    proto_item_append_text(ci, " (%s)", (c==0x1D0F)?"Ok":"bad");
-    proto_tree_add_boolean(af_tree, hf_edcp_crc_ok, tvb, offset, 2, c==0x1D0F);
+    const char *crc_buf = (const char *) tvb_get_ptr(tvb, 0, len);
+    unsigned long c = crc_drm(crc_buf, len, 16, 0x11021, 1);
+    proto_item_append_text(ci, " (%s)", (c==0xe2f0)?"Ok":"bad");
+    proto_tree_add_boolean(af_tree, hf_edcp_crc_ok, tvb, offset, 2, c==0xe2f0);
   }
   /*offset += 2;*/
 
@@ -615,14 +618,14 @@ dissect_tpl(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
   while(offset<tvb_length(tvb)) {
     guint32 bits;
     guint32 bytes;
-    char *tag = (char*)tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 4, ENC_ASCII); offset += 4;
+    char *tag = (char*)tvb_get_string (wmem_packet_scope(), tvb, offset, 4); offset += 4;
     bits = tvb_get_ntohl(tvb, offset); offset += 4;
     bytes = bits / 8;
     if(bits % 8)
       bytes++;
 
     if(strcmp(tag, "*ptr")==0) {
-        prot = (char*)tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 4, ENC_ASCII);
+        prot = (char*)tvb_get_string (wmem_packet_scope(), tvb, offset, 4);
         maj = tvb_get_ntohs(tvb, offset+4);
         min = tvb_get_ntohs(tvb, offset+6);
         proto_tree_add_bytes_format(tpl_tree, hf_tpl_tlv, tvb,
@@ -864,13 +867,6 @@ proto_register_dcp_etsi (void)
     &ett_edcp_fragments
   };
 
-  static ei_register_info ei[] = {
-     { &ei_edcp_reassembly, { "dcp-etsi.reassembly_failed", PI_REASSEMBLE, PI_ERROR, "Reassembly failed", EXPFILL }},
-     { &ei_edcp_reassembly_info, { "dcp-etsi.reassembly_info", PI_REASSEMBLE, PI_CHAT, "Reassembly information", EXPFILL }},
-  };
-
-  expert_module_t* expert_dcp_etsi;
-
   proto_dcp_etsi = proto_register_protocol ("ETSI Distribution & Communication Protocol (for DRM)",     /* name */
                                             "DCP (ETSI)",       /* short name */
                                             "dcp-etsi"  /* abbrev */
@@ -884,8 +880,6 @@ proto_register_dcp_etsi (void)
   proto_register_field_array (proto_pft, hf_pft, array_length (hf_pft));
   proto_register_field_array (proto_tpl, hf_tpl, array_length (hf_tpl));
   proto_register_subtree_array (ett, array_length (ett));
-  expert_dcp_etsi = expert_register_protocol(proto_dcp_etsi);
-  expert_register_field_array(expert_dcp_etsi, ei, array_length(ei));
 
   /* subdissector code */
   dcp_dissector_table = register_dissector_table("dcp-etsi.sync",

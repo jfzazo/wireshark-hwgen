@@ -26,14 +26,23 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <ctype.h>
+
+#include <glib.h>
 #include <epan/prefs.h>
+#include <epan/packet.h>
 #include <epan/reassemble.h>
 #include <epan/conversation.h>
-#include <epan/ipproto.h>
-#include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 #include "packet-frame.h"
 #include "packet-osi.h"
+#include "packet-osi-options.h"
+#include "packet-isis.h"
+#include "packet-esis.h"
+#include <epan/nlpid.h>
+#include <epan/ipproto.h>
+#include <epan/expert.h>
+#include <epan/strutil.h>
 
 void proto_register_cotp(void);
 void proto_register_cltp(void);
@@ -61,45 +70,6 @@ static int hf_cotp_next_tpdu_number = -1;
 static int hf_cotp_next_tpdu_number_extended = -1;
 static int hf_cotp_eot          = -1;
 static int hf_cotp_eot_extended = -1;
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_cotp_parameter_code = -1;
-static int hf_cotp_parameter_length = -1;
-static int hf_cotp_parameter_value = -1;
-static int hf_cotp_atn_extended_checksum = -1;
-static int hf_cotp_ack_time = -1;
-static int hf_cotp_res_error_rate_target_value = -1;
-static int hf_cotp_res_error_rate_min_accept = -1;
-static int hf_cotp_res_error_rate_tdsu = -1;
-static int hf_cotp_vp_priority = -1;
-static int hf_cotp_transit_delay_targ_calling_called = -1;
-static int hf_cotp_transit_delay_max_accept_calling_called = -1;
-static int hf_cotp_transit_delay_targ_called_calling = -1;
-static int hf_cotp_transit_delay_max_accept_called_calling = -1;
-static int hf_cotp_max_throughput_targ_calling_called = -1;
-static int hf_cotp_max_throughput_min_accept_calling_called = -1;
-static int hf_cotp_max_throughput_targ_called_calling = -1;
-static int hf_cotp_max_throughput_min_accept_called_calling = -1;
-static int hf_cotp_avg_throughput_targ_calling_called = -1;
-static int hf_cotp_avg_throughput_min_accept_calling_called = -1;
-static int hf_cotp_avg_throughput_targ_called_calling = -1;
-static int hf_cotp_avg_throughput_min_accept_called_calling = -1;
-static int hf_cotp_sequence_number = -1;
-static int hf_cotp_reassignment_time = -1;
-static int hf_cotp_lower_window_edge = -1;
-static int hf_cotp_credit = -1;
-static int hf_cotp_tpdu_size = -1;
-static int hf_cotp_checksum = -1;
-static int hf_cotp_vp_version_nr = -1;
-static int hf_cotp_network_expedited_data = -1;
-static int hf_cotp_vp_opt_sel_class1_use = -1;
-static int hf_cotp_use_16_bit_checksum = -1;
-static int hf_cotp_transport_expedited_data_transfer = -1;
-static int hf_cotp_preferred_maximum_tpdu_size = -1;
-static int hf_cotp_inactivity_timer = -1;
-static int hf_cotp_cause = -1;
-static int hf_cotp_segment_data = -1;
-static int hf_cotp_credit_cdt = -1;
-static int hf_cotp_reject_cause = -1;
 
 static int hf_cotp_segments    = -1;
 static int hf_cotp_segment     = -1;
@@ -117,7 +87,6 @@ static expert_field ei_cotp_multiple_tpdus = EI_INIT;
 static expert_field ei_cotp_reject = EI_INIT;
 static expert_field ei_cotp_connection = EI_INIT;
 static expert_field ei_cotp_disconnect_request = EI_INIT;
-static expert_field ei_cotp_preferred_maximum_tpdu_size = EI_INIT;
 
 static int  proto_cltp         = -1;
 static gint ett_cltp           = -1;
@@ -419,15 +388,14 @@ static gchar *print_tsap(const guchar *tsap, int length)
 
 } /* print_tsap */
 
-static const true_false_string tfs_vp_opt_sel_class1_use = { "Receipt confirmation", "explicit AK variant" };
-
 static gboolean ositp_decode_var_part(tvbuff_t *tvb, int offset, int vp_length,
                                       int class_option, int tpdu_len,
                                       packet_info *pinfo, proto_tree *tree)
 {
   guint8          code, length;
   guint8          c1;
-  guint16         s;
+  guint16         s, s1,s2,s3,s4;
+  guint32         t1, t2, t3, t4;
   guint32         offset_iso8073_checksum = 0;
   gint32          i                       = 0;
   guint8          tmp_code                = 0;
@@ -435,18 +403,20 @@ static gboolean ositp_decode_var_part(tvbuff_t *tvb, int offset, int vp_length,
   cksum_status_t  cksum_status;
   gboolean        checksum_ok             = FALSE;
   guint32         pref_max_tpdu_size;
-  proto_item     *ti, *hidden_item;
+  proto_item     *hidden_item;
 
   while (vp_length != 0) {
     code = tvb_get_guint8(tvb, offset);
-    proto_tree_add_item(tree, hf_cotp_parameter_code, tvb, offset, 1, ENC_NA);
+    proto_tree_add_text(tree, tvb, offset, 1,
+                        "Parameter code:   0x%02x (%s)", code,
+                        val_to_str_const(code, tp_vpart_type_vals, "Unknown"));
     offset += 1;
     vp_length -= 1;
 
     if (vp_length == 0)
       break;
     length = tvb_get_guint8(tvb, offset);
-    proto_tree_add_item(tree, hf_cotp_parameter_length, tvb, offset, 1, ENC_NA);
+    proto_tree_add_text(tree, tvb, offset, 1, "Parameter length: %u", length);
     offset += 1;
     vp_length -= 1;
 
@@ -473,10 +443,13 @@ static gboolean ositp_decode_var_part(tvbuff_t *tvb, int offset, int vp_length,
                                       offset_iso8073_checksum,
                                       pinfo->dst.len, (const guint8 *)pinfo->dst.data,
                                       pinfo->src.len, (const guint8 *)pinfo->src.data);
-        ti = proto_tree_add_item(tree, hf_cotp_atn_extended_checksum, tvb, offset, 2, ENC_BIG_ENDIAN);
-        proto_item_append_text(ti, checksum_ok ? " (correct)" : " (incorrect)");
+        proto_tree_add_text(tree, tvb, offset, length,
+                            "ATN extended checksum : 0x%04x (%s)",
+                            tvb_get_ntohs(tvb, offset),
+                            checksum_ok ? "correct" : "incorrect");
       } else {
-        proto_tree_add_bytes_format_value(tree, hf_cotp_parameter_value, tvb, offset, length, NULL, "<not shown>");
+        proto_tree_add_text(tree, tvb, offset, length,
+                            "Parameter value: <not shown>");
       }
       offset += length;
       vp_length -= length;
@@ -503,126 +476,173 @@ static gboolean ositp_decode_var_part(tvbuff_t *tvb, int offset, int vp_length,
                                       offset_iso8073_checksum,
                                       pinfo->dst.len, (const guint8 *)pinfo->dst.data,
                                       pinfo->src.len, (const guint8 *)pinfo->src.data);
-        ti = proto_tree_add_item(tree, hf_cotp_atn_extended_checksum, tvb, offset, 4, ENC_BIG_ENDIAN);
-        proto_item_append_text(ti, checksum_ok ? " (correct)" : " (incorrect)");
+        proto_tree_add_text(tree, tvb, offset, length,
+                            "ATN extended checksum : 0x%08x (%s)",
+                            tvb_get_ntohl(tvb, offset),
+                            checksum_ok ? "correct" : "incorrect");
       } else {
-        proto_tree_add_bytes_format_value(tree, hf_cotp_parameter_value, tvb, offset, length, NULL, "<not shown>");
+        proto_tree_add_text(tree, tvb, offset, length,
+                            "Parameter value: <not shown>");
       }
       offset += length;
       vp_length -= length;
       break;
 
     case VP_ACK_TIME:
-      proto_tree_add_item(tree, hf_cotp_ack_time, tvb, offset, length, ENC_BIG_ENDIAN);
+      s = tvb_get_ntohs(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, length, "Ack time (ms): %u", s);
       offset += length;
       vp_length -= length;
       break;
 
     case VP_RES_ERROR:
-      s = tvb_get_guint8(tvb, offset);
-      proto_tree_add_uint_format(tree, hf_cotp_res_error_rate_target_value, tvb, offset, 1,
-                          s, "Residual error rate, target value: 10^%u", s);
+      proto_tree_add_text(tree, tvb, offset, 1,
+                          "Residual error rate, target value: 10^%u",
+                          tvb_get_guint8(tvb, offset));
       offset += 1;
       vp_length -= 1;
 
-      s = tvb_get_guint8(tvb, offset);
-      proto_tree_add_uint_format(tree, hf_cotp_res_error_rate_min_accept, tvb, offset, 1,
-                          s, "Residual error rate, minimum acceptable: 10^%u", s);
+      proto_tree_add_text(tree, tvb, offset, 1,
+                          "Residual error rate, minimum acceptable: 10^%u",
+                          tvb_get_guint8(tvb, offset));
       offset += 1;
       vp_length -= 1;
 
-      s = tvb_get_guint8(tvb, offset);
-      proto_tree_add_uint(tree,hf_cotp_res_error_rate_tdsu, tvb, offset, 1, 1 << s);
+      proto_tree_add_text(tree, tvb, offset, 1,
+                          "Residual error rate, TSDU size of interest: %u",
+                          1 << tvb_get_guint8(tvb, offset));
       offset += 1;
       vp_length -= 1;
       break;
 
     case VP_PRIORITY:
-      proto_tree_add_item(tree, hf_cotp_vp_priority, tvb, offset, 2, ENC_BIG_ENDIAN);
+      s = tvb_get_ntohs(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, length, "Priority: %u", s);
       offset += length;
       vp_length -= length;
       break;
 
     case VP_TRANSIT_DEL:
-      proto_tree_add_item(tree, hf_cotp_transit_delay_targ_calling_called, tvb, offset, 2, ENC_BIG_ENDIAN);
+      s1 = tvb_get_ntohs(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, 2,
+                          "Transit delay, target value, calling-called: %u ms",
+                          s1);
       offset += 2;
       vp_length -= 2;
 
-      proto_tree_add_item(tree, hf_cotp_transit_delay_max_accept_calling_called, tvb, offset, 2, ENC_BIG_ENDIAN);
+      s2 = tvb_get_ntohs(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, 2,
+                          "Transit delay, maximum acceptable, calling-called: %u ms",
+                          s2);
       offset += 2;
       vp_length -= 2;
 
-      proto_tree_add_item(tree, hf_cotp_transit_delay_targ_called_calling, tvb, offset, 2, ENC_BIG_ENDIAN);
+      s3 = tvb_get_ntohs(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, 2,
+                          "Transit delay, target value, called-calling: %u ms",
+                          s3);
       offset += 2;
       vp_length -= 2;
 
-      proto_tree_add_item(tree, hf_cotp_transit_delay_max_accept_called_calling, tvb, offset, 2, ENC_BIG_ENDIAN);
+      s4 = tvb_get_ntohs(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, 2,
+                          "Transit delay, maximum acceptable, called-calling: %u ms",
+                          s4);
       offset += 2;
       vp_length -= 2;
       break;
 
     case VP_THROUGHPUT:
-      proto_tree_add_item(tree, hf_cotp_max_throughput_targ_calling_called, tvb, offset, 3, ENC_BIG_ENDIAN);
+      t1 = tvb_get_ntoh24(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, 3,
+                          "Maximum throughput, target value, calling-called:       %u o/s",
+                          t1);
       offset += 3;
       length -= 3;
       vp_length -= 3;
 
-      proto_tree_add_item(tree, hf_cotp_max_throughput_min_accept_calling_called, tvb, offset, 3, ENC_BIG_ENDIAN);
+      t2 = tvb_get_ntoh24(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, 3,
+                          "Maximum throughput, minimum acceptable, calling-called: %u o/s",
+                          t2);
       offset += 3;
       length -= 3;
       vp_length -= 3;
 
-      proto_tree_add_item(tree, hf_cotp_max_throughput_targ_called_calling, tvb, offset, 3, ENC_BIG_ENDIAN);
+      t3 = tvb_get_ntoh24(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, 3,
+                          "Maximum throughput, target value, called-calling:       %u o/s",
+                          t3);
       offset += 3;
       length -= 3;
       vp_length -= 3;
 
-      proto_tree_add_item(tree, hf_cotp_max_throughput_min_accept_called_calling, tvb, offset, 3, ENC_BIG_ENDIAN);
+      t4 = tvb_get_ntoh24(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, 3,
+                          "Maximum throughput, minimum acceptable, called-calling: %u o/s",
+                          t4);
       offset += 3;
       length -= 3;
       vp_length -= 3;
 
       if (length != 0) {    /* XXX - should be 0 or 12 */
-        proto_tree_add_item(tree, hf_cotp_avg_throughput_targ_calling_called, tvb, offset, 3, ENC_BIG_ENDIAN);
+        t1 = tvb_get_ntoh24(tvb, offset);
+        proto_tree_add_text(tree, tvb, offset, 3,
+                            "Average throughput, target value, calling-called:       %u o/s",
+                            t1);
         offset += 3;
         vp_length -= 3;
 
-        proto_tree_add_item(tree, hf_cotp_avg_throughput_min_accept_calling_called, tvb, offset, 3, ENC_BIG_ENDIAN);
+        t2 = tvb_get_ntoh24(tvb, offset);
+        proto_tree_add_text(tree, tvb, offset, 3,
+                            "Average throughput, minimum acceptable, calling-called: %u o/s",
+                            t2);
         offset += 3;
         vp_length -= 3;
 
-        proto_tree_add_item(tree, hf_cotp_avg_throughput_targ_called_calling, tvb, offset, 3, ENC_BIG_ENDIAN);
+        t3 = tvb_get_ntoh24(tvb, offset);
+        proto_tree_add_text(tree, tvb, offset, 3,
+                            "Average throughput, target value, called-calling:       %u o/s",
+                            t3);
         offset += 3;
         vp_length -= 3;
 
-        proto_tree_add_item(tree, hf_cotp_avg_throughput_min_accept_called_calling, tvb, offset, 3, ENC_BIG_ENDIAN);
+        t4 = tvb_get_ntoh24(tvb, offset);
+        proto_tree_add_text(tree, tvb, offset, 3,
+                            "Average throughput, minimum acceptable, called-calling: %u o/s",
+                            t4);
         offset += 3;
         vp_length -= 3;
       }
       break;
 
     case VP_SEQ_NR:
-      proto_tree_add_item(tree, hf_cotp_sequence_number, tvb, offset, 2, ENC_BIG_ENDIAN);
+      proto_tree_add_text(tree, tvb, offset, 2, "Sequence number: 0x%04x",
+                          tvb_get_ntohs(tvb, offset));
       offset += length;
       vp_length -= length;
       break;
 
     case VP_REASSIGNMENT:
-      proto_tree_add_item(tree, hf_cotp_reassignment_time, tvb, offset, 2, ENC_BIG_ENDIAN);
+      proto_tree_add_text(tree, tvb, offset, 2, "Reassignment time: %u secs",
+                          tvb_get_ntohs(tvb, offset));
       offset += length;
       vp_length -= length;
       break;
 
     case VP_FLOW_CNTL:
-      proto_tree_add_item(tree, hf_cotp_lower_window_edge, tvb, offset, 4, ENC_BIG_ENDIAN);
+      proto_tree_add_text(tree, tvb, offset, 4, "Lower window edge: 0x%08x",
+                          tvb_get_ntohl(tvb, offset));
       offset += 4;
       vp_length -= 4;
 
-      proto_tree_add_item(tree, hf_cotp_sequence_number, tvb, offset, 2, ENC_BIG_ENDIAN);
+      proto_tree_add_text(tree, tvb, offset, 2, "Sequence number: 0x%04x",
+                          tvb_get_ntohs(tvb, offset));
       offset += 2;
       vp_length -= 2;
 
-      proto_tree_add_item(tree, hf_cotp_credit, tvb, offset, 2, ENC_BIG_ENDIAN);
+      proto_tree_add_text(tree, tvb, offset, 2, "Credit: 0x%04x",
+                          tvb_get_ntohs(tvb, offset));
       offset += 2;
       vp_length -= 2;
 
@@ -630,7 +650,7 @@ static gboolean ositp_decode_var_part(tvbuff_t *tvb, int offset, int vp_length,
 
     case VP_TPDU_SIZE:
       c1 = tvb_get_guint8(tvb, offset) & 0x0F;
-      proto_tree_add_uint(tree, hf_cotp_tpdu_size, tvb, offset, 1, 1 << c1);
+      proto_tree_add_text(tree, tvb, offset, length, "TPDU size: %u", 1 << c1);
       offset += length;
       vp_length -= length;
       break;
@@ -698,25 +718,26 @@ static gboolean ositp_decode_var_part(tvbuff_t *tvb, int offset, int vp_length,
          * No checksum present, or not enough of the packet present to
          * checksum it.
          */
-        proto_tree_add_item(tree, hf_cotp_checksum, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_text(tree, tvb, offset, length,
+                            "Checksum: 0x%04x", tvb_get_ntohs(tvb, offset));
         break;
 
       case CKSUM_OK:
         /*
          * Checksum is correct.
          */
-        s = tvb_get_ntohs(tvb, offset);
-        proto_tree_add_uint_format_value(tree, hf_cotp_checksum, tvb, offset, 2,
-                            s, "0x%04x (correct)", s);
+        proto_tree_add_text(tree, tvb, offset, length,
+                            "Checksum: 0x%04x (correct)",
+                            tvb_get_ntohs(tvb, offset));
         break;
 
       case CKSUM_NOT_OK:
         /*
          * Checksum is not correct.
          */
-        s = tvb_get_ntohs(tvb, offset);
-        proto_tree_add_uint_format_value(tree, hf_cotp_checksum, tvb, offset, 2,
-                            s, "0x%04x (incorrect)", s);
+        proto_tree_add_text(tree, tvb, offset, length,
+                            "Checksum: 0x%04x (incorrect)",
+                            tvb_get_ntohs(tvb, offset));
         break;
       }
       offset += length;
@@ -724,26 +745,46 @@ static gboolean ositp_decode_var_part(tvbuff_t *tvb, int offset, int vp_length,
       break;
 
     case VP_VERSION_NR:
-      proto_tree_add_item(tree, hf_cotp_vp_version_nr, tvb, offset, 1, ENC_NA);
+      c1 = tvb_get_guint8(tvb, offset);
+      proto_tree_add_text(tree, tvb, offset, length, "Version: %u", c1);
       offset += length;
       vp_length -= length;
       break;
 
     case VP_OPT_SEL:
+      c1 = tvb_get_guint8(tvb, offset) & 0x0F;
       switch (class_option) {
 
       case 1:
-        proto_tree_add_item(tree, hf_cotp_network_expedited_data, tvb, offset, 1, ENC_NA);
-
-        proto_tree_add_item(tree, hf_cotp_vp_opt_sel_class1_use, tvb, offset, 1, ENC_NA);
+        if (c1 & 0x8)
+          proto_tree_add_text(tree, tvb, offset, 1,
+                              "Use of network expedited data");
+        else
+          proto_tree_add_text(tree, tvb, offset, 1,
+                              "Non use of network expedited data");
+        if (c1 & 0x4)
+          proto_tree_add_text(tree, tvb, offset, 1,
+                              "Use of Receipt confirmation");
+        else
+          proto_tree_add_text(tree, tvb, offset, 1,
+                              "Use of explicit AK variant");
         break;
 
       case 4:
-        proto_tree_add_item(tree, hf_cotp_use_16_bit_checksum, tvb, offset, 1, ENC_NA);
+        if (c1 & 0x2)
+          proto_tree_add_text(tree, tvb, offset, 1,
+                              "Non-use 16 bit checksum in class 4");
+        else
+          proto_tree_add_text(tree, tvb, offset, 1, "Use 16 bit checksum ");
         break;
       }
 
-      proto_tree_add_item(tree, hf_cotp_transport_expedited_data_transfer, tvb, offset, 1, ENC_NA);
+      if (c1 & 0x1)
+        proto_tree_add_text(tree, tvb, offset, 1,
+                            "Use of transport expedited data transfer");
+      else
+        proto_tree_add_text(tree, tvb, offset, 1,
+                            "Non-use of transport expedited data transfer");
       offset += length;
       vp_length -= length;
       break;
@@ -768,17 +809,21 @@ static gboolean ositp_decode_var_part(tvbuff_t *tvb, int offset, int vp_length,
         break;
 
       default:
-        proto_tree_add_expert_format(tree, pinfo, &ei_cotp_preferred_maximum_tpdu_size, tvb, offset, length,
-                            "Preferred maximum TPDU size: bogus length %u (not 1, 2, 3, or 4)", length);
+        proto_tree_add_text(tree, tvb, offset, length,
+                            "Preferred maximum TPDU size: bogus length %u (not 1, 2, 3, or 4)",
+                            length);
         return FALSE;
       }
-      proto_tree_add_uint(tree, hf_cotp_preferred_maximum_tpdu_size, tvb, offset, length, pref_max_tpdu_size*128);
+      proto_tree_add_text(tree, tvb, offset, length,
+                          "Preferred maximum TPDU size: %u",
+                          pref_max_tpdu_size*128);
       offset += length;
       vp_length -= length;
       break;
 
     case VP_INACTIVITY_TIMER:
-      proto_tree_add_item(tree, hf_cotp_inactivity_timer, tvb, offset, length, ENC_BIG_ENDIAN);
+      proto_tree_add_text(tree, tvb, offset, length, "Inactivity timer: %u ms",
+                          tvb_get_ntohl(tvb, offset));
       offset += length;
       vp_length -= length;
       break;
@@ -787,7 +832,8 @@ static gboolean ositp_decode_var_part(tvbuff_t *tvb, int offset, int vp_length,
     case VP_PROTO_CLASS:            /* todo */
     case VP_CLEARING_INFO:          /* user-defined */
     default:                        /* unknown, no decoding */
-      proto_tree_add_bytes_format_value(tree, hf_cotp_parameter_value, tvb, offset, length, NULL, "<not shown>");
+      proto_tree_add_text(tree, tvb, offset, length,
+                          "Parameter value: <not shown>");
       offset += length;
       vp_length -= length;
       break;
@@ -797,23 +843,6 @@ static gboolean ositp_decode_var_part(tvbuff_t *tvb, int offset, int vp_length,
   return TRUE;
 }
 
-static const value_string cotp_cause_vals[] = {
-  { 0, "Reason not specified" },
-  { 1, "Congestion at TSAP" },
-  { 2, "Session entity not attached to TSAP" },
-  { 3, "Address unknown" },
-  { 128+0, "Normal Disconnect" },
-  { 128+1, "Remote transport entity congestion" },
-  { 128+2, "Connection negotiation failed" },
-  { 128+3, "Duplicate source reference" },
-  { 128+4, "Mismatched references" },
-  { 128+5, "Protocol error" },
-  { 128+7, "Reference overflow" },
-  { 128+8, "Connection request refused" },
-  { 128+10, "Header or parameter length invalid" },
-  { 0,       NULL }
-};
-
 static int ositp_decode_DR(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
                            packet_info *pinfo, proto_tree *tree)
 {
@@ -821,6 +850,7 @@ static int ositp_decode_DR(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
   proto_item *ti        = NULL;
   guint16     dst_ref, src_ref;
   guchar      reason;
+  const char *str;
   guint       tpdu_len;
 
   /* ATN TPDU's tend to be larger than normal OSI,
@@ -840,7 +870,7 @@ static int ositp_decode_DR(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
   pinfo->clnp_dstref = dst_ref;
   pinfo->clnp_srcref = src_ref;
 
-  /* the settings of the TCP srcport and destport are currently disabled,
+  /* the settings of the TCP srcport and destport are currently disables,
    * for the following reasons:
    * a) only used for ISO conversation handling (which currently doesn't work)
    * b) will prevent "ISO on TCP" (RFC1006) packets from using
@@ -852,8 +882,22 @@ static int ositp_decode_DR(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
    */
   /*pinfo->srcport = src_ref;*/
   /*pinfo->destport = dst_ref;*/
-  if (try_val_to_str(reason, cotp_cause_vals) == NULL)
-      return -1;
+  switch(reason) {
+    case (128+0): str = "Normal Disconnect"; break;
+    case (128+1): str = "Remote transport entity congestion"; break;
+    case (128+2): str = "Connection negotiation failed"; break;
+    case (128+3): str = "Duplicate source reference"; break;
+    case (128+4): str = "Mismatched references"; break;
+    case (128+5): str = "Protocol error"; break;
+    case (128+7): str = "Reference overflow"; break;
+    case (128+8): str = "Connection request refused"; break;
+    case (128+10):str = "Header or parameter length invalid"; break;
+    case (0):     str = "Reason not specified"; break;
+    case (1):     str = "Congestion at TSAP"; break;
+    case (2):     str = "Session entity not attached to TSAP"; break;
+    case (3):     str = "Address unknown"; break;
+    default:      return -1;
+  }
 
   col_append_fstr(pinfo->cinfo, COL_INFO,
                   "DR TPDU src-ref: 0x%04x dst-ref: 0x%04x", src_ref, dst_ref);
@@ -867,7 +911,7 @@ static int ositp_decode_DR(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
                         dst_ref);
     proto_tree_add_uint(cotp_tree, hf_cotp_srcref, tvb, offset +  4, 2,
                         src_ref);
-    proto_tree_add_item(cotp_tree, hf_cotp_cause, tvb, offset + 6, 1, ENC_NA);
+    proto_tree_add_text(cotp_tree, tvb, offset +  6, 1, "Cause: %s", str);
   }
   offset += 7;
   li -= 6;
@@ -1166,8 +1210,8 @@ static int ositp_decode_DT(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
                                     dst_ref, NULL, fragment_length, fragment);
     if (fd_head && fd_head->next) {
       /* don't use -1 if fragment length is zero (throws Exception) */
-      proto_tree_add_bytes_format(cotp_tree, hf_cotp_segment_data, tvb, offset, (fragment_length) ? -1 : 0,
-                          NULL, "COTP segment data (%u byte%s)", fragment_length,
+      proto_tree_add_text(cotp_tree, tvb, offset, (fragment_length) ? -1 : 0,
+                          "COTP segment data (%u byte%s)", fragment_length,
                           plurality(fragment_length, "", "s"));
 
       if (!fragment) {
@@ -1476,9 +1520,8 @@ static int ositp_decode_RJ(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
     proto_tree_add_uint(cotp_tree, hf_cotp_li, tvb, offset, 1,li);
     item = proto_tree_add_uint(cotp_tree, hf_cotp_type, tvb, offset +  1, 1,
                                tpdu);
-    if (li == LI_NORMAL_RJ) {
-      proto_tree_add_uint(cotp_tree, hf_cotp_credit_cdt, tvb, offset +  1, 1, cdt);
-    }
+    if (li == LI_NORMAL_RJ)
+      proto_tree_add_text(cotp_tree, tvb, offset +  1, 1, "Credit: %u", cdt);
     proto_tree_add_uint(cotp_tree, hf_cotp_destref, tvb, offset +  2, 2,
                         dst_ref);
     if (li == LI_NORMAL_RJ)
@@ -1487,7 +1530,8 @@ static int ositp_decode_RJ(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
     else {
       proto_tree_add_uint(cotp_tree, hf_cotp_next_tpdu_number_extended, tvb,
                           offset + 4, 4, tpdu_nr);
-      proto_tree_add_uint(cotp_tree, hf_cotp_credit, tvb, offset +  8, 2, credit);
+      proto_tree_add_text(cotp_tree, tvb, offset +  8, 2, "Credit: 0x%02x",
+                          credit);
     }
   }
 
@@ -1734,7 +1778,7 @@ static int ositp_decode_AK(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
 
     if (tree) {
       proto_tree_add_uint(cotp_tree, hf_cotp_type, tvb, offset, 1, tpdu);
-      proto_tree_add_uint(cotp_tree, hf_cotp_credit_cdt, tvb, offset, 1, cdt);
+      proto_tree_add_text(cotp_tree, tvb, offset, 1, "Credit: %u", cdt);
     }
     offset += 1;
     li -= 1;
@@ -1792,7 +1836,8 @@ static int ositp_decode_AK(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
     li -= 4;
 
     if (tree) {
-      proto_tree_add_uint(cotp_tree, hf_cotp_credit, tvb, offset, 2, cdt_in_ak);
+      proto_tree_add_text(cotp_tree, tvb, offset, 2, "Credit: 0x%04x",
+                          cdt_in_ak);
     }
     offset += 2;
     li -= 2;
@@ -1993,19 +2038,12 @@ static int ositp_decode_EA(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
 
 } /* ositp_decode_EA */
 
-static const value_string cotp_reject_vals[] = {
-  { 0, "Reason not specified" },
-  { 1, "Invalid parameter code" },
-  { 2, "Invalid TPDU type" },
-  { 3, "Invalid parameter value" },
-  { 0,       NULL }
-};
-
 static int ositp_decode_ER(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
                            packet_info *pinfo, proto_tree *tree)
 {
   proto_tree *cotp_tree = NULL;
   proto_item *ti;
+  const char *str;
   guint16 dst_ref;
   guint8 tpdu_len;
 
@@ -2022,8 +2060,22 @@ static int ositp_decode_ER(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
    * length */
   tpdu_len = li + 1;
 
-  if(try_val_to_str(tvb_get_guint8(tvb, offset + P_REJECT_ER), cotp_reject_vals) == NULL)
+  switch(tvb_get_guint8(tvb, offset + P_REJECT_ER)) {
+    case 0 :
+      str = "Reason not specified";
+      break;
+    case 1 :
+      str = "Invalid parameter code";
+      break;
+    case 2 :
+      str = "Invalid TPDU type";
+      break;
+    case 3 :
+      str = "Invalid parameter value";
+      break;
+    default:
       return -1;
+  }
 
   dst_ref = tvb_get_ntohs(tvb, offset + P_DST_REF);
   pinfo->clnp_dstref = dst_ref;
@@ -2037,7 +2089,8 @@ static int ositp_decode_ER(tvbuff_t *tvb, int offset, guint8 li, guint8 tpdu,
     proto_tree_add_uint(cotp_tree, hf_cotp_type, tvb, offset +  1, 1, tpdu);
     proto_tree_add_uint(cotp_tree, hf_cotp_destref, tvb, offset +  2, 2,
                         dst_ref);
-    proto_tree_add_item(cotp_tree, hf_cotp_reject_cause, tvb, offset + 4, 1, ENC_NA);
+    proto_tree_add_text(cotp_tree, tvb, offset +  4, 1, "Reject cause: %s",
+                        str);
   }
   offset += 5;
   li -= 4;
@@ -2344,46 +2397,7 @@ void proto_register_cotp(void)
         NULL, 0x0, "Called TSAP", HFILL }},
     { &hf_cotp_vp_dst_tsap_bytes,
       { "Destination TSAP", "cotp.dst-tsap-bytes", FT_BYTES, BASE_NONE,
-        NULL, 0x0, "Called TSAP (bytes representation)", HFILL }},
-      /* Generated from convert_proto_tree_add_text.pl */
-      { &hf_cotp_parameter_code, { "Parameter code", "cotp.parameter_code", FT_UINT8, BASE_HEX, VALS(tp_vpart_type_vals), 0x0, NULL, HFILL }},
-      { &hf_cotp_parameter_length, { "Parameter length", "cotp.parameter_length", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_parameter_value, { "Parameter value", "cotp.parameter_value", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_atn_extended_checksum, { "ATN extended checksum", "cotp.atn_extended_checksum", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_ack_time, { "Ack time (ms)", "cotp.ack_time", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_res_error_rate_target_value, { "Residual error rate, target value", "cotp.res_error_rate.target_value", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_res_error_rate_min_accept, { "Residual error rate, minimum acceptable", "cotp.res_error_rate.min_accept", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_res_error_rate_tdsu, { "Residual error rate, TSDU size of interest", "cotp.res_error_rate.tdsu", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_vp_priority, { "Priority", "cotp.vp_priority", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_transit_delay_targ_calling_called, { "Transit delay, target value, calling-called (ms)", "cotp.transit_delay.targ_calling_called", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_transit_delay_max_accept_calling_called, { "Transit delay, maximum acceptable, calling-called (ms)", "cotp.transit_delay.max_accept_calling_called", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_transit_delay_targ_called_calling, { "Transit delay, target value, called-calling (ms)", "cotp.transit_delay.targ_called_calling", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_transit_delay_max_accept_called_calling, { "Transit delay, maximum acceptable, called-calling (ms)", "cotp.transit_delay.max_accept_called_calling", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_max_throughput_targ_calling_called, { "Maximum throughput, target value, calling-called (o/s)", "cotp.max_throughput.targ_calling_called", FT_UINT24, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_max_throughput_min_accept_calling_called, { "Maximum throughput, minimum acceptable, calling-called (o/s)", "cotp.max_throughput.min_accept_calling_called", FT_UINT24, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_max_throughput_targ_called_calling, { "Maximum throughput, target value, called-calling (o/s)", "cotp.max_throughput.targ_called_calling", FT_UINT24, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_max_throughput_min_accept_called_calling, { "Maximum throughput, minimum acceptable, called-calling (o/s)", "cotp.max_throughput.min_accept_called_calling", FT_UINT24, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_avg_throughput_targ_calling_called, { "Average throughput, target value, calling-called (o/s)", "cotp.avg_throughput.targ_calling_called", FT_UINT24, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_avg_throughput_min_accept_calling_called, { "Average throughput, minimum acceptable, calling-called (o/s)", "cotp.avg_throughput.min_accept_calling_called", FT_UINT24, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_avg_throughput_targ_called_calling, { "Average throughput, target value, called-calling (o/s)", "cotp.avg_throughput.targ_called_calling", FT_UINT24, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_avg_throughput_min_accept_called_calling, { "Average throughput, minimum acceptable, called-calling (o/s)", "cotp.avg_throughput.min_accept_called_calling", FT_UINT24, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_sequence_number, { "Sequence number", "cotp.sequence_number", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_reassignment_time, { "Reassignment time (secs)", "cotp.reassignment_time", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_lower_window_edge, { "Lower window edge", "cotp.lower_window_edge", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_credit, { "Credit", "cotp.credit", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_tpdu_size, { "TPDU size", "cotp.tpdu_size", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_checksum, { "Checksum", "cotp.checksum", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_vp_version_nr, { "Version", "cotp.vp_version_nr", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_network_expedited_data, { "Use of network expedited data", "cotp.network_expedited_data", FT_BOOLEAN, 8, TFS(&tfs_used_notused), 0x08, NULL, HFILL }},
-      { &hf_cotp_vp_opt_sel_class1_use, { "Use", "cotp.vp_opt_sel_class1_use", FT_BOOLEAN, 8, TFS(&tfs_vp_opt_sel_class1_use), 0x04, NULL, HFILL }},
-      { &hf_cotp_use_16_bit_checksum, { "16 bit checksum", "cotp.use_16_bit_checksum", FT_BOOLEAN, 8, TFS(&tfs_used_notused), 0x02, NULL, HFILL }},
-      { &hf_cotp_transport_expedited_data_transfer, { "Transport expedited data transfer", "cotp.transport_expedited_data_transfer", FT_BOOLEAN, 8, TFS(&tfs_used_notused), 0x01, NULL, HFILL }},
-      { &hf_cotp_preferred_maximum_tpdu_size, { "Preferred maximum TPDU size", "cotp.preferred_maximum_tpdu_size", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_inactivity_timer, { "Inactivity timer (ms)", "cotp.inactivity_timer", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_cause, { "Cause", "cotp.cause", FT_UINT8, BASE_DEC, VALS(cotp_cause_vals), 0x0, NULL, HFILL }},
-      { &hf_cotp_segment_data, { "COTP segment data", "cotp.segment_data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_credit_cdt, { "Credit", "cotp.credit", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-      { &hf_cotp_reject_cause, { "Reject cause", "cotp.reject_cause", FT_UINT8, BASE_DEC, VALS(cotp_reject_vals), 0x0, NULL, HFILL }},
+        NULL, 0x0, "Called TSAP (bytes representation)", HFILL }}
   };
   static gint *ett[] = {
     &ett_cotp,
@@ -2396,7 +2410,6 @@ void proto_register_cotp(void)
       { &ei_cotp_connection, { "cotp.connection", PI_SEQUENCE, PI_CHAT, "Connection %s: 0x%x -> 0x%x", EXPFILL }},
       { &ei_cotp_disconnect_confirm, { "cotp.disconnect_confirm", PI_SEQUENCE, PI_CHAT, "Disconnect Confirm(DC): 0x%x -> 0x%x", EXPFILL }},
       { &ei_cotp_multiple_tpdus, { "cotp.multiple_tpdus", PI_SEQUENCE, PI_NOTE, "Multiple TPDUs in one packet", EXPFILL }},
-      { &ei_cotp_preferred_maximum_tpdu_size, { "cotp.preferred_maximum_tpdu_size.invalid", PI_PROTOCOL, PI_WARN, "Preferred maximum TPDU size: bogus length", EXPFILL }},
   };
 
   module_t *cotp_module;
@@ -2432,10 +2445,10 @@ void proto_register_cotp(void)
                                  "settings.", &cotp_decode_atn);
 
   /* subdissector code in inactive subset */
-  cotp_is_heur_subdissector_list = register_heur_dissector_list("cotp_is");
+  register_heur_dissector_list("cotp_is", &cotp_is_heur_subdissector_list);
 
   /* other COTP/ISO 8473 subdissectors */
-  cotp_heur_subdissector_list = register_heur_dissector_list("cotp");
+  register_heur_dissector_list("cotp", &cotp_heur_subdissector_list);
 
   /* XXX - what about CLTP and proto_cltp? */
   new_register_dissector("ositp", dissect_ositp, proto_cotp);
@@ -2462,7 +2475,7 @@ void proto_register_cltp(void)
   proto_register_field_array(proto_cltp, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
 
-  cltp_heur_subdissector_list = register_heur_dissector_list("cltp");
+  register_heur_dissector_list("cltp", &cltp_heur_subdissector_list);
 }
 
 void

@@ -28,7 +28,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/ipproto.h>
 #include <epan/xdlc.h>
 
 void proto_register_ehdlc(void);
@@ -158,8 +161,8 @@ dissect_ehdlc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		header_length += XDLC_CONTROL_LEN(control, is_extended);
 
 		if (XDLC_IS_INFORMATION(control)) {
-			next_tvb = tvb_new_subset_length(tvb, offset+header_length,
-						  len-header_length);
+			next_tvb = tvb_new_subset(tvb, offset+header_length,
+						  len-header_length, len-header_length);
 
 			switch (msg_type) {
 			case 0x20:
@@ -321,16 +324,3 @@ proto_reg_handoff_ehdlc(void)
 	sub_handles[SUB_OML]  = find_dissector("gsm_abis_oml");
 	sub_handles[SUB_DATA] = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

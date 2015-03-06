@@ -20,7 +20,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <config.h>
+#include "config.h"
 
 #ifdef HAVE_LIBPCAP
 
@@ -125,7 +125,7 @@ cf_open_error_message(int err, gchar *err_info, gboolean for_writing,
             /* Seen only when opening a capture file for reading. */
             g_snprintf(errmsg_errno, sizeof(errmsg_errno),
                        "The file \"%%s\" contains record data that Wireshark doesn't support.\n"
-                       "(%s)", err_info != NULL ? err_info : "no information supplied");
+                       "(%s)", err_info);
             g_free(err_info);
             errmsg = errmsg_errno;
             break;
@@ -138,14 +138,21 @@ cf_open_error_message(int err, gchar *err_info, gboolean for_writing,
             errmsg = errmsg_errno;
             break;
 
-        case WTAP_ERR_UNWRITABLE_FILE_TYPE:
+        case WTAP_ERR_UNSUPPORTED_FILE_TYPE:
             /* Seen only when opening a capture file for writing. */
             errmsg = "Wireshark doesn't support writing capture files in that format.";
             break;
 
-        case WTAP_ERR_UNWRITABLE_ENCAP:
-            /* Seen only when opening a capture file for writing. */
-            errmsg = "Wireshark can't save this capture in that format.";
+        case WTAP_ERR_UNSUPPORTED_ENCAP:
+            if (for_writing)
+                errmsg = "Wireshark can't save this capture in that format.";
+            else {
+                g_snprintf(errmsg_errno, sizeof(errmsg_errno),
+                           "The file \"%%s\" is a capture for a network type that Wireshark doesn't support.\n"
+                           "(%s)", err_info);
+                g_free(err_info);
+                errmsg = errmsg_errno;
+            }
             break;
 
         case WTAP_ERR_ENCAP_PER_PACKET_UNSUPPORTED:
@@ -159,7 +166,7 @@ cf_open_error_message(int err, gchar *err_info, gboolean for_writing,
             /* Seen only when opening a capture file for reading. */
             g_snprintf(errmsg_errno, sizeof(errmsg_errno),
                        "The file \"%%s\" appears to be damaged or corrupt.\n"
-                       "(%s)", err_info != NULL ? err_info : "no information supplied");
+                       "(%s)", err_info);
             g_free(err_info);
             errmsg = errmsg_errno;
             break;
@@ -183,7 +190,7 @@ cf_open_error_message(int err, gchar *err_info, gboolean for_writing,
         case WTAP_ERR_DECOMPRESS:
             g_snprintf(errmsg_errno, sizeof(errmsg_errno),
                        "The compressed file \"%%s\" appears to be damaged or corrupt.\n"
-                       "(%s)", err_info != NULL ? err_info : "no information supplied");
+                       "(%s)", err_info);
             g_free(err_info);
             errmsg = errmsg_errno;
             break;
@@ -368,16 +375,3 @@ capture_info_packet(packet_counts *counts, gint wtap_linktype, const guchar *pd,
 
 
 #endif /* HAVE_LIBPCAP */
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

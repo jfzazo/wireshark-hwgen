@@ -32,6 +32,7 @@
 
 #include "tvbuff.h"
 #include "osi-utils.h"
+#include "emem.h"
 
 /*
  * XXX - shouldn't there be a centralized routine for dissecting NSAPs?
@@ -43,7 +44,7 @@ print_nsap_net( const guint8 *ad, int length )
 {
   gchar *cur;
 
-  cur = (gchar *)wmem_alloc(wmem_packet_scope(), MAX_NSAP_LEN * 3 + 50);
+  cur = (gchar *)ep_alloc(MAX_NSAP_LEN * 3 + 50);
   print_nsap_net_buf( ad, length, cur, MAX_NSAP_LEN * 3 + 50);
   return( cur );
 }
@@ -78,11 +79,11 @@ print_nsap_net_buf( const guint8 *ad, int length, gchar *buf, int buf_len)
 } /* print_nsap */
 
 gchar *
-print_system_id(wmem_allocator_t* scope, const guint8 *ad, int length )
+print_system_id( const guint8 *ad, int length )
 {
   gchar        *cur;
 
-  cur = (gchar *)wmem_alloc(scope, MAX_SYSTEMID_LEN * 3 + 5);
+  cur = (gchar *)ep_alloc(MAX_SYSTEMID_LEN * 3 + 5);
   print_system_id_buf(ad, length, cur, MAX_SYSTEMID_LEN * 3 + 5);
   return( cur );
 }
@@ -90,7 +91,7 @@ print_system_id(wmem_allocator_t* scope, const guint8 *ad, int length )
 gchar *
 tvb_print_system_id( tvbuff_t *tvb, const gint offset, int length )
 {
-  return( print_system_id(wmem_packet_scope(), tvb_get_ptr(tvb, offset, length), length) );
+  return( print_system_id(tvb_get_ptr(tvb, offset, length), length) );
 }
 
 void
@@ -143,7 +144,7 @@ print_area(const guint8 *ad, int length)
 {
   gchar *cur;
 
-  cur = (gchar *)wmem_alloc(wmem_packet_scope(), MAX_AREA_LEN * 3 + 20);
+  cur = (gchar *)ep_alloc(MAX_AREA_LEN * 3 + 20);
   print_area_buf(ad, length, cur, MAX_AREA_LEN * 3 + 20);
   return cur;
 }
@@ -213,15 +214,3 @@ print_area_buf(const guint8 *ad, int length, gchar *buf, int buf_len)
   }
 } /* print_area_buf */
 
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

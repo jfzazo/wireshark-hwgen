@@ -27,20 +27,26 @@
 #include <gtk/gtk.h>
 
 #include <epan/packet_info.h>
+#include <epan/epan.h>
 #include <epan/value_string.h>
 #include <epan/tap.h>
 #include <epan/packet.h>
+#include <epan/asn1.h>
 #include <epan/dissectors/packet-camel.h>
 
+#include "../file.h"
+#include "../stat_menu.h"
 
 #include "ui/simple_dialog.h"
 
 #include "ui/gtk/main.h"
 #include "ui/gtk/dlg_utils.h"
 #include "ui/gtk/gui_utils.h"
+#include "ui/gtk/gui_stat_util.h"
 #include "ui/gtk/tap_param_dlg.h"
 #include "ui/gtk/service_response_time_table.h"
 
+#include "ui/gtk/old-gtk-compat.h"
 
 /* used to keep track of the statistics for an entire program interface */
 struct camelsrt_t {
@@ -135,7 +141,6 @@ static void gtk_camelsrt_init(const char *opt_arg, void *userdata _U_)
   GtkWidget *vbox;
   GtkWidget *bbox;
   GtkWidget *close_bt;
-  gchar* tmp_str;
   int i;
 
   if(strncmp(opt_arg,"camel,srt,",10) == 0){
@@ -176,9 +181,8 @@ static void gtk_camelsrt_init(const char *opt_arg, void *userdata _U_)
 
   init_srt_table(&p_camelsrt->camel_srt_table, NB_CAMELSRT_CATEGORY, vbox, NULL);
   for(i=0 ;i<NB_CAMELSRT_CATEGORY; i++) {
-    tmp_str = val_to_str_wmem(NULL,i,camelSRTtype_naming,"Unknown (%d)");
-    init_srt_table_row(&p_camelsrt->camel_srt_table, i, tmp_str);
-    wmem_free(NULL, tmp_str);
+    init_srt_table_row(&p_camelsrt->camel_srt_table, i,
+		       val_to_str(i,camelSRTtype_naming,"Unknown"));
   }
 
   error_string=register_tap_listener("CAMEL",
@@ -214,7 +218,7 @@ static void gtk_camelsrt_init(const char *opt_arg, void *userdata _U_)
 }
 
 static tap_param camel_srt_params[] = {
-  { PARAM_FILTER, "filter", "Filter", NULL, TRUE }
+  { PARAM_FILTER, "Filter", NULL }
 };
 
 static tap_param_dlg camel_srt_dlg = {

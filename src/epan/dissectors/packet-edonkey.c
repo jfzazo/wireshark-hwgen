@@ -35,8 +35,11 @@
 
 #include <stdlib.h>
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
 #include "packet-edonkey.h"
 #include "packet-tcp.h"
 
@@ -558,8 +561,9 @@ static int dissect_edonkey_list(tvbuff_t *tvb, packet_info *pinfo _U_,
         int item_start_offset;
 
         item_start_offset = offset;
-        subtree = proto_tree_add_subtree_format( tree, tvb, item_start_offset, 1, ett_edonkey_listitem, &ti,
-                                    "%s[%u/%u]", listdesc, i+1, listnum);
+        ti = proto_tree_add_text( tree, tvb, item_start_offset, 1, "%s[%u/%u]", listdesc, i+1, listnum);
+
+        subtree = proto_item_add_subtree(ti, ett_edonkey_listitem );
 
         /* dissect one list element */
         offset = (*item_dissector)(tvb, pinfo, offset, subtree);
@@ -943,7 +947,7 @@ static int dissect_kademlia_string(tvbuff_t *tvb, packet_info *pinfo _U_,
     proto_tree_add_uint(tree, hf_edonkey_string_length, tvb, offset, 2, string_length);
 
     /* TODO: ASCII or UTF-8? */
-    string_value = tvb_get_string_enc(wmem_packet_scope(),  tvb, offset + 2, string_length , ENC_ASCII);
+    string_value = tvb_get_string(wmem_packet_scope(),  tvb, offset + 2, string_length );
 
     proto_tree_add_text(tree, tvb, offset+2, string_length, "String: %s", string_value);
 
@@ -1067,7 +1071,7 @@ static int dissect_kademlia_tag_bsob(tvbuff_t *tvb, packet_info *pinfo _U_,
     guint16 bsob_length;
 
     bsob_length = tvb_get_guint8(tvb, offset);
-    *string_value = tvb_bytes_to_str(wmem_packet_scope(), tvb, offset + 1, bsob_length );
+    *string_value = tvb_bytes_to_ep_str( tvb, offset + 1, bsob_length );
 
     proto_tree_add_item(tree, hf_kademlia_tag_bsob, tvb, offset + 1, bsob_length, ENC_NA);
     return offset + 1 + bsob_length;
@@ -2333,7 +2337,8 @@ static int dissect_kademlia_tag(tvbuff_t *tvb, packet_info *pinfo _U_,
 
     item_start_offset = offset;
     /* tag_node length is adjusted at the end of this function */
-    subtree = proto_tree_add_subtree( tree, tvb, offset, 1, ett_kademlia_tag, &tag_node, "Tag " );
+    tag_node = proto_tree_add_text( tree, tvb, offset, 1, "Tag " );
+    subtree = proto_item_add_subtree( tag_node, ett_kademlia_tag );
 
     type = tvb_get_guint8( tvb, offset );
     str_type = val_to_str_const(type, kademlia_tag_types, "Unknown" );
@@ -2366,7 +2371,7 @@ static int dissect_kademlia_tag(tvbuff_t *tvb, packet_info *pinfo _U_,
     switch( type )
     {
         case KADEMLIA_TAGTYPE_HASH:
-            proto_item_append_text( tag_node, "%s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, 16 ));
+            proto_item_append_text( tag_node, "%s", tvb_bytes_to_ep_str( tvb, offset, 16 ));
             offset = dissect_kademlia_tag_hash( tvb, pinfo, offset, subtree );
             break;
         case KADEMLIA_TAGTYPE_STRING:
@@ -2912,8 +2917,7 @@ static int dissect_kademlia_udp_compressed_message(guint8 msg_type,
 }
 
 
-static guint get_edonkey_tcp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
-                                     int offset, void *data _U_)
+static guint get_edonkey_tcp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     guint32 msg_len;
 
@@ -2932,7 +2936,7 @@ static guint get_edonkey_tcp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
 static int dissect_edonkey_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
     proto_item *ti;
-    proto_tree *edonkey_tree, *edonkey_msg_tree = NULL, *emule_zlib_tree = NULL;
+    proto_tree *edonkey_tree = NULL, *edonkey_msg_tree = NULL, *emule_zlib_tree = NULL;
     int offset;
     guint8 protocol, msg_type;
     guint32 msg_len;
@@ -2942,16 +2946,16 @@ static int dissect_edonkey_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "eDonkey");
 
-    ti = proto_tree_add_item(tree, proto_edonkey, tvb, 0, -1, ENC_NA);
-    edonkey_tree = proto_item_add_subtree(ti, ett_edonkey);
+    if (tree) {
+        ti = proto_tree_add_item(tree, proto_edonkey, tvb, 0, -1, ENC_NA);
+        edonkey_tree = proto_item_add_subtree(ti, ett_edonkey);
+    }
 
     offset = 0;
     protocol = tvb_get_guint8(tvb, offset);
     msg_len = tvb_get_letohl(tvb, offset+1);
 
-    protocol_name = val_to_str_const(protocol, edonkey_protocols, "Unknown");
-
-    col_append_sep_fstr(pinfo->cinfo, COL_INFO, ", ", "%s TCP", protocol_name);
+    protocol_name = try_val_to_str(protocol, edonkey_protocols);
 
     /* Add edonkey message tree */
     if (edonkey_tree) {
@@ -2959,13 +2963,16 @@ static int dissect_edonkey_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree
                                  offset, EDONKEY_TCP_HEADER_LENGTH + msg_len, ENC_NA);
         edonkey_msg_tree = proto_item_add_subtree(ti, ett_edonkey_message);
 
-        proto_tree_add_uint(edonkey_msg_tree, hf_edonkey_protocol, tvb, offset, 1, protocol);
+        proto_tree_add_uint_format_value(edonkey_msg_tree, hf_edonkey_protocol, tvb, offset, 1, protocol,
+                                   "%s (0x%02x)", protocol_name, protocol);
         proto_tree_add_uint(edonkey_msg_tree, hf_edonkey_message_length, tvb, offset+1, 4, msg_len);
     }
 
 
     /* Skip past the EDONKEY Header */
     offset += EDONKEY_TCP_HEADER_LENGTH;
+
+    col_append_sep_fstr(pinfo->cinfo, COL_INFO, ", ", "%s TCP", protocol_name);
 
     msg_type = tvb_get_guint8(tvb, offset);
     switch (protocol) {
@@ -3082,7 +3089,8 @@ static int dissect_edonkey_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
         ti = proto_tree_add_item(edonkey_tree, hf_edonkey_message, tvb, offset, -1, ENC_NA);
         edonkey_msg_tree = proto_item_add_subtree(ti, ett_edonkey_message);
 
-        proto_tree_add_uint(edonkey_msg_tree, hf_edonkey_protocol, tvb, offset, 1, protocol);
+        proto_tree_add_uint_format_value(edonkey_msg_tree, hf_edonkey_protocol, tvb, offset, 1, protocol,
+                                    "%s (0x%02x)", protocol_name, protocol);
         proto_tree_add_uint_format_value(edonkey_msg_tree, hf_edonkey_message_type, tvb, offset+1, 1, msg_type,
                                     "%s (0x%02x)", message_name, msg_type);
 

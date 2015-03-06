@@ -36,6 +36,7 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include <gtk/gtk.h>
@@ -43,16 +44,21 @@
 #include <epan/prefs.h>
 #include <epan/funnel.h>
 
+#include "../file.h"
+#include "../stat_menu.h"
 #include "ui/progress_dlg.h"
 #include "../color_filters.h"
 
 #include "ui/gtk/gui_utils.h"
 #include "ui/gtk/dlg_utils.h"
+#include "ui/gtk/tap_param_dlg.h"
 #include "ui/gtk/font_utils.h"
 #include "ui/gtk/gui_stat_menu.h"
+#include "ui/gtk/prefs_dlg.h"
 #include "ui/gtk/main.h"
 #include "ui/gtk/webbrowser.h"
 #include "ui/gtk/gtkglobals.h"
+#include "ui/gtk/old-gtk-compat.h"
 
 void register_tap_listener_gtkfunnel(void);
 
@@ -486,11 +492,11 @@ static void funnel_retap_packets(void) {
     cf_retap_packets(&cfile);
 }
 
-static gboolean funnel_open_file(const char* fname, const char* filter, char** err_str) {
+static gboolean funnel_open_file(const char* fname, const char* filter, const char** err_str) {
     int err = 0;
     dfilter_t   *rfcode = NULL;
 
-    *err_str = NULL;
+    *err_str = "no error";
 
     switch (cfile.state) {
         case FILE_CLOSED:
@@ -498,19 +504,20 @@ static gboolean funnel_open_file(const char* fname, const char* filter, char** e
         case FILE_READ_ABORTED:
             break;
         case FILE_READ_IN_PROGRESS:
-            *err_str = g_strdup("file read in progress");
+            *err_str = "file read in progress";
             return FALSE;
     }
 
     if (filter) {
-        if (!dfilter_compile(filter, &rfcode, err_str)) {
+        if (!dfilter_compile(filter, &rfcode)) {
+            *err_str = dfilter_error_msg ? dfilter_error_msg : "cannot compile filter";
             return FALSE;
         }
     }
 
     /* This closes the current file if it succeeds. */
     if (cf_open(&cfile, fname, WTAP_TYPE_AUTO, FALSE, &err) != CF_OK) {
-        *err_str = g_strdup(g_strerror(err));
+        *err_str = g_strerror(err);
         if (rfcode != NULL) dfilter_free(rfcode);
         return FALSE;
     }
@@ -522,7 +529,7 @@ static gboolean funnel_open_file(const char* fname, const char* filter, char** e
         case CF_READ_ERROR:
             break;
         default:
-            *err_str = g_strdup("problem while reading file");
+            *err_str = "problem while reading file";
             return FALSE;
     }
 

@@ -31,9 +31,12 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
+
+#include <string.h>
 
 #include "packet-per.h"
 #include "packet-h225.h"
@@ -254,7 +257,7 @@ static int hf_h460_21_capability = -1;            /* Capability */
 static int hf_h460_21_sourceAddress = -1;         /* UnicastAddress */
 
 /*--- End of included file: packet-h460-hf.c ---*/
-#line 45 "../../asn1/h460/packet-h460-template.c"
+#line 48 "../../asn1/h460/packet-h460-template.c"
 
 /* Initialize the subtree pointers */
 
@@ -351,7 +354,7 @@ static gint ett_h460_21_SEQUENCE_SIZE_1_256_OF_Capability = -1;
 static gint ett_h460_21_TransmitCapabilities = -1;
 
 /*--- End of included file: packet-h460-ett.c ---*/
-#line 48 "../../asn1/h460/packet-h460-template.c"
+#line 51 "../../asn1/h460/packet-h460-template.c"
 
 /* Subdissectors */
 static dissector_handle_t q931_ie_handle = NULL;
@@ -1962,7 +1965,7 @@ static int dissect_h460_21_CapabilityAdvertisement_PDU(tvbuff_t *tvb _U_, packet
 
 
 /*--- End of included file: packet-h460-fn.c ---*/
-#line 54 "../../asn1/h460/packet-h460-template.c"
+#line 57 "../../asn1/h460/packet-h460-template.c"
 
 static int
 dissect_ies(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_) {
@@ -2138,7 +2141,9 @@ dissect_h460_name(tvbuff_t *tvb _U_, packet_info *pinfo, proto_tree *tree, void 
   DISSECTOR_ASSERT(actx);
 
   if (tree) {
+    /* DEBUG */ /*proto_tree_add_text(tree, tvb, 0, 0, "*** DEBUG dissect_h460_name: %s", pinfo->match_string);*/
     ftr = find_ftr(pinfo->match_string);
+    /* DEBUG */ /*proto_tree_add_text(tree, tvb, 0, 0, "*** DEBUG dissect_h460_name: ftr %s", (ftr)?ftr->name:"-none-");*/
     if (ftr) {
       proto_item_append_text(actx->created_item, " - %s", ftr->name);
       proto_item_append_text(proto_item_get_parent(proto_tree_get_parent(tree)), ": %s", ftr->name);
@@ -2871,7 +2876,7 @@ void proto_register_h460(void) {
         "UnicastAddress", HFILL }},
 
 /*--- End of included file: packet-h460-hfarr.c ---*/
-#line 248 "../../asn1/h460/packet-h460-template.c"
+#line 253 "../../asn1/h460/packet-h460-template.c"
   };
 
   /* List of subtrees */
@@ -2970,7 +2975,7 @@ void proto_register_h460(void) {
     &ett_h460_21_TransmitCapabilities,
 
 /*--- End of included file: packet-h460-ettarr.c ---*/
-#line 253 "../../asn1/h460/packet-h460-template.c"
+#line 258 "../../asn1/h460/packet-h460-template.c"
   };
 
   /* Register protocol */

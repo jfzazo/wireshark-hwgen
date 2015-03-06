@@ -23,12 +23,15 @@
  */
 
 #include "config.h"
-
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/dissectors/packet-tcp.h>
 #include <epan/uat.h>
+#include <epan/wmem/wmem.h>
+#include <epan/address.h>
 #include <epan/to_str.h>
-#include "packet-tcp.h"
+#include <epan/conversation.h>
 #include "packet-lbm.h"
 #include "packet-lbttcp.h"
 
@@ -76,7 +79,7 @@ static lbttcp_transport_t * lbttcp_transport_create(const address * source_addre
     lbttcp_transport_t * transport = NULL;
 
     transport = wmem_new(wmem_file_scope(), lbttcp_transport_t);
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &(transport->source_address), source_address);
+    SE_COPY_ADDRESS(&(transport->source_address), source_address);
     transport->source_port = source_port;
     transport->session_id = session_id;
     transport->channel = lbm_channel_assign(LBM_CHANNEL_TRANSPORT_LBTTCP);
@@ -154,7 +157,7 @@ static lbttcp_client_transport_t * lbttcp_client_transport_add(lbttcp_transport_
         return (entry);
     }
     entry = wmem_new(wmem_file_scope(), lbttcp_client_transport_t);
-    WMEM_COPY_ADDRESS(wmem_file_scope(), &(entry->receiver_address), receiver_address);
+    SE_COPY_ADDRESS(&(entry->receiver_address), receiver_address);
     entry->receiver_port = receiver_port;
     entry->id = transport->next_client_id++;
 
@@ -326,7 +329,7 @@ static uat_field_t lbttcp_tag_array[] =
 /*----------------------------------------------------------------------------*/
 /* UAT callback functions.                                                    */
 /*----------------------------------------------------------------------------*/
-static void lbttcp_tag_update_cb(void * record, char * * error_string)
+static void lbttcp_tag_update_cb(void * record, const char * * error_string)
 {
     lbttcp_tag_entry_t * tag = (lbttcp_tag_entry_t *)record;
 
@@ -469,8 +472,7 @@ static gboolean lbttcp_packet_is_transport_client(packet_info * pinfo, const lbt
     return (is_transport_client_packet);
 }
 
-static guint get_lbttcp_pdu_length(packet_info * pinfo _U_, tvbuff_t * tvb,
-                                   int offset, void *data _U_)
+static guint get_lbttcp_pdu_length(packet_info * pinfo _U_, tvbuff_t * tvb, int offset)
 {
     return lbmc_get_message_length(tvb, offset);
 }
@@ -799,7 +801,7 @@ void proto_reg_handoff_lbttcp(void)
     if (!already_registered)
     {
         lbttcp_dissector_handle = new_create_dissector_handle(dissect_lbttcp, proto_lbttcp);
-        dissector_add_for_decode_as("tcp.port", lbttcp_dissector_handle);
+        dissector_add_handle("tcp.port", lbttcp_dissector_handle); /* for decode as */
         heur_dissector_add("tcp", test_lbttcp_packet, proto_lbttcp);
     }
 

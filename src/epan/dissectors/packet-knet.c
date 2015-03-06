@@ -26,7 +26,8 @@
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
-#include "packet-tcp.h"
+#include <epan/wmem/wmem.h>
+#include <epan/dissectors/packet-tcp.h>
 
 void proto_register_knet(void);
 void proto_reg_handoff_knet(void);
@@ -437,7 +438,7 @@ dissect_payload(tvbuff_t *buffer, int offset, int messageid, proto_tree *tree, i
         break;
         case DISCONNECT:    /*No payload*/
         case DISCONNECTACK: /*No payload*/
-            proto_tree_add_bytes_format(payload_tree, hf_knet_payload, buffer, offset, 0, NULL, "No Payload");
+            proto_tree_add_text(payload_tree, buffer, offset, 0, "No Payload");
         break;
         case CONNECTSYN:    /*TODO: Not yet implemented, implement when available*/
         case CONNECTSYNACK: /*TODO: Not yet implemented, implement when available*/
@@ -544,7 +545,7 @@ dissect_knet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int current_pr
  *
  */
 static guint
-get_knet_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_knet_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
     return count_vle_bytes(tvb, offset) + dissect_content_length_vle(tvb, &offset, NULL);
 }
@@ -644,7 +645,7 @@ dissect_knet_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     if(tvb_get_guint8(tvb, 0) & UDP_DATAGRAM_RELIABLE_FLAG)
         offset += dissect_reliable_message_index_base(tvb, 3, datagram_tree); /* Calculate RMIB */
 
-    while ((tvb_length_remaining(tvb, offset) > 2) && /* If there's at least 2 bytes available in the buffer */
+    while ((tvb_length_remaining(tvb, offset) > 2) && /* If theres at least 2 bytes available in the buffer */
            (dissect_content_length(tvb, offset, NULL) > 0)) /* Empty data Abort */
     {
         offset += dissect_knet_message(tvb, pinfo, knet_tree, offset, messageindex); /* Call the message subdissector */

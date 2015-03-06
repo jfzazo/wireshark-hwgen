@@ -6,7 +6,7 @@
 /* Input file: packet-sabp-template.c */
 
 #line 1 "../../asn1/sabp/packet-sabp-template.c"
-/* packet-sabp-template.c
+/* packet-sabp.c
  * Routines for UTRAN Iu-BC Interface: Service Area Broadcast Protocol (SABP) packet dissection
  * Copyright 2007, Tomas Kukosa <tomas.kukosa@siemens.com>
  *
@@ -33,6 +33,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 
 #include <epan/asn1.h>
@@ -95,7 +96,7 @@ typedef enum _ProtocolIE_ID_enum {
 } ProtocolIE_ID_enum;
 
 /*--- End of included file: packet-sabp-val.h ---*/
-#line 45 "../../asn1/sabp/packet-sabp-template.c"
+#line 46 "../../asn1/sabp/packet-sabp-template.c"
 
 void proto_register_sabp(void);
 void proto_reg_handoff_sabp(void);
@@ -191,7 +192,7 @@ static int hf_sabp_successfulOutcome_value = -1;  /* SuccessfulOutcome_value */
 static int hf_sabp_unsuccessfulOutcome_value = -1;  /* UnsuccessfulOutcome_value */
 
 /*--- End of included file: packet-sabp-hf.c ---*/
-#line 57 "../../asn1/sabp/packet-sabp-template.c"
+#line 58 "../../asn1/sabp/packet-sabp-template.c"
 
 /* Initialize the subtree pointers */
 static int ett_sabp = -1;
@@ -247,7 +248,7 @@ static gint ett_sabp_SuccessfulOutcome = -1;
 static gint ett_sabp_UnsuccessfulOutcome = -1;
 
 /*--- End of included file: packet-sabp-ett.c ---*/
-#line 69 "../../asn1/sabp/packet-sabp-template.c"
+#line 70 "../../asn1/sabp/packet-sabp-template.c"
 
 /* Global variables */
 static guint32 ProcedureCode;
@@ -700,7 +701,7 @@ dissect_sabp_T_pLMNidentity(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx 
 	 if (!parameter_tvb)
 		return offset;
 	subtree = proto_item_add_subtree(actx->created_item, ett_sabp_e212);
-	dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, E212_NONE, FALSE);
+	dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, FALSE);
 
 
 
@@ -1727,31 +1728,31 @@ static int dissect_SABP_PDU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto
 
 
 /*--- End of included file: packet-sabp-fn.c ---*/
-#line 94 "../../asn1/sabp/packet-sabp-template.c"
+#line 95 "../../asn1/sabp/packet-sabp-template.c"
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sabp_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sabp_ies_dissector_table, ProtocolIE_ID, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_ProtocolExtensionFieldExtensionValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sabp_extension_dissector_table, ProtocolExtensionID, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sabp_extension_dissector_table, ProtocolExtensionID, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_InitiatingMessageValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sabp_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sabp_proc_imsg_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_SuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sabp_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sabp_proc_sout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-  return (dissector_try_uint(sabp_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_captured_length(tvb) : 0;
+  return (dissector_try_uint(sabp_proc_uout_dissector_table, ProcedureCode, tvb, pinfo, tree)) ? tvb_length(tvb) : 0;
 }
 
 
@@ -1761,7 +1762,7 @@ static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, p
 static void
 dissect_sabp_cb_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-  proto_item *cbs_page_item;
+  proto_item *item, *cbs_page_item;
   proto_tree *subtree;
   tvbuff_t *page_tvb, *unpacked_tvb;
   int offset = 0;
@@ -1781,14 +1782,14 @@ dissect_sabp_cb_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     return;
   }
   for (n = 0; n < nr_pages; n++) {
-    subtree = proto_tree_add_subtree_format(tree, tvb, offset, 83, ett_sabp_cbs_page, NULL,
-                "CB page %u data",  n+1);
+    item = proto_tree_add_text(tree, tvb, offset, 83, "CB page %u data",  n+1);
+    subtree = proto_item_add_subtree(item, ett_sabp_cbs_page);
     /* octet 2 - 83 CBS-Message-Information-Page 1  */
-    cbs_page_item = proto_tree_add_item(subtree, hf_sabp_cb_msg_inf_page, tvb, offset, 82, ENC_NA);
+    cbs_page_item = proto_tree_add_item(subtree, hf_sabp_cb_msg_inf_page, tvb, offset, 82, ENC_BIG_ENDIAN);
     cb_inf_msg_len = tvb_get_guint8(tvb,offset+82);
-    page_tvb = tvb_new_subset_length(tvb, offset, cb_inf_msg_len);
+    page_tvb = tvb_new_subset(tvb, offset, cb_inf_msg_len, cb_inf_msg_len);
     unpacked_tvb = dissect_cbs_data(sms_encoding, page_tvb, subtree, pinfo, 0);
-    len = tvb_captured_length(unpacked_tvb);
+    len = tvb_length(unpacked_tvb);
     if (unpacked_tvb != NULL){
       if (tree != NULL){
         proto_tree *cbs_page_subtree = proto_item_add_subtree(cbs_page_item, ett_sabp_cbs_page_content);
@@ -1804,7 +1805,7 @@ dissect_sabp_cb_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 }
 
 static guint
-get_sabp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_sabp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
   guint32 type_length;
   int bit_offset;
@@ -1845,7 +1846,7 @@ dissect_sabp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
   sabp_tree = proto_item_add_subtree(sabp_item, ett_sabp);
 
   dissect_SABP_PDU_PDU(tvb, pinfo, sabp_tree, NULL);
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 /* Note a little bit of a hack assumes length max takes two bytes and that the length starts at byte 4 */
@@ -1854,7 +1855,7 @@ dissect_sabp_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 {
   tcp_dissect_pdus(tvb, pinfo, tree, gbl_sabp_desegment, 5,
                    get_sabp_pdu_len, dissect_sabp, data);
-  return tvb_captured_length(tvb);
+  return tvb_length(tvb);
 }
 
 /*--- proto_register_sabp -------------------------------------------*/
@@ -2201,7 +2202,7 @@ void proto_register_sabp(void) {
         "UnsuccessfulOutcome_value", HFILL }},
 
 /*--- End of included file: packet-sabp-hfarr.c ---*/
-#line 247 "../../asn1/sabp/packet-sabp-template.c"
+#line 248 "../../asn1/sabp/packet-sabp-template.c"
   };
 
   /* List of subtrees */
@@ -2258,7 +2259,7 @@ void proto_register_sabp(void) {
     &ett_sabp_UnsuccessfulOutcome,
 
 /*--- End of included file: packet-sabp-ettarr.c ---*/
-#line 260 "../../asn1/sabp/packet-sabp-template.c"
+#line 261 "../../asn1/sabp/packet-sabp-template.c"
   };
 
 
@@ -2340,7 +2341,7 @@ proto_reg_handoff_sabp(void)
 
 
 /*--- End of included file: packet-sabp-dis-tab.c ---*/
-#line 296 "../../asn1/sabp/packet-sabp-template.c"
+#line 297 "../../asn1/sabp/packet-sabp-template.c"
 }
 
 

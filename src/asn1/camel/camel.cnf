@@ -41,7 +41,7 @@ OPERATION.&ResultType
 #.END
 
 
-#.REGISTER_NEW
+#.REGISTER
 CAP-GPRS-ReferenceNumber	B "0.4.0.0.1.1.5.2" "id-CAP-GPRS-ReferenceNumber"
 CAP-U-ABORT-REASON			B "0.4.0.0.1.1.2.2" "id-CAP-U-ABORT-Reason"
 
@@ -280,7 +280,7 @@ dissect_isup_location_number_parameter(parameter_tvb, subtree, NULL);
  if (!parameter_tvb)
         return offset;
 
-dissect_isup_generic_number_parameter(parameter_tvb, actx->pinfo, tree, NULL);
+dissect_isup_generic_number_parameter(parameter_tvb, tree, NULL);
 #.END
 
 #----------------------------------------------------------------------------------------
@@ -296,7 +296,7 @@ proto_tree *subtree;
 	return offset;
  subtree = proto_item_add_subtree(actx->created_item, ett_camel_cause);
 
- dissect_q931_cause_ie(parameter_tvb, 0, tvb_reported_length_remaining(parameter_tvb,0), subtree, hf_camel_cause_indicator, &Cause_value, isup_parameter_type_value);
+ dissect_q931_cause_ie(parameter_tvb, 0, tvb_length_remaining(parameter_tvb,0), subtree, hf_camel_cause_indicator, &Cause_value, isup_parameter_type_value);
 #.END
 
 #----------------------------------------------------------------------------------------
@@ -312,7 +312,7 @@ proto_tree *subtree;
 	return offset;
  subtree = proto_item_add_subtree(actx->created_item, ett_camel_RPcause);
 
- dissect_RP_cause_ie(parameter_tvb, 0, tvb_reported_length_remaining(parameter_tvb,0), subtree, hf_camel_RP_Cause, &Cause_value);
+ dissect_RP_cause_ie(parameter_tvb, 0, tvb_length_remaining(parameter_tvb,0), subtree, hf_camel_RP_Cause, &Cause_value);
 #.END
 
 #----------------------------------------------------------------------------------------
@@ -421,7 +421,7 @@ proto_tree *subtree;
  if (!parameter_tvb)
 	return offset;
 
- dissect_q931_bearer_capability_ie(parameter_tvb, 0, tvb_reported_length_remaining(parameter_tvb,0), tree);
+ dissect_q931_bearer_capability_ie(parameter_tvb, 0, tvb_length_remaining(parameter_tvb,0), tree);
 #.END
 
 #----------------------------------------------------------------------------------------
@@ -433,7 +433,7 @@ proto_tree *subtree;
 
  if (!parameter_tvb)
 	return offset;
- dissect_isup_original_called_number_parameter(parameter_tvb, actx->pinfo, tree, NULL);
+ dissect_isup_original_called_number_parameter(parameter_tvb, tree, NULL);
 #.END
 
 #----------------------------------------------------------------------------------------
@@ -466,7 +466,7 @@ proto_tree *subtree;
   if (!parameter_tvb)
     return offset;
   subtree = proto_item_add_subtree(actx->created_item, ett_camel_AccessPointName);
-  de_sm_apn(parameter_tvb, subtree, actx->pinfo, 0, tvb_reported_length(parameter_tvb), NULL, 0);
+  de_sm_apn(parameter_tvb, subtree, actx->pinfo, 0, tvb_length(parameter_tvb), NULL, 0);
 #.END
 
 #----------------------------------------------------------------------------------------
@@ -522,10 +522,10 @@ proto_tree *subtree;
  case 1: /* IETF */
 	switch(PDPTypeNumber){
 	case 0x21: /* IPv4 */
-		proto_tree_add_item(subtree, hf_camel_PDPAddress_IPv4, parameter_tvb, 0, tvb_reported_length(parameter_tvb), ENC_BIG_ENDIAN);
+		proto_tree_add_item(subtree, hf_camel_PDPAddress_IPv4, parameter_tvb, 0, tvb_length(parameter_tvb), ENC_BIG_ENDIAN);
 		break;
 	case 0x57: /* IPv6 */
-		proto_tree_add_item(subtree, hf_camel_PDPAddress_IPv6, parameter_tvb, 0, tvb_reported_length(parameter_tvb), ENC_NA);
+		proto_tree_add_item(subtree, hf_camel_PDPAddress_IPv6, parameter_tvb, 0, tvb_length(parameter_tvb), ENC_NA);
 		break;
 	default:
 		break;
@@ -629,7 +629,7 @@ proto_tree *subtree;
 
 # V3 and V4 incompatibillity bug #1719
 #.FN_BODY CAMEL-AChBillingChargingCharacteristics/timeDurationCharging/audibleIndicator
-  if (tvb_reported_length_remaining(tvb,offset) < 2)
+  if (tvb_length_remaining(tvb,offset) < 2)
 	offset = dissect_camel_BOOLEAN(TRUE, tvb, offset, actx , tree, hf_camel_audibleIndicatorTone);
   else
 %(DEFAULT_BODY)s
@@ -658,36 +658,9 @@ proto_tree *subtree;
  if (!parameter_tvb)
 	return offset;
  subtree = proto_item_add_subtree(actx->created_item, ett_camel_calledpartybcdnumber);
- de_cld_party_bcd_num(parameter_tvb, subtree, actx->pinfo, 0, tvb_reported_length(parameter_tvb), NULL, 0);
+ de_cld_party_bcd_num(parameter_tvb, subtree, actx->pinfo, 0, tvb_length(parameter_tvb), NULL, 0);
 
 #.END
-
-#.FN_BODY AdditionalCallingPartyNumber VAL_PTR = &parameter_tvb
-/*
-* Digits {PARAMETERS-BOUND : bound} ::= OCTET STRING (SIZE(
-*	bound.&minDigitsLength .. bound.&maxDigitsLength))
-*-- Indicates the address signalling digits.
-*-- Refer to ETSI EN 300 356 1 [23] Generic Number & Generic Digits parameters for encoding.
-*-- The coding of the subfields 'NumberQualifier' in Generic Number and 'TypeOfDigits' in
-*-- Generic Digits are irrelevant to the CAP;
-*-- the ASN.1 tags are sufficient to identify the parameter.
-*-- The ISUP format does not allow to exclude these subfields,
-*-- therefore the value is network operator specific.
-*--
-*-- The following parameters shall use Generic Number:
-*--  - AdditionalCallingPartyNumber for InitialDP
-*
-*/
- tvbuff_t	*parameter_tvb;
- proto_tree *subtree;
-
-  offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index,
-                                       &parameter_tvb);
-
-  if (!parameter_tvb)
-	return offset;
-  subtree = proto_item_add_subtree(actx->created_item, ett_camel_additionalcallingpartynumber);
-  dissect_isup_generic_number_parameter(parameter_tvb, actx->pinfo, subtree, NULL);
 
 #.TYPE_ATTR
 PDPTypeOrganization TYPE = FT_UINT8  DISPLAY = BASE_DEC  BITMASK = 0x0f STRINGS = VALS(gsm_map_PDP_Type_Organisation_vals)

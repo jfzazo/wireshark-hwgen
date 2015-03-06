@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>405</width>
-    <height>416</height>
+    <width>425</width>
+    <height>421</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -242,6 +242,55 @@
     </layout>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_5">
+     <item>
+      <widget class="QLabel" name="label_6">
+       <property name="text">
+        <string>Filter toolbar style:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="filterToolbarComboBox">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <item>
+        <property name="text">
+         <string>Icons only</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Text only</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Icons &amp; Text</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_5">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="horizontalLayout_6">
      <item>
       <widget class="QLabel" name="label_7">
@@ -263,7 +312,27 @@
        </property>
        <item>
         <property name="text">
-         <string>Use system setting</string>
+         <string>Auto-Detect</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>English</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Français</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Deutsch</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Chinese</string>
         </property>
        </item>
       </widget>

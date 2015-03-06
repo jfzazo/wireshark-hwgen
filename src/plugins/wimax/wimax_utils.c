@@ -30,8 +30,8 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include "wimax_tlv.h"
 #include "wimax_mac.h"
 
@@ -78,7 +78,7 @@ guint get_service_type( void )
 	return scheduling_service_type;
 }
 
-static void set_service_type( guint set_to )
+void set_service_type( guint set_to )
 {
 	if( seen_a_service_type == 0 ){
 		scheduling_service_type = set_to;
@@ -187,16 +187,16 @@ static const value_string vals_harq[] =
 
 static const value_string vals_cs_specification[] =
 {
-	{ 0, "Reserved"},
-	{ 1, "Packet, IPv4"},
-	{ 2, "Packet, IPv6"},
-	{ 3, "Packet, IEEE 802.3/Ethernet"},
-	{ 4, "Packet, IEEE 802.1Q VLAN"},
-	{ 5, "Packet, IPv4 over IEEE 802.3/Ethernet"},
-	{ 6, "Packet, IPv6 over IEEE 802.3/Ethernet"},
-	{ 7, "Packet, IPv4 over IEEE 802.1Q VLAN"},
-	{ 8, "Packet, IPv6 over IEEE 802.1Q VLAN"},
-	{ 9, "ATM"},
+	{0, "Reserved"},
+	{1, "Packet, IPv4"},
+	{2, "Packet, IPv6"},
+	{3, "Packet, IEEE 802.3/Ethernet"},
+	{4, "Packet, IEEE 802.1Q VLAN"},
+	{5, "Packet, IPv4 over IEEE 802.3/Ethernet"},
+	{6, "Packet, IPv6 over IEEE 802.3/Ethernet"},
+	{7, "Packet, IPv4 over IEEE 802.1Q VLAN"},
+	{8, "Packet, IPv6 over IEEE 802.1Q VLAN"},
+	{9, "ATM"},
 	{10, "Packet, IEEE 802.3/Ethernet with ROCH header compression"},
 	{11, "Packet, IEEE 802.3/Ethernet with ECRTP header compression"},
 	{12, "Packet, IP2 with ROCH header compression"},
@@ -262,16 +262,16 @@ static const value_string vals_atm_switching_encodings[] =
 
 static const value_string vals_cc[] =
 {
-	{ 0, "OK/success"},
-	{ 1, "Reject-other"},
-	{ 2, "Reject-unrecognized-configuration-setting"},
-	{ 3, "Reject-temporary / reject-resource"},
-	{ 4, "Reject-permanent / reject-admin"},
-	{ 5, "Reject-not-owner"},
-	{ 6, "Reject-service-flow-not-found"},
-	{ 7, "Reject-service-flow-exists"},
-	{ 8, "Reject-required-parameter-not-present"},
-	{ 9, "Reject-header-suppression"},
+	{0, "OK/success"},
+	{1, "Reject-other"},
+	{2, "Reject-unrecognized-configuration-setting"},
+	{3, "Reject-temporary / reject-resource"},
+	{4, "Reject-permanent / reject-admin"},
+	{5, "Reject-not-owner"},
+	{6, "Reject-service-flow-not-found"},
+	{7, "Reject-service-flow-exists"},
+	{8, "Reject-required-parameter-not-present"},
+	{9, "Reject-header-suppression"},
 	{10, "Reject-unknown-transaction-id"},
 	{11, "Reject-authentication-failure"},
 	{12, "Reject-add-aborted"},
@@ -292,8 +292,8 @@ static const value_string vals_classification_action_rule[] =
 
 static const true_false_string tfs_supported =
 {
-	"supported",
-	"not supported"
+    "supported",
+    "not supported"
 };
 
 #if 0
@@ -392,13 +392,13 @@ static const value_string vals_tek_encryption_ids[] =
 
 static const value_string vals_dcd_mac_version[] =
 {
-	{1, "Conformance with IEEE Std 802.16-2001"},
-	{2, "Conformance with IEEE Std 802.16c-2002 and its predecessors"},
-	{3, "Conformance with IEEE Std 802.16a-2003 and its predecessors"},
-	{4, "Conformance with IEEE Std 802.16-2004"},
-	{5, "Conformance with IEEE Std 802.16-2004 and IEEE Std 802.16e-2005"},
-	{6, "reserved"},
-	{0, NULL}
+    {1, "Conformance with IEEE Std 802.16-2001"},
+    {2, "Conformance with IEEE Std 802.16c-2002 and its predecessors"},
+    {3, "Conformance with IEEE Std 802.16a-2003 and its predecessors"},
+    {4, "Conformance with IEEE Std 802.16-2004"},
+    {5, "Conformance with IEEE Std 802.16-2004 and IEEE Std 802.16e-2005"},
+    {6, "reserved"},
+    {0, NULL}
 };
 
 /* fix fields */
@@ -689,8 +689,6 @@ static gint hf_common_tlv_vendor_specific_length = -1;
 static gint hf_common_tlv_vendor_specific_length_size = -1;
 static gint hf_common_tlv_vendor_specific_value = -1;
 static gint hf_common_current_transmitted_power = -1;
-
-static expert_field ei_common_tlv_info = EI_INIT;
 
 /* Register WiMax Utility Routines */
 void proto_register_wimax_utility_decoders(void)
@@ -1685,12 +1683,6 @@ void proto_register_wimax_utility_decoders(void)
 #endif
 	};
 
-	static ei_register_info ei[] = {
-		{ &ei_common_tlv_info, { "wmx.common_tlv.invalid", PI_PROTOCOL, PI_WARN, "Invalid TLV info", EXPFILL }},
-	};
-
-	expert_module_t* expert_wimax_utility;
-
 	if(proto_wimax_utility_decoders == -1)
 	{
 		proto_wimax_utility_decoders = proto_register_protocol (
@@ -1707,8 +1699,6 @@ void proto_register_wimax_utility_decoders(void)
 		proto_register_field_array(proto_wimax_utility_decoders, hf_snp, array_length(hf_snp));
 		proto_register_field_array(proto_wimax_utility_decoders, hf_pkm, array_length(hf_pkm));
 		proto_register_field_array(proto_wimax_utility_decoders, hf_common_tlv, array_length(hf_common_tlv));
-		expert_wimax_utility = expert_register_protocol(proto_wimax_utility_decoders);
-		expert_register_field_array(expert_wimax_utility, ei, array_length(ei));
 
 		eap_handle = find_dissector("eap");
 	}
@@ -2434,7 +2424,7 @@ void wimax_service_flow_encodings_decoder(tvbuff_t *tvb, packet_info *pinfo, pro
 			break;
 		}	/* end of switch */
 		offset += tlv_len;
-	}	/* end of while loop */
+        }	/* end of while loop */
 }
 
 /**************************************************************/
@@ -3228,7 +3218,7 @@ void wimax_vendor_specific_information_decoder(tvbuff_t *tvb, packet_info *pinfo
 	if(tvb_len < 2)
 	{	/* invalid tlv info */
 		col_append_sep_str(pinfo->cinfo, COL_INFO, NULL, "Invalid Vendor Specific Info");
-		proto_tree_add_expert(tree, pinfo, &ei_common_tlv_info, tvb, 0, tvb_len);
+		proto_tree_add_text(tree, tvb, 0, tvb_len, "Invalid TLV info");
 		return;
 	}
 	/* process Vendor Specific Information (11.1.6) */
@@ -3271,7 +3261,7 @@ void wimax_vendor_specific_information_decoder(tvbuff_t *tvb, packet_info *pinfo
 				proto_tree_add_item(tree, hf_common_tlv_vendor_specific_length_size, tvb, (offset + 1), 1, ENC_BIG_ENDIAN);
 				if(get_tlv_size_of_length(&tlv_info))
 				{	/* display the multiple byte TLV length */
-					proto_tree_add_uint(tree, hf_common_tlv_vendor_specific_length, tvb, (offset + 2), 1, get_tlv_size_of_length(&tlv_info));
+					proto_tree_add_text(tree, tvb, (offset + 2), get_tlv_size_of_length(&tlv_info), "Vendor Specific Length: %u", get_tlv_size_of_length(&tlv_info));
 				}
 				else
 				{	/* length = 0 */
@@ -3391,16 +3381,3 @@ guint wimax_common_tlv_encoding_decoder(tvbuff_t *tvb, packet_info *pinfo, proto
 	}	/* end of while loop */
 	return offset;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

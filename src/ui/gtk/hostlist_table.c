@@ -25,21 +25,30 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 #include <locale.h>
 
 #include <gtk/gtk.h>
 
+#include <epan/packet_info.h>
+#include <epan/to_str.h>
 #include <epan/addr_resolv.h>
+#include <epan/tap.h>
+#include <epan/strutil.h>
 #ifdef HAVE_GEOIP
 #include <GeoIP.h>
-#include "epan/geoip_db.h"
-#include "wsutil/pint.h"
+#include <epan/geoip_db.h>
+#include <wsutil/pint.h>
+#include <wsutil/filesystem.h>
 #endif
+
+#include <wsutil/file_util.h>
 
 #include "ui/simple_dialog.h"
 #include "ui/alert_box.h"
 #include "ui/utf8_entities.h"
+#include "wsutil/tempfile.h"
 
 #include "ui/gtk/hostlist_table.h"
 #include "ui/gtk/filter_utils.h"
@@ -70,9 +79,105 @@
 
 #define COL_STR_LEN 32
 
-static void
-reset_host_table_data(hostlist_table *hosts)
+/* convert a port number into a string */
+static char *
+hostlist_port_to_str(int port_type_val, guint32 port)
 {
+    static int i=0;
+    static gchar *strp, str[4][12];
+    gchar *bp;
+
+    switch(port_type_val){
+    case PT_TCP:
+    case PT_UDP:
+    case PT_SCTP:
+        i = (i+1)%4;
+        strp=str[i];
+        bp = &strp[11];
+
+        *bp = 0;
+        do {
+            *--bp = (port % 10) +'0';
+        } while ((port /= 10) != 0 && bp > strp);
+        return bp;
+    }
+    return NULL;
+}
+
+
+#define FN_ANY_ADDRESS          0
+#define FN_ANY_PORT             1
+
+/* Given an address (to distinguish between ipv4 and ipv6 for tcp/udp,
+   a port_type and a name_type (FN_...)
+   return a string for the filter name.
+
+   Some addresses, like AT_ETHER may actually be any of multiple types
+   of protocols,   either ethernet, tokenring, fddi etc so we must be more
+   specific there;  that's why we need specific_addr_type.
+*/
+static const char *
+hostlist_get_filter_name(address *addr, int specific_addr_type_val, int port_type_val, int name_type_val)
+{
+    switch(name_type_val){
+    case FN_ANY_ADDRESS:
+        switch(addr->type){
+        case AT_ETHER:
+            switch(specific_addr_type_val){
+            case SAT_ETHER:
+                return "eth.addr";
+            case SAT_WLAN:
+                return "wlan.addr";
+            case SAT_FDDI:
+                return "fddi.addr";
+            case SAT_TOKENRING:
+                return "tr.addr";
+            default:
+                break;
+            }
+            break;
+        case AT_IPv4:
+            return "ip.addr";
+        case AT_IPv6:
+            return "ipv6.addr";
+        case AT_IPX:
+            return "ipx.addr";
+        case AT_FC:
+            return "fc.id";
+        case AT_URI:
+            switch(specific_addr_type_val){
+            case SAT_JXTA:
+                return "jxta.message.address";
+            default:
+                break;
+            }
+            break;
+        case AT_USB:
+            return "usb.addr";
+        default:
+            break;
+        }
+        break;
+    case FN_ANY_PORT:
+        switch(port_type_val){
+        case PT_TCP:
+            return "tcp.port";
+        case PT_UDP:
+            return "udp.port";
+        case PT_SCTP:
+            return "sctp.port";
+        }
+        break;
+    }
+
+    g_assert_not_reached();
+    return NULL;
+}
+
+static void
+reset_hostlist_table_data(hostlist_table *hosts)
+{
+    guint32 i;
     char *display_name;
     char title[256];
     GString *error_string;
@@ -84,7 +189,7 @@ reset_host_table_data(hostlist_table *hosts)
     } else {
         filter = hosts->filter;
     }
-    error_string = set_tap_dfilter (&hosts->hash, filter);
+    error_string = set_tap_dfilter (hosts, filter);
     if (error_string) {
         simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", error_string->str);
         g_string_free(error_string, TRUE);
@@ -123,15 +228,26 @@ reset_host_table_data(hostlist_table *hosts)
     gtk_list_store_clear(store);
 
     /* delete all hosts */
-    reset_hostlist_table_data(&hosts->hash);
+    for(i=0;i<hosts->num_hosts;i++){
+        hostlist_talker_t *host = &g_array_index(hosts->hosts, hostlist_talker_t, i);
+        g_free((gpointer)host->myaddress.data);
+    }
+
+    if (hosts->hosts)
+        g_array_free(hosts->hosts, TRUE);
+
+    if (hosts->hashtable != NULL)
+        g_hash_table_destroy(hosts->hashtable);
+
+    hosts->hosts=NULL;
+    hosts->hashtable=NULL;
+    hosts->num_hosts=0;
 }
 
 static void
 reset_hostlist_table_data_cb(void *arg)
 {
-    conv_hash_t *hash = (conv_hash_t*)arg;
-
-    reset_host_table_data((hostlist_table *)hash->user_data);
+    reset_hostlist_table_data((hostlist_table *)arg);
 }
 
 static void
@@ -139,11 +255,40 @@ hostlist_win_destroy_cb(GtkWindow *win _U_, gpointer data)
 {
     hostlist_table *hosts=(hostlist_table *)data;
 
-    remove_tap_listener(&hosts->hash);
+    remove_tap_listener(hosts);
 
-    reset_host_table_data(hosts);
+    reset_hostlist_table_data(hosts);
     g_free(hosts);
 }
+
+enum
+{
+    ADR_COLUMN,
+    PORT_COLUMN,
+    PACKETS_COLUMN,
+    BYTES_COLUMN,
+    PKT_AB_COLUMN,
+    BYTES_AB_COLUMN,
+    PKT_BA_COLUMN,
+    BYTES_BA_COLUMN,
+#ifdef HAVE_GEOIP
+    GEOIP1_COLUMN,
+    GEOIP2_COLUMN,
+    GEOIP3_COLUMN,
+    GEOIP4_COLUMN,
+    GEOIP5_COLUMN,
+    GEOIP6_COLUMN,
+    GEOIP7_COLUMN,
+    GEOIP8_COLUMN,
+    GEOIP9_COLUMN,
+    GEOIP10_COLUMN,
+    GEOIP11_COLUMN,
+    GEOIP12_COLUMN,
+    GEOIP13_COLUMN,
+#endif
+    INDEX_COLUMN,
+    N_COLUMNS
+};
 
 static gint
 hostlist_sort_column(GtkTreeModel *model,
@@ -158,19 +303,19 @@ hostlist_sort_column(GtkTreeModel *model,
     hostlist_talker_t *host1 = NULL;
     hostlist_talker_t *host2 = NULL;
 
-    gtk_tree_model_get(model, a, ENDP_INDEX_COLUMN, &idx1, -1);
-    gtk_tree_model_get(model, b, ENDP_INDEX_COLUMN, &idx2, -1);
+    gtk_tree_model_get(model, a, INDEX_COLUMN, &idx1, -1);
+    gtk_tree_model_get(model, b, INDEX_COLUMN, &idx2, -1);
 
-    if (!hl || idx1 >= hl->hash.conv_array->len || idx2 >= hl->hash.conv_array->len)
+    if (!hl || idx1 >= hl->num_hosts || idx2 >= hl->num_hosts)
         return 0;
 
-    host1 = &g_array_index(hl->hash.conv_array, hostlist_talker_t, idx1);
-    host2 = &g_array_index(hl->hash.conv_array, hostlist_talker_t, idx2);
+    host1 = &g_array_index(hl->hosts, hostlist_talker_t, idx1);
+    host2 = &g_array_index(hl->hosts, hostlist_talker_t, idx2);
 
     switch(data_column){
-    case ENDP_COLUMN_ADDR: /* Address */
+    case 0: /* Address */
         return(CMP_ADDRESS(&host1->myaddress, &host2->myaddress));
-    case ENDP_COLUMN_PORT: /* (Port) */
+    case 1: /* (Port) */
         CMP_INT(host1->port, host2->port);
 #ifdef HAVE_GEOIP
     default:
@@ -204,27 +349,36 @@ hostlist_select_filter_cb(GtkWidget *widget _U_, gpointer callback_data, guint c
 {
     guint idx;
     hostlist_table *hl=(hostlist_table *)callback_data;
-    char *str;
+    char *str = NULL;
+    char *sport;
     GtkTreeIter iter;
     GtkTreeModel *model;
     GtkTreeSelection  *sel;
-    hostlist_talker_t *host;
+    hostlist_talker_t *host = NULL;
 
     sel = gtk_tree_view_get_selection (GTK_TREE_VIEW(hl->table));
     if (!gtk_tree_selection_get_selected(sel, &model, &iter))
         return;
 
     gtk_tree_model_get (model, &iter,
-                            ENDP_INDEX_COLUMN, &idx,
+                            INDEX_COLUMN, &idx,
                             -1);
 
-    if(idx>= hl->hash.conv_array->len){
+    if(idx>= hl->num_hosts){
         simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "No hostlist selected");
         return;
     }
-    host = &g_array_index(hl->hash.conv_array, hostlist_talker_t, idx);
+    host = &g_array_index(hl->hosts, hostlist_talker_t, idx);
 
-    str = (char*)get_hostlist_filter(host);
+    sport=hostlist_port_to_str(host->port_type, host->port);
+
+    str = g_strdup_printf("%s==%s%s%s%s%s",
+                          hostlist_get_filter_name(&host->myaddress, host->sat, host->port_type,  FN_ANY_ADDRESS),
+                          ep_address_to_str(&host->myaddress),
+                          sport?" && ":"",
+                          sport?hostlist_get_filter_name(&host->myaddress, host->sat, host->port_type,  FN_ANY_PORT):"",
+                          sport?"==":"",
+                          sport?sport:"");
 
     apply_selected_filter (callback_action, str);
 
@@ -460,37 +614,56 @@ hostlist_create_popup_menu(hostlist_table *hl)
     g_signal_connect(hl->table, "button_press_event", G_CALLBACK(hostlist_show_popup_menu_cb), hl);
 }
 
+
+/* Draw/refresh the address field of a single entry at the specified index */
+static void
+get_hostlist_table_address(hostlist_table *hl, hostlist_talker_t *host, const char **entries)
+{
+    char *port;
+    guint32 pt;
+
+    if (!hl->resolve_names)
+        entries[0] = ep_address_to_str(&host->myaddress);
+    else
+        entries[0] = (char *)ep_address_to_display(&host->myaddress);
+
+    pt = host->port_type;
+    if(!hl->resolve_names) pt = PT_NONE;
+    switch(pt) {
+    case(PT_TCP):
+        entries[1] = ep_tcp_port_to_display(host->port);
+        break;
+    case(PT_UDP):
+        entries[1] = ep_udp_port_to_display(host->port);
+        break;
+    case(PT_SCTP):
+        entries[1] = ep_sctp_port_to_display(host->port);
+        break;
+    default:
+        port=hostlist_port_to_str(host->port_type, host->port);
+        entries[1] = port?port:"";
+    }
+}
+
 /* Refresh the address fields of all entries in the list */
 static void
 draw_hostlist_table_addresses(hostlist_table *hl)
 {
-    guint idx;
+    guint32 i;
+    const char *entries[2];
     GtkListStore *store;
-    GtkTreeIter iter;
-    gboolean iter_valid;
 
     store = GTK_LIST_STORE(gtk_tree_view_get_model(hl->table));
     g_object_ref(store);
     gtk_tree_view_set_model(GTK_TREE_VIEW(hl->table), NULL);
-    iter_valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(store), &iter);
 
-    while (iter_valid) {
-        hostlist_talker_t *host;
-        char *addr_str, *port_str;
-
-        gtk_tree_model_get(GTK_TREE_MODEL(store), &iter, ENDP_INDEX_COLUMN, &idx, -1);
-        host = &g_array_index(hl->hash.conv_array, hostlist_talker_t, idx);
-
-        addr_str = (char*)get_conversation_address(NULL, &host->myaddress, hl->resolve_names);
-        port_str = (char*)get_conversation_port(NULL, host->port, host->ptype, hl->resolve_names);
-        gtk_list_store_set (store, &iter,
-                  ENDP_COLUMN_ADDR, addr_str,
-                  ENDP_COLUMN_PORT, port_str,
+    for(i=0;i<hl->num_hosts;i++){
+        hostlist_talker_t *host = &g_array_index(hl->hosts, hostlist_talker_t, i);
+        get_hostlist_table_address(hl, host, entries);
+        gtk_list_store_set (store, &host->iter,
+                  ADR_COLUMN, entries[0],
+                  PORT_COLUMN, entries[1],
                     -1);
-
-        iter_valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(store), &iter);
-        wmem_free(NULL, addr_str);
-        wmem_free(NULL, port_str);
     }
     gtk_tree_view_set_model(GTK_TREE_VIEW(hl->table), GTK_TREE_MODEL(store));
     g_object_unref(store);
@@ -500,24 +673,22 @@ draw_hostlist_table_addresses(hostlist_table *hl)
 static void
 draw_hostlist_table_data(hostlist_table *hl)
 {
-    guint idx, new_idx;
+    guint32 i;
     char title[256];
     GtkListStore *store;
-    GtkTreeIter iter;
-    gboolean iter_valid;
     gboolean first = TRUE;
 
     if (hl->page_lb) {
-        if(hl->hash.conv_array && hl->hash.conv_array->len) {
-            g_snprintf(title, sizeof(title), "%s: %u", hl->name, hl->hash.conv_array->len);
+        if(hl->num_hosts) {
+            g_snprintf(title, sizeof(title), "%s: %u", hl->name, hl->num_hosts);
         } else {
             g_snprintf(title, sizeof(title), "%s", hl->name);
         }
         gtk_label_set_text(GTK_LABEL(hl->page_lb), title);
-        gtk_widget_set_sensitive(hl->page_lb, hl->hash.conv_array && hl->hash.conv_array->len);
+        gtk_widget_set_sensitive(hl->page_lb, hl->num_hosts);
     } else {
-        if(hl->hash.conv_array && hl->hash.conv_array->len) {
-            g_snprintf(title, sizeof(title), "%s Endpoints: %u", hl->name, hl->hash.conv_array->len);
+        if(hl->num_hosts) {
+            g_snprintf(title, sizeof(title), "%s Endpoints: %u", hl->name, hl->num_hosts);
         } else {
             g_snprintf(title, sizeof(title), "%s Endpoints", hl->name);
         }
@@ -525,28 +696,11 @@ draw_hostlist_table_data(hostlist_table *hl)
     }
 
     store = GTK_LIST_STORE(gtk_tree_view_get_model(hl->table));
-    iter_valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(store), &iter);
-    new_idx = gtk_tree_model_iter_n_children(GTK_TREE_MODEL(store), NULL);
+    for(i=0;i<hl->num_hosts;i++){
+        hostlist_talker_t *host = &g_array_index(hl->hosts, hostlist_talker_t, i);
 
-    while (iter_valid || (hl->hash.conv_array && new_idx < hl->hash.conv_array->len)) {
-        hostlist_talker_t *host;
-
-        if (iter_valid) {
-            gtk_tree_model_get(GTK_TREE_MODEL(store), &iter, ENDP_INDEX_COLUMN, &idx, -1);
-        } else {
-            idx = new_idx;
-            new_idx++;
-        }
-        if(!hl->hash.conv_array){ /* Already check on while loop but for avoid Clang Analyzer warnings */
+        if (!host->modified)
             continue;
-        }
-
-        host = &g_array_index(hl->hash.conv_array, hostlist_talker_t, idx);
-
-        if (!host->modified) {
-            iter_valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(store), &iter);
-            continue;
-        }
 
         if (first) {
             g_object_ref(store);
@@ -555,10 +709,10 @@ draw_hostlist_table_data(hostlist_table *hl)
             first = FALSE;
         }
         host->modified = FALSE;
-        if (!iter_valid) {
-            char *addr_str, *port_str;
+        if (!host->iter_valid) {
+            const char *entries[2];
 #ifdef HAVE_GEOIP
-            char *geoip[ENDP_NUM_GEOIP_COLUMNS];
+            char *geoip[NUM_GEOIP_COLS];
             guint j;
 
             if ((host->myaddress.type == AT_IPv4 || host->myaddress.type == AT_IPv6) && !hl->geoip_visible) {
@@ -573,7 +727,7 @@ draw_hostlist_table_data(hostlist_table *hl)
                     column = (GtkTreeViewColumn *)columns->data;
                     title_p = gtk_tree_view_column_get_title(column);
                     id = gtk_tree_view_column_get_sort_column_id(column);
-                    if (title_p[0] != 0 && id >= ENDP_COLUMN_GEOIP1) {
+                    if (title_p[0] != 0 && id >= GEOIP1_COLUMN) {
                         gtk_tree_view_column_set_visible(column, TRUE);
                     }
                     columns = g_list_next(columns);
@@ -583,74 +737,69 @@ draw_hostlist_table_data(hostlist_table *hl)
             }
 
             /* Filled in from the GeoIP config, if any */
-            for (j = 0; j < ENDP_NUM_GEOIP_COLUMNS; j++) {
+            for (j = 0; j < NUM_GEOIP_COLS; j++) {
                 if (host->myaddress.type == AT_IPv4 && j < geoip_db_num_dbs()) {
-                    guchar *name = geoip_db_lookup_ipv4(j, pntoh32(host->myaddress.data), "-");
+                    const guchar *name = geoip_db_lookup_ipv4(j, pntoh32(host->myaddress.data), "-");
                     geoip[j] = g_strdup(name);
-                    wmem_free(NULL, name);
                 } else if (host->myaddress.type == AT_IPv6 && j < geoip_db_num_dbs()) {
-                    guchar *name;
+                    const guchar *name;
                     const struct e_in6_addr *addr = (const struct e_in6_addr *) host->myaddress.data;
 
                     name = geoip_db_lookup_ipv6(j, *addr, "-");
                     geoip[j] = g_strdup(name);
-                    wmem_free(NULL, name);
                 } else {
                   geoip[j] = NULL;
                 }
             }
 #endif /* HAVE_GEOIP */
 
-            addr_str = (char*)get_conversation_address(NULL, &host->myaddress, hl->resolve_names);
-            port_str = (char*)get_conversation_port(NULL, host->port, host->ptype, hl->resolve_names);
-            gtk_list_store_insert_with_values( store, &iter, G_MAXINT,
-                  ENDP_COLUMN_ADDR, addr_str,
-                  ENDP_COLUMN_PORT, port_str,
-                  ENDP_COLUMN_PACKETS,  host->tx_frames+host->rx_frames,
-                  ENDP_COLUMN_BYTES,    host->tx_bytes+host->rx_bytes,
-                  ENDP_COLUMN_PKT_AB,   host->tx_frames,
-                  ENDP_COLUMN_BYTES_AB, host->tx_bytes,
-                  ENDP_COLUMN_PKT_BA,   host->rx_frames,
-                  ENDP_COLUMN_BYTES_BA, host->rx_bytes,
+            get_hostlist_table_address(hl, host, entries);
+            host->iter_valid = TRUE;
+            gtk_list_store_insert_with_values( store , &host->iter, G_MAXINT,
+                  ADR_COLUMN,      entries[0],
+                  PORT_COLUMN,     entries[1],
+                  PACKETS_COLUMN,  host->tx_frames+host->rx_frames,
+                  BYTES_COLUMN,    host->tx_bytes+host->rx_bytes,
+                  PKT_AB_COLUMN,   host->tx_frames,
+                  BYTES_AB_COLUMN, host->tx_bytes,
+                  PKT_BA_COLUMN,   host->rx_frames,
+                  BYTES_BA_COLUMN, host->rx_bytes,
 #ifdef HAVE_GEOIP
-                  ENDP_COLUMN_GEOIP1,   geoip[0],
-                  ENDP_COLUMN_GEOIP2,   geoip[1],
-                  ENDP_COLUMN_GEOIP3,   geoip[2],
-                  ENDP_COLUMN_GEOIP4,   geoip[3],
-                  ENDP_COLUMN_GEOIP5,   geoip[4],
-                  ENDP_COLUMN_GEOIP6,   geoip[5],
-                  ENDP_COLUMN_GEOIP7,   geoip[6],
-                  ENDP_COLUMN_GEOIP8,   geoip[7],
-                  ENDP_COLUMN_GEOIP9,   geoip[8],
-                  ENDP_COLUMN_GEOIP10,  geoip[9],
-                  ENDP_COLUMN_GEOIP11,  geoip[10],
-                  ENDP_COLUMN_GEOIP12,  geoip[11],
-                  ENDP_COLUMN_GEOIP13,  geoip[12],
+                  GEOIP1_COLUMN,   geoip[0],
+                  GEOIP2_COLUMN,   geoip[1],
+                  GEOIP3_COLUMN,   geoip[2],
+                  GEOIP4_COLUMN,   geoip[3],
+                  GEOIP5_COLUMN,   geoip[4],
+                  GEOIP6_COLUMN,   geoip[5],
+                  GEOIP7_COLUMN,   geoip[6],
+                  GEOIP8_COLUMN,   geoip[7],
+                  GEOIP9_COLUMN,   geoip[8],
+                  GEOIP10_COLUMN,  geoip[9],
+                  GEOIP11_COLUMN,  geoip[10],
+                  GEOIP12_COLUMN,  geoip[11],
+                  GEOIP13_COLUMN,  geoip[12],
 #endif
-                  ENDP_INDEX_COLUMN,    idx,
+                  INDEX_COLUMN,    i,
                     -1);
-            wmem_free(NULL, addr_str);
-            wmem_free(NULL, port_str);
+
 #ifdef HAVE_GEOIP
-            for (j = 0; j < ENDP_NUM_GEOIP_COLUMNS; j++)
+            for (j = 0; j < NUM_GEOIP_COLS; j++)
                 g_free(geoip[j]);
 #endif /* HAVE_GEOIP */
         }
         else {
-            gtk_list_store_set (store, &iter,
-                  ENDP_COLUMN_PACKETS,  host->tx_frames+host->rx_frames,
-                  ENDP_COLUMN_BYTES,    host->tx_bytes+host->rx_bytes,
-                  ENDP_COLUMN_PKT_AB,   host->tx_frames,
-                  ENDP_COLUMN_BYTES_AB, host->tx_bytes,
-                  ENDP_COLUMN_PKT_BA,   host->rx_frames,
-                  ENDP_COLUMN_BYTES_BA, host->rx_bytes,
+            gtk_list_store_set (store, &host->iter,
+                  PACKETS_COLUMN,  host->tx_frames+host->rx_frames,
+                  BYTES_COLUMN,    host->tx_bytes+host->rx_bytes,
+                  PKT_AB_COLUMN,   host->tx_frames,
+                  BYTES_AB_COLUMN, host->tx_bytes,
+                  PKT_BA_COLUMN,   host->rx_frames,
+                  BYTES_BA_COLUMN, host->rx_bytes,
                     -1);
         }
-
-        iter_valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(store), &iter);
     }
     if (!first) {
-            if (!hl->fixed_col && hl->hash.conv_array && hl->hash.conv_array->len >= 1000) {
+            if (!hl->fixed_col && hl->num_hosts >= 1000) {
                 /* finding the right size for a column isn't easy
                  * let it run in autosize a little (1000 is arbitrary)
                  * and then switch to fixed width.
@@ -667,14 +816,12 @@ draw_hostlist_table_data(hostlist_table *hl)
 static void
 draw_hostlist_table_data_cb(void *arg)
 {
-    conv_hash_t *hash = (conv_hash_t*)arg;
-
-    draw_hostlist_table_data((hostlist_table *)hash->user_data);
+    draw_hostlist_table_data((hostlist_table *)arg);
 }
 
 typedef struct {
     int             nb_cols;
-    gint            columns_order[ENDP_NUM_COLUMNS+ENDP_NUM_GEOIP_COLUMNS];
+    gint            columns_order[N_COLUMNS];
     GString        *CSV_str;
     hostlist_table *talkers;
 } csv_t;
@@ -690,27 +837,27 @@ csv_handle(GtkTreeModel *model, GtkTreePath *path _U_, GtkTreeIter *iter,
     guint idx;
     guint64  value;
 
-    gtk_tree_model_get(model, iter, ENDP_INDEX_COLUMN, &idx, -1);
+    gtk_tree_model_get(model, iter, INDEX_COLUMN, &idx, -1);
 
     for (i=0; i< csv->nb_cols; i++) {
         if (i)
             g_string_append(csv->CSV_str, ",");
 
         switch(csv->columns_order[i]) {
-        case ENDP_COLUMN_ADDR:
-        case ENDP_COLUMN_PORT:
+        case ADR_COLUMN:
+        case PORT_COLUMN:
             gtk_tree_model_get(model, iter, csv->columns_order[i], &table_text, -1);
             if (table_text) {
                 g_string_append_printf(csv->CSV_str, "\"%s\"", table_text);
                 g_free(table_text);
             }
             break;
-        case ENDP_COLUMN_PACKETS:
-        case ENDP_COLUMN_BYTES:
-        case ENDP_COLUMN_PKT_AB:
-        case ENDP_COLUMN_BYTES_AB:
-        case ENDP_COLUMN_PKT_BA:
-        case ENDP_COLUMN_BYTES_BA:
+        case PACKETS_COLUMN:
+        case BYTES_COLUMN:
+        case PKT_AB_COLUMN:
+        case BYTES_AB_COLUMN:
+        case PKT_BA_COLUMN:
+        case BYTES_BA_COLUMN:
             gtk_tree_model_get(model, iter, csv->columns_order[i], &value, -1);
             g_string_append_printf(csv->CSV_str, "\"%" G_GINT64_MODIFIER "u\"", value);
             break;
@@ -775,27 +922,243 @@ copy_as_csv_cb(GtkWindow *copy_bt, gpointer data _U_)
 }
 
 #ifdef HAVE_GEOIP
+typedef struct {
+    int                nb_cols;
+    gint32             col_lat, col_lon, col_country, col_city, col_as_num, col_ip, col_packets, col_bytes;
+    FILE              *out_file;
+    gboolean           hosts_written;
+    hostlist_table    *talkers;
+} map_t;
 
+static const char *map_endpoint_opener;
+
+static void
+map_init(void)
+{
+    map_endpoint_opener = "{\n";
+}
+
+/* XXX output in C locale */
+static gboolean
+map_handle(GtkTreeModel *model, GtkTreePath *path _U_, GtkTreeIter *iter,
+              gpointer data)
+{
+    map_t   *map = (map_t *)data;
+    gchar   *table_entry, *esc_entry;
+    guint64  value;
+    /* Add the column values to the TSV data */
+
+    /* check, if we have a geolocation available for this host */
+    gtk_tree_model_get(model, iter, map->col_lat, &table_entry, -1);
+    if (strcmp(table_entry, "-") == 0) {
+        g_free(table_entry);
+        return FALSE;
+    }
+
+    gtk_tree_model_get(model, iter, map->col_lon, &table_entry, -1);
+    if (strcmp(table_entry, "-") == 0) {
+        g_free(table_entry);
+        return FALSE;
+    }
+
+/*
+{
+  'type': 'Feature', 'geometry': { 'type': 'Point', 'coordinates': [-122.583889, 37.898889] },
+  'properties': { 'title': 'host.example.com', 'description': 'AS: AS12345 Ewok Holdings, Inc.<br/>Country: US<br/>City: Muir Woods, CA<br/>Packets: 6<br/>Bytes: 980' }
+},
+ */
+
+    fputs(map_endpoint_opener, map->out_file);
+    fputs("  'type': 'Feature', 'geometry': { 'type': 'Point', 'coordinates': [", map->out_file);
+
+    /* Longitude */
+    gtk_tree_model_get(model, iter, map->col_lon, &table_entry, -1);
+    fputs(table_entry, map->out_file);
+    g_free(table_entry);
+    fputs(", ", map->out_file);
+
+    /* Latitude */
+    gtk_tree_model_get(model, iter, map->col_lat, &table_entry, -1);
+    fputs(table_entry, map->out_file);
+    g_free(table_entry);
+    fputs("] },\n", map->out_file);
+
+    fputs("  'properties': { 'title': '", map->out_file);
+
+    /* Title */
+    gtk_tree_model_get(model, iter, map->col_ip, &table_entry, -1);
+    esc_entry = string_replace(table_entry, "'", "&#39;");
+    fputs(esc_entry, map->out_file);
+    g_free(table_entry);
+    g_free(esc_entry);
+    fputs("', 'description': '", map->out_file);
+
+    /* Description */
+    if (map->col_as_num >= 0) {
+        gtk_tree_model_get(model, iter, map->col_as_num, &table_entry, -1);
+        fputs("AS: ", map->out_file);
+        esc_entry = string_replace(table_entry, "'", "&#39;");
+        fputs(esc_entry, map->out_file);
+        g_free(table_entry);
+        g_free(esc_entry);
+        fputs("<br/>", map->out_file);
+    }
+
+    if (map->col_country >= 0) {
+        gtk_tree_model_get(model, iter, map->col_country, &table_entry, -1);
+        fputs("Country: ", map->out_file);
+        esc_entry = string_replace(table_entry, "'", "&#39;");
+        fputs(esc_entry, map->out_file);
+        g_free(table_entry);
+        g_free(esc_entry);
+        fputs("<br/>", map->out_file);
+    }
+
+    if (map->col_country >= 0) {
+        gtk_tree_model_get(model, iter, map->col_city, &table_entry, -1);
+        fputs("City: ", map->out_file);
+        esc_entry = string_replace(table_entry, "'", "&#39;");
+        fputs(esc_entry, map->out_file);
+        g_free(table_entry);
+        g_free(esc_entry);
+        fputs("<br/>", map->out_file);
+    }
+
+    gtk_tree_model_get(model, iter, map->col_packets, &value, -1);
+    fprintf(map->out_file, "Packets: %" G_GINT64_MODIFIER "u<br/>", value);
+
+    gtk_tree_model_get(model, iter, map->col_bytes, &value, -1);
+    fprintf(map->out_file, "Bytes: %" G_GINT64_MODIFIER "u", value);
+
+    /* XXX - we could add specific icons, e.g. depending on the amount of packets or bytes */
+
+    fputs("' }\n", map->out_file);
+    fputs("}", map->out_file);
+    map_endpoint_opener = ",\n{\n";
+
+    map->hosts_written = TRUE;
+
+    return FALSE;
+}
+
+#define MAX_TPL_LINE_LEN 4096
 static void
 open_as_map_cb(GtkWindow *copy_bt, gpointer data _U_)
 {
-    gchar          *err_str;
-    gchar          *file_uri;
-    gboolean        uri_open;
-    hostlist_table *talkers;
-    gchar          *map_filename;
+    guint32            i;
+    gchar             *file_uri;
+    gboolean           uri_open;
+    char              *map_path, *map_filename;
+    char              *tpl_filename;
+    char              *tpl_line;
+    GList             *columns, *list;
+    GtkTreeViewColumn *column;
+    GtkListStore      *store;
+    map_t              map;
+    FILE              *tpl_file;
 
+    map.talkers = (hostlist_table *)g_object_get_data(G_OBJECT(copy_bt), HOST_PTR_KEY);
+    if (!map.talkers)
+        return;
 
-    talkers = (hostlist_table *)g_object_get_data(G_OBJECT(copy_bt), HOST_PTR_KEY);
-    if (!talkers) {
+    map.col_lat = map.col_lon = map.col_country = map.col_city = map.col_as_num = map.col_ip = map.col_packets = map.col_bytes = -1;
+    map.hosts_written = FALSE;
+    /* Find the interesting columns */
+    columns = gtk_tree_view_get_columns(GTK_TREE_VIEW(map.talkers->table));
+    list = columns;
+    map.nb_cols = 0;
+    while(columns) {
+        column = (GtkTreeViewColumn *)columns->data;
+        i = gtk_tree_view_column_get_sort_column_id(column);
+        if(strcmp(map.talkers->default_titles[i], "Latitude") == 0) {
+            map.col_lat = i;
+            map.nb_cols++;
+        }
+        if(strcmp(map.talkers->default_titles[i], "Longitude") == 0) {
+            map.col_lon = i;
+            map.nb_cols++;
+        }
+        if(strcmp(map.talkers->default_titles[i], "Country") == 0) {
+            map.col_country = i;
+            map.nb_cols++;
+        }
+        if(strcmp(map.talkers->default_titles[i], "City") == 0) {
+            map.col_city = i;
+            map.nb_cols++;
+        }
+        if(strcmp(map.talkers->default_titles[i], "AS Number") == 0) {
+            map.col_as_num = i;
+        }
+        if(strcmp(map.talkers->default_titles[i], "Address") == 0) {
+            map.col_ip = i;
+            map.nb_cols++;
+        }
+        if(strcmp(map.talkers->default_titles[i], "Packets") == 0) {
+            map.col_packets = i;
+            map.nb_cols++;
+        }
+        if(strcmp(map.talkers->default_titles[i], "Bytes") == 0) {
+            map.col_bytes = i;
+            map.nb_cols++;
+        }
+        columns = g_list_next(columns);
+    }
+    g_list_free(list);
+
+    /* check for the minimum required data */
+    if(map.col_lat == -1 || map.col_lon == -1) {
+        simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "Latitude/Longitude data not available (GeoIP installed?)");
         return;
     }
 
-    map_filename = create_endpoint_geoip_map(talkers->hash.conv_array, &err_str);
+    /* Create a location map HTML file from a template */
+    /* XXX - add error handling */
+    tpl_filename = get_datafile_path("ipmap.html");
+    tpl_file = ws_fopen(tpl_filename, "r");
+    if(tpl_file == NULL) {
+        open_failure_alert_box(tpl_filename, errno, FALSE);
+        g_free(tpl_filename);
+        return;
+    }
+    g_free(tpl_filename);
 
-    if (!map_filename) {
-        simple_error_message_box("%s", err_str);
-        g_free(err_str);
+    /* We should probably create a file with a temporary name and a .html extension instead */
+    if (! create_tempdir(&map_path, "Wireshark IP Map ")) {
+        simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK,
+                "Could not create temporary directory\n%s",
+                map_path);
+        fclose(tpl_file);
+        return;
+    }
+
+    map_filename = g_strdup_printf("%s%cipmap.html", map_path, G_DIR_SEPARATOR);
+    map.out_file = ws_fopen(map_filename, "w");
+    if(map.out_file == NULL) {
+        open_failure_alert_box(map_filename, errno, TRUE);
+        g_free(map_filename);
+        fclose(tpl_file);
+        return;
+    }
+
+    store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW(map.talkers->table)));
+    tpl_line = (char *)g_malloc(MAX_TPL_LINE_LEN);
+
+    while (fgets(tpl_line, MAX_TPL_LINE_LEN, tpl_file) != NULL) {
+        fputs(tpl_line, map.out_file);
+        /* MUST match ipmap.html */
+        if (strstr(tpl_line, "// Start endpoint list")) {
+            map_init();
+            gtk_tree_model_foreach(GTK_TREE_MODEL(store), map_handle, &map);
+        }
+    }
+    g_free(tpl_line);
+
+    fclose(tpl_file);
+    fclose(map.out_file);
+
+    if(!map.hosts_written) {
+        simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "No latitude/longitude data found");
+        g_free(map_filename);
         return;
     }
 
@@ -813,34 +1176,34 @@ open_as_map_cb(GtkWindow *copy_bt, gpointer data _U_)
 }
 #endif /* HAVE_GEOIP */
 
-static gint default_col_size[ENDP_NUM_COLUMNS+ENDP_NUM_GEOIP_COLUMNS];
+static gint default_col_size[N_COLUMNS];
 
 static void
 init_default_col_size(GtkWidget *view)
 {
 
-    default_col_size[ENDP_COLUMN_ADDR] = get_default_col_size(view, "00000000.000000000000");
-    default_col_size[ENDP_COLUMN_PORT] = get_default_col_size(view, "000000");
-    default_col_size[ENDP_COLUMN_PACKETS] = get_default_col_size(view, "00 000 000");
-    default_col_size[ENDP_COLUMN_BYTES] = get_default_col_size(view, "0 000 000 000");
-    default_col_size[ENDP_COLUMN_PKT_AB] = default_col_size[ENDP_COLUMN_PACKETS];
-    default_col_size[ENDP_COLUMN_PKT_BA] = default_col_size[ENDP_COLUMN_PACKETS];
-    default_col_size[ENDP_COLUMN_BYTES_AB] = default_col_size[ENDP_COLUMN_BYTES];
-    default_col_size[ENDP_COLUMN_BYTES_BA] = default_col_size[ENDP_COLUMN_BYTES];
+    default_col_size[ADR_COLUMN] = get_default_col_size(view, "00000000.000000000000");
+    default_col_size[PORT_COLUMN] = get_default_col_size(view, "000000");
+    default_col_size[PACKETS_COLUMN] = get_default_col_size(view, "00 000 000");
+    default_col_size[BYTES_COLUMN] = get_default_col_size(view, "0 000 000 000");
+    default_col_size[PKT_AB_COLUMN] = default_col_size[PACKETS_COLUMN];
+    default_col_size[PKT_BA_COLUMN] = default_col_size[PACKETS_COLUMN];
+    default_col_size[BYTES_AB_COLUMN] = default_col_size[BYTES_COLUMN];
+    default_col_size[BYTES_BA_COLUMN] = default_col_size[BYTES_COLUMN];
 #ifdef HAVE_GEOIP
-    default_col_size[ENDP_COLUMN_GEOIP1] = default_col_size[ENDP_COLUMN_ADDR];
-    default_col_size[ENDP_COLUMN_GEOIP2] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP3] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP4] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP5] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP6] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP7] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP8] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP9] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP10] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP11] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP12] = default_col_size[ENDP_COLUMN_GEOIP1];
-    default_col_size[ENDP_COLUMN_GEOIP13] = default_col_size[ENDP_COLUMN_GEOIP1];
+    default_col_size[GEOIP1_COLUMN] = default_col_size[ADR_COLUMN];
+    default_col_size[GEOIP2_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP3_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP4_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP5_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP6_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP7_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP8_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP9_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP10_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP11_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP12_COLUMN] = default_col_size[GEOIP1_COLUMN];
+    default_col_size[GEOIP13_COLUMN] = default_col_size[GEOIP1_COLUMN];
 
 #endif
 }
@@ -870,20 +1233,21 @@ init_hostlist_table_page(hostlist_table *hosttable, GtkWidget *vbox, gboolean hi
     hosttable->default_titles[7]  = "Rx Bytes";
 
 #ifdef HAVE_GEOIP
-    for (i = 0; i < ENDP_NUM_GEOIP_COLUMNS; i++) {
+    for (i = 0; i < NUM_GEOIP_COLS; i++) {
         if (i < geoip_db_num_dbs()) {
-            hosttable->default_titles[ENDP_NUM_COLUMNS + i]  = geoip_db_name(i);
+            hosttable->default_titles[NUM_BUILTIN_COLS + i]  = geoip_db_name(i);
         } else {
-            hosttable->default_titles[ENDP_NUM_COLUMNS + i]  = "";
+            hosttable->default_titles[NUM_BUILTIN_COLS + i]  = "";
         }
     }
 #endif /* HAVE_GEOIP */
 
     if (strcmp(table_name, "NCP")==0) {
-        hosttable->default_titles[1] = endp_conn_title;
+        hosttable->default_titles[1] = "Connection";
     }
 
     hosttable->has_ports=!hide_ports;
+    hosttable->num_hosts = 0;
     hosttable->resolve_names=TRUE;
     hosttable->page_lb = NULL;
     hosttable->fixed_col = FALSE;
@@ -894,8 +1258,7 @@ init_hostlist_table_page(hostlist_table *hosttable, GtkWidget *vbox, gboolean hi
     gtk_box_pack_start(GTK_BOX(vbox), hosttable->name_lb, FALSE, FALSE, 0);
 
     /* Create the store */
-
-    store = gtk_list_store_new (ENDP_INDEX_COLUMN + 1,      /* Total number of columns */
+    store = gtk_list_store_new (N_COLUMNS,      /* Total number of columns */
                                G_TYPE_STRING,   /* Address  */
                                G_TYPE_STRING,   /* Port     */
                                G_TYPE_UINT64,   /* Packets   */
@@ -923,7 +1286,6 @@ init_hostlist_table_page(hostlist_table *hosttable, GtkWidget *vbox, gboolean hi
 
     hosttable->scrolled_window=scrolled_window_new(NULL, NULL);
     gtk_box_pack_start(GTK_BOX(vbox), hosttable->scrolled_window, TRUE, TRUE, 0);
-
     tree = gtk_tree_view_new_with_model (GTK_TREE_MODEL (store));
     hosttable->table = GTK_TREE_VIEW(tree);
     sortable = GTK_TREE_SORTABLE(store);
@@ -937,26 +1299,26 @@ init_hostlist_table_page(hostlist_table *hosttable, GtkWidget *vbox, gboolean hi
     g_object_set_data(G_OBJECT(store), HOST_PTR_KEY, hosttable);
     g_object_set_data(G_OBJECT(hosttable->table), HOST_PTR_KEY, hosttable);
 
-    for (i = 0; i < ENDP_NUM_COLUMNS+ENDP_NUM_GEOIP_COLUMNS; i++) {
+    for (i = 0; i < N_COLUMNS -1; i++) {
         renderer = gtk_cell_renderer_text_new ();
         g_object_set(renderer, "ypad", 0, NULL);
         switch(i) {
-        case ENDP_COLUMN_ADDR: /* address and port */
-        case ENDP_COLUMN_PORT:
+        case 0: /* address and port */
+        case 1:
             column = gtk_tree_view_column_new_with_attributes (hosttable->default_titles[i], renderer, "text",
                                                                i, NULL);
-            if(hide_ports && i == ENDP_COLUMN_PORT){
+            if(hide_ports && i == 1){
                 /* hide srcport and dstport if we don't use ports */
                 gtk_tree_view_column_set_visible(column, FALSE);
             }
             gtk_tree_sortable_set_sort_func(sortable, i, hostlist_sort_column, GINT_TO_POINTER(i), NULL);
             break;
-        case ENDP_COLUMN_PACKETS: /* counts */
-        case ENDP_COLUMN_BYTES:
-        case ENDP_COLUMN_PKT_AB:
-        case ENDP_COLUMN_BYTES_AB:
-        case ENDP_COLUMN_PKT_BA:
-        case ENDP_COLUMN_BYTES_BA: /* right align numbers */
+        case 2: /* counts */
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7: /* right align numbers */
             g_object_set(G_OBJECT(renderer), "xalign", 1.0, NULL);
             column = gtk_tree_view_column_new_with_attributes (hosttable->default_titles[i], renderer, NULL);
             gtk_tree_view_column_set_cell_data_func(column, renderer, u64_data_func,  GINT_TO_POINTER(i), NULL);
@@ -966,8 +1328,8 @@ init_hostlist_table_page(hostlist_table *hosttable, GtkWidget *vbox, gboolean hi
                                                                i, NULL);
             gtk_tree_view_column_set_visible(column, FALSE);
 #ifdef HAVE_GEOIP
-            if (i >= ENDP_NUM_COLUMNS && i - ENDP_NUM_COLUMNS < geoip_db_num_dbs()) {
-                int goip_type = geoip_db_type(i - ENDP_NUM_COLUMNS);
+            if (i >= NUM_BUILTIN_COLS && i - NUM_BUILTIN_COLS < geoip_db_num_dbs()) {
+                int goip_type = geoip_db_type(i - NUM_BUILTIN_COLS);
                 if (goip_type == WS_LON_FAKE_EDITION || goip_type == WS_LAT_FAKE_EDITION) {
                     g_object_set(G_OBJECT(renderer), "xalign", 1.0, NULL);
                     gtk_tree_sortable_set_sort_func(sortable, i, hostlist_sort_column, GINT_TO_POINTER(i), NULL);
@@ -992,13 +1354,14 @@ init_hostlist_table_page(hostlist_table *hosttable, GtkWidget *vbox, gboolean hi
     }
 
     gtk_container_add(GTK_CONTAINER(hosttable->scrolled_window), (GtkWidget *)hosttable->table);
+
+    hosttable->num_hosts=0;
+    hosttable->hosts=NULL;
+    hosttable->hashtable=NULL;
+
     gtk_tree_view_set_rules_hint(hosttable->table, TRUE);
     gtk_tree_view_set_headers_clickable(hosttable->table, TRUE);
     gtk_tree_view_set_reorderable (hosttable->table, TRUE);
-
-    hosttable->hash.conv_array = NULL;
-    hosttable->hash.hashtable = NULL;
-    hosttable->hash.user_data = hosttable;
 
     sel = gtk_tree_view_get_selection(GTK_TREE_VIEW(hosttable->table));
     gtk_tree_selection_set_mode(sel, GTK_SELECTION_SINGLE);
@@ -1007,7 +1370,7 @@ init_hostlist_table_page(hostlist_table *hosttable, GtkWidget *vbox, gboolean hi
     hostlist_create_popup_menu(hosttable);
 
     /* register the tap and rerun the taps on the packet list */
-    error_string=register_tap_listener(tap_name, &hosttable->hash, filter, 0, reset_hostlist_table_data_cb, packet_func, draw_hostlist_table_data_cb);
+    error_string=register_tap_listener(tap_name, hosttable, filter, 0, reset_hostlist_table_data_cb, packet_func, draw_hostlist_table_data_cb);
     if(error_string){
         simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK, "%s", error_string->str);
         g_string_free(error_string, TRUE);
@@ -1019,7 +1382,7 @@ init_hostlist_table_page(hostlist_table *hosttable, GtkWidget *vbox, gboolean hi
 
 
 void
-init_hostlist_table(struct register_ct* ct, const char *filter)
+init_hostlist_table(gboolean hide_ports, const char *table_name, const char *tap_name, const char *filter, tap_packet_cb packet_func)
 {
     hostlist_table *hosttable;
     char *display_name;
@@ -1034,13 +1397,13 @@ init_hostlist_table(struct register_ct* ct, const char *filter)
 #endif
     window_geometry_t tl_geom;
 
-    hosttable=g_new0(hostlist_table,1);
+    hosttable=g_new(hostlist_table,1);
 
-    hosttable->name=proto_get_protocol_short_name(find_protocol_by_id(get_conversation_proto_id(ct)));
+    hosttable->name=table_name;
     hosttable->filter=filter;
     hosttable->use_dfilter=FALSE;
     display_name = cf_get_display_name(&cfile);
-    g_snprintf(title, sizeof(title), "%s Endpoints: %s", hosttable->name, display_name);
+    g_snprintf(title, sizeof(title), "%s Endpoints: %s", table_name, display_name);
     g_free(display_name);
     hosttable->win = dlg_window_new(title);  /* transient_for top_level */
     gtk_window_set_destroy_with_parent (GTK_WINDOW(hosttable->win), TRUE);
@@ -1052,8 +1415,7 @@ init_hostlist_table(struct register_ct* ct, const char *filter)
     gtk_container_add(GTK_CONTAINER(hosttable->win), vbox);
     gtk_container_set_border_width(GTK_CONTAINER(vbox), DLG_OUTER_MARGIN);
 
-    ret = init_hostlist_table_page(hosttable, vbox, get_conversation_hide_ports(ct), hosttable->name,
-                    proto_get_protocol_filter_name(get_conversation_proto_id(ct)), filter, get_hostlist_packet_func(ct));
+    ret = init_hostlist_table_page(hosttable, vbox, hide_ports, table_name, tap_name, filter, packet_func);
     if(ret == FALSE) {
         g_free(hosttable);
         return;
@@ -1063,7 +1425,7 @@ init_hostlist_table(struct register_ct* ct, const char *filter)
     /* XXX - maybe we want to have a "Copy as CSV" stock button here? */
     /*copy_bt = gtk_button_new_with_label ("Copy content to clipboard as CSV");*/
 #ifdef HAVE_GEOIP
-    if( strstr(hosttable->name, "IPv4") || strstr(hosttable->name, "IPv6") ) {
+    if( strstr(table_name, "IPv4") || strstr(table_name, "IPv6") ) {
         bbox = dlg_button_row_new(GTK_STOCK_CLOSE, GTK_STOCK_COPY, WIRESHARK_STOCK_MAP, GTK_STOCK_HELP, NULL);
     } else {
         bbox = dlg_button_row_new(GTK_STOCK_CLOSE, GTK_STOCK_COPY, GTK_STOCK_HELP, NULL);
@@ -1157,14 +1519,15 @@ hostlist_win_destroy_notebook_cb(GtkWindow *win _U_, gpointer data)
 
 
 static hostlist_table *
-init_hostlist_notebook_page_cb(register_ct_t *table, const char *filter)
+init_hostlist_notebook_page_cb(gboolean hide_ports, const char *table_name, const char *tap_name, const char *filter,
+  tap_packet_cb packet_func)
 {
     gboolean ret;
     GtkWidget *page_vbox;
     hostlist_table *hosttable;
 
-    hosttable=g_new0(hostlist_table,1);
-    hosttable->name=proto_get_protocol_short_name(find_protocol_by_id(get_conversation_proto_id(table)));
+    hosttable=g_new(hostlist_table,1);
+    hosttable->name=table_name;
     hosttable->filter=filter;
     hosttable->use_dfilter=FALSE;
 
@@ -1172,8 +1535,7 @@ init_hostlist_notebook_page_cb(register_ct_t *table, const char *filter)
     hosttable->win = page_vbox;
     gtk_container_set_border_width(GTK_CONTAINER(page_vbox), 6);
 
-    ret = init_hostlist_table_page(hosttable, page_vbox, get_conversation_hide_ports(table), hosttable->name,
-                proto_get_protocol_filter_name(get_conversation_proto_id(table)), filter, get_hostlist_packet_func(table));
+    ret = init_hostlist_table_page(hosttable, page_vbox, hide_ports, table_name, tap_name, filter, packet_func);
     if(ret == FALSE) {
         g_free(hosttable);
         return NULL;
@@ -1181,6 +1543,35 @@ init_hostlist_notebook_page_cb(register_ct_t *table, const char *filter)
 
     return hosttable;
 }
+
+
+typedef struct {
+    gboolean hide_ports;       /* hide TCP / UDP port columns */
+    const char *table_name;    /* GUI output name */
+    const char *tap_name;      /* internal name */
+    const char *filter;        /* display filter string (unused) */
+    tap_packet_cb packet_func; /* function to be called for new incoming packets */
+} register_hostlist_t;
+
+
+static GSList *registered_hostlist_tables = NULL;
+
+void
+register_hostlist_table(gboolean hide_ports, const char *table_name, const char *tap_name, const char *filter, tap_packet_cb packet_func)
+{
+    register_hostlist_t *table;
+
+    table = g_new(register_hostlist_t,1);
+
+    table->hide_ports   = hide_ports;
+    table->table_name   = table_name;
+    table->tap_name     = tap_name;
+    table->filter       = filter;
+    table->packet_func  = packet_func;
+
+    registered_hostlist_tables = g_slist_append(registered_hostlist_tables, table);
+}
+
 
 static void
 hostlist_resolve_toggle_dest(GtkWidget *widget, gpointer data)
@@ -1214,7 +1605,7 @@ hostlist_filter_toggle_dest(GtkWidget *widget, gpointer data)
     for (page=1; page<=GPOINTER_TO_INT(pages[0]); page++) {
         hosttable = (hostlist_table *)pages[page];
         hosttable->use_dfilter = use_filter;
-        reset_host_table_data(hosttable);
+        reset_hostlist_table_data(hosttable);
     }
 
     cf_retap_packets(&cfile);
@@ -1223,36 +1614,11 @@ hostlist_filter_toggle_dest(GtkWidget *widget, gpointer data)
     }
 }
 
-typedef struct _init_host_page_data {
-    int page;
-    void ** pages;
-    GtkWidget *nb;
-    GtkWidget *win;
-} init_host_page_data;
-
-static void
-init_host_page(gpointer data, gpointer user_data)
-{
-    register_ct_t *table = (register_ct_t*)data;
-    init_host_page_data* host_page_data = (init_host_page_data*)user_data;
-
-    hostlist_table *hosttable;
-    GtkWidget *page_lb;
-
-    hosttable = init_hostlist_notebook_page_cb(table, NULL /*filter*/);
-    if (hosttable) {
-        g_object_set_data(G_OBJECT(hosttable->win), HOST_PTR_KEY, hosttable);
-        page_lb = gtk_label_new("");
-        gtk_notebook_append_page(GTK_NOTEBOOK(host_page_data->nb), hosttable->win, page_lb);
-        hosttable->win = host_page_data->win;
-        hosttable->page_lb = page_lb;
-        host_page_data->pages[++host_page_data->page] = hosttable;
-    }
-}
 
 void
 init_hostlist_notebook_cb(GtkWidget *w _U_, gpointer d _U_)
 {
+    hostlist_table *hosttable;
     char *display_name;
     char title[256];
     GtkWidget *vbox;
@@ -1262,16 +1628,19 @@ init_hostlist_notebook_cb(GtkWidget *w _U_, gpointer d _U_)
     GtkWidget *win;
     GtkWidget *resolv_cb;
     GtkWidget *filter_cb;
+    int page;
     void ** pages;
     GtkWidget *nb;
+    GtkWidget *page_lb;
+    GSList  *current_table;
+    register_hostlist_t *registered;
     GtkWidget *copy_bt;
 #ifdef HAVE_GEOIP
     GtkWidget *map_bt;
 #endif
     window_geometry_t tl_geom;
-    init_host_page_data host_page_iter_data;
 
-    pages = (void **)g_malloc(sizeof(void *) * (conversation_table_get_num() + 1));
+    pages = (void **)g_malloc(sizeof(void *) * (g_slist_length(registered_hostlist_tables) + 1));
 
     win = dlg_window_new("hostlist");  /* transient_for top_level */
     gtk_window_set_destroy_with_parent (GTK_WINDOW(win), TRUE);
@@ -1292,14 +1661,25 @@ init_hostlist_notebook_cb(GtkWidget *w _U_, gpointer d _U_)
     gtk_box_pack_start(GTK_BOX(vbox), nb, TRUE, TRUE, 0);
     g_object_set_data(G_OBJECT(nb), NB_PAGES_KEY, pages);
 
-    host_page_iter_data.page = 0;
-    host_page_iter_data.pages = pages;
-    host_page_iter_data.nb = nb;
-    host_page_iter_data.win = win;
+    page = 0;
 
-    conversation_table_iterate_tables(init_host_page, &host_page_iter_data);
+    current_table = registered_hostlist_tables;
+    while(current_table) {
+        registered = (register_hostlist_t *)current_table->data;
+        page_lb = gtk_label_new("");
+        hosttable = init_hostlist_notebook_page_cb(registered->hide_ports, registered->table_name, registered->tap_name,
+            registered->filter, registered->packet_func);
+        g_object_set_data(G_OBJECT(hosttable->win), HOST_PTR_KEY, hosttable);
+        gtk_notebook_append_page(GTK_NOTEBOOK(nb), hosttable->win, page_lb);
+        hosttable->win = win;
+        hosttable->page_lb = page_lb;
+        pages[++page] = hosttable;
 
-    pages[0] = GINT_TO_POINTER(host_page_iter_data.page);
+        current_table = g_slist_next(current_table);
+    }
+
+    pages[0] = GINT_TO_POINTER(page);
+
     hbox = ws_gtk_box_new(GTK_ORIENTATION_HORIZONTAL, DLG_UNRELATED_SPACING, FALSE);
     gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
 
@@ -1326,20 +1706,18 @@ init_hostlist_notebook_cb(GtkWidget *w _U_, gpointer d _U_)
 #endif
     gtk_box_pack_end(GTK_BOX(vbox), bbox, FALSE, FALSE, 0);
 
-    /* Close */
     close_bt = (GtkWidget *)g_object_get_data(G_OBJECT(bbox), GTK_STOCK_CLOSE);
     window_set_cancel_button(win, close_bt, window_cancel_button_cb);
 
-    /* Copy */
     copy_bt = (GtkWidget *)g_object_get_data(G_OBJECT(bbox), GTK_STOCK_COPY);
     gtk_widget_set_tooltip_text(copy_bt, "Copy all statistical values of this page to the clipboard in CSV (Comma Separated Values) format.");
     g_signal_connect(copy_bt, "clicked", G_CALLBACK(copy_as_csv_cb), NULL);
-    g_object_set_data(G_OBJECT(copy_bt), HOST_PTR_KEY, pages[host_page_iter_data.page]);
+    g_object_set_data(G_OBJECT(copy_bt), HOST_PTR_KEY, pages[page]);
 
 #ifdef HAVE_GEOIP
     map_bt = (GtkWidget *)g_object_get_data(G_OBJECT(bbox), WIRESHARK_STOCK_MAP);
     gtk_widget_set_tooltip_text(map_bt, "Show a map of the IP addresses (internet connection required).");
-    g_object_set_data(G_OBJECT(map_bt), HOST_PTR_KEY, pages[host_page_iter_data.page]);
+    g_object_set_data(G_OBJECT(map_bt), HOST_PTR_KEY, pages[page]);
     g_signal_connect(map_bt, "clicked", G_CALLBACK(open_as_map_cb), NULL);
     g_signal_connect(nb, "switch-page", G_CALLBACK(ct_nb_map_switch_page_cb), map_bt);
     gtk_widget_set_sensitive(map_bt, FALSE);
@@ -1360,13 +1738,115 @@ init_hostlist_notebook_cb(GtkWidget *w _U_, gpointer d _U_)
     gdk_window_raise(gtk_widget_get_window(win));
 }
 
-void hostlist_endpoint_cb(register_ct_t* table)
+/*
+ * Compute the hash value for a given address/port pairs if the match
+ * is to be exact.
+ */
+typedef struct {
+    address  myaddress;
+    guint32  port;
+} host_key_t;
+
+static guint
+host_hash(gconstpointer v)
 {
-    char cmd_str[50];
+    const host_key_t *key = (const host_key_t *)v;
+    guint hash_val;
 
-    g_snprintf(cmd_str, 50, "%s,%s", HOSTLIST_TAP_PREFIX, proto_get_protocol_filter_name(get_conversation_proto_id(table)));
+    hash_val = 0;
+    ADD_ADDRESS_TO_HASH(hash_val, &key->myaddress);
+    hash_val += key->port;
+    return hash_val;
+}
 
-    dissector_hostlist_init(cmd_str, table);
+/*
+ * Compare two host keys for an exact match.
+ */
+static gint
+host_match(gconstpointer v, gconstpointer w)
+{
+    const host_key_t *v1 = (const host_key_t *)v;
+    const host_key_t *v2 = (const host_key_t *)w;
+
+    if (v1->port == v2->port &&
+        ADDRESSES_EQUAL(&v1->myaddress, &v2->myaddress)) {
+        return 1;
+    }
+    /*
+     * The addresses or the ports don't match.
+     */
+    return 0;
+}
+
+void
+add_hostlist_table_data(hostlist_table *hl, const address *addr, guint32 port, gboolean sender, int num_frames, int num_bytes, SAT_E sat, int port_type_val)
+{
+    hostlist_talker_t *talker=NULL;
+    int talker_idx=0;
+
+    /* XXX should be optimized to allocate n extra entries at a time
+       instead of just one */
+    /* if we dont have any entries at all yet */
+    if(hl->hosts==NULL){
+        hl->hosts=g_array_sized_new(FALSE, FALSE, sizeof(hostlist_talker_t), 10000);
+        hl->hashtable = g_hash_table_new_full(host_hash,
+                                              host_match, /* key_equal_func */
+                                              g_free,     /* key_destroy_func */
+                                              NULL);      /* value_destroy_func */
+    }
+    else {
+        /* try to find it among the existing known conversations */
+        host_key_t existing_key;
+
+        existing_key.myaddress = *addr;
+        existing_key.port = port;
+        talker_idx = GPOINTER_TO_UINT(g_hash_table_lookup(hl->hashtable, &existing_key));
+        if (talker_idx) {
+            talker_idx--;
+            talker=&g_array_index(hl->hosts, hostlist_talker_t, talker_idx);
+        }
+    }
+
+    /* if we still dont know what talker this is it has to be a new one
+       and we have to allocate it and append it to the end of the list */
+    if(talker==NULL){
+        host_key_t *new_key;
+        hostlist_talker_t host;
+
+        COPY_ADDRESS(&host.myaddress, addr);
+        host.sat=sat;
+        host.port_type=port_type_val;
+        host.port=port;
+        host.rx_frames=0;
+        host.tx_frames=0;
+        host.rx_bytes=0;
+        host.tx_bytes=0;
+        host.iter_valid = FALSE;
+        host.modified = TRUE;
+
+        g_array_append_val(hl->hosts, host);
+        talker_idx= hl->num_hosts;
+        talker=&g_array_index(hl->hosts, hostlist_talker_t, talker_idx);
+
+        /* hl->hosts address is not a constant but address.data is */
+        new_key = g_new(host_key_t,1);
+        SET_ADDRESS(&new_key->myaddress, talker->myaddress.type, talker->myaddress.len, talker->myaddress.data);
+        new_key->port = port;
+        g_hash_table_insert(hl->hashtable, new_key, GUINT_TO_POINTER(talker_idx +1));
+        hl->num_hosts++;
+    }
+
+    /* if this is a new talker we need to initialize the struct */
+    talker->modified = TRUE;
+
+    /* update the talker struct */
+    if( sender ){
+        talker->tx_frames+=num_frames;
+        talker->tx_bytes+=num_bytes;
+    } else {
+        talker->rx_frames+=num_frames;
+        talker->rx_bytes+=num_bytes;
+    }
 }
 
 /*

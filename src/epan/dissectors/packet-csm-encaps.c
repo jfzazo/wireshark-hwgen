@@ -25,7 +25,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/tap.h>
+#include <epan/wmem/wmem.h>
 #include <epan/etypes.h>
 
 
@@ -155,9 +159,11 @@ static const gchar *
 csm_fc(guint16 fc, guint16 ct)
 {
     if (fc == 0x0000) {
-        return val_to_str(ct, class_type_vals, "0x%04x");
+        return wmem_strdup(wmem_packet_scope(),
+                           val_to_str(ct, class_type_vals, "0x%04x"));
     } else {
-        return val_to_str(fc, function_code_vals, "0x%04x");
+        return wmem_strdup(wmem_packet_scope(),
+                           val_to_str(fc, function_code_vals, "0x%04x"));
     }
 }
 
@@ -183,8 +189,9 @@ csm_to_host(guint16 fc, guint16 ct)
 static void
 dissect_csm_encaps(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-    proto_item  *ti;
+    proto_item  *ti, *subitem;
     proto_tree  *csm_encaps_tree = NULL;
+    proto_tree  *csm_encaps_control_tree = NULL;
     guint16      function_code, channel, class_type;
     guint        control, type, sequence, length;
     guint        i;
@@ -252,20 +259,21 @@ dissect_csm_encaps(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 
     if (tree) {
-        static const int * control_flags[] = {
-            &hf_csm_encaps_ctrl_ack,
-            &hf_csm_encaps_ctrl_ack_suppress,
-            &hf_csm_encaps_ctrl_endian,
-            NULL
-        };
-
         ti = proto_tree_add_item(tree, proto_csm_encaps, tvb, 0, -1, ENC_NA);
         csm_encaps_tree = proto_item_add_subtree(ti, ett_csm_encaps);
+
+
+
 
         proto_tree_add_item(csm_encaps_tree, hf_csm_encaps_opcode, tvb, 0, 2, ENC_BIG_ENDIAN);
         proto_tree_add_item(csm_encaps_tree, hf_csm_encaps_seq, tvb, 2, 1, ENC_BIG_ENDIAN);
 
-        proto_tree_add_bitmask(tree, tvb, 3, hf_csm_encaps_ctrl, ett_csm_encaps_control, control_flags, ENC_NA);
+        subitem = proto_tree_add_uint(csm_encaps_tree, hf_csm_encaps_ctrl, tvb, 3, 1, control);
+        csm_encaps_control_tree = proto_item_add_subtree(subitem, ett_csm_encaps_control);
+
+        proto_tree_add_boolean(csm_encaps_control_tree, hf_csm_encaps_ctrl_ack, tvb, 3, 1, control);
+            proto_tree_add_boolean(csm_encaps_control_tree, hf_csm_encaps_ctrl_ack_suppress, tvb, 3, 1, control);
+        proto_tree_add_boolean(csm_encaps_control_tree, hf_csm_encaps_ctrl_endian, tvb, 3, 1, control);
 
         proto_tree_add_item(csm_encaps_tree, hf_csm_encaps_channel, tvb, 4, 2, ENC_BIG_ENDIAN);
         proto_tree_add_item(csm_encaps_tree, hf_csm_encaps_length, tvb, 6, 1, ENC_BIG_ENDIAN);
@@ -641,16 +649,3 @@ proto_reg_handoff_csm_encaps(void)
     csm_encaps_handle = create_dissector_handle(dissect_csm_encaps, proto_csm_encaps);
     dissector_add_uint("ethertype", ETHERTYPE_CSM_ENCAPS, csm_encaps_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

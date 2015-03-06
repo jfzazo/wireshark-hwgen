@@ -25,8 +25,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/expert.h>
+#include <epan/emem.h>
 #include <epan/lapd_sapi.h>
 #include <epan/prefs.h>
 
@@ -728,8 +730,6 @@ static int ett_oml = -1;
 static int ett_oml_fom = -1;
 static int ett_oml_fom_att = -1;
 
-static expert_field ei_unknown_type = EI_INIT;
-
 enum {
 	OML_DIALECT_ETSI,
 	OML_DIALECT_SIEMENS,
@@ -1164,7 +1164,6 @@ static const enum_val_t oml_dialect_enumvals[] = {
 static void format_custom_msgtype(gchar *out, guint32 in)
 {
 	const gchar *tmp = NULL;
-	gchar *tmp_str;
 
 	switch (global_oml_dialect) {
 	case OML_DIALECT_SIEMENS:
@@ -1175,23 +1174,21 @@ static void format_custom_msgtype(gchar *out, guint32 in)
 		break;
 	case OML_DIALECT_ETSI:
 	default:
-		/* Handled by tmp == NULL below */
-		break;
+		g_snprintf(out, ITEM_LABEL_LENGTH, "%s",
+			   val_to_str(in, oml_fom_msgtype_vals, "Unknown 0x%02x"));
+		return;
 	}
 
 	if (tmp)
 		g_snprintf(out, ITEM_LABEL_LENGTH, "%s", tmp);
-	else {
-		tmp_str = val_to_str_wmem(NULL, in, oml_fom_msgtype_vals, "Unknown 0x%02x");
-		g_snprintf(out, ITEM_LABEL_LENGTH, "%s", tmp_str);
-		wmem_free(NULL, tmp_str);
-	}
+	else
+		g_snprintf(out, ITEM_LABEL_LENGTH, "%s",
+			   val_to_str(in, oml_fom_msgtype_vals, "Unknown 0x%02x"));
 }
 
 static void format_custom_attr(gchar *out, guint32 in)
 {
 	const gchar *tmp = NULL;
-	gchar *tmp_str;
 
 	switch (global_oml_dialect) {
 	case OML_DIALECT_SIEMENS:
@@ -1202,17 +1199,16 @@ static void format_custom_attr(gchar *out, guint32 in)
 		break;
 	case OML_DIALECT_ETSI:
 	default:
-		/* Handled by tmp == NULL below */
-		break;
+		g_snprintf(out, ITEM_LABEL_LENGTH, "%s",
+			   val_to_str(in, oml_fom_attr_vals, "Unknown 0x%02x"));
+		return;
 	}
 
 	if (tmp)
 		g_snprintf(out, ITEM_LABEL_LENGTH, "%s", tmp);
-	else {
-		tmp_str = val_to_str_wmem(NULL, in, oml_fom_attr_vals, "Unknown 0x%02x");
-		g_snprintf(out, ITEM_LABEL_LENGTH, "%s", tmp_str);
-		wmem_free(NULL, tmp_str);
-	}
+	else
+		g_snprintf(out, ITEM_LABEL_LENGTH, "%s",
+			   val_to_str(in, oml_fom_attr_vals, "Unknown 0x%02x"));
 }
 
 /* Section 9.4.4: Administrative State */
@@ -1535,10 +1531,6 @@ dissect_oml_attrs(tvbuff_t *tvb, int base_offs, packet_info *pinfo,
 		tvbuff_t *sub_tvb;
 
 		tag = tvb_get_guint8(tvb, offset);
-		ti = proto_tree_add_item(tree, hf_oml_fom_attr_tag, tvb,
-					 offset, 1, ENC_BIG_ENDIAN);
-		att_tree = proto_item_add_subtree(ti, ett_oml_fom_att);
-
 		tdef = find_tlv_tag(tag);
 
 		switch (tdef->type) {
@@ -1575,15 +1567,18 @@ dissect_oml_attrs(tvbuff_t *tvb, int base_offs, packet_info *pinfo,
 			break;
 		case TLV_TYPE_UNKNOWN: /* fall through */
 		default:
-			expert_add_info(pinfo, ti, &ei_unknown_type);
-			return tvb_captured_length(tvb);
+			DISSECTOR_ASSERT_NOT_REACHED();
+			break;
 		}
 
+		ti = proto_tree_add_item(tree, hf_oml_fom_attr_tag, tvb,
+					 offset, 1, ENC_BIG_ENDIAN);
+		att_tree = proto_item_add_subtree(ti, ett_oml_fom_att);
 		proto_tree_add_uint(att_tree, hf_oml_fom_attr_len, tvb,
 				    offset+1, len_len, len);
 		offset += hlen;
 
-		sub_tvb = tvb_new_subset_length(tvb, offset, len);
+		sub_tvb = tvb_new_subset(tvb, offset, len, len);
 
 		switch (tag) {
 		/* parse only the most common IE for now */
@@ -1821,54 +1816,55 @@ dissect_abis_oml(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
 {
 	proto_item *ti;
 	proto_tree *oml_tree;
+
 	int offset = 0;
-
-	guint8	    msg_disc = tvb_get_guint8(tvb, offset);
-	guint8	    len	     = tvb_get_guint8(tvb, offset+3);
-
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "OML");
 
 	top_tree = tree;
+	/* if (tree) */ {
+		guint8 msg_disc = tvb_get_guint8(tvb, offset);
+		guint8 len = tvb_get_guint8(tvb, offset+3);
 
-	ti = proto_tree_add_item(tree, proto_abis_oml, tvb, 0, -1, ENC_NA);
-	oml_tree = proto_item_add_subtree(ti, ett_oml);
+		ti = proto_tree_add_item(tree, proto_abis_oml, tvb, 0, -1, ENC_NA);
+		oml_tree = proto_item_add_subtree(ti, ett_oml);
 
-	proto_tree_add_item(oml_tree, hf_oml_msg_disc, tvb, offset++,
-			    1, ENC_LITTLE_ENDIAN);
-	proto_tree_add_item(oml_tree, hf_oml_placement, tvb, offset++,
-			    1, ENC_LITTLE_ENDIAN);
-	proto_tree_add_item(oml_tree, hf_oml_sequence, tvb, offset++,
-			    1, ENC_LITTLE_ENDIAN);
-	proto_tree_add_item(oml_tree, hf_oml_length, tvb, offset++,
-			    1, ENC_LITTLE_ENDIAN);
+		proto_tree_add_item(oml_tree, hf_oml_msg_disc, tvb, offset++,
+				    1, ENC_LITTLE_ENDIAN);
+		proto_tree_add_item(oml_tree, hf_oml_placement, tvb, offset++,
+				    1, ENC_LITTLE_ENDIAN);
+		proto_tree_add_item(oml_tree, hf_oml_sequence, tvb, offset++,
+				    1, ENC_LITTLE_ENDIAN);
+		proto_tree_add_item(oml_tree, hf_oml_length, tvb, offset++,
+				    1, ENC_LITTLE_ENDIAN);
 
-	if (global_oml_dialect == OML_DIALECT_ERICSSON) {
-		/* Ericsson OM2000 only sharese the common header above
-		 * and has completely custom/proprietary message format
-		 * after that header.  Thus, it makes more sense of
-		 * putting all of that into an external dissector and
-		 * call out to that dissector */
-		tvbuff_t *subtvb;
-		subtvb = tvb_new_subset_length(tvb, offset, len);
+		if (global_oml_dialect == OML_DIALECT_ERICSSON) {
+			/* Ericsson OM2000 only sharese the common header above
+			 * and has completely custom/proprietary message format
+			 * after that header.  Thus, it makes more sense of
+			 * putting all of that into an external dissector and
+			 * call out to that dissector */
+			tvbuff_t *subtvb;
+			subtvb = tvb_new_subset(tvb, offset, len, len);
 
-		if (sub_om2000)
-			call_dissector(sub_om2000, subtvb, pinfo, tree);
-	} else {
+			if (sub_om2000)
+				call_dissector(sub_om2000, subtvb, pinfo, tree);
+		} else {
 
-		switch (msg_disc) {
-		case ABIS_OM_MDISC_FOM:
-			offset = dissect_oml_fom(tvb, pinfo, oml_tree,
-						 offset, ti);
-			break;
-		case ABIS_OM_MDISC_MANUF:
-			offset = dissect_oml_manuf(tvb, pinfo, oml_tree,
-						   offset, ti);
-			break;
-		case ABIS_OM_MDISC_MMI:
-		case ABIS_OM_MDISC_TRAU:
-		default:
-			break;
+			switch (msg_disc) {
+			case ABIS_OM_MDISC_FOM:
+				offset = dissect_oml_fom(tvb, pinfo, oml_tree,
+							 offset, ti);
+				break;
+			case ABIS_OM_MDISC_MANUF:
+				offset = dissect_oml_manuf(tvb, pinfo, oml_tree,
+							   offset, ti);
+				break;
+			case ABIS_OM_MDISC_MMI:
+			case ABIS_OM_MDISC_TRAU:
+			default:
+				break;
+			}
 		}
 	}
 
@@ -2196,13 +2192,7 @@ proto_register_abis_oml(void)
 		&ett_oml_fom_att,
 	};
 
-	static ei_register_info ei[] = {
-		{ &ei_unknown_type, { "gsm_abis_oml.expert.unknown_type", PI_PROTOCOL, PI_NOTE, "Unknown TLV type", EXPFILL }},
-	};
-
 	module_t *oml_module;
-
-	expert_module_t  *expert_module;
 
 #define NM_ATT_TLVDEF_BASE(_attr, _type, _fixed_len)			\
 	nm_att_tlvdef_base.def[_attr].type = _type;			\
@@ -2375,9 +2365,6 @@ proto_register_abis_oml(void)
 
 	proto_register_subtree_array(ett, array_length(ett));
 
-	expert_module = expert_register_protocol(proto_abis_oml);
-	expert_register_field_array(expert_module, ei, array_length(ei));
-
 	new_register_dissector("gsm_abis_oml", dissect_abis_oml, proto_abis_oml);
 
 	oml_module = prefs_register_protocol(proto_abis_oml, NULL);
@@ -2401,16 +2388,3 @@ proto_reg_handoff_abis_oml(void)
 
 	sub_om2000 = find_dissector("gsm_abis_om2000");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

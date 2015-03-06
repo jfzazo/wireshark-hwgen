@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/oids.h>
@@ -74,15 +75,10 @@ static int inap_opcode_type;
 #define INAP_OPCODE_RETURN_ERROR  3
 #define INAP_OPCODE_REJECT        4
 
-static int hf_inap_cause_indicator = -1;
-
 /* Initialize the subtree pointers */
 static gint ett_inap = -1;
 static gint ett_inapisup_parameter = -1;
 static gint ett_inap_HighLayerCompatibility = -1;
-static gint ett_inap_extention_data = -1;
-static gint ett_inap_cause = -1;
-
 #include "packet-inap-ett.c"
 
 static expert_field ei_inap_unknown_invokeData = EI_INIT;
@@ -131,8 +127,8 @@ static guint8 inap_pdu_type = 0;
 static guint8 inap_pdu_size = 0;
 
 
-static int
-dissect_inap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *data _U_)
+static void
+dissect_inap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 {
     proto_item		*item=NULL;
     proto_tree		*tree=NULL;
@@ -153,7 +149,7 @@ dissect_inap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *d
 	opcode = 0;
     dissect_inap_ROS(TRUE, tvb, offset, &asn1_ctx, tree, -1);
 
-	return inap_pdu_size;
+
 }
 
 /*--- proto_reg_handoff_inap ---------------------------------------*/
@@ -204,10 +200,6 @@ void proto_register_inap(void) {
   static hf_register_info hf[] = {
 
 
-	  { &hf_inap_cause_indicator, /* Currently not enabled */
-	  { "Cause indicator", "inap.cause_indicator",
-	  FT_UINT8, BASE_DEC | BASE_EXT_STRING, &q850_cause_code_vals_ext, 0x7f,
-	  NULL, HFILL } },
 
 #include "packet-inap-hfarr.c"
   };
@@ -222,8 +214,6 @@ void proto_register_inap(void) {
     &ett_inap,
 	&ett_inapisup_parameter,
 	&ett_inap_HighLayerCompatibility,
-    &ett_inap_extention_data,
-	&ett_inap_cause,
 #include "packet-inap-ettarr.c"
   };
 
@@ -237,14 +227,12 @@ void proto_register_inap(void) {
 
   /* Register protocol */
   proto_inap = proto_register_protocol(PNAME, PSNAME, PFNAME);
-  new_register_dissector("inap", dissect_inap, proto_inap);
+  register_dissector("inap", dissect_inap, proto_inap);
   /* Register fields and subtrees */
   proto_register_field_array(proto_inap, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
   expert_inap = expert_register_protocol(proto_inap);
   expert_register_field_array(expert_inap, ei, array_length(ei));
-
-  new_register_ber_oid_dissector("0.4.0.1.1.1.0.0", dissect_inap, proto_inap, "cs1-ssp-to-scp");
 
   /* Set default SSNs */
   range_convert_str(&global_ssn_range, "106,241", MAX_SSN);

@@ -27,6 +27,7 @@
 #include <string.h>
 #include <glib.h>
 
+#include <epan/emem.h>
 #include <epan/wmem/wmem.h>
 #include <epan/proto.h>
 #include <epan/packet_info.h>
@@ -90,7 +91,7 @@ static tvbparse_elem_t* new_tok(tvbparse_t* tt,
     if (TVBPARSE_DEBUG & TVBPARSE_DEBUG_NEWTOK) g_warning("new_tok: id=%i offset=%u len=%u",id,offset,len);
 #endif
 
-    tok = (tvbparse_elem_t *)wmem_new(wmem_packet_scope(), tvbparse_elem_t);
+    tok = (tvbparse_elem_t *)ep_alloc(sizeof(tvbparse_elem_t));
 
     tok->tvb = tt->tvb;
     tok->id = id;
@@ -177,13 +178,13 @@ tvbparse_wanted_t* tvbparse_char(const int id,
     return w;
 }
 
-static int cond_chars_common(tvbparse_t* tt, int offset, const tvbparse_wanted_t * wanted, tvbparse_elem_t** tok) {
+static int cond_chars (tvbparse_t* tt, int offset, const tvbparse_wanted_t * wanted, tvbparse_elem_t** tok) {
     guint length = 0;
     int start = offset;
     int left = tt->end_offset - offset;
 
 #ifdef TVBPARSE_DEBUG
-    if (TVBPARSE_DEBUG & TVBPARSE_DEBUG_CHARS) g_warning("cond_chars_common: control='%s'",wanted->control.str);
+    if (TVBPARSE_DEBUG & TVBPARSE_DEBUG_CHARS) g_warning("cond_chars: control='%s'",wanted->control.str);
 #endif
 
     if ( offset + (int)wanted->min > tt->end_offset )
@@ -192,11 +193,17 @@ static int cond_chars_common(tvbparse_t* tt, int offset, const tvbparse_wanted_t
     left = left < (int) wanted->max ? left :  (int) wanted->max;
 
     while( left > 0 ) {
-        guint8 t = tvb_get_guint8(tt->tvb,offset++);
+        gchar t = (gchar) tvb_get_guint8(tt->tvb,offset++);
+        gchar c;
+        guint i = 0;
 
-        if (!wanted->control.str[t])
-            break;
+        while ( (c = wanted->control.str[i++]) ) {
+            if (c == t) goto next_char;
+        }
 
+        break;
+
+next_char:
         length++;
         left--;
     };
@@ -206,7 +213,7 @@ static int cond_chars_common(tvbparse_t* tt, int offset, const tvbparse_wanted_t
     } else {
         *tok = new_tok(tt,wanted->id,start,length,wanted);
 #ifdef TVBPARSE_DEBUG
-        if (TVBPARSE_DEBUG & TVBPARSE_DEBUG_CHARS) g_warning("cond_chars_common: GOT len=%i",length);
+        if (TVBPARSE_DEBUG & TVBPARSE_DEBUG_CHARS) g_warning("cond_chars: GOT len=%i",length);
 #endif
         return length;
     }
@@ -218,20 +225,12 @@ tvbparse_wanted_t* tvbparse_chars(const int id,
                                   const gchar* chr,
                                   const void* data,
                                   tvbparse_action_t before_cb,
-                                  tvbparse_action_t after_cb)
-{
+                                  tvbparse_action_t after_cb) {
     tvbparse_wanted_t* w = (tvbparse_wanted_t *)g_malloc0(sizeof(tvbparse_wanted_t));
-    char *accept_str;
-    gsize i;
 
-    accept_str = (char *)g_malloc(256);
-    memset(accept_str, 0x00, 256);
-    for (i = 0; chr[i]; i++)
-        accept_str[(unsigned) chr[i]] = 0xFF;
-
-    w->condition = cond_chars_common;
+    w->condition = cond_chars;
     w->id = id;
-    w->control.str = accept_str;
+    w->control.str = chr;
     w->min = min_len ? min_len : 1;
     w->max = max_len ? max_len : G_MAXINT/2;
     w->data = data;
@@ -251,7 +250,7 @@ static int cond_not_char(tvbparse_t* tt, const int offset, const tvbparse_wanted
     if (TVBPARSE_DEBUG & TVBPARSE_DEBUG_NOT_CHAR) g_warning("cond_not_char: control='%s'",wanted->control.str);
 #endif
 
-    if (! offset < tt->end_offset ) {
+    if ( offset >= tt->end_offset ) {
         return -1;
     }
 
@@ -291,27 +290,61 @@ tvbparse_wanted_t* tvbparse_not_char(const int id,
     return w;
 }
 
+static int cond_not_chars(tvbparse_t* tt, int offset, const tvbparse_wanted_t * wanted, tvbparse_elem_t** tok) {
+    guint length = 0;
+    int left = tt->end_offset - offset;
+    int start = offset;
+
+#ifdef TVBPARSE_DEBUG
+    if (TVBPARSE_DEBUG & TVBPARSE_DEBUG_NOT_CHARS) g_warning("cond_not_chars: control='%s'",wanted->control.str);
+#endif
+
+    if ( offset + (int)wanted->min > tt->end_offset )
+        return -1;
+
+    if (left < (int)wanted->min)
+        return -1;
+
+    left = left <= (int)wanted->max ? left :  (int)wanted->max;
+
+    while( left > 0 ) {
+        gchar c;
+        gchar t = (gchar) tvb_get_guint8(tt->tvb,offset);
+        guint i = 0;
+
+        while ( (c = wanted->control.str[i++]) ) {
+            if (c == t) goto end_not_chars;
+        }
+
+        offset++;
+        length++;
+        left--;
+    }
+end_not_chars:
+
+    if ( length < wanted->min ) {
+        return -1;
+    } else {
+        *tok = new_tok(tt,wanted->id,start,length,wanted);
+#ifdef TVBPARSE_DEBUG
+        if (TVBPARSE_DEBUG & TVBPARSE_DEBUG_NOT_CHARS) g_warning("cond_not_chars: GOT len=%i",length);
+#endif
+        return length;
+    }
+}
+
 tvbparse_wanted_t* tvbparse_not_chars(const int id,
                                       const guint min_len,
                                       const guint max_len,
                                       const gchar* chr,
                                       const void* data,
                                       tvbparse_action_t before_cb,
-                                      tvbparse_action_t after_cb)
-{
+                                      tvbparse_action_t after_cb){
     tvbparse_wanted_t* w = (tvbparse_wanted_t *)g_malloc0(sizeof(tvbparse_wanted_t));
-    char *accept_str;
-    gsize i;
 
-    /* cond_chars_common() use accept string, so mark all elements with, and later unset from reject */
-    accept_str = (char *)g_malloc(256);
-    memset(accept_str, 0xFF, 256);
-    for (i = 0; chr[i]; i++)
-        accept_str[(unsigned) chr[i]] = '\0';
-
-    w->condition = cond_chars_common;
+    w->condition = cond_not_chars;
     w->id = id;
-    w->control.str = accept_str;
+    w->control.str = chr;
     w->len = 0;
     w->min = min_len ? min_len : 1;
     w->max = max_len ? max_len : G_MAXINT/2;
@@ -582,8 +615,7 @@ static int cond_seq(tvbparse_t* tt, int offset, const tvbparse_wanted_t * wanted
 
         if (len >= 0) {
             if (ret_tok) {
-                if (new_elem->len)
-                    ret_tok->len = (new_elem->offset - ret_tok->offset) + new_elem->len;
+                ret_tok->len = (new_elem->offset - ret_tok->offset) + new_elem->len;
                 ret_tok->sub->last->next = new_elem;
                 ret_tok->sub->last = new_elem;
             } else {
@@ -661,8 +693,7 @@ static int cond_some(tvbparse_t* tt, int offset, const tvbparse_wanted_t * wante
 
         if(consumed >= 0) {
             if (ret_tok) {
-                if (new_elem->len)
-                    ret_tok->len = (new_elem->offset - ret_tok->offset) + new_elem->len;
+                ret_tok->len = (new_elem->offset - ret_tok->offset) + new_elem->len;
 
                 if (ret_tok->sub) {
                     ret_tok->sub->last->next = new_elem;
@@ -927,127 +958,127 @@ static gboolean comp_le_f(void* lp, const void* rp) { return ( *((gdouble*)lp) <
 static gboolean comp_lt_f(void* lp, const void* rp) { return ( *((gdouble*)lp) < *((gdouble*)rp) ); }
 
 static void* extract_u8(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_guint8(tvb,offset);
     return p;
 }
 
 static void* extract_uns(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_ntohs(tvb,offset);
     return p;
 }
 
 static void* extract_un24(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_ntoh24(tvb,offset);
     return p;
 }
 
 static void* extract_unl(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_ntohl(tvb,offset);
     return p;
 }
 
 static void* extract_un64(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_ntoh64(tvb,offset);
     return p;
 }
 
 static void* extract_ules(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_letohs(tvb,offset);
     return p;
 }
 
 static void* extract_ule24(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_letoh24(tvb,offset);
     return p;
 }
 
 static void* extract_ulel(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_letohl(tvb,offset);
     return p;
 }
 
 static void* extract_ule64(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_letoh64(tvb,offset);
     return p;
 }
 
 static void* extract_ins(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_ntohs(tvb,offset);
     return p;
 }
 
 static void* extract_in24(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_ntoh24(tvb,offset);
     return p;
 }
 
 static void* extract_inl(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_ntohl(tvb,offset);
     return p;
 }
 
 static void* extract_in64(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_ntoh64(tvb,offset);
     return p;
 }
 
 static void* extract_iles(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_letohs(tvb,offset);
     return p;
 }
 
 static void* extract_ile24(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_letoh24(tvb,offset);
     return p;
 }
 
 static void* extract_ilel(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_letohl(tvb,offset);
     return p;
 }
 
 static void* extract_ile64(tvbuff_t* tvb, guint offset) {
-    guint64* p = wmem_new(wmem_packet_scope(), guint64);
+    guint64* p = ep_new(guint64);
     *p = tvb_get_letoh64(tvb,offset);
     return p;
 }
 
 static void* extract_inf(tvbuff_t* tvb, guint offset) {
-    gdouble* p = wmem_new(wmem_packet_scope(), gdouble);
+    gdouble* p = ep_new(gdouble);
     *p = tvb_get_ntohieee_float(tvb,offset);
     return p;
 }
 
 static void* extract_ind(tvbuff_t* tvb, guint offset) {
-    gdouble* p = wmem_new(wmem_packet_scope(), gdouble);
+    gdouble* p = ep_new(gdouble);
     *p = tvb_get_ntohieee_double(tvb,offset);
     return p;
 }
 
 static void* extract_ilef(tvbuff_t* tvb, guint offset) {
-    gdouble* p = wmem_new(wmem_packet_scope(), gdouble);
+    gdouble* p = ep_new(gdouble);
     *p = tvb_get_letohieee_float(tvb,offset);
     return p;
 }
 
 static void* extract_iled(tvbuff_t* tvb, guint offset) {
-    gdouble* p = wmem_new(wmem_packet_scope(), gdouble);
+    gdouble* p = ep_new(gdouble);
     *p = tvb_get_letohieee_double(tvb,offset);
     return p;
 }
@@ -1178,7 +1209,7 @@ tvbparse_t* tvbparse_init(tvbuff_t* tvb,
                           int len,
                           void* data,
                           const tvbparse_wanted_t* ignore) {
-    tvbparse_t* tt = (tvbparse_t *)wmem_new(wmem_packet_scope(), tvbparse_t);
+    tvbparse_t* tt = (tvbparse_t *)ep_alloc(sizeof(tvbparse_t));
 
 #ifdef TVBPARSE_DEBUG
     if (TVBPARSE_DEBUG & TVBPARSE_DEBUG_TT) g_warning("tvbparse_init: offset=%i len=%i",offset,len);
@@ -1187,7 +1218,7 @@ tvbparse_t* tvbparse_init(tvbuff_t* tvb,
 
     tt->tvb = tvb;
     tt->offset = offset;
-    len = (len == -1) ? (int) tvb_captured_length(tvb) : len;
+    len = (len == -1) ? (int) tvb_length(tvb) : len;
     tt->end_offset = offset + len;
     tt->data = data;
     tt->ignore = ignore;
@@ -1202,9 +1233,9 @@ gboolean tvbparse_reset(tvbparse_t* tt,
     if (TVBPARSE_DEBUG & TVBPARSE_DEBUG_TT) g_warning("tvbparse_init: offset=%i len=%i",offset,len);
 #endif
 
-    len = (len == -1) ? (int) tvb_captured_length(tt->tvb) : len;
+    len = (len == -1) ? (int) tvb_length(tt->tvb) : len;
 
-    if( tvb_captured_length_remaining(tt->tvb, offset) >= len) {
+    if( tvb_length_remaining(tt->tvb, offset) >= len) {
         tt->offset = offset;
         tt->end_offset = offset + len;
         return TRUE;
@@ -1387,15 +1418,3 @@ void tvbparse_tree_add_elem(proto_tree* tree, tvbparse_elem_t* curr) {
     }
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

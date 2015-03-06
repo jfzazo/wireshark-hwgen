@@ -27,8 +27,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
-#include <epan/prefs.h>
+#include <prefs.h>
 #include <wiretap/wtap.h>
 
 #include "packet-sll.h"
@@ -87,10 +89,10 @@ struct can_identifier
 };
 
 static const enum_val_t can_high_level_protocol_dissector_options[] = {
-	{ "raw",	"Raw data (no further dissection)",	CAN_DATA_DISSECTOR },
+	{ "raw",		"Raw data (no further dissection)",	CAN_DATA_DISSECTOR },
 	{ "CANopen",	"CANopen protocol",			CAN_CANOPEN_DISSECTOR },
 	{ "DeviceNet",	"DeviceNet protocol",			CAN_DEVICENET_DISSECTOR },
-	{ "J1939",	"J1939 protocol",			CAN_J1939_DISSECTOR },
+	{ "J1939",		"J1939 protocol",			CAN_J1939_DISSECTOR },
 	{ NULL,	NULL, 0 }
 };
 
@@ -143,7 +145,7 @@ dissect_socketcan(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	col_add_fstr(pinfo->cinfo, COL_INFO, "%s: 0x%08x",
 		     val_to_str(frame_type, frame_type_vals, "Unknown (0x%02x)"), can_id.id);
 	col_append_fstr(pinfo->cinfo, COL_INFO, "   %s",
-			tvb_bytes_to_str_punct(wmem_packet_scope(), tvb, CAN_DATA_OFFSET, frame_len, ' '));
+			tvb_bytes_to_ep_str_punct(tvb, CAN_DATA_OFFSET, frame_len, ' '));
 
 	ti       = proto_tree_add_item(tree, proto_can, tvb, 0, -1, ENC_NA);
 	can_tree = proto_item_add_subtree(ti, ett_can);
@@ -167,7 +169,7 @@ dissect_socketcan(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			break;
 		case CAN_DEVICENET_DISSECTOR:
 			/* XXX - Not sure this is correct.  But the capture provided in
-			 * bug 8564 provides CAN ID in little endian format, so this makes it work */
+             * bug 8564 provides CAN ID in little endian format, so this makes it work */
 			can_id.id = GUINT32_SWAP_LE_BE(can_id.id);
 
 			call_dissector_with_data(devicenet_handle, next_tvb, pinfo, tree, &can_id);
@@ -272,16 +274,3 @@ proto_reg_handoff_socketcan(void)
 	j1939_handle   = find_dissector("j1939");
 	data_handle    = find_dissector("data");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -22,6 +22,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/etypes.h>
 
@@ -35,7 +36,6 @@ void proto_reg_handoff_snaeth(void);
 
 static int proto_snaeth = -1;
 static int hf_snaeth_len = -1;
-static int hf_snaeth_padding = -1;
 
 static gint ett_snaeth = -1;
 
@@ -60,7 +60,7 @@ dissect_snaeth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		    ENC_NA);
 		snaeth_tree = proto_item_add_subtree(snaeth_ti, ett_snaeth);
 		proto_tree_add_uint(snaeth_tree, hf_snaeth_len, tvb, 0, 2, len);
-		proto_tree_add_item(snaeth_tree, hf_snaeth_padding, tvb, 2, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_text(snaeth_tree, tvb, 2, 1, "Padding");
 	}
 
 	/*
@@ -83,9 +83,6 @@ proto_register_snaeth(void)
 		{ &hf_snaeth_len,
 		{ "Length",	"snaeth.len", FT_UINT16, BASE_DEC, NULL, 0x0,
 			"Length of LLC payload", HFILL }},
-		{ &hf_snaeth_padding,
-		{ "Padding",	"snaeth.padding", FT_UINT8, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }},
 	};
 	static gint *ett[] = {
 		&ett_snaeth,
@@ -110,16 +107,3 @@ proto_reg_handoff_snaeth(void)
 	snaeth_handle = create_dissector_handle(dissect_snaeth, proto_snaeth);
 	dissector_add_uint("ethertype", ETHERTYPE_SNA, snaeth_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

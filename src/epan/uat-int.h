@@ -85,6 +85,9 @@ WS_DLL_PUBLIC
 void* uat_add_record(uat_t*, const void* orig_rec_ptr, gboolean valid_rec);
 
 WS_DLL_PUBLIC
+void uat_update_record(uat_t *uat, const void *data, gboolean valid_rec);
+
+WS_DLL_PUBLIC
 void uat_swap(uat_t*, guint idx_a, guint idx_b);
 
 WS_DLL_PUBLIC
@@ -96,7 +99,7 @@ WS_DLL_PUBLIC
 void uat_clear(uat_t*);
 
 WS_DLL_PUBLIC
-gboolean uat_save(uat_t* , char** );
+gboolean uat_save(uat_t* , const char** );
 
 void uat_load_all(void);
 

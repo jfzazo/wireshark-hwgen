@@ -30,11 +30,11 @@
 
 #include "config.h"
 
-#include <math.h>
-
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/nlpid.h>
+
+#include <math.h>
 
 #define IDRP_PROTO "ISO/IEC 10747 (1993): Inter Domain Routing Protocol "
 
@@ -121,8 +121,6 @@ static int hf_idrp_rib_refresh_rib_attr_locally_defined_qos_value = -1;
 static int hf_idrp_rib_refresh_rib_attr_locally_defined_qos_metric = -1;
 static int hf_idrp_rib_refresh_rib_attr_security_reg_id = -1;
 static int hf_idrp_rib_refresh_rib_attr_security_info = -1;
-
-static expert_field ei_idrp_no_path_attributes = EI_INIT;
 
 /* flags */
 #define IDRP_UPDATE_PATH_FLAG_OPTIONAL                    0x80
@@ -390,7 +388,7 @@ static int dissect_BISPDU_OPEN(tvbuff_t * tvb, int offset, proto_tree * tree)
     offset += 1;
 
     /* Source RDI */
-    proto_tree_add_item(tree, hf_idrp_open_src_rdi, tvb, offset, rdi_len, ENC_NA);
+    proto_tree_add_item(tree, hf_idrp_open_src_rdi, tvb, offset, rdi_len, ENC_ASCII | ENC_NA);
     offset += rdi_len;
 
     /* Number of Non-empty RIB-Atts */
@@ -436,7 +434,7 @@ static int dissect_BISPDU_OPEN(tvbuff_t * tvb, int offset, proto_tree * tree)
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
 
                     /* 1 octet Qos length */
@@ -449,7 +447,7 @@ static int dissect_BISPDU_OPEN(tvbuff_t * tvb, int offset, proto_tree * tree)
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
 
                     /* 1 octet Metric length */
@@ -463,7 +461,7 @@ static int dissect_BISPDU_OPEN(tvbuff_t * tvb, int offset, proto_tree * tree)
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
                     break;
                 case IDRP_PATH_ATTR_TYPE_SECURITY:
@@ -480,7 +478,7 @@ static int dissect_BISPDU_OPEN(tvbuff_t * tvb, int offset, proto_tree * tree)
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
 
                     /* length of Security Information */
@@ -494,7 +492,7 @@ static int dissect_BISPDU_OPEN(tvbuff_t * tvb, int offset, proto_tree * tree)
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
 
                     break;
@@ -519,7 +517,7 @@ static int dissect_BISPDU_OPEN(tvbuff_t * tvb, int offset, proto_tree * tree)
 
         /* process Nth RDI */
         proto_tree_add_item(tree, hf_idrp_open_confederation, tvb,
-                offset, length_indicator_guint8, ENC_NA);
+                offset, length_indicator_guint8, ENC_ASCII | ENC_NA);
         offset += length_indicator_guint8;
     }
 
@@ -530,7 +528,7 @@ static int dissect_BISPDU_OPEN(tvbuff_t * tvb, int offset, proto_tree * tree)
 
     /* Authentication Data */
     proto_tree_add_item(tree, hf_idrp_open_authentication_data, tvb, offset,
-            tvb_reported_length_remaining(tvb, offset), ENC_NA);
+            tvb_reported_length_remaining(tvb, offset), ENC_ASCII | ENC_NA);
     offset += tvb_reported_length_remaining(tvb, offset);
 
     return offset;
@@ -650,7 +648,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
                                 tvb,
                                 offset,
                                 length_indicator_guint8,
-                                ENC_NA);
+                                ENC_ASCII | ENC_NA);
                         offset += length_indicator_guint8;
                     }
                 }
@@ -697,7 +695,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset +=  length_indicator_guint8;
 
                     /* number of SNPA */
@@ -720,7 +718,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
                                 tvb,
                                 offset,
                                 length_indicator_guint8 ,
-                                ENC_NA);
+                                ENC_ASCII | ENC_NA);
                         offset += length_indicator_guint8;
                     }
                 } /* while: process Nth next hop */
@@ -747,7 +745,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
                             tvb,
                             offset,
                             length_indicator_guint8 ,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
                 }
                 break;
@@ -773,7 +771,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
                             tvb,
                             offset,
                             length_indicator_guint8 ,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
                 }
                 break;
@@ -827,7 +825,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
                         tvb,
                         offset,
                         length_indicator_guint8 ,
-                        ENC_NA);
+                        ENC_ASCII | ENC_NA);
                 offset += length_indicator_guint8;
                 /* 1 octet Qoslength */
                 length_indicator_guint8 = tvb_get_guint8(tvb, offset);
@@ -838,7 +836,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
                         tvb,
                         offset,
                         length_indicator_guint8 ,
-                        ENC_NA);
+                        ENC_ASCII | ENC_NA);
                 offset += length_indicator_guint8;
                 /* 1 octet Metric length */
                 length_indicator_guint8  = tvb_get_guint8(tvb, offset);
@@ -849,7 +847,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
                         tvb,
                         offset,
                         length_indicator_guint8 ,
-                        ENC_NA);
+                        ENC_ASCII | ENC_NA);
                 offset += length_indicator_guint8;
                 break;
             case IDRP_PATH_ATTR_TYPE_HIERARCHICALRECORDING:
@@ -882,7 +880,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
                         tvb,
                         offset,
                         length_indicator_guint8 ,
-                        ENC_NA);
+                        ENC_ASCII | ENC_NA);
                 offset += length_indicator_guint8;
 
                 /* length of Security Information */
@@ -894,7 +892,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
                         tvb,
                         offset,
                         length_indicator_guint8,
-                        ENC_NA);
+                        ENC_ASCII | ENC_NA);
                 offset += length_indicator_guint8;
                 break;
             case IDRP_PATH_ATTR_TYPE_CAPACITY:
@@ -931,7 +929,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
 
     /* N octets Proto identity: in case of ISO 8473 one octet with the value 0x81 */
     proto_tree_add_item(tree, hf_idrp_update_nlri_proto_id, tvb, offset,
-            proto_len, ENC_NA);
+            proto_len, ENC_ASCII | ENC_NA);
     offset += proto_len;
 
     /* 2 octets length of address */
@@ -950,7 +948,7 @@ static int dissect_BISPDU_UPDATE(tvbuff_t * tvb, int offset, proto_tree * tree)
         offset += 1;
 
         proto_tree_add_item(tree, hf_idrp_update_nlri_addr_info, tvb,
-                offset, rdi_len, ENC_NA);
+                offset, rdi_len, ENC_ASCII | ENC_NA);
         offset += rdi_len;
     }
     return offset;
@@ -998,17 +996,17 @@ static int dissect_BISPDU_ERROR(tvbuff_t * tvb, int offset, proto_tree * tree)
     data_length = tvb_reported_length_remaining(tvb, offset);
     if (data_length>0) {
         proto_tree_add_item(tree, hf_idrp_error_data, tvb, offset, data_length,
-                ENC_NA);
+                ENC_ASCII | ENC_NA);
         offset += data_length;
     }
 
     return offset;
 }
 
-static int dissect_BISPDU_RIB_REFRESH(tvbuff_t * tvb, packet_info *pinfo, int offset, proto_tree * tree)
+static int dissect_BISPDU_RIB_REFRESH(tvbuff_t * tvb, int offset, proto_tree * tree)
 {
     proto_tree *sub_tree;
-    proto_item *sub_item;
+    proto_item *ti;
     guint8      number_of_non_empty_rib_attributes;
     guint8      number_of_distinguishing_attributes;
     guint8      rib_attribute_type;
@@ -1022,14 +1020,15 @@ static int dissect_BISPDU_RIB_REFRESH(tvbuff_t * tvb, packet_info *pinfo, int of
     offset += 1;
 
     /* Path Attributes subtree */
-    sub_tree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_idrp_sub, &sub_item, "Path Attributes");
+    ti = proto_tree_add_text(tree, tvb, offset, 0, "Path Attributes");
+    sub_tree = proto_item_add_subtree(ti, ett_idrp_sub);
 
     /* Number of Non-empty RIB-Atts */
     number_of_non_empty_rib_attributes = tvb_get_guint8(tvb, offset);
     offset += 1;
 
     if (!number_of_non_empty_rib_attributes)
-        expert_add_info(pinfo, sub_item, &ei_idrp_no_path_attributes);
+        proto_tree_add_text(sub_tree, tvb, offset, 0, "none");
 
     /* process Nth RIB-Atts */
     for (i = number_of_non_empty_rib_attributes; i > 0; i--) {
@@ -1071,7 +1070,7 @@ static int dissect_BISPDU_RIB_REFRESH(tvbuff_t * tvb, packet_info *pinfo, int of
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
 
                     /* 1 octet Qos length */
@@ -1084,7 +1083,7 @@ static int dissect_BISPDU_RIB_REFRESH(tvbuff_t * tvb, packet_info *pinfo, int of
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
 
                     /* 1 octet Metric length */
@@ -1098,7 +1097,7 @@ static int dissect_BISPDU_RIB_REFRESH(tvbuff_t * tvb, packet_info *pinfo, int of
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
                     break;
                 case IDRP_PATH_ATTR_TYPE_SECURITY:
@@ -1115,7 +1114,7 @@ static int dissect_BISPDU_RIB_REFRESH(tvbuff_t * tvb, packet_info *pinfo, int of
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
 
                     /* length of Security Information */
@@ -1129,7 +1128,7 @@ static int dissect_BISPDU_RIB_REFRESH(tvbuff_t * tvb, packet_info *pinfo, int of
                             tvb,
                             offset,
                             length_indicator_guint8,
-                            ENC_NA);
+                            ENC_ASCII | ENC_NA);
                     offset += length_indicator_guint8;
 
                     break;
@@ -1193,7 +1192,7 @@ dissect_idrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 
     /* 16 octets validation */
     proto_tree_add_item(idrp_tree, hf_idrp_validation_pattern,
-            tvb, offset, 16, ENC_NA);
+            tvb, offset, 16, ENC_ASCII | ENC_NA);
     offset += 16;
 
     switch (pdu_type) {
@@ -1216,7 +1215,7 @@ dissect_idrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
             offset += 30;
             break;
         case IDRP_TYPE_RIB_REFRESH:
-            offset = dissect_BISPDU_RIB_REFRESH(tvb, pinfo, offset, idrp_tree);
+            offset = dissect_BISPDU_RIB_REFRESH(tvb, offset, idrp_tree);
             break;
         default:
             break;
@@ -1585,17 +1584,9 @@ void proto_register_idrp(void)
         &ett_idrp_sub
     };
 
-    static ei_register_info ei[] = {
-        { &ei_idrp_no_path_attributes, { "idrp.no_path_attributes", PI_PROTOCOL, PI_NOTE, "No path attributes", EXPFILL }},
-    };
-
-    expert_module_t* expert_idrp;
-
     proto_idrp = proto_register_protocol(IDRP_PROTO, "IDRP", "idrp");
     proto_register_field_array(proto_idrp, hf_idrp, array_length(hf_idrp));
     proto_register_subtree_array(ett, array_length(ett));
-    expert_idrp = expert_register_protocol(proto_idrp);
-    expert_register_field_array(expert_idrp, ei, array_length(ei));
     new_register_dissector("idrp", dissect_idrp, proto_idrp);
 
 }

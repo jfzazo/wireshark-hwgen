@@ -28,11 +28,14 @@
 
 #include <stdlib.h>
 
+#include <string.h>
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/strutil.h>
 #include <epan/conversation.h>
 #include <epan/prefs.h>
 #include <epan/reassemble.h>
+#include <epan/wmem/wmem.h>
 #include "packet-ssl.h"
 
 void proto_register_pop(void);
@@ -491,16 +494,3 @@ proto_reg_handoff_pop(void)
   /* find the SSL dissector */
   ssl_handle = find_dissector("ssl");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

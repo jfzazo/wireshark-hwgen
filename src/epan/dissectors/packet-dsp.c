@@ -31,8 +31,8 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/prefs.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
@@ -287,11 +287,6 @@ static gint ett_dsp_T_basicLevels = -1;
 
 /*--- End of included file: packet-dsp-ett.c ---*/
 #line 64 "../../asn1/dsp/packet-dsp-template.c"
-
-static expert_field ei_dsp_unsupported_opcode = EI_INIT;
-static expert_field ei_dsp_unsupported_errcode = EI_INIT;
-static expert_field ei_dsp_unsupported_pdu = EI_INIT;
-static expert_field ei_dsp_zero_pdu = EI_INIT;
 
 
 /*--- Included file: packet-dsp-fn.c ---*/
@@ -1669,31 +1664,25 @@ dissect_dsp_DitBridgeKnowledge(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int
 
 /*--- PDUs ---*/
 
-static int dissect_AccessPoint_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_AccessPoint_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dsp_AccessPoint(FALSE, tvb, offset, &asn1_ctx, tree, hf_dsp_AccessPoint_PDU);
-  return offset;
+  dissect_dsp_AccessPoint(FALSE, tvb, 0, &asn1_ctx, tree, hf_dsp_AccessPoint_PDU);
 }
-static int dissect_MasterAndShadowAccessPoints_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_MasterAndShadowAccessPoints_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dsp_MasterAndShadowAccessPoints(FALSE, tvb, offset, &asn1_ctx, tree, hf_dsp_MasterAndShadowAccessPoints_PDU);
-  return offset;
+  dissect_dsp_MasterAndShadowAccessPoints(FALSE, tvb, 0, &asn1_ctx, tree, hf_dsp_MasterAndShadowAccessPoints_PDU);
 }
-static int dissect_DitBridgeKnowledge_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_DitBridgeKnowledge_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dsp_DitBridgeKnowledge(FALSE, tvb, offset, &asn1_ctx, tree, hf_dsp_DitBridgeKnowledge_PDU);
-  return offset;
+  dissect_dsp_DitBridgeKnowledge(FALSE, tvb, 0, &asn1_ctx, tree, hf_dsp_DitBridgeKnowledge_PDU);
 }
 
 
 /*--- End of included file: packet-dsp-fn.c ---*/
-#line 71 "../../asn1/dsp/packet-dsp-template.c"
+#line 66 "../../asn1/dsp/packet-dsp-template.c"
 
 /*
 * Dissect X518 PDUs inside a ROS PDUs
@@ -1777,8 +1766,8 @@ dissect_dsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* da
 	    dsp_op_name = "ChainedModify-DN-Argument";
 	    break;
 	  default:
-	    proto_tree_add_expert_format(tree, pinfo, &ei_dsp_unsupported_opcode, tvb, offset, -1,
-	        "Unsupported DSP opcode (%d)", session->ros_op & ROS_OP_OPCODE_MASK);
+	    proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DSP opcode (%d)",
+				session->ros_op & ROS_OP_OPCODE_MASK);
 	    break;
 	  }
 	  break;
@@ -1821,7 +1810,7 @@ dissect_dsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* da
 	    dsp_op_name = "ChainedModify-DN-Result";
 	    break;
 	  default:
-	    proto_tree_add_expert(tree, pinfo, &ei_dsp_unsupported_opcode, tvb, offset, -1);
+	    proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DSP opcode");
 	    break;
 	  }
 	  break;
@@ -1864,13 +1853,13 @@ dissect_dsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* da
 	    dsp_op_name = "DSA-Referral";
 	    break;
 	  default:
-	    proto_tree_add_expert(tree, pinfo, &ei_dsp_unsupported_errcode, tvb, offset, -1);
+	    proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DSP errcode");
 	    break;
 	  }
 	  break;
 	default:
-	  proto_tree_add_expert(tree, pinfo, &ei_dsp_unsupported_pdu, tvb, offset, -1);
-	  return tvb_captured_length(tvb);
+	  proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DSP PDU");
+	  return tvb_length(tvb);
 	}
 
 	if(dsp_dissector) {
@@ -1880,13 +1869,13 @@ dissect_dsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* da
 	    old_offset=offset;
 	    offset=(*dsp_dissector)(FALSE, tvb, offset, &asn1_ctx, tree, -1);
 	    if(offset == old_offset){
-	      proto_tree_add_expert(tree, pinfo, &ei_dsp_zero_pdu, tvb, offset, -1);
+	      proto_tree_add_text(tree, tvb, offset, -1,"Internal error, zero-byte DSP PDU");
 	      break;
 	    }
 	  }
 	}
 
-	return tvb_captured_length(tvb);
+	return tvb_length(tvb);
 }
 
 
@@ -2449,7 +2438,7 @@ void proto_register_dsp(void) {
         "EXTERNAL", HFILL }},
 
 /*--- End of included file: packet-dsp-hfarr.c ---*/
-#line 274 "../../asn1/dsp/packet-dsp-template.c"
+#line 269 "../../asn1/dsp/packet-dsp-template.c"
   };
 
   /* List of subtrees */
@@ -2531,17 +2520,9 @@ void proto_register_dsp(void) {
     &ett_dsp_T_basicLevels,
 
 /*--- End of included file: packet-dsp-ettarr.c ---*/
-#line 280 "../../asn1/dsp/packet-dsp-template.c"
+#line 275 "../../asn1/dsp/packet-dsp-template.c"
   };
-  static ei_register_info ei[] = {
-    { &ei_dsp_unsupported_opcode, { "dsp.unsupported_opcode", PI_UNDECODED, PI_WARN, "Unsupported DSP opcode", EXPFILL }},
-    { &ei_dsp_unsupported_errcode, { "dsp.unsupported_errcode", PI_UNDECODED, PI_WARN, "Unsupported DSP errcode", EXPFILL }},
-    { &ei_dsp_unsupported_pdu, { "dsp.unsupported_pdu", PI_UNDECODED, PI_WARN, "Unsupported DSP PDU", EXPFILL }},
-    { &ei_dsp_zero_pdu, { "dsp.zero_pdu", PI_PROTOCOL, PI_ERROR, "Internal error, zero-byte DSP PDU", EXPFILL }},
-  };
-
   module_t *dsp_module;
-  expert_module_t* expert_dsp;
 
   /* Register protocol */
   proto_dsp = proto_register_protocol(PNAME, PSNAME, PFNAME);
@@ -2551,8 +2532,6 @@ void proto_register_dsp(void) {
   /* Register fields and subtrees */
   proto_register_field_array(proto_dsp, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
-  expert_dsp = expert_register_protocol(proto_dsp);
-  expert_register_field_array(expert_dsp, ei, array_length(ei));
 
   /* Register our configuration options for DSP, particularly our port */
 
@@ -2574,15 +2553,15 @@ void proto_reg_handoff_dsp(void) {
 
 /*--- Included file: packet-dsp-dis-tab.c ---*/
 #line 1 "../../asn1/dsp/packet-dsp-dis-tab.c"
-  new_register_ber_oid_dissector("2.5.12.1", dissect_AccessPoint_PDU, proto_dsp, "id-doa-myAccessPoint");
-  new_register_ber_oid_dissector("2.5.12.2", dissect_AccessPoint_PDU, proto_dsp, "id-doa-superiorKnowledge");
-  new_register_ber_oid_dissector("2.5.12.3", dissect_MasterAndShadowAccessPoints_PDU, proto_dsp, "id-doa-specificKnowledge");
-  new_register_ber_oid_dissector("2.5.12.4", dissect_MasterAndShadowAccessPoints_PDU, proto_dsp, "id-doa-nonSpecificKnowledge");
-  new_register_ber_oid_dissector("2.5.12.8", dissect_DitBridgeKnowledge_PDU, proto_dsp, "id-doa-ditBridgeKnowledge");
+  register_ber_oid_dissector("2.5.12.1", dissect_AccessPoint_PDU, proto_dsp, "id-doa-myAccessPoint");
+  register_ber_oid_dissector("2.5.12.2", dissect_AccessPoint_PDU, proto_dsp, "id-doa-superiorKnowledge");
+  register_ber_oid_dissector("2.5.12.3", dissect_MasterAndShadowAccessPoints_PDU, proto_dsp, "id-doa-specificKnowledge");
+  register_ber_oid_dissector("2.5.12.4", dissect_MasterAndShadowAccessPoints_PDU, proto_dsp, "id-doa-nonSpecificKnowledge");
+  register_ber_oid_dissector("2.5.12.8", dissect_DitBridgeKnowledge_PDU, proto_dsp, "id-doa-ditBridgeKnowledge");
 
 
 /*--- End of included file: packet-dsp-dis-tab.c ---*/
-#line 320 "../../asn1/dsp/packet-dsp-template.c"
+#line 305 "../../asn1/dsp/packet-dsp-template.c"
 
   /* APPLICATION CONTEXT */
 

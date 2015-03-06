@@ -31,6 +31,7 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/asn1.h>
 
@@ -78,7 +79,7 @@ static int hf_pkinit_dhNonce = -1;                /* INTEGER */
 static int hf_pkinit_dhKeyExpiration = -1;        /* KerberosTime */
 
 /*--- End of included file: packet-pkinit-hf.c ---*/
-#line 45 "../../asn1/pkinit/packet-pkinit-template.c"
+#line 46 "../../asn1/pkinit/packet-pkinit-template.c"
 
 /* Initialize the subtree pointers */
 
@@ -95,7 +96,7 @@ static gint ett_pkinit_PaPkAsRep = -1;
 static gint ett_pkinit_KDCDHKeyInfo = -1;
 
 /*--- End of included file: packet-pkinit-ett.c ---*/
-#line 48 "../../asn1/pkinit/packet-pkinit-template.c"
+#line 49 "../../asn1/pkinit/packet-pkinit-template.c"
 
 static int dissect_KerberosV5Spec2_KerberosTime(gboolean implicit_tag _U_, tvbuff_t *tvb, int offset,  asn1_ctx_t *actx, proto_tree *tree, int hf_index _U_);
 static int dissect_KerberosV5Spec2_Checksum(gboolean implicit_tag _U_, tvbuff_t *tvb, int offset,  asn1_ctx_t *actx, proto_tree *tree, int hf_index _U_);
@@ -288,31 +289,25 @@ dissect_pkinit_KDCDHKeyInfo(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int of
 
 /*--- PDUs ---*/
 
-static int dissect_AuthPack_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_AuthPack_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_pkinit_AuthPack(FALSE, tvb, offset, &asn1_ctx, tree, hf_pkinit_AuthPack_PDU);
-  return offset;
+  dissect_pkinit_AuthPack(FALSE, tvb, 0, &asn1_ctx, tree, hf_pkinit_AuthPack_PDU);
 }
-static int dissect_KRB5PrincipalName_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_KRB5PrincipalName_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_pkinit_KRB5PrincipalName(FALSE, tvb, offset, &asn1_ctx, tree, hf_pkinit_KRB5PrincipalName_PDU);
-  return offset;
+  dissect_pkinit_KRB5PrincipalName(FALSE, tvb, 0, &asn1_ctx, tree, hf_pkinit_KRB5PrincipalName_PDU);
 }
-static int dissect_KDCDHKeyInfo_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_KDCDHKeyInfo_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_pkinit_KDCDHKeyInfo(FALSE, tvb, offset, &asn1_ctx, tree, hf_pkinit_KDCDHKeyInfo_PDU);
-  return offset;
+  dissect_pkinit_KDCDHKeyInfo(FALSE, tvb, 0, &asn1_ctx, tree, hf_pkinit_KDCDHKeyInfo_PDU);
 }
 
 
 /*--- End of included file: packet-pkinit-fn.c ---*/
-#line 55 "../../asn1/pkinit/packet-pkinit-template.c"
+#line 56 "../../asn1/pkinit/packet-pkinit-template.c"
 
 int
 dissect_pkinit_PA_PK_AS_REQ(proto_tree *tree, tvbuff_t *tvb, int offset, asn1_ctx_t *actx _U_) {
@@ -457,7 +452,7 @@ void proto_register_pkinit(void) {
         "KerberosTime", HFILL }},
 
 /*--- End of included file: packet-pkinit-hfarr.c ---*/
-#line 99 "../../asn1/pkinit/packet-pkinit-template.c"
+#line 100 "../../asn1/pkinit/packet-pkinit-template.c"
   };
 
   /* List of subtrees */
@@ -476,7 +471,7 @@ void proto_register_pkinit(void) {
     &ett_pkinit_KDCDHKeyInfo,
 
 /*--- End of included file: packet-pkinit-ettarr.c ---*/
-#line 104 "../../asn1/pkinit/packet-pkinit-template.c"
+#line 105 "../../asn1/pkinit/packet-pkinit-template.c"
   };
 
   /* Register protocol */
@@ -494,12 +489,12 @@ void proto_reg_handoff_pkinit(void) {
 
 /*--- Included file: packet-pkinit-dis-tab.c ---*/
 #line 1 "../../asn1/pkinit/packet-pkinit-dis-tab.c"
-  new_register_ber_oid_dissector("1.3.6.1.5.2.3.1", dissect_AuthPack_PDU, proto_pkinit, "id-pkauthdata");
-  new_register_ber_oid_dissector("1.3.6.1.5.2.3.2", dissect_KDCDHKeyInfo_PDU, proto_pkinit, "id-pkdhkeydata");
-  new_register_ber_oid_dissector("1.3.6.1.5.2.2", dissect_KRB5PrincipalName_PDU, proto_pkinit, "id-pkinit-san");
+  register_ber_oid_dissector("1.3.6.1.5.2.3.1", dissect_AuthPack_PDU, proto_pkinit, "id-pkauthdata");
+  register_ber_oid_dissector("1.3.6.1.5.2.3.2", dissect_KDCDHKeyInfo_PDU, proto_pkinit, "id-pkdhkeydata");
+  register_ber_oid_dissector("1.3.6.1.5.2.2", dissect_KRB5PrincipalName_PDU, proto_pkinit, "id-pkinit-san");
 
 
 /*--- End of included file: packet-pkinit-dis-tab.c ---*/
-#line 119 "../../asn1/pkinit/packet-pkinit-template.c"
+#line 120 "../../asn1/pkinit/packet-pkinit-template.c"
 }
 

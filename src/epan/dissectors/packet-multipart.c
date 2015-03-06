@@ -56,10 +56,14 @@
 
 #include "config.h"
 
+#include <string.h>
+
+#include <glib.h>
 
 #include <epan/packet.h>
-#include <epan/expert.h>
 #include <epan/prefs.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-imf.h"
 
 void proto_register_multipart(void);
@@ -72,20 +76,10 @@ static dissector_table_t multipart_media_subdissector_table;
 /* Initialize the protocol and registered fields */
 static int proto_multipart = -1;
 
-/* Generated from convert_proto_tree_add_text.pl */
-static int hf_multipart_trailer = -1;
-static int hf_multipart_boundary = -1;
-static int hf_multipart_first_boundary = -1;
-static int hf_multipart_last_boundary = -1;
-static int hf_multipart_preamble = -1;
-
 /* Initialize the subtree pointers */
 static gint ett_multipart = -1;
 static gint ett_multipart_main = -1;
 static gint ett_multipart_body = -1;
-
-/* Generated from convert_proto_tree_add_text.pl */
-static expert_field ei_multipart_no_required_boundary_parameter = EI_INIT;
 
 /* Not sure that compact_name exists for multipart, but choose to keep
  * the structure from SIP dissector, all the content- is also from SIP */
@@ -180,7 +174,7 @@ base64_decode(packet_info *pinfo, tvbuff_t *b64_tvb, char *name)
 {
     char *data;
     tvbuff_t *tvb;
-    data = tvb_get_string_enc(wmem_packet_scope(), b64_tvb, 0, tvb_reported_length(b64_tvb), ENC_ASCII);
+    data = tvb_get_string(wmem_packet_scope(), b64_tvb, 0, tvb_length(b64_tvb));
 
     tvb = base64_to_tvb(b64_tvb, data);
     add_new_data_source(pinfo, tvb, name);
@@ -342,9 +336,6 @@ static char *find_parameter(char *parameters, const char *key, int *retlen)
         p++; /* Skip semicolon */
 
     }
-    if (*p == 0x0)
-        return NULL;  /* key wasn't found */
-
     start = p + keylen;
     if (start[0] == 0) {
         return NULL;
@@ -393,7 +384,7 @@ static char *find_parameter(char *parameters, const char *key, int *retlen)
  * leading hyphens. (quote from rfc2046)
  */
 static multipart_info_t *
-get_multipart_info(packet_info *pinfo, const char *str)
+get_multipart_info(packet_info *pinfo)
 {
     const char *start;
     int len = 0;
@@ -402,7 +393,7 @@ get_multipart_info(packet_info *pinfo, const char *str)
     char *parameters;
     gint dummy;
 
-    if ((type == NULL) || (str == NULL)) {
+    if ((type == NULL) || (pinfo->private_data == NULL)) {
         /*
          * We need both a content type AND parameters
          * for multipart dissection.
@@ -411,7 +402,7 @@ get_multipart_info(packet_info *pinfo, const char *str)
     }
 
     /* Clean up the parameters */
-    parameters = unfold_and_compact_mime_header(str, &dummy);
+    parameters = unfold_and_compact_mime_header((const char *)pinfo->private_data, &dummy);
 
     start = find_parameter(parameters, "boundary=", &len);
 
@@ -454,13 +445,13 @@ find_first_boundary(tvbuff_t *tvb, gint start, const guint8 *boundary,
 {
     gint offset = start, next_offset, line_len, boundary_start;
 
-    while (tvb_reported_length_remaining(tvb, offset + 2 + boundary_len) > 0) {
+    while (tvb_length_remaining(tvb, offset + 2 + boundary_len) > 0) {
         boundary_start = offset;
         if (((tvb_strneql(tvb, offset, (const guint8 *)"--", 2) == 0)
                     && (tvb_strneql(tvb, offset + 2, boundary,  boundary_len) == 0)))
         {
             /* Boundary string; now check if last */
-            if ((tvb_reported_length_remaining(tvb, offset + 2 + boundary_len + 2) >= 0)
+            if ((tvb_length_remaining(tvb, offset + 2 + boundary_len + 2) >= 0)
                     && (tvb_strneql(tvb, offset + 2 + boundary_len,
                             (const guint8 *)"--", 2) == 0)) {
                 *last_boundary = TRUE;
@@ -500,7 +491,7 @@ find_next_boundary(tvbuff_t *tvb, gint start, const guint8 *boundary,
 {
     gint offset = start, next_offset, line_len, boundary_start;
 
-    while (tvb_reported_length_remaining(tvb, offset + 2 + boundary_len) > 0) {
+    while (tvb_length_remaining(tvb, offset + 2 + boundary_len) > 0) {
         line_len =  tvb_find_line_end(tvb, offset, -1, &next_offset, FALSE);
         if (line_len == -1) {
             return -1;
@@ -510,7 +501,7 @@ find_next_boundary(tvbuff_t *tvb, gint start, const guint8 *boundary,
                     && (tvb_strneql(tvb, next_offset + 2, boundary, boundary_len) == 0)))
         {
             /* Boundary string; now check if last */
-            if ((tvb_reported_length_remaining(tvb, next_offset + 2 + boundary_len + 2) >= 0)
+            if ((tvb_length_remaining(tvb, next_offset + 2 + boundary_len + 2) >= 0)
                     && (tvb_strneql(tvb, next_offset + 2 + boundary_len,
                             (const guint8 *)"--", 2) == 0)) {
                 *last_boundary = TRUE;
@@ -547,16 +538,22 @@ process_preamble(proto_tree *tree, tvbuff_t *tvb, const guint8 *boundary,
     boundary_start = find_first_boundary(tvb, 0, boundary, boundary_len,
             &boundary_line_len, last_boundary);
     if (boundary_start == 0) {
-       proto_tree_add_item(tree, hf_multipart_first_boundary, tvb, boundary_start, boundary_line_len, ENC_NA|ENC_ASCII);
+       proto_tree_add_text(tree, tvb, boundary_start, boundary_line_len,
+             "First boundary: %s",
+             tvb_format_text(tvb, boundary_start, boundary_line_len));
         return boundary_start + boundary_line_len;
     } else if (boundary_start > 0) {
         if (boundary_line_len > 0) {
             gint body_part_start = boundary_start + boundary_line_len;
 
-            if (boundary_start > 0) {
-               proto_tree_add_item(tree, hf_multipart_preamble, tvb, 0, boundary_start, ENC_NA);
+            if (body_part_start > 0) {
+               proto_tree_add_text(tree, tvb, 0, body_part_start,
+                     "Preamble");
             }
-            proto_tree_add_item(tree, hf_multipart_first_boundary, tvb, boundary_start, boundary_line_len, ENC_NA|ENC_ASCII);
+            proto_tree_add_text(tree, tvb, boundary_start,
+                  boundary_line_len, "First boundary: %s",
+                  tvb_format_text(tvb, boundary_start,
+                     boundary_line_len));
             return body_part_start;
         }
     }
@@ -606,17 +603,19 @@ process_body_part(proto_tree *tree, tvbuff_t *tvb, const guint8 *boundary,
         /* Look for the end of the header (denoted by cr)
          * 3:d argument to imf_find_field_end() maxlen; must be last offset in the tvb.
          */
-        next_offset = imf_find_field_end(tvb, offset, tvb_reported_length_remaining(tvb, offset)+offset, &last_field);
+        next_offset = imf_find_field_end(tvb, offset, tvb_length_remaining(tvb, offset)+offset, &last_field);
         /* If cr not found, won't have advanced - get out to avoid infinite loop! */
         if (next_offset == offset) {
             break;
         }
 
-        hdr_str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, next_offset - offset, ENC_ASCII);
+        hdr_str = tvb_get_string(wmem_packet_scope(), tvb, offset, next_offset - offset);
 
         header_str = unfold_and_compact_mime_header(hdr_str, &colon_offset);
         if (colon_offset <= 0) {
-           proto_tree_add_format_text(subtree, tvb, offset, next_offset - offset);
+           proto_tree_add_text(subtree, tvb, offset, next_offset - offset,
+                 "%s",
+                 tvb_format_text(tvb, offset, next_offset - offset));
         } else {
             gint hf_index;
 
@@ -625,7 +624,10 @@ process_body_part(proto_tree *tree, tvbuff_t *tvb, const guint8 *boundary,
             hf_index = is_known_multipart_header(header_str, colon_offset);
 
             if (hf_index == -1) {
-               proto_tree_add_format_text(subtree, tvb, offset, next_offset - offset);
+               proto_tree_add_text(subtree, tvb, offset,
+                     next_offset - offset,
+                     "%s",
+                     tvb_format_text(tvb, offset, next_offset - offset));
             } else {
                 char *value_str = header_str + colon_offset + 1;
 
@@ -700,13 +702,15 @@ process_body_part(proto_tree *tree, tvbuff_t *tvb, const guint8 *boundary,
             &boundary_line_len, last_boundary);
     if (boundary_start > 0) {
         gint body_len = boundary_start - body_start;
-        tvbuff_t *tmp_tvb = tvb_new_subset_length(tvb, body_start, body_len);
+        tvbuff_t *tmp_tvb = tvb_new_subset(tvb, body_start,
+                body_len, body_len);
 
         if (content_type_str) {
 
             /*
              * subdissection
              */
+            void *save_private_data = pinfo->private_data;
             gboolean dissected;
 
             /*
@@ -722,33 +726,43 @@ process_body_part(proto_tree *tree, tvbuff_t *tvb, const guint8 *boundary,
 
             }
 
+            pinfo->private_data = parameters;
             /*
              * First try the dedicated multipart dissector table
              */
             dissected = dissector_try_string(multipart_media_subdissector_table,
-                        content_type_str, tmp_tvb, pinfo, subtree, parameters);
+                        content_type_str, tmp_tvb, pinfo, subtree, NULL);
             if (! dissected) {
                 /*
                  * Fall back to the default media dissector table
                  */
                 dissected = dissector_try_string(media_type_dissector_table,
-                        content_type_str, tmp_tvb, pinfo, subtree, parameters);
+                        content_type_str, tmp_tvb, pinfo, subtree, NULL);
             }
             if (! dissected) {
                 const char *save_match_string = pinfo->match_string;
                 pinfo->match_string = content_type_str;
-                call_dissector_with_data(media_handle, tmp_tvb, pinfo, subtree, parameters);
+                call_dissector(media_handle, tmp_tvb, pinfo, subtree);
                 pinfo->match_string = save_match_string;
             }
+            pinfo->private_data = save_private_data;
             parameters = NULL; /* Shares same memory as content_type_str */
         } else {
             call_dissector(data_handle, tmp_tvb, pinfo, subtree);
         }
         proto_item_set_len(ti, boundary_start - start);
         if (*last_boundary == TRUE) {
-           proto_tree_add_item(tree, hf_multipart_last_boundary, tvb, boundary_start, boundary_line_len, ENC_NA|ENC_ASCII);
+           proto_tree_add_text(tree, tvb,
+                 boundary_start, boundary_line_len,
+                 "Last boundary: %s",
+                 tvb_format_text(tvb, boundary_start,
+                    boundary_line_len));
         } else {
-           proto_tree_add_item(tree, hf_multipart_boundary, tvb, boundary_start, boundary_line_len, ENC_NA|ENC_ASCII);
+           proto_tree_add_text(tree, tvb,
+                 boundary_start, boundary_line_len,
+                 "Boundary: %s",
+                 tvb_format_text(tvb, boundary_start,
+                    boundary_line_len));
         }
 
         g_free(filename);
@@ -767,12 +781,12 @@ process_body_part(proto_tree *tree, tvbuff_t *tvb, const guint8 *boundary,
  * Call this method to actually dissect the multipart body.
  * NOTE - Only do so if a boundary string has been found!
  */
-static int dissect_multipart(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
+static int dissect_multipart(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
     proto_tree *subtree;
     proto_item *ti;
     proto_item *type_ti;
-    multipart_info_t *m_info = get_multipart_info(pinfo, (const char*)data);
+    multipart_info_t *m_info = get_multipart_info(pinfo);
     gint header_start = 0;
     guint8 *boundary;
     gint boundary_len;
@@ -782,9 +796,11 @@ static int dissect_multipart(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
         /*
          * We can't get the required multipart information
          */
-        proto_tree_add_expert(tree, pinfo, &ei_multipart_no_required_boundary_parameter, tvb, 0, -1);
+        proto_tree_add_text(tree, tvb, 0, -1,
+                "The multipart dissector could not find "
+                "the required boundary parameter.");
         call_dissector(data_handle, tvb, pinfo, tree);
-        return tvb_reported_length(tvb);
+        return tvb_length(tvb);
     }
     boundary = (guint8 *)m_info->boundary;
     boundary_len = m_info->boundary_length;
@@ -818,7 +834,7 @@ static int dissect_multipart(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
         call_dissector(data_handle, tvb, pinfo, subtree);
         /* Clean up the dynamically allocated memory */
         cleanup_multipart_info(m_info);
-        return tvb_reported_length(tvb);
+        return tvb_length(tvb);
     }
     /*
      * Process the encapsulated bodies
@@ -829,18 +845,18 @@ static int dissect_multipart(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
         if (header_start == -1) {
             /* Clean up the dynamically allocated memory */
             cleanup_multipart_info(m_info);
-            return tvb_reported_length(tvb);
+            return tvb_length(tvb);
         }
     }
     /*
      * Process the multipart trailer
      */
-    if (tvb_reported_length_remaining(tvb, header_start) > 0) {
-       proto_tree_add_item(subtree, hf_multipart_trailer, tvb, header_start, -1, ENC_NA);
+    if (tvb_length_remaining(tvb, header_start) > 0) {
+       proto_tree_add_text(subtree, tvb, header_start, -1, "Trailer");
     }
     /* Clean up the dynamically allocated memory */
     cleanup_multipart_info(m_info);
-    return tvb_reported_length(tvb);
+    return tvb_length(tvb);
 }
 
 /* Returns index of method in multipart_headers */
@@ -938,22 +954,12 @@ proto_register_multipart(void)
               "Content-Type Header", HFILL
           }
         },
-
-      /* Generated from convert_proto_tree_add_text.pl */
-      { &hf_multipart_first_boundary, { "First boundary", "mime_multipart.first_boundary", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_multipart_preamble, { "Preamble", "mime_multipart.preamble", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_multipart_last_boundary, { "Last boundary", "mime_multipart.last_boundary", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_multipart_boundary, { "Boundary", "mime_multipart.boundary", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-      { &hf_multipart_trailer, { "Trailer", "mime_multipart.trailer", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-
     };
 
     /*
      * Preferences
      */
     module_t *multipart_module;
-    expert_module_t* expert_multipart;
-
 
     /*
      * Setup protocol subtree array
@@ -962,10 +968,6 @@ proto_register_multipart(void)
         &ett_multipart,
         &ett_multipart_main,
         &ett_multipart_body,
-    };
-
-    static ei_register_info ei[] = {
-        { &ei_multipart_no_required_boundary_parameter, { "mime_multipart.no_required_boundary_parameter", PI_PROTOCOL, PI_ERROR, "The multipart dissector could not find the required boundary parameter.", EXPFILL }},
     };
 
     /*
@@ -982,8 +984,6 @@ proto_register_multipart(void)
      */
     proto_register_field_array(proto_multipart, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-    expert_multipart = expert_register_protocol(proto_multipart);
-    expert_register_field_array(expert_multipart, ei, array_length(ei));
 
     multipart_module = prefs_register_protocol(proto_multipart, NULL);
 
@@ -1051,8 +1051,6 @@ proto_reg_handoff_multipart(void)
             "multipart/form-data", multipart_handle);
     dissector_add_string("media_type",
             "multipart/report", multipart_handle);
-    dissector_add_string("media_type",
-            "multipart/signed", multipart_handle);
 
     /*
      * Supply an entry to use for unknown multipart subtype.
@@ -1061,16 +1059,3 @@ proto_reg_handoff_multipart(void)
     dissector_add_string("media_type",
             "multipart/", multipart_handle);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

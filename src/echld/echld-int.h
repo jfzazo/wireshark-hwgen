@@ -61,20 +61,19 @@
 
 
 #include "capture_opts.h"
-#include <capchild/capture_session.h>
-#include <caputils/capture_ifinfo.h>
-#include <capchild/capture_sync.h>
+#include "capture_session.h"
+#include "capture_ifinfo.h"
+#include "capture_sync.h"
+#include "version_info.h"
 #include "cfile.h"
 #include "wsutil/crash_info.h"
 #include "wsutil/privileges.h"
 #include "wsutil/filesystem.h"
-#include "wsutil/copyright_info.h"
-#include "wsutil/ws_version_info.h"
-#include "epan/addr_resolv.h"
 #include "epan/epan.h"
 #include "epan/prefs.h"
 #include "epan/ex-opt.h"
 #include "epan/funnel.h"
+#include "epan/prefs.h"
 #include "epan/timestamp.h"
 #include "epan/disabled_protos.h"
 #include "echld.h"

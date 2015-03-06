@@ -24,7 +24,7 @@
 
 #include <stdio.h>
 
-#include <config.h>
+#include "config.h"
 
 #include <glib.h>
 
@@ -37,7 +37,7 @@
 #ifdef HAVE_LIBPCAP
 #include "capture_opts.h"
 #endif
-#include <capchild/capture_session.h>
+#include "capture_session.h"
 
 #include <QMainWindow>
 #include <QSplitter>
@@ -48,21 +48,18 @@
 # include <QSocketNotifier>
 #endif
 
-#include "about_dialog.h"
-#include "capture_file.h"
-#include "capture_file_dialog.h"
-#include "capture_file_properties_dialog.h"
-#include "capture_interfaces_dialog.h"
-#include "display_filter_combo.h"
-#include "file_set_dialog.h"
-#include "filter_action.h"
-#include "follow_stream_dialog.h"
 #include "main_welcome.h"
 #include "packet_list.h"
+#include "display_filter_combo.h"
 #include "progress_bar.h"
+#include "file_set_dialog.h"
+#include "capture_file_dialog.h"
+#include "summary_dialog.h"
+#include "follow_stream_dialog.h"
+#include "capture_interfaces_dialog.h"
+#include "about_dialog.h"
 
 class QAction;
-class QActionGroup;
 
 namespace Ui {
     class MainWindow;
@@ -78,17 +75,13 @@ public:
     void setPipeInputHandler(gint source, gpointer user_data, int *child_process, pipe_input_cb_t input_cb);
 
     QString getFilter();
-#ifdef HAVE_LIBPCAP
-    capture_session *captureSession() { return &cap_session_; }
-#endif
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event);
     void keyPressEvent(QKeyEvent *event);
-    void closeEvent(QCloseEvent *event);
+    void closeEvent (QCloseEvent *event);
 
 private:
-    // XXX Move to FilterUtils
     enum MatchSelected {
         MatchSelectedReplace,
         MatchSelectedAnd,
@@ -110,24 +103,20 @@ private:
     QSplitter extra_split_;
     MainWelcome *main_welcome_;
     DisplayFilterCombo *df_combo_box_;
-    CaptureFile capture_file_;
-    QFont mono_font_;
+    capture_file *cap_file_;
     // XXX - packet_list_, proto_tree_, and byte_view_tab_ should
     // probably be full-on values instead of pointers.
     PacketList *packet_list_;
     ProtoTree *proto_tree_;
     QWidget *previous_focus_;
     FileSetDialog file_set_dialog_;
+    SummaryDialog summary_dialog_;
     ByteViewTab *byte_view_tab_;
     QWidget empty_pane_;
-    QActionGroup *show_hide_actions_;
-    QActionGroup *time_display_actions_;
-    QActionGroup *time_precision_actions_;
 
     bool capture_stopping_;
     bool capture_filter_valid_;
 #ifdef HAVE_LIBPCAP
-    capture_session cap_session_;
     CaptureInterfacesDialog capture_interfaces_dialog_;
 #endif
 
@@ -156,11 +145,6 @@ private:
     bool testCaptureFileClose(bool from_quit = false, QString& before_what = *new QString());
     void captureStop();
 
-    void initMainToolbarIcons();
-    void initShowHideMainWidgets();
-    void initTimeDisplayFormatMenu();
-    void initTimePrecisionFormatMenu();
-
     void setTitlebarForSelectedTreeRow();
     void setTitlebarForCaptureFile();
     void setTitlebarForCaptureInProgress();
@@ -171,14 +155,12 @@ private:
     void setMenusForFileSet(bool enable_list_files);
 
     void setForCaptureInProgress(gboolean capture_in_progress = false);
-    QMenu* findOrAddMenu(QMenu *parent_menu, QString& menu_text);
 
 signals:
     void showProgress(progdlg_t **dlg_p, bool animate, const QString message, bool terminate_is_stop, bool *stop_flag, float pct);
     void setCaptureFile(capture_file *cf);
     void setDissectedCaptureFile(capture_file *cf);
     void displayFilterSuccess(bool success);
-    void monospaceFontChanged(const QFont &mono_font);
 
 public slots:
     // in main_window_slots.cpp
@@ -186,10 +168,8 @@ public slots:
     void filterPackets(QString& new_filter = *new QString(), bool force = false);
     void updateForUnsavedChanges();
     void layoutPanes();
-    void layoutToolbars();
-    void updateNameResolutionActions();
 
-    void captureCapturePrepared(capture_session *);
+    void captureCapturePrepared(capture_session *cap_session);
     void captureCaptureUpdateStarted(capture_session *cap_session);
     void captureCaptureUpdateFinished(capture_session *cap_session);
     void captureCaptureFixedStarted(capture_session *cap_session);
@@ -197,11 +177,11 @@ public slots:
     void captureCaptureStopping(capture_session *cap_session);
     void captureCaptureFailed(capture_session *cap_session);
 
-    void captureFileOpened();
-    void captureFileReadStarted();
-    void captureFileReadFinished();
-    void captureFileClosing();
-    void captureFileClosed();
+    void captureFileOpened(const capture_file *cf);
+    void captureFileReadStarted(const capture_file *cf);
+    void captureFileReadFinished(const capture_file *cf);
+    void captureFileClosing(const capture_file *cf);
+    void captureFileClosed(const capture_file *cf);
 
     void configurationProfileChanged(const gchar *profile_name);
     void filterExpressionsChanged();
@@ -224,26 +204,11 @@ private slots:
     void captureFilterSyntaxChanged(bool valid);
     void redissectPackets();
     void recreatePacketList();
-    void fieldsChanged();
-    void showColumnEditor(int column);
-    void addStatsPluginsToMenu();
-
-    void startInterfaceCapture(bool valid);
 
     void setFeaturesEnabled(bool enabled = true);
 
     void addDisplayFilterButton(QString df_text);
     void displayFilterButtonClicked();
-
-    // Handle FilterAction signals
-    void filterAction(QString& filter, FilterAction::Action action, FilterAction::ActionType type);
-
-    /** Pass stat cmd arguments to a slot.
-     * @param menu_path slot Partial slot name, e.g. "StatisticsIOGraph".
-     * @param arg "-z" argument, e.g. "io,stat".
-     * @param userdata Optional user data.
-     */
-    void openStatCommandDialog(const QString &menu_path, const char *arg, void *userdata);
 
     // We should probably move these to main_window_actions.cpp similar to
     // gtk/main_menubar.c
@@ -267,7 +232,6 @@ private slots:
     void on_actionFileExportObjectsDICOM_triggered();
     void on_actionFileExportObjectsHTTP_triggered();
     void on_actionFileExportObjectsSMB_triggered();
-    void on_actionFileExportObjectsTFTP_triggered();
     void on_actionFilePrint_triggered();
 
     void on_actionFileExportPDU_triggered();
@@ -296,35 +260,20 @@ private slots:
     void on_actionEditTimeShift_triggered();
     void on_actionEditPacketComment_triggered();
     void on_actionEditConfigurationProfiles_triggered();
-    void showPreferencesDialog(PreferencesDialog::PreferencesPane start_pane = PreferencesDialog::ppAppearance);
     void on_actionEditPreferences_triggered();
 
-    void showHideMainWidgets(QAction *action);
-    void setTimestampFormat(QAction *action);
-    void setTimestampPrecision(QAction *action);
-    void on_actionViewTimeDisplaySecondsWithHoursAndMinutes_triggered(bool checked);
-    void setNameResolution();
-    void on_actionViewNameResolutionPhysical_triggered();
-    void on_actionViewNameResolutionNetwork_triggered();
-    void on_actionViewNameResolutionTransport_triggered();
-    // XXX We're not porting the concurrency action from GTK+ on purpose.
-    void zoomText();
-    void on_actionViewZoomIn_triggered();
-    void on_actionViewZoomOut_triggered();
-    void on_actionViewNormalSize_triggered();
-    void on_actionViewColorizePacketList_triggered(bool checked);
-    void on_actionViewResizeColumns_triggered();
     void on_actionViewReload_triggered();
+    void on_actionViewToolbarMainToolbar_triggered();
+    void on_actionViewToolbarDisplayFilter_triggered();
 
     void on_actionGoGoToPacket_triggered();
     void resetPreviousFocus();
 
 #ifdef HAVE_LIBPCAP
     void on_actionCaptureOptions_triggered();
-    void on_actionCaptureRefreshInterfaces_triggered();
 #endif
 
-    void matchFieldFilter(FilterAction::Action action, FilterAction::ActionType filter_type);
+    void matchSelectedFilter(MainWindow::MatchSelected filter_type, bool apply = false, bool copy_only = false);
     void on_actionAnalyzeAAFSelected_triggered();
     void on_actionAnalyzeAAFNotSelected_triggered();
     void on_actionAnalyzeAAFAndSelected_triggered();
@@ -365,17 +314,16 @@ private slots:
     void on_actionHelpAbout_triggered();
 
 #ifdef HAVE_SOFTWARE_UPDATE
-    void checkForUpdates();
+    void on_actionHelpCheckForUpdates_triggered();
 #endif
 
     void on_goToCancel_clicked();
     void on_goToGo_clicked();
     void on_goToLineEdit_returnPressed();
-    void on_actionCaptureStart_triggered();
-    void on_actionCaptureStop_triggered();
+    void on_actionStartCapture_triggered();
+    void on_actionStopCapture_triggered();
 
-    void on_actionStatisticsCaptureFileProperties_triggered();
-    void on_actionStatisticsProtocolHierarchy_triggered();
+    void on_actionSummary_triggered();
     void on_actionStatisticsFlowGraph_triggered();
     void openTcpStreamDialog(int graph_type);
     void on_actionStatisticsTcpStreamStevens_triggered();
@@ -387,6 +335,10 @@ private slots:
     void on_actionSCTPShowAllAssociations_triggered();
     void on_actionSCTPAnalyseThisAssociation_triggered();
     void on_actionSCTPFilterThisAssociation_triggered();
+
+#ifdef HAVE_LIBPCAP
+    void on_actionCaptureInterfaces_triggered();
+#endif
 
     void openStatisticsTreeDialog(const gchar *abbr);
     void on_actionStatistics29WestTopics_Advertisements_by_Topic_triggered();
@@ -410,33 +362,18 @@ private slots:
     void on_actionStatisticsBACappObjectId_triggered();
     void on_actionStatisticsBACappService_triggered();
     void on_actionStatisticsCollectd_triggered();
-    void statCommandConversations(const char *arg = NULL, void *userdata = NULL);
-    void on_actionStatisticsConversations_triggered();
-    void statCommandEndpoints(const char *arg = NULL, void *userdata = NULL);
-    void on_actionStatisticsEndpoints_triggered();
     void on_actionStatisticsHART_IP_triggered();
     void on_actionStatisticsHTTPPacketCounter_triggered();
     void on_actionStatisticsHTTPRequests_triggered();
     void on_actionStatisticsHTTPLoadDistribution_triggered();
     void on_actionStatisticsPacketLen_triggered();
-    void statCommandIOGraph(const char *arg = NULL, void *userdata = NULL);
     void on_actionStatisticsIOGraph_triggered();
     void on_actionStatisticsSametime_triggered();
-    void on_actionStatisticsDNS_triggered();
-    void actionStatisticsPlugin_triggered();
-    void on_actionStatisticsHpfeeds_triggered();
-    void on_actionStatisticsHTTP2_triggered();
 
-    void openVoipCallsDialog(bool all_flows = false);
-    void on_actionTelephonyVoipCalls_triggered();
     void on_actionTelephonyISUPMessages_triggered();
-    void on_actionTelephonyRTPStreams_triggered();
     void on_actionTelephonyRTSPPacketCounter_triggered();
     void on_actionTelephonySMPPOperations_triggered();
     void on_actionTelephonyUCPMessages_triggered();
-    void on_actionTelephonySipFlows_triggered();
-
-    void changeEvent(QEvent* event);
 };
 
 #endif // MAINWINDOW_H

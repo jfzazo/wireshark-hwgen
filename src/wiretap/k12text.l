@@ -96,7 +96,7 @@ static gboolean at_eof;
 static guint junk_chars;
 static void finalize_frame(void);
 static gchar* error_str;
-static guint64 file_bytes_read;
+static guint file_bytes_read;
 static gboolean ok_frame;
 static FILE_T yy_fh;
 
@@ -141,8 +141,8 @@ bytes_junk \174[A-F0-9][A-F0-9\040][A-F0-9\040][A-F0-9\040]\174
 byte [a-f0-9][a-f0-9]\174
 end_bytes \015?\012\015?\012
 eth ETHER
-mtp2 MTP-L2
-sscop SSCOP
+ /* mtp2 MTP-L2 ;; XXX: Not supported until it's determined how to fill in the pseudo_header req'd by packet-mtp2 */
+ /* sscop SSCOP ;; XXX: Not supported until it's determined how to fill in the pseudo_header req'd by packet-atm  */
 sscfnni SSCF
 hdlc HDLC
 
@@ -162,8 +162,8 @@ hdlc HDLC
 <M2N>{comma}  { BEGIN(NS); }
 <NS>{threedigits} { SET_NS(yytext); BEGIN(ENCAP);}
 <ENCAP>{eth} {g_encap = WTAP_ENCAP_ETHERNET; BEGIN(STARTBYTES); }
-<ENCAP>{mtp2} {g_encap = WTAP_ENCAP_MTP2; BEGIN(STARTBYTES); }
-<ENCAP>{sscop} {g_encap = WTAP_ENCAP_ATM_PDUS; BEGIN(STARTBYTES); }
+ /* <ENCAP>{mtp2} {g_encap = WTAP_ENCAP_MTP2; BEGIN(STARTBYTES); }      Not supported as yet */
+ /* <ENCAP>{sscop} {g_encap = WTAP_ENCAP_ATM_PDUS; BEGIN(STARTBYTES); } Not supported as yet */
 <ENCAP>{sscfnni} {g_encap = WTAP_ENCAP_MTP3; BEGIN(STARTBYTES); }
 <ENCAP>{hdlc} {g_encap = WTAP_ENCAP_CHDLC; BEGIN(STARTBYTES); }
 <ENCAP,STARTBYTES>{start_bytes} { BEGIN(BYTE); }
@@ -182,8 +182,8 @@ static void finalize_frame(void) {
 
 /* Fill in pkthdr */
 
-static gboolean
-k12text_set_headers(struct wtap_pkthdr *phdr, int *err, gchar **err_info)
+static void
+k12text_set_headers(struct wtap_pkthdr *phdr)
 {
 	phdr->rec_type = REC_TYPE_PACKET;
 	phdr->presence_flags = WTAP_HAS_TS|WTAP_HAS_CAP_LEN;
@@ -204,24 +204,18 @@ k12text_set_headers(struct wtap_pkthdr *phdr, int *err, gchar **err_info)
 	    case WTAP_ENCAP_CHDLC:
 		    /* no pseudo_header to fill in for these types */
 		    break;
+#if 0
 	    case WTAP_ENCAP_MTP2:      /* not (yet) supported		*/
-		    /* XXX: I don't know how to fill in the		*/
-		    /* pseudo_header for these types.			*/
-		    *err = WTAP_ERR_UNSUPPORTED;
-		    *err_info = g_strdup("k12text: MTP2 packets not yet supported");
-		    return FALSE;
 	    case WTAP_ENCAP_ATM_PDUS:  /* not (yet) supported		*/
 		    /* XXX: I don't know how to fill in the		*/
-		    /* pseudo_header for these types.			*/
-		    *err = WTAP_ERR_UNSUPPORTED;
-		    *err_info = g_strdup("k12text: SSCOP packets not yet supported");
-		    return FALSE;
+		    /* pseudo_header for these types. So: The Lexer	*/
+		    /* has recognition for these types commented	*/
+		    /* out ....						*/
+		    break;
+#endif
 	    default:
-		    *err = WTAP_ERR_UNSUPPORTED;
-		    *err_info = g_strdup("k12text: unknown encapsulation type");
-		    return FALSE;
+		    break;
 	}
-	return TRUE;
 }
 
 /* Note: k12text_reset is called each time data is to be processed from	*/
@@ -287,11 +281,10 @@ k12text_read(wtap *wth, int *err, char ** err_info, gint64 *data_offset)
 	*data_offset = k12text->next_frame_offset;       /* file position for beginning of this frame   */
 	k12text->next_frame_offset += file_bytes_read;   /* file position after end of this frame       */
 
-	if (!k12text_set_headers(&wth->phdr, err, err_info))
-		return FALSE;
+	k12text_set_headers(&wth->phdr);
 
-	ws_buffer_assure_space(wth->frame_buffer, wth->phdr.caplen);
-	memcpy(ws_buffer_start_ptr(wth->frame_buffer), bb, wth->phdr.caplen);
+	buffer_assure_space(wth->frame_buffer, wth->phdr.caplen);
+	memcpy(buffer_start_ptr(wth->frame_buffer), bb, wth->phdr.caplen);
 
 	return TRUE;
 }
@@ -318,16 +311,15 @@ k12text_seek_read(wtap *wth, gint64 seek_off, struct wtap_pkthdr *phdr, Buffer *
 		return FALSE;
 	}
 
-	if (!k12text_set_headers(phdr, err, err_info))
-		return FALSE;
+	k12text_set_headers(phdr);
 
-	ws_buffer_assure_space(buf, phdr->caplen);
-	memcpy(ws_buffer_start_ptr(buf), bb, phdr->caplen);
+	buffer_assure_space(buf, phdr->caplen);
+	memcpy(buffer_start_ptr(buf), bb, phdr->caplen);
 
 	return TRUE;
 }
 
-wtap_open_return_val
+int
 k12text_open(wtap *wth, int *err, gchar **err_info _U_)
 {
 	k12text_t *k12text;
@@ -337,10 +329,10 @@ k12text_open(wtap *wth, int *err, gchar **err_info _U_)
 	BEGIN(MAGIC);
 	yylex();
 
-	if (! is_k12text) return WTAP_OPEN_NOT_MINE;
+	if (! is_k12text) return 0;
 
 	if ( file_seek(wth->fh, 0, SEEK_SET, err) == -1) {
-		return WTAP_OPEN_ERROR;
+		return -1;
 	}
 
 	k12text = (k12text_t *)g_malloc(sizeof(k12text_t));
@@ -351,9 +343,9 @@ k12text_open(wtap *wth, int *err, gchar **err_info _U_)
 	wth->snapshot_length = 0;
 	wth->subtype_read = k12text_read;
 	wth->subtype_seek_read = k12text_seek_read;
-	wth->file_tsprec = WTAP_TSPREC_NSEC;
+	wth->tsprecision = WTAP_FILE_TSPREC_NSEC;
 
-	return WTAP_OPEN_MINE;
+	return 1;
 }
 
 
@@ -369,7 +361,7 @@ static const struct { int e; const char* s; } encaps[] = {
 
 static gboolean
 k12text_dump(wtap_dumper *wdh _U_, const struct wtap_pkthdr *phdr,
-	     const guint8 *pd, int *err, gchar **err_info _U_) {
+	     const guint8 *pd, int *err) {
 #define K12BUF_SIZE 196808
 	char *buf;
 	size_t left = K12BUF_SIZE;
@@ -399,7 +391,7 @@ k12text_dump(wtap_dumper *wdh _U_, const struct wtap_pkthdr *phdr,
 		/*
 		 * That encapsulation type is not supported.  Fail.
 		 */
-		*err = WTAP_ERR_UNWRITABLE_ENCAP;
+		*err = WTAP_ERR_UNSUPPORTED_ENCAP;
 		return FALSE;
 	}
 
@@ -418,17 +410,17 @@ k12text_dump(wtap_dumper *wdh _U_, const struct wtap_pkthdr *phdr,
 	p += wl;
 	left -= wl;
 
-	wl = g_snprintf(p, (gulong)left, "%.3d,%.3d   %s\r\n|0   |", ms, ns, str_enc);
+	wl = g_snprintf(p, left, "%.3d,%.3d   %s\r\n|0   |", ms, ns, str_enc);
 	p += wl;
 	left -= wl;
 
 	for(i = 0; i < phdr->caplen && left > 2; i++) {
-		wl = g_snprintf(p, (gulong)left, "%.2x|", pd[i]);
+		wl = g_snprintf(p, left, "%.2x|", pd[i]);
 		p += wl;
 		left -= wl;
 	}
 
-	wl = g_snprintf(p, (gulong)left, "\r\n\r\n");
+	wl = g_snprintf(p, left, "\r\n\r\n");
 	left -= wl;
 
 	ret = wtap_dump_file_write(wdh, buf, K12BUF_SIZE - left, err);
@@ -458,7 +450,7 @@ k12text_dump_can_write_encap(int encap)
 	case WTAP_ENCAP_MTP2:
 	case WTAP_ENCAP_ATM_PDUS:
 	default:
-		return WTAP_ERR_UNWRITABLE_ENCAP;
+		return WTAP_ERR_UNSUPPORTED_ENCAP;
     }
 }
 

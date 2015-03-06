@@ -23,6 +23,6 @@
 #include <glib.h>
 #include "ws_symbol_export.h"
 
-wtap_open_return_val ber_open(wtap *wth, int *err, gchar **err_info);
+int ber_open(wtap *wth, int *err, gchar **err_info);
 
 #endif

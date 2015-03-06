@@ -25,6 +25,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include "packet-windows-common.h"
 #include "packet-smb-common.h"
@@ -51,11 +53,9 @@ static int hf_lm_token = -1;
 static int hf_major_version = -1;
 static int hf_minor_version = -1;
 static int hf_os_version = -1;
-static int hf_signature = -1;
 static int hf_date_time = -1;
 static int hf_update_type = -1;
 static int hf_request_count = -1;
-static int hf_account_control = -1;
 static int hf_flags_autolock = -1;
 static int hf_flags_expire = -1;
 static int hf_flags_server_trust = -1;
@@ -84,7 +84,6 @@ static int hf_server_ip = -1;
 
 static int hf_server_site_name = -1;
 static int hf_client_site_name = -1;
-static int hf_data = -1;
 
 static int ett_smb_logon = -1;
 static int ett_smb_account_flags = -1;
@@ -153,24 +152,34 @@ static int
 dissect_account_control(tvbuff_t *tvb, proto_tree *tree, int offset)
 {
 	/* display the Allowable Account control bits */
-	static const int * flags[] = {
-		&hf_flags_autolock,
-		&hf_flags_expire,
-		&hf_flags_server_trust,
-		&hf_flags_workstation_trust,
-		&hf_flags_interdomain_trust,
-		&hf_flags_mns_user,
-		&hf_flags_normal_user,
-		&hf_flags_temp_dup_user,
-		&hf_flags_password_required,
-		&hf_flags_homedir_required,
-		&hf_flags_enabled,
-		NULL
-	};
 
-	proto_tree_add_bitmask(tree, tvb, offset, hf_account_control, ett_smb_account_flags, flags, ENC_LITTLE_ENDIAN);
+	proto_item *ti = NULL;
+	proto_tree *flags_tree = NULL;
+	guint32 flags;
+
+	flags = tvb_get_letohl(tvb, offset);
+
+	if (tree) {
+		ti = proto_tree_add_text(tree, tvb, offset, 4,
+			"Account control  = 0x%04x", flags);
+
+		flags_tree = proto_item_add_subtree(ti, ett_smb_account_flags);
+	}
+
+	proto_tree_add_boolean(flags_tree, hf_flags_autolock, tvb, offset, 4, flags);
+	proto_tree_add_boolean(flags_tree, hf_flags_expire, tvb, offset, 4, flags);
+	proto_tree_add_boolean(flags_tree, hf_flags_server_trust, tvb, offset, 4, flags);
+	proto_tree_add_boolean(flags_tree, hf_flags_workstation_trust, tvb, offset, 4, flags);
+	proto_tree_add_boolean(flags_tree, hf_flags_interdomain_trust, tvb, offset, 4, flags);
+	proto_tree_add_boolean(flags_tree, hf_flags_mns_user, tvb, offset, 4, flags);
+	proto_tree_add_boolean(flags_tree, hf_flags_normal_user, tvb, offset, 4, flags);
+	proto_tree_add_boolean(flags_tree, hf_flags_temp_dup_user, tvb, offset, 4, flags);
+	proto_tree_add_boolean(flags_tree, hf_flags_password_required, tvb, offset, 4, flags);
+	proto_tree_add_boolean(flags_tree, hf_flags_homedir_required, tvb, offset, 4, flags);
+	proto_tree_add_boolean(flags_tree, hf_flags_enabled, tvb, offset, 4, flags);
 
 	offset += 4;
+
 	return offset;
 }
 
@@ -247,7 +256,7 @@ dissect_smb_logon_request(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tre
 	offset += 1;
 
 	/* NT version */
-	proto_tree_add_item(tree, hf_nt_version, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+  	proto_tree_add_item(tree, hf_nt_version, tvb, offset, 2, ENC_LITTLE_ENDIAN);
 	offset += 2;
 
 	/* LM token */
@@ -288,7 +297,7 @@ dissect_smb_logon_2(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int
 	offset = display_ms_string(tvb, tree, offset, hf_mailslot_name, NULL);
 
 	/* NT version */
-	proto_tree_add_item(tree, hf_nt_version, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+  	proto_tree_add_item(tree, hf_nt_version, tvb, offset, 2, ENC_LITTLE_ENDIAN);
 	offset += 2;
 
 	/* LM token */
@@ -395,7 +404,7 @@ dissect_smb_pdc_startup(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 	  }
 
 	  /* NT version */
-	  proto_tree_add_item(tree, hf_nt_version, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+  	  proto_tree_add_item(tree, hf_nt_version, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 	  offset += 4;
 
 	  /* LMNT token */
@@ -433,7 +442,8 @@ dissect_announce_change(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 {
 	/*** 0x0A ( Announce change to UAS or SAM ) ***/
 	guint32 info_count;
-	proto_tree *info_tree;
+	proto_item *ti = NULL;
+	proto_tree *info_tree = NULL;
 	guint32 db_index;
 	guint32 domain_sid_size;
 
@@ -480,8 +490,11 @@ dissect_announce_change(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 
 		while (info_count != 0) {
 			db_index = tvb_get_letohl(tvb, offset);
-			info_tree = proto_tree_add_subtree_format(tree, tvb, offset, 20,
-				    ett_smb_db_info, NULL, "DBChange Info Structure: index %u", db_index);
+			if (tree) {
+				ti = proto_tree_add_text(tree, tvb, offset, 20,
+				    "DBChange Info Structure: index %u", db_index);
+				info_tree = proto_item_add_subtree(ti, ett_smb_db_info);
+			}
 
 			proto_tree_add_uint(info_tree, hf_db_index, tvb, offset, 4,
 			    db_index);
@@ -626,8 +639,14 @@ dissect_smb_acc_update(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, 
 {
 	/*** 0x11  LM2.1 Announce Acc updates  ***/
 
+	guint32 Temp1, Temp2;
+
+	Temp1 = tvb_get_letohl(tvb, offset);
+	Temp2 = tvb_get_letohl(tvb, offset + 4);
+
 	/* signature */
-	proto_tree_add_item(tree, hf_signature, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+	proto_tree_add_text(tree, tvb, offset, 8, "Signature: 0x%08x%08x",
+		Temp1, Temp2);
 	offset += 8;
 
 	/* date/time */
@@ -798,9 +817,10 @@ dissect_smb_unknown(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int
 {
 	/* display data as unknown */
 
-	proto_tree_add_item(tree, hf_data, tvb, offset, -1, ENC_NA);
+	proto_tree_add_text(tree, tvb, offset, -1, "Data (%u bytes)",
+	    tvb_reported_length_remaining(tvb, offset));
 
-	return offset+tvb_reported_length_remaining(tvb, offset);
+	return offset+tvb_length_remaining(tvb, offset);
 }
 
 #define LOGON_LM10_LOGON_REQUEST		0x00
@@ -832,62 +852,62 @@ dissect_smb_unknown(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int
 #define LOGON_LAST_CMD				0x19
 
 static const value_string commands[] = {
-	{LOGON_LM10_LOGON_REQUEST,	   "LM1.0/LM2.0 LOGON Request"},
-	{LOGON_LM10_LOGON_RESPONSE,	   "LM1.0 LOGON Response"},
-	{LOGON_LM10_QUERY_CI,		   "LM1.0 Query - Centralized Initialization"},
-	{LOGON_LM10_QUERY_DI,		   "LM1.0 Query - Distributed Initialization"},
-	{LOGON_LM10_RESPONSE_CI,	   "LM1.0 Response - Centralized Query"},
-	{LOGON_LM10_RESPONSE_DI,	   "LM1.0 Response - Distributed Initialization"},
-	{LOGON_LM20_LOGON_RESPONSE,	   "LM2.0 Response to LOGON Request"},
-	{LOGON_PDC_QUERY,		   "Query for PDC"},
-	{LOGON_PDC_STARTUP,		   "Announce Startup of PDC"},
-	{LOGON_PDC_FAILED,		   "Announce Failed PDC"},
-	{LOGON_UAS_SAM,			   "Announce Change to UAS or SAM"},
-	{LOGON_NO_USER,			   "Announce no user on machine"},
-	{LOGON_PDC_RESPONSE,		   "Response from PDC"},
-	{LOGON_RELOGON_RESPONSE,	   "LM1.0/LM2.0 Response to re-LOGON Request"},
-	{LOGON_INTERROGATE_RESPONSE,	   "LM1.0/LM2.0 Response to Interrogate Request"},
-	{LOGON_LM20_RESPONSE_DURING_LOGON, "LM2.0 Response during LOGON pause"},
-	{LOGON_LM20_USER_UNKNOWN,	   "LM2.0 Response - user unknown"},
-	{LOGON_LM20_ACCOUNT_UPDATE,	   "LM2.0 Announce account updates"},
-	{LOGON_SAM_LOGON_REQUEST,	   "SAM LOGON request from client"},
-	{LOGON_SAM_LOGON_RESPONSE,	   "Response to SAM LOGON request"},
-	{LOGON_SAM_RESPONSE_DURING_LOGON,  "SAM Response during LOGON pause"},
-	{LOGON_SAM_USER_UNKNOWN,	   "SAM Response - user unknown"},
-	{LOGON_SAM_INTERROGATE_RESPONSE,   "SAM Response to Interrogate Request"},
-	{LOGON_SAM_AD_USER_UNKNOWN,	   "SAM Active Directory Response - user unknown"},
-	{LOGON_SAM_UNKNOWN_18,		   "SAM unknown command 0x18"},
-	{LOGON_SAM_AD_LOGON_RESPONSE,	   "Active Directory Response to SAM LOGON request"},
+	{LOGON_LM10_LOGON_REQUEST,	"LM1.0/LM2.0 LOGON Request"},
+	{LOGON_LM10_LOGON_RESPONSE,	"LM1.0 LOGON Response"},
+	{LOGON_LM10_QUERY_CI,		"LM1.0 Query - Centralized Initialization"},
+	{LOGON_LM10_QUERY_DI,		"LM1.0 Query - Distributed Initialization"},
+	{LOGON_LM10_RESPONSE_CI,	"LM1.0 Response - Centralized Query"},
+	{LOGON_LM10_RESPONSE_DI,	"LM1.0 Response - Distributed Initialization"},
+	{LOGON_LM20_LOGON_RESPONSE,	"LM2.0 Response to LOGON Request"},
+	{LOGON_PDC_QUERY,		"Query for PDC"},
+	{LOGON_PDC_STARTUP,		"Announce Startup of PDC"},
+	{LOGON_PDC_FAILED,		"Announce Failed PDC"},
+	{LOGON_UAS_SAM,			"Announce Change to UAS or SAM"},
+	{LOGON_NO_USER,			"Announce no user on machine"},
+	{LOGON_PDC_RESPONSE,		"Response from PDC"},
+	{LOGON_RELOGON_RESPONSE,	"LM1.0/LM2.0 Response to re-LOGON Request"},
+	{LOGON_INTERROGATE_RESPONSE,	"LM1.0/LM2.0 Response to Interrogate Request"},
+	{LOGON_LM20_RESPONSE_DURING_LOGON,"LM2.0 Response during LOGON pause"},
+	{LOGON_LM20_USER_UNKNOWN,	"LM2.0 Response - user unknown"},
+	{LOGON_LM20_ACCOUNT_UPDATE,	"LM2.0 Announce account updates"},
+	{LOGON_SAM_LOGON_REQUEST,	"SAM LOGON request from client"},
+	{LOGON_SAM_LOGON_RESPONSE,	"Response to SAM LOGON request"},
+	{LOGON_SAM_RESPONSE_DURING_LOGON,"SAM Response during LOGON pause"},
+	{LOGON_SAM_USER_UNKNOWN,	"SAM Response - user unknown"},
+	{LOGON_SAM_INTERROGATE_RESPONSE,"SAM Response to Interrogate Request"},
+	{LOGON_SAM_AD_USER_UNKNOWN,	"SAM Active Directory Response - user unknown"},
+	{LOGON_SAM_UNKNOWN_18,		"SAM unknown command 0x18"},
+	{LOGON_SAM_AD_LOGON_RESPONSE,	"Active Directory Response to SAM LOGON request"},
 	{0,	NULL}
 };
 
 static int (*dissect_smb_logon_cmds[])(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset) = {
-	dissect_smb_logon_request,    /* 0x00 (LM1.0/LM2.0 LOGON Request) */
-	dissect_smb_logon_LM10_resp,  /* 0x01 (LM1.0 LOGON Response)	*/
-	dissect_smb_logon_2,	      /* 0x02 (LM1.0 Query Centralized Init.)*/
-	dissect_smb_logon_2,	      /* 0x03 (LM1.0 Query Distributed Init.)*/
-	dissect_smb_logon_2,	      /* 0x04 (LM1.0 Centralized Query Resp.)*/
-	dissect_smb_logon_2,	      /* 0x05 (LM1.0 Distributed Query Resp.) */
-	dissect_smb_logon_LM20_resp,  /* 0x06 (LM2.0 LOGON Response)	*/
-	dissect_smb_pdc_query,	      /* 0x07 (Query for PDC) 		*/
-	dissect_smb_pdc_startup,      /* 0x08 (Announce PDC startup)	*/
-	dissect_smb_pdc_failure,      /* 0x09 (Announce Failed PDC)	*/
-	dissect_announce_change,      /* 0x0A (Announce Change to UAS or SAM)*/
-	dissect_smb_no_user,	      /* 0x0B (Announce no user on machine)*/
-	dissect_smb_pdc_startup,      /* 0x0C (Response from PDC)		*/
-	dissect_smb_relogon_resp,     /* 0x0D (Relogon response) 		*/
-	dissect_smb_inter_resp,	      /* 0x0E (Interrogate response) 	*/
-	dissect_smb_pdc_failure,      /* 0x0F (LM2.0 Resp. during LOGON pause*/
-	dissect_smb_pdc_failure,      /* 0x10 (LM 2.0 Unknown user response)*/
-	dissect_smb_acc_update,	      /* 0x11 (LM2.1 Announce Acc updates)*/
-	dissect_smb_sam_logon_req,    /* 0x12 (SAM LOGON request )	*/
-	dissect_smb_sam_logon_resp,   /* 0x13 (SAM LOGON response)	*/
-	dissect_smb_unknown,	      /* 0x14 (SAM Response during LOGON Pause) */
-	dissect_smb_sam_logon_resp,   /* 0x15 (SAM Response User Unknown)	*/
-	dissect_smb_unknown,	      /* 0x16 (SAM Response to Interrogate)*/
-	dissect_smb_pdc_response_ads, /* 0x17 (SAM AD response User Unknown*/
-	dissect_smb_unknown,	      /* 0x18 (Unknown command)		*/
-	dissect_smb_pdc_response_ads  /* 0x19 (SAM LOGON AD response)	*/
+	dissect_smb_logon_request,  /* 0x00 (LM1.0/LM2.0 LOGON Request) */
+	dissect_smb_logon_LM10_resp,/* 0x01 (LM1.0 LOGON Response)	*/
+	dissect_smb_logon_2,	    /* 0x02 (LM1.0 Query Centralized Init.)*/
+	dissect_smb_logon_2,	    /* 0x03 (LM1.0 Query Distributed Init.)*/
+	dissect_smb_logon_2,	    /* 0x04 (LM1.0 Centralized Query Resp.)*/
+	dissect_smb_logon_2,	    /* 0x05 (LM1.0 Distributed Query Resp.) */
+	dissect_smb_logon_LM20_resp,/* 0x06 (LM2.0 LOGON Response)	*/
+	dissect_smb_pdc_query,	    /* 0x07 (Query for PDC) 		*/
+	dissect_smb_pdc_startup,    /* 0x08 (Announce PDC startup)	*/
+	dissect_smb_pdc_failure,    /* 0x09 (Announce Failed PDC)	*/
+	dissect_announce_change,    /* 0x0A (Announce Change to UAS or SAM)*/
+	dissect_smb_no_user,	    /* 0x0B (Announce no user on machine)*/
+	dissect_smb_pdc_startup,    /* 0x0C (Response from PDC)		*/
+	dissect_smb_relogon_resp,   /* 0x0D (Relogon response) 		*/
+	dissect_smb_inter_resp,     /* 0x0E (Interrogate response) 	*/
+	dissect_smb_pdc_failure,    /* 0x0F (LM2.0 Resp. during LOGON pause*/
+	dissect_smb_pdc_failure,    /* 0x10 (LM 2.0 Unknown user response)*/
+	dissect_smb_acc_update,	    /* 0x11 (LM2.1 Announce Acc updates)*/
+	dissect_smb_sam_logon_req,  /* 0x12 (SAM LOGON request )	*/
+	dissect_smb_sam_logon_resp, /* 0x13 (SAM LOGON response)	*/
+	dissect_smb_unknown,        /* 0x14 (SAM Response during LOGON Pause) */
+	dissect_smb_sam_logon_resp, /* 0x15 (SAM Response User Unknown)	*/
+	dissect_smb_unknown,        /* 0x16 (SAM Response to Interrogate)*/
+	dissect_smb_pdc_response_ads,        /* 0x17 (SAM AD response User Unknown*/
+	dissect_smb_unknown,        /* 0x18 (Unknown command)		*/
+	dissect_smb_pdc_response_ads         /* 0x19 (SAM LOGON AD response)	*/
 };
 
 
@@ -903,11 +923,11 @@ dissect_smb_logon(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	col_clear(pinfo->cinfo, COL_INFO);
 
 	/* get the Command field */
-	cmd = tvb_get_guint8(tvb, offset);
+   	cmd = tvb_get_guint8(tvb, offset);
 
 	col_add_str(pinfo->cinfo, COL_INFO, val_to_str(cmd, commands, "Unknown Command:%02x") );
 
-	if (tree) {
+   	if (tree) {
 		item = proto_tree_add_item(tree, proto_smb_logon, tvb,
 			offset,	-1, ENC_NA);
 
@@ -1013,10 +1033,6 @@ proto_register_smb_logon( void)
 			{ "Workstation OS Version", "smb_netlogon.os_version", FT_UINT8, BASE_DEC,
 			  NULL, 0, "SMB NETLOGON Workstation OS Version", HFILL }},
 
-		{ &hf_signature,
-			{ "Signature", "smb_netlogon.signature", FT_UINT64, BASE_HEX,
-			  NULL, 0, NULL, HFILL }},
-
 		{ &hf_date_time,
 			{ "Date/Time", "smb_netlogon.date_time", FT_UINT32, BASE_DEC,
 			  NULL, 0, "SMB NETLOGON Date/Time", HFILL }},
@@ -1028,10 +1044,6 @@ proto_register_smb_logon( void)
 		{ &hf_request_count,
 			{ "Request Count", "smb_netlogon.request_count", FT_UINT16, BASE_DEC,
 			  NULL, 0, "SMB NETLOGON Request Count", HFILL }},
-
-		{ &hf_account_control,
-			{ "Account control", "smb_netlogon.flags", FT_UINT32, BASE_HEX,
-			  NULL, 0, NULL, HFILL }},
 
 		{ &hf_flags_autolock,
 			{ "Autolock", "smb_netlogon.flags.autolock", FT_BOOLEAN, 32,
@@ -1132,10 +1144,6 @@ proto_register_smb_logon( void)
 		{ &hf_client_site_name,
 			{ "Client Site Name", "smb_netlogon.client_site_name", FT_STRING, BASE_NONE,
 			  NULL, 0, "SMB NETLOGON Client Site Name", HFILL }},
-
-		{ &hf_data,
-			{ "Data", "smb_netlogon.data", FT_BYTES, BASE_NONE,
-			  NULL, 0, NULL, HFILL }},
 	};
 
 	static gint *ett[] = {
@@ -1144,24 +1152,11 @@ proto_register_smb_logon( void)
 		&ett_smb_db_info
 	};
 
-	proto_smb_logon = proto_register_protocol(
-		"Microsoft Windows Logon Protocol (Old)", "SMB_NETLOGON", "smb_netlogon");
+   	proto_smb_logon = proto_register_protocol(
+   		"Microsoft Windows Logon Protocol (Old)", "SMB_NETLOGON", "smb_netlogon");
 
 	proto_register_field_array(proto_smb_logon, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
 
 	register_dissector("smb_netlogon", dissect_smb_logon, proto_smb_logon);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

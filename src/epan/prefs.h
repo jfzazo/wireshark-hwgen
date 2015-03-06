@@ -46,10 +46,10 @@ extern "C" {
 
 #define RTP_PLAYER_DEFAULT_VISIBLE 4
 #define TAP_UPDATE_DEFAULT_INTERVAL 3000
-#define ST_DEF_BURSTRES 5
+#define	ST_DEF_BURSTRES 5
 #define ST_DEF_BURSTLEN 100
-#define ST_MAX_BURSTRES 600000 /* somewhat arbirary limit of 10 minutes */
-#define ST_MAX_BURSTBUCKETS 100 /* somewhat arbirary limit - more buckets degrade performance */
+#define ST_MAX_BURSTRES 600000	/* somewhat arbirary limit of 10 minutes */
+#define ST_MAX_BURSTBUCKETS 100	/* somewhat arbirary limit - more buckets degrade performance */
 
 struct epan_uat;
 struct _e_addr_resolve;
@@ -67,15 +67,15 @@ char string_to_name_resolve(const char *string, struct _e_addr_resolve *name_res
 /*
  * Modes for the starting directory in File Open dialogs.
  */
-#define FO_STYLE_LAST_OPENED    0 /* start in last directory we looked at */
-#define FO_STYLE_SPECIFIED      1 /* start in specified directory */
+#define FO_STYLE_LAST_OPENED	0	/* start in last directory we looked at */
+#define FO_STYLE_SPECIFIED	1	/* start in specified directory */
 
 /*
  * Toolbar styles.
  */
-#define TB_STYLE_ICONS          0
-#define TB_STYLE_TEXT           1
-#define TB_STYLE_BOTH           2
+#define TB_STYLE_ICONS		0
+#define TB_STYLE_TEXT		1
+#define TB_STYLE_BOTH		2
 
 /*
  * Types of layout of summary/details/hex panes.
@@ -150,7 +150,7 @@ typedef struct _e_prefs {
   gint         gui_ptree_expander_style;
   gboolean     gui_hex_dump_highlight_style;
   gint         gui_toolbar_main_style;
-  gint         gui_toolbar_filter_style; /* GTK only? */
+  gint         gui_toolbar_filter_style;
   gchar       *gui_gtk2_font_name;
   gchar       *gui_qt_font_name;
   color_t      gui_marked_fg;
@@ -193,7 +193,6 @@ typedef struct _e_prefs {
 #endif
   gchar       *capture_devices_snaplen;
   gchar       *capture_devices_pmode;
-  gchar       *capture_devices_filter;
   gboolean     capture_prom_mode;
   gboolean     capture_pcap_ng;
   gboolean     capture_real_time;
@@ -203,16 +202,15 @@ typedef struct _e_prefs {
   guint        rtp_player_max_visible;
   guint        tap_update_interval;
   gboolean     display_hidden_proto_items;
-  gboolean     display_byte_fields_with_spaces;
-  gpointer     filter_expressions;/* Actually points to &head */
+  gpointer     filter_expressions;	/* Actually points to &head */
   gboolean     gui_update_enabled;
   software_update_channel_e gui_update_channel;
   gint         gui_update_interval;
   gchar       *saved_at_version;
-  gboolean     unknown_prefs; /* unknown or obsolete pref(s) */
-  gboolean     unknown_colorfilters; /* unknown or obsolete color filter(s) */
-  guint        gui_qt_language; /* Qt Translation language selection */
-  gboolean     gui_packet_editor; /* Enable Packet Editor */
+  gboolean     unknown_prefs;         /* unknown or obsolete pref(s) */
+  gboolean     unknown_colorfilters;  /* unknown or obsolete color filter(s) */
+  guint        gui_qt_language;       /* Qt Translation language selection */
+  gboolean     gui_packet_editor;     /* Enable Packet Editor */
   gboolean     st_enable_burstinfo;
   gboolean     st_burst_showcount;
   gint         st_burst_resolution;
@@ -290,7 +288,8 @@ WS_DLL_PUBLIC module_t *prefs_register_protocol(int id, void (*apply_cb)(void));
  * "description" is a longer human-readable description of the tap.
  */
 WS_DLL_PUBLIC module_t *prefs_register_stat(const char *name, const char *title,
-    const char *description, void (*apply_cb)(void));
+                                     const char *description,
+                                     void (*apply_cb)(void));
 
 /*
  * Register that a protocol has preferences and group it under a single
@@ -298,7 +297,7 @@ WS_DLL_PUBLIC module_t *prefs_register_stat(const char *name, const char *title,
  */
 #define PREFERENCE_GROUPING
 WS_DLL_PUBLIC module_t *prefs_register_protocol_subtree(const char *subtree, int id,
-    void (*apply_cb)(void));
+						 void (*apply_cb)(void));
 
 /*
  * Register that a protocol used to have preferences but no longer does,
@@ -452,14 +451,20 @@ WS_DLL_PUBLIC void prefs_register_static_text_preference(module_t *module, const
  * preferences tab of the module.
  */
 WS_DLL_PUBLIC void prefs_register_uat_preference(module_t *module,
-    const char *name, const char* title, const char *description,  struct epan_uat* uat);
+										  const char *name,
+										  const char* title,
+										  const char *description,
+										  struct epan_uat* uat);
 
 /*
  * Register a uat 'preference' for QT only. It adds a button that opens the uat's window in the
  * preferences tab of the module.
  */
 WS_DLL_PUBLIC void prefs_register_uat_preference_qt(module_t *module,
-    const char *name, const char* title, const char *description,  struct epan_uat* uat);
+										  const char *name,
+										  const char* title,
+										  const char *description,
+										  struct epan_uat* uat);
 
 
 /*
@@ -574,10 +579,10 @@ WS_DLL_PUBLIC int write_prefs(char **);
  * the syntax error.
  */
 typedef enum {
-    PREFS_SET_OK,               /* succeeded */
-    PREFS_SET_SYNTAX_ERR,       /* syntax error in string */
-    PREFS_SET_NO_SUCH_PREF,     /* no such preference */
-    PREFS_SET_OBSOLETE          /* preference used to exist but no longer does */
+    PREFS_SET_OK,		/* succeeded */
+    PREFS_SET_SYNTAX_ERR,	/* syntax error in string */
+    PREFS_SET_NO_SUCH_PREF,	/* no such preference */
+    PREFS_SET_OBSOLETE		/* preference used to exist but no longer does */
 } prefs_set_pref_e;
 
 WS_DLL_PUBLIC prefs_set_pref_e prefs_set_pref(char *prefarg);
@@ -608,16 +613,3 @@ WS_DLL_PUBLIC gboolean prefs_capture_options_dialog_column_is_visible(const gcha
 #endif /* __cplusplus */
 
 #endif /* prefs.h */
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

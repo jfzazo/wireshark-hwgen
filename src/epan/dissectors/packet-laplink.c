@@ -23,7 +23,10 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
+#include <epan/strutil.h>
 
 #include "packet-tcp.h"
 #include <epan/prefs.h>
@@ -146,7 +149,7 @@ dissect_laplink_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 }
 
 static guint
-get_laplink_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+get_laplink_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset)
 {
 	guint plen;
 	/*
@@ -244,15 +247,3 @@ proto_reg_handoff_laplink(void)
 	dissector_add_uint("udp.port", UDP_PORT_LAPLINK, laplink_udp_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

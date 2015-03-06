@@ -23,6 +23,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 
 #include "packet-aim.h"
@@ -46,7 +48,6 @@ static const value_string confirm_statusses[] = {
 /* Initialize the protocol and registered fields */
 static int proto_aim_admin = -1;
 static int hf_admin_acctinfo_code = -1;
-static int hf_admin_acctinfo_unknown = -1;
 static int hf_admin_acctinfo_permissions = -1;
 static int hf_admin_confirm_status = -1;
 
@@ -55,16 +56,15 @@ static gint ett_aim_admin          = -1;
 
 static int dissect_aim_admin_accnt_info_req(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *admin_tree)
 {
-	proto_tree_add_item(admin_tree, hf_admin_acctinfo_code, tvb, 0, 2, ENC_BIG_ENDIAN);
-	proto_tree_add_item(admin_tree, hf_admin_acctinfo_unknown, tvb, 2, 2, ENC_BIG_ENDIAN);
+	proto_tree_add_item(admin_tree, hf_admin_acctinfo_code, tvb, 0, 2, tvb_get_ntohs(tvb, 0));
+	proto_tree_add_text(admin_tree, tvb, 2, 2, "Unknown");
 	return 4;
 }
 
 static int dissect_aim_admin_accnt_info_repl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *admin_tree)
 {
 	int offset = 0;
-	proto_tree_add_item(admin_tree, hf_admin_acctinfo_permissions, tvb, offset, 2, ENC_BIG_ENDIAN);
-	offset+=2;
+	proto_tree_add_uint(admin_tree, hf_admin_acctinfo_permissions, tvb, offset, 2, tvb_get_ntohs(tvb, offset)); offset+=2;
 	return dissect_aim_tlv_list(tvb, pinfo, offset, admin_tree, aim_client_tlvs);
 }
 
@@ -76,8 +76,7 @@ static int dissect_aim_admin_info_change_req(tvbuff_t *tvb, packet_info *pinfo, 
 static int dissect_aim_admin_cfrm_repl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *admin_tree)
 {
 	int offset = 0;
-	proto_tree_add_item(admin_tree, hf_admin_confirm_status, tvb, offset, 2, ENC_BIG_ENDIAN);
-	offset+=2;
+	proto_tree_add_uint(admin_tree, hf_admin_confirm_status, tvb, offset, 2, tvb_get_ntohs(tvb, offset)); offset+=2;
 	return dissect_aim_tlv_sequence(tvb, pinfo, offset, admin_tree, aim_client_tlvs);
 }
 
@@ -101,9 +100,6 @@ proto_register_aim_admin(void)
 	static hf_register_info hf[] = {
 		{ &hf_admin_acctinfo_code,
 		  { "Account Information Request Code", "aim_admin.acctinfo.code", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL },
-		},
-		{ &hf_admin_acctinfo_unknown,
-		  { "Unknown", "aim_admin.acctinfo.unknown", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_admin_acctinfo_permissions,
 		  { "Account Permissions", "aim_admin.acctinfo.permissions", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL },
@@ -131,16 +127,3 @@ proto_reg_handoff_aim_admin(void)
 {
 	aim_init_family(proto_aim_admin, ett_aim_admin, FAMILY_ADMIN, aim_fnac_family_admin);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

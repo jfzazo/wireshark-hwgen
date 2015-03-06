@@ -29,23 +29,21 @@ LIBWIRESHARK_SRC =		\
 	aftypes.c		\
 	app_mem_usage.c		\
 	asn1.c			\
+	atalk-utils.c		\
 	charsets.c		\
 	circuit.c		\
-	color_dissector_filters.c	\
 	column.c		\
 	column-utils.c		\
 	conversation.c		\
-	conversation_table.c	\
-	crc10-tvb.c		\
 	crc16-tvb.c		\
 	crc32-tvb.c		\
-	crc6-tvb.c		\
 	crc8-tvb.c		\
 	decode_as.c		\
 	disabled_protos.c	\
 	dissector_filters.c	\
 	dvb_chartbl.c		\
 	dwarf.c			\
+	emem.c			\
 	epan.c			\
 	ex-opt.c		\
 	except.c		\
@@ -61,27 +59,28 @@ LIBWIRESHARK_SRC =		\
 	geoip_db.c		\
 	golay.c			\
 	guid-utils.c		\
+	h225-persistentdata.c	\
 	in_cksum.c		\
 	ipproto.c		\
 	ipv4.c			\
 	next_tvb.c		\
 	oids.c			\
 	osi-utils.c		\
-	oui.c			\
 	packet-range.c		\
 	packet.c		\
 	prefs.c			\
 	print.c			\
-	print_stream.c		\
 	proto.c			\
 	range.c			\
 	reassemble.c		\
 	reedsolomon.c		\
 	req_resp_hdrs.c		\
 	show_exception.c	\
+	sigcomp_state_hdlr.c	\
+	sigcomp-udvm.c		\
 	sminmpec.c		\
 	sna-utils.c		\
-	stat_tap_ui.c		\
+	stat_cmd_args.c		\
 	stats_tree.c		\
 	strutil.c		\
 	stream.c		\
@@ -152,23 +151,20 @@ LIBWIRESHARK_INCLUDES =		\
 	arcnet_pids.h		\
 	arptypes.h		\
 	asn1.h			\
+	atalk-utils.h		\
 	ax25_pids.h		\
 	bridged_pids.h		\
 	charsets.h		\
 	chdlctypes.h		\
 	circuit.h		\
-	color_dissector_filters.h	\
 	column.h		\
 	column-info.h		\
 	column-utils.h		\
 	conversation.h		\
 	conversation_debug.h		\
-	conversation_table.h		\
 	conv_id.h		\
-	crc10-tvb.h		\
 	crc16-tvb.h		\
 	crc32-tvb.h		\
-	crc6-tvb.h		\
 	crc8-tvb.h		\
 	decode_as.h		\
 	diam_dict.h		\
@@ -180,6 +176,7 @@ LIBWIRESHARK_INCLUDES =		\
 	dwarf.h			\
 	eap.h			\
 	eapol_keydes_types.h	\
+	emem.h			\
 	epan-int.h		\
 	epan.h			\
 	epan_dissect.h		\
@@ -199,7 +196,9 @@ LIBWIRESHARK_INCLUDES =		\
 	gcp.h			\
 	geoip_db.h		\
 	golay.h			\
+	greproto.h		\
 	guid-utils.h		\
+	h225-persistentdata.h	\
 	iana_snap_pid.h		\
 	iax2_codec_type.h	\
 	in_cksum.h		\
@@ -220,7 +219,6 @@ LIBWIRESHARK_INCLUDES =		\
 	params.h		\
 	ppptypes.h		\
 	print.h			\
-	print_stream.h		\
 	prefs.h			\
 	prefs-int.h		\
 	proto.h			\
@@ -233,11 +231,11 @@ LIBWIRESHARK_INCLUDES =		\
 	rtp_pt.h		\
 	sctpppids.h		\
 	show_exception.h	\
-	slow_protocol_subtypes.h \
+	sigcomp_state_hdlr.h	\
+	sigcomp-udvm.h		\
 	sminmpec.h		\
 	sna-utils.h		\
-	stat_tap_ui.h		\
-	stat_groups.h		\
+	stat_cmd_args.h		\
 	stats_tree.h		\
 	stats_tree_priv.h	\
 	stream.h		\

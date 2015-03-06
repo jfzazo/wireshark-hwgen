@@ -59,7 +59,6 @@ DecodeAsDialog::DecodeAsDialog(QWidget *parent, capture_file *cf, bool create_ne
     selector_combo_box_(NULL)
 {
     ui->setupUi(this);
-    setWindowTitle(wsApp->windowTitleString(tr("Decode As" UTF8_HORIZONTAL_ELLIPSIS)));
     ui->deleteToolButton->setEnabled(false);
 
     GList *cur;
@@ -101,7 +100,7 @@ QString DecodeAsDialog::entryString(const gchar *table_name, gpointer value)
     case FT_UINT32:
     {
         uint num_val = GPOINTER_TO_UINT(value);
-        switch (get_dissector_table_param(table_name)) {
+        switch (get_dissector_table_base(table_name)) {
 
         case BASE_DEC:
             entry_str = QString::number(num_val);
@@ -348,7 +347,7 @@ void DecodeAsDialog::fillTypeColumn(QTreeWidgetItem *item)
         item->setText(type_col_, tr("String"));
     } else {
         QString type_desc = tr("Integer, base ");
-        switch (get_dissector_table_param(table_name)) {
+        switch (get_dissector_table_base(table_name)) {
         case BASE_OCT:
             type_desc.append("8");
             break;
@@ -493,7 +492,19 @@ void DecodeAsDialog::curProtoDestroyed()
 
 void DecodeAsDialog::on_buttonBox_accepted()
 {
-    save_decode_as_entries();
+    FILE *da_file = decode_as_open();
+    if (!da_file) return;
+
+    for (int i = 0; i < ui->decodeAsTreeWidget->topLevelItemCount(); i++) {
+        QTreeWidgetItem *item = ui->decodeAsTreeWidget->topLevelItem(i);
+
+        decode_as_write_entry(da_file,
+                ui_name_to_name_[item->text(table_col_)],
+                item->text(selector_col_).toUtf8().constData(),
+                item->text(default_col_).toUtf8().constData(),
+                item->text(proto_col_).toUtf8().constData());
+    }
+    fclose(da_file);
 }
 
 void DecodeAsDialog::on_buttonBox_helpRequested()

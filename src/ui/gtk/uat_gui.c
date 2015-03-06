@@ -37,9 +37,11 @@
 #include "config.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 
 #include <gtk/gtk.h>
+#include <gdk/gdkkeysyms.h>
 #if GTK_CHECK_VERSION(3,0,0)
 # include <gdk/gdkkeysyms-compat.h>
 #endif
@@ -47,13 +49,14 @@
 #include <wsutil/report_err.h>
 
 #include <epan/dfilter/dfilter-macro.h>
+#include <epan/emem.h>
 #include <epan/proto.h>
 #include <epan/packet.h>
 #include <epan/uat-int.h>
 #include <epan/value_string.h>
 #include <wsutil/filesystem.h>
 
-#include <epan/stat_groups.h>
+#include "../stat_menu.h"
 
 #include "ui/help_url.h"
 #include "ui/gtk/gtkglobals.h"
@@ -180,7 +183,7 @@ static char *fld_tostr(void *rec, uat_field_t *f) {
 		case PT_TXTMOD_ENUM:
 		case PT_TXTMOD_FILENAME:
 		case PT_TXTMOD_DIRECTORYNAME:
-			out = g_strndup(ptr, len);
+			out = ep_strndup(ptr, len);
 			break;
 		case PT_TXTMOD_HEXBYTES: {
 			GString *s = g_string_sized_new( len*2 + 1 );
@@ -188,7 +191,7 @@ static char *fld_tostr(void *rec, uat_field_t *f) {
 
 			for (i=0; i<len;i++) g_string_append_printf(s, "%.2X", ((const guint8*)ptr)[i]);
 
-			out = g_strdup(s->str);
+			out = ep_strdup(s->str);
 
 			g_string_free(s, TRUE);
 			break;
@@ -199,27 +202,27 @@ static char *fld_tostr(void *rec, uat_field_t *f) {
 			break;
 	}
 
-	g_free((char*)ptr);
 	return out;
 }
 
 
 
 static void append_row(uat_t *uat, guint idx) {
+	GPtrArray   *a	 = g_ptr_array_new();
 	void	    *rec = UAT_INDEX_PTR(uat, idx);
 	uat_field_t *f	 = uat->fields;
 	guint	     colnum;
 	GtkTreeIter  iter;
-	gchar* tmp_str;
 
 	if (! uat->rep) return;
 
 	gtk_list_store_insert_before(uat->rep->list_store, &iter, NULL);
 	for ( colnum = 0; colnum < uat->ncols; colnum++ ) {
-		tmp_str = fld_tostr(rec, &(f[colnum]));
-		gtk_list_store_set(uat->rep->list_store, &iter, colnum, tmp_str, -1);
-		g_free(tmp_str);
+		g_ptr_array_add(a, fld_tostr(rec, &(f[colnum])));
+		gtk_list_store_set(uat->rep->list_store, &iter, colnum, fld_tostr(rec, &(f[colnum])), -1);
 	}
+
+	g_ptr_array_free(a, TRUE);
 }
 
 static void reset_row(uat_t *uat, guint idx) {
@@ -228,7 +231,6 @@ static void reset_row(uat_t *uat, guint idx) {
 	guint	     colnum;
 	GtkTreePath *path;
 	GtkTreeIter  iter;
-	gchar* tmp_str;
 
 	if (! uat->rep) return;
 
@@ -238,24 +240,22 @@ static void reset_row(uat_t *uat, guint idx) {
 	}
 
 	for ( colnum = 0; colnum < uat->ncols; colnum++ ) {
-		tmp_str = fld_tostr(rec, &(f[colnum]));
-		gtk_list_store_set(uat->rep->list_store, &iter, colnum, tmp_str, -1);
-		g_free(tmp_str);
+		gtk_list_store_set(uat->rep->list_store, &iter, colnum, fld_tostr(rec, &(f[colnum])), -1);
 	}
 }
 
-static guint8 *unhexbytes(const char *si, guint len, guint *len_p, char** err) {
+static guint8 *unhexbytes(const char *si, guint len, guint *len_p, const char** err) {
 	guint8	     *buf;
 	guint8	     *p;
 	const guint8 *s = (const guint8 *)si;
 	guint	      i;
 
 	if (len % 2) {
-		*err = g_strdup_printf("Uneven number of chars hex string %u \n'%s'", len, si);
+		*err = ep_strdup_printf("Uneven number of chars hex string %u \n'%s'", len, si);
 		return NULL;
 	}
 
-	buf = (guint8 *)g_malloc(len/2+1);
+	buf = (guint8 *)ep_alloc(len/2+1);
 	p = buf;
 
 	for (i = 0; i<len ; i += 2) {
@@ -299,7 +299,7 @@ static guint8 *unhexbytes(const char *si, guint len, guint *len_p, char** err) {
 	return buf;
 
 on_error:
-	*err = g_strdup("Error parsing hex string");
+	*err = "Error parsing hex string";
 	return NULL;
 }
 
@@ -308,7 +308,7 @@ static gboolean uat_dlg_cb(GtkWidget *win _U_, gpointer user_data) {
 	struct _uat_dlg_data *dd    = (struct _uat_dlg_data *)user_data;
 	guint		      ncols = dd->uat->ncols;
 	uat_field_t          *f	    = dd->uat->fields;
-	char                 *err   = NULL, *tmp_err = NULL;
+	const char           *err   = NULL;
 	guint		      colnum;
 
 	for ( colnum = 0; colnum < ncols; colnum++ ) {
@@ -336,13 +336,10 @@ static gboolean uat_dlg_cb(GtkWidget *win _U_, gpointer user_data) {
 			case PT_TXTMOD_HEXBYTES: {
 				text = gtk_entry_get_text(GTK_ENTRY(e));
 
-				text_free = unhexbytes(text, (guint) strlen(text), &len, &err);
-				text = (const char *)text_free;
+				text = (const char *) unhexbytes(text, (guint) strlen(text), &len, &err);
 
 				if (err) {
-					tmp_err = err;
-					err = g_strdup_printf("error in field '%s': %s", f[colnum].title, tmp_err);
-					g_free(tmp_err);
+					err = ep_strdup_printf("error in field '%s': %s", f[colnum].title, err);
 					goto on_failure;
 				}
 
@@ -362,9 +359,7 @@ static gboolean uat_dlg_cb(GtkWidget *win _U_, gpointer user_data) {
 
 		if (f[colnum].cb.chk) {
 			if (! f[colnum].cb.chk(dd->rec, text, len, f[colnum].cbdata.chk, f[colnum].fld_data, &err)) {
-				tmp_err = err;
-				err = g_strdup_printf("error in column '%s': %s", f[colnum].title, tmp_err);
-				g_free(tmp_err);
+				err = ep_strdup_printf("error in column '%s': %s", f[colnum].title, err);
 				goto on_failure;
 			}
 		}
@@ -378,9 +373,13 @@ static gboolean uat_dlg_cb(GtkWidget *win _U_, gpointer user_data) {
 		dd->uat->update_cb(dd->rec, &err);
 
 		if (err) {
-			tmp_err = err;
-			err = g_strdup_printf("error updating record: %s", tmp_err);
-			g_free(tmp_err);
+			char *tmp;
+			tmp = ep_strdup_printf("error updating record: %s", err);
+			/* XXX bit of a hack to remove emem from dissectors, this can
+			 * be removed as proper use of glib memory is propogated
+			 * through the rest of the UAT code */
+			g_free((char*)err);
+			err = tmp;
 			goto on_failure;
 		}
 	}
@@ -394,6 +393,8 @@ static gboolean uat_dlg_cb(GtkWidget *win _U_, gpointer user_data) {
 		}
 
 		g_free(rec_tmp);
+	} else {
+		uat_update_record(dd->uat, dd->rec, TRUE);
 	}
 
 	dd->uat->changed = TRUE;
@@ -420,7 +421,6 @@ static gboolean uat_dlg_cb(GtkWidget *win _U_, gpointer user_data) {
 on_failure:
 
 	report_failure("%s", err);
-	g_free(err);
 	return FALSE;
 }
 
@@ -455,15 +455,12 @@ static void uat_edit_dialog(uat_t *uat, gint row, gboolean copy) {
 	struct _uat_dlg_data *dd = (struct _uat_dlg_data *)g_malloc(sizeof(struct _uat_dlg_data));
 	uat_field_t	     *f	 = uat->fields;
 	guint		      colnum;
-	gchar            *tmp_str;
 
 	/* Only allow a single operation at a time, prevents bug 9129 */
 	limit_buttons(uat);
 
 	dd->entries = g_ptr_array_new();
-	tmp_str = g_strdup_printf("%s: %s", uat->name, (row == -1 ? "New" : "Edit"));
-	dd->win = dlg_conf_window_new(tmp_str);
-	g_free(tmp_str);
+	dd->win = dlg_conf_window_new(ep_strdup_printf("%s: %s", uat->name, (row == -1 ? "New" : "Edit")));
 	dd->uat = uat;
 	if (copy && row >= 0) {
 	  dd->rec = g_malloc0(uat->record_size);
@@ -508,17 +505,14 @@ static void uat_edit_dialog(uat_t *uat, gint row, gboolean copy) {
 	for ( colnum = 0; colnum < uat->ncols; colnum++ ) {
 		GtkWidget *entry, *label, *event_box;
 		char *text = fld_tostr(dd->rec, &(f[colnum]));
-		char *label_text;
 		gchar *fc_filename;
 
 		event_box = gtk_event_box_new();
 
-		label_text = g_strdup_printf("%s:", f[colnum].title);
-		label = gtk_label_new(label_text);
+		label = gtk_label_new(ep_strdup_printf("%s:", f[colnum].title));
 		if (f[colnum].desc != NULL)
 			gtk_widget_set_tooltip_text(event_box, f[colnum].desc);
 
-		g_free(label_text);
 		gtk_misc_set_alignment(GTK_MISC(label), 1.0f, 0.5f);
 		ws_gtk_grid_attach_defaults(GTK_GRID(main_grid), event_box, 0, colnum, 1, 1);
 		gtk_container_add(GTK_CONTAINER(event_box), label);
@@ -594,7 +588,6 @@ static void uat_edit_dialog(uat_t *uat, gint row, gboolean copy) {
 				g_assert_not_reached();
 				return;
 		}
-		g_free(text);
 	}
 
 	gtk_widget_grab_default(bt_ok);
@@ -650,7 +643,6 @@ static void uat_del_dlg(uat_t *uat, int idx) {
 	uat_field_t	*f   = uat->fields;
 	guint		 colnum;
 	void		*rec = UAT_INDEX_PTR(uat, idx);
-	gchar       *tmp_str;
 
 	struct _uat_del *ud  = (struct _uat_del *)g_malloc(sizeof(struct _uat_del));
 
@@ -659,9 +651,7 @@ static void uat_del_dlg(uat_t *uat, int idx) {
 
 	ud->uat = uat;
 	ud->idx = idx;
-	tmp_str = g_strdup_printf("%s: Confirm Delete", uat->name);
-	ud->win = win = dlg_conf_window_new(tmp_str);
-	g_free(tmp_str);
+	ud->win = win = dlg_conf_window_new(ep_strdup_printf("%s: Confirm Delete", uat->name));
 
 	gtk_window_set_resizable(GTK_WINDOW(win), FALSE);
 	gtk_window_resize(GTK_WINDOW(win), 400, 25*(uat->ncols+2));
@@ -679,16 +669,13 @@ static void uat_del_dlg(uat_t *uat, int idx) {
 		GtkWidget *label;
 		char *text = fld_tostr(rec, &(f[colnum]));
 
-		tmp_str = g_strdup_printf("%s:", f[colnum].title);
-		label = gtk_label_new(tmp_str);
+		label = gtk_label_new(ep_strdup_printf("%s:", f[colnum].title));
 		gtk_misc_set_alignment(GTK_MISC(label), 1.0f, 0.5f);
 		ws_gtk_grid_attach_defaults(GTK_GRID(main_grid), label, 0, colnum, 1, 1);
-		g_free(tmp_str);
 
 		label = gtk_label_new(text);
 		gtk_misc_set_alignment(GTK_MISC(label), 1.0f, 0.5f);
 		ws_gtk_grid_attach_defaults(GTK_GRID(main_grid), label, 1, colnum, 1, 1);
-		g_free(text);
 	}
 
 	bbox = dlg_button_row_new(GTK_STOCK_CANCEL, GTK_STOCK_DELETE, NULL);
@@ -792,7 +779,7 @@ static void uat_down_cb(GtkButton *button _U_, gpointer u) {
 static void uat_apply_changes(uat_t *uat) {
 	if (uat->flags & UAT_AFFECTS_FIELDS) {
 		/* Recreate list with new fields and redissect packets */
-		main_fields_changed ();
+		packet_list_recreate ();
 	} else {
 		if (uat->flags & UAT_AFFECTS_DISSECTION) {
 			/* Just redissect packets if we have any */
@@ -806,13 +793,14 @@ static void uat_apply_changes(uat_t *uat) {
 
 static void uat_cancel_cb(GtkWidget *button _U_, gpointer u) {
 	uat_t *uat = (uat_t *)u;
-	gchar *err = NULL;
+	const gchar *err = NULL;
 
 	if (uat->changed) {
 		uat_clear(uat);
-		if (!uat_load(uat, &err)) {
+		uat_load(uat, &err);
+
+		if (err) {
 			report_failure("Error while loading %s: %s", uat->name, err);
-			g_free(err);
 		}
 
 		uat_apply_changes (uat);
@@ -836,12 +824,13 @@ static void uat_apply_cb(GtkButton *button _U_, gpointer u) {
 
 static void uat_ok_cb(GtkButton *button _U_, gpointer u) {
 	uat_t *uat = (uat_t *)u;
-	gchar *err = NULL;
+	const gchar *err = NULL;
 
 	if (uat->changed) {
-		if (!uat_save(uat, &err)) {
+		uat_save(uat, &err);
+
+		if (err) {
 			report_failure("Error while saving %s: %s", uat->name, err);
-			g_free(err);
 		}
 
 		if (uat->post_update_cb) uat->post_update_cb();
@@ -865,20 +854,18 @@ static void uat_clear_cb(GtkButton *button _U_, gpointer u) {
 
 static void uat_refresh_cb(GtkButton *button _U_, gpointer u) {
 	uat_t *uat = (uat_t *)u;
-	gchar *err = NULL;
+	const gchar *err = NULL;
 	guint  i;
-	gboolean success;
 
 	uat_clear_cb(button, u);
 
 	uat->from_global = TRUE;
-	success = uat_load(uat, &err);
+	uat_load(uat, &err);
 	uat->from_global = FALSE;
 	uat->changed = TRUE;
 
-	if (!success) {
+	if (err) {
 		report_failure("Error while loading %s: %s", uat->name, err);
-		g_free(err);
 	}
 
 	for (i = 0 ; i < uat->raw_data->len; i++) {
@@ -903,13 +890,14 @@ static void remember_selected_row(GtkWidget *w _U_, gpointer u) {
 
 static void uat_yessave_cb(GtkWindow *w _U_, void *u) {
 	uat_t *uat = (uat_t *)u;
-	gchar *err = NULL;
+	const gchar *err = NULL;
 
 	window_delete_event_cb(uat->rep->unsaved_window, NULL, NULL);
 
-	if (!uat_save(uat, &err)) {
+	uat_save(uat, &err);
+
+	if (err) {
 		report_failure("Error while saving %s: %s", uat->name, err);
-		g_free(err);
 	}
 
 	g_signal_handlers_disconnect_by_func(uat->rep->window, uat_window_delete_event_cb, uat);
@@ -952,11 +940,10 @@ static gboolean unsaved_dialog(GtkWindow *w _U_, GdkEvent *e _U_, gpointer u) {
 	gtk_container_set_border_width(GTK_CONTAINER(vbox), 6);
 	gtk_container_add(GTK_CONTAINER(win), vbox);
 
-	message  = g_strdup_printf("Changes to '%s' are not being saved!\n"
+	message  = ep_strdup_printf("Changes to '%s' are not being saved!\n"
 		"Do you want to save '%s'?", uat->name, uat->name);
 
 	label = gtk_label_new(message);
-	g_free(message);
 
 	bbox = dlg_button_row_new(GTK_STOCK_YES, GTK_STOCK_NO, NULL);
 

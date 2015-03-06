@@ -41,8 +41,9 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
 #include <epan/addr_resolv.h>
+#include <epan/packet.h>
 #include <epan/etypes.h>
 
 void proto_register_vmlab(void);
@@ -127,7 +128,7 @@ dissect_vmlab(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     offset += 6;
 
     proto_item_append_text(ti, ", Src: %s (%s), Dst: %s (%s)",
-                           get_ether_name(src_addr), tvb_ether_to_str(tvb, offset-6), get_ether_name(dst_addr), tvb_ether_to_str(tvb, offset-12));
+                           get_ether_name(src_addr), ether_to_str(src_addr), get_ether_name(dst_addr), ether_to_str(dst_addr));
 
     /* Encapsulated Ethertype is also part of the block*/
     encap_proto = tvb_get_ntohs(tvb, offset);
@@ -189,16 +190,3 @@ proto_reg_handoff_vmlab(void)
 
     ethertype_handle = find_dissector("ethertype");
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

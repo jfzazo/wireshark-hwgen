@@ -23,8 +23,12 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/to_str.h>
+#include <epan/etypes.h>
+#include <epan/conversation.h>
 #include "packet-fc.h"
 #include "packet-fcct.h"
 
@@ -142,7 +146,6 @@ dissect_fcct (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
         offset = 0;
     guint8 server;
     fc_ct_preamble cthdr;
-    address addr;
 
     /* Make entries in Protocol column and Info column on summary display */
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "FC_CT");
@@ -189,9 +192,8 @@ dissect_fcct (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 
         proto_tree_add_item (fcct_tree, hf_fcct_revision, tvb, offset++,
                              sizeof (guint8), ENC_BIG_ENDIAN);
-        SET_ADDRESS(&addr, AT_FC, 3, &in_id);
         proto_tree_add_string (fcct_tree, hf_fcct_inid, tvb, offset, 3,
-                               address_to_str(wmem_packet_scope(), &addr));
+                               fc_to_str ((guint8 *)&in_id));
         offset += 3; /* sizeof FC address */
 
         proto_tree_add_item (fcct_tree, hf_fcct_gstype, tvb, offset++,
@@ -218,6 +220,10 @@ dissect_fcct (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 }
 
 /* Register the protocol with Wireshark */
+
+/* this format is require because a script is used to build the C function
+   that calls all the protocol registration.
+*/
 
 void
 proto_register_fcct(void)
@@ -279,6 +285,10 @@ proto_register_fcct(void)
                                                    FT_UINT8, BASE_HEX);
 }
 
+/* If this dissector uses sub-dissector registration add a registration routine.
+   This format is required because a script is used to find these routines and
+   create the code that calls these routines.
+*/
 void
 proto_reg_handoff_fcct (void)
 {
@@ -290,15 +300,4 @@ proto_reg_handoff_fcct (void)
     data_handle = find_dissector ("data");
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+

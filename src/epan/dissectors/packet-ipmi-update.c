@@ -27,8 +27,6 @@
 
 #include "packet-ipmi.h"
 
-void proto_register_ipmi_update(void);
-
 static ipmi_cmd_t cmd_update[] = {
 	{ 0x00, IPMI_TBD,   NULL, NULL, "[PPS OEM] Upgrade Status", 0 },
 	{ 0x01, IPMI_TBD,   NULL, NULL, "[PPS OEM] Upgrade Start", 0 },
@@ -40,21 +38,8 @@ static ipmi_cmd_t cmd_update[] = {
 };
 
 void
-proto_register_ipmi_update(void)
+ipmi_register_update(gint proto_ipmi _U_)
 {
 	ipmi_register_netfn_cmdtab(IPMI_UPDATE_REQ, IPMI_OEM_PPS, NULL, 0, NULL,
 			cmd_update, array_length(cmd_update));
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

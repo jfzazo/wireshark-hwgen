@@ -34,8 +34,7 @@
 
 #include <ui/export_object.h>
 
-#include "wireshark_dialog.h"
-
+#include <QDialog>
 #include <QMetaType>
 #include <QTreeWidgetItem>
 #include <QAbstractButton>
@@ -51,14 +50,14 @@ struct _export_object_list_t {
 };
 
 
-class ExportObjectDialog : public WiresharkDialog
+class ExportObjectDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    enum ObjectType { Dicom, Http, Smb, Tftp };
+    enum ObjectType { Dicom, Http, Smb };
 
-    explicit ExportObjectDialog(QWidget &parent, CaptureFile &cf, ObjectType object_type);
+    explicit ExportObjectDialog(QWidget *parent, capture_file *cf, ObjectType object_type);
     ~ExportObjectDialog();
 
 
@@ -71,7 +70,7 @@ public slots:
 
 private slots:
     void accept();
-    void captureFileClosing();
+    void captureFileClosing(const capture_file *cf);
     void on_buttonBox_helpRequested();
     void on_objectTree_currentItemChanged(QTreeWidgetItem *item, QTreeWidgetItem *previous);
     void on_buttonBox_clicked(QAbstractButton *button);
@@ -88,6 +87,7 @@ private:
     typedef void (*eo_protocoldata_reset_cb)(void);
 
     Ui::ExportObjectDialog *eo_ui_;
+    capture_file *cap_file_;
 
     QPushButton *save_bt_;
     QPushButton *save_all_bt_;

@@ -19,11 +19,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-include(WiresharkPlugin)
-
-# This info is from moduleinfo.nmake
-set_module_info(m2m 1 1 0 0)
-
 set(DISSECTOR_SRC
 	packet-m2m.c
 )
@@ -57,10 +52,18 @@ register_dissector_files(plugin.c
 	${DISSECTOR_SRC}
 )
 
-add_plugin_library(m2m)
+add_library(m2m ${LINK_MODE_MODULE}
+	${PLUGIN_FILES}
+)
+set_target_properties(m2m PROPERTIES PREFIX "")
+set_target_properties(m2m PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
+set_target_properties(m2m PROPERTIES FOLDER "Plugins")
+
+target_link_libraries(m2m epan)
 
 install(TARGETS m2m
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION} NAMELINK_SKIP
 	RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION}
 )
+

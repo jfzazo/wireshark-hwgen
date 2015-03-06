@@ -24,6 +24,8 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 
@@ -210,7 +212,7 @@ void proto_reg_handoff_netdump(void)
 		netdump_handle = create_dissector_handle(dissect_netdump,
 				proto_netdump);
 
-		dissector_add_for_decode_as("udp.port", netdump_handle);
+		dissector_add_handle("udp.port", netdump_handle); /* For Decode As */
 		initalized = TRUE;
 	} else {
 		if (CurrentPort != 0)
@@ -223,15 +225,3 @@ void proto_reg_handoff_netdump(void)
 		dissector_add_uint("udp.port", CurrentPort, netdump_handle);
 }
 
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

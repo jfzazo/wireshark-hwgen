@@ -30,15 +30,46 @@
 #include <epan/epan.h>
 #include <epan/packet.h>
 
-#include <epan/print_stream.h>
-
 #include <epan/packet-range.h>
-
-#include "ws_symbol_export.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
+
+/*
+ * Print stream code; this provides a "print stream" class with subclasses
+ * of various sorts.  Additional subclasses might be implemented elsewhere.
+ */
+struct print_stream;
+
+typedef struct print_stream_ops {
+	gboolean (*print_preamble)(struct print_stream *self, gchar *filename, const char *version_string);
+	gboolean (*print_line)(struct print_stream *self, int indent,
+	    const char *line);
+	gboolean (*print_bookmark)(struct print_stream *self,
+	    const gchar *name, const gchar *title);
+	gboolean (*new_page)(struct print_stream *self);
+	gboolean (*print_finale)(struct print_stream *self);
+	gboolean (*destroy)(struct print_stream *self);
+} print_stream_ops_t;
+
+typedef struct print_stream {
+	const print_stream_ops_t *ops;
+	void *data;
+} print_stream_t;
+
+WS_DLL_PUBLIC print_stream_t *print_stream_text_new(gboolean to_file, const char *dest);
+WS_DLL_PUBLIC print_stream_t *print_stream_text_stdio_new(FILE *fh);
+WS_DLL_PUBLIC print_stream_t *print_stream_ps_new(gboolean to_file, const char *dest);
+WS_DLL_PUBLIC print_stream_t *print_stream_ps_stdio_new(FILE *fh);
+
+WS_DLL_PUBLIC gboolean print_preamble(print_stream_t *self, gchar *filename, const char *version_string);
+WS_DLL_PUBLIC gboolean print_line(print_stream_t *self, int indent, const char *line);
+WS_DLL_PUBLIC gboolean print_bookmark(print_stream_t *self, const gchar *name,
+    const gchar *title);
+WS_DLL_PUBLIC gboolean new_page(print_stream_t *self);
+WS_DLL_PUBLIC gboolean print_finale(print_stream_t *self);
+WS_DLL_PUBLIC gboolean destroy_print_stream(print_stream_t *self);
 
 /* print output format */
 typedef enum {
@@ -95,30 +126,36 @@ WS_DLL_PUBLIC void output_fields_list_options(FILE *fh);
 WS_DLL_PUBLIC gboolean output_fields_has_cols(output_fields_t* info);
 
 /*
+ * Output only these protocols
+ */
+WS_DLL_PUBLIC GHashTable *output_only_tables;
+
+/*
  * Higher-level packet-printing code.
  */
 
-WS_DLL_PUBLIC gboolean proto_tree_print(print_args_t *print_args,
-                                        epan_dissect_t *edt,
-                                        GHashTable *output_only_tables,
-                                        print_stream_t *stream);
+WS_DLL_PUBLIC gboolean proto_tree_print(print_args_t *print_args, epan_dissect_t *edt,
+     print_stream_t *stream);
 WS_DLL_PUBLIC gboolean print_hex_data(print_stream_t *stream, epan_dissect_t *edt);
 
 WS_DLL_PUBLIC void write_pdml_preamble(FILE *fh, const gchar* filename);
-WS_DLL_PUBLIC void write_pdml_proto_tree(epan_dissect_t *edt, FILE *fh);
+WS_DLL_PUBLIC void proto_tree_write_pdml(epan_dissect_t *edt, FILE *fh);
 WS_DLL_PUBLIC void write_pdml_finale(FILE *fh);
 
-WS_DLL_PUBLIC void write_psml_preamble(column_info *cinfo, FILE *fh);
-WS_DLL_PUBLIC void write_psml_columns(epan_dissect_t *edt, FILE *fh);
+WS_DLL_PUBLIC void write_psml_preamble(FILE *fh);
+WS_DLL_PUBLIC void proto_tree_write_psml(epan_dissect_t *edt, FILE *fh);
 WS_DLL_PUBLIC void write_psml_finale(FILE *fh);
 
-WS_DLL_PUBLIC void write_csv_column_titles(column_info *cinfo, FILE *fh);
-WS_DLL_PUBLIC void write_csv_columns(epan_dissect_t *edt, FILE *fh);
+WS_DLL_PUBLIC void write_csv_preamble(FILE *fh);
+WS_DLL_PUBLIC void proto_tree_write_csv(epan_dissect_t *edt, FILE *fh);
+WS_DLL_PUBLIC void write_csv_finale(FILE *fh);
 
-WS_DLL_PUBLIC void write_carrays_hex_data(guint32 num, FILE *fh, epan_dissect_t *edt);
+WS_DLL_PUBLIC void write_carrays_preamble(FILE *fh);
+WS_DLL_PUBLIC void proto_tree_write_carrays(guint32 num, FILE *fh, epan_dissect_t *edt);
+WS_DLL_PUBLIC void write_carrays_finale(FILE *fh);
 
 WS_DLL_PUBLIC void write_fields_preamble(output_fields_t* fields, FILE *fh);
-WS_DLL_PUBLIC void write_fields_proto_tree(output_fields_t* fields, epan_dissect_t *edt, column_info *cinfo, FILE *fh);
+WS_DLL_PUBLIC void proto_tree_write_fields(output_fields_t* fields, epan_dissect_t *edt, column_info *cinfo, FILE *fh);
 WS_DLL_PUBLIC void write_fields_finale(output_fields_t* fields, FILE *fh);
 
 WS_DLL_PUBLIC gchar* get_node_field_value(field_info* fi, epan_dissect_t* edt);

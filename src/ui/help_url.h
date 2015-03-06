@@ -29,7 +29,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/** @file help_url.h
+/** @file
  * "Help" URLs.
  */
 
@@ -77,7 +77,6 @@ typedef enum {
     HELP_FIREWALL_DIALOG,
     HELP_GOTO_DIALOG,
     HELP_CAPTURE_INTERFACES_DIALOG,
-    HELP_CAPTURE_MANAGE_INTERFACES_DIALOG,
     HELP_ENABLED_PROTOCOLS_DIALOG,
     HELP_DECODE_AS_DIALOG,
     HELP_DECODE_AS_SHOW_DIALOG,
@@ -109,9 +108,7 @@ typedef enum {
     HELP_MERGE_WIN32_DIALOG,
     HELP_SAVE_WIN32_DIALOG,
     HELP_TIME_SHIFT_DIALOG,
-    HELP_FILTER_SAVE_DIALOG,
-    HELP_TELEPHONY_VOIP_CALLS_DIALOG,
-    HELP_RTP_ANALYSIS_DIALOG
+    HELP_FILTER_SAVE_DIALOG
 } topic_action_e;
 
 /** Given a filename return a filesystem URL. Relative paths are prefixed with

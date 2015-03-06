@@ -31,11 +31,13 @@
 
 #include "config.h"
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/oids.h>
 #include <epan/asn1.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
 
 #include "packet-ber.h"
 #include "packet-acse.h"
@@ -265,7 +267,7 @@ static int hf_dop_GrantsAndDenials_grantInvoke = -1;
 static int hf_dop_GrantsAndDenials_denyInvoke = -1;
 
 /*--- End of included file: packet-dop-hf.c ---*/
-#line 65 "../../asn1/dop/packet-dop-template.c"
+#line 67 "../../asn1/dop/packet-dop-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_dop = -1;
@@ -342,13 +344,9 @@ static gint ett_dop_T_basicLevels = -1;
 static gint ett_dop_GrantsAndDenials = -1;
 
 /*--- End of included file: packet-dop-ett.c ---*/
-#line 70 "../../asn1/dop/packet-dop-template.c"
+#line 72 "../../asn1/dop/packet-dop-template.c"
 
 static expert_field ei_dop_unknown_binding_parameter = EI_INIT;
-static expert_field ei_dop_unsupported_opcode = EI_INIT;
-static expert_field ei_dop_unsupported_errcode = EI_INIT;
-static expert_field ei_dop_unsupported_pdu = EI_INIT;
-static expert_field ei_dop_zero_pdu = EI_INIT;
 
 /* Dissector table */
 static dissector_table_t dop_dissector_table;
@@ -357,7 +355,7 @@ static void append_oid(packet_info *pinfo, const char *oid)
 {
   	const char *name = NULL;
 
-    name = oid_resolved_from_string(wmem_packet_scope(), oid);
+    name = oid_resolved_from_string(oid);
     col_append_fstr(pinfo->cinfo, COL_INFO, " %s", name ? name : oid);
 }
 
@@ -1954,94 +1952,70 @@ dissect_dop_ACIItem(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_
 
 /*--- PDUs ---*/
 
-static int dissect_DSEType_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_DSEType_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_DSEType(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_DSEType_PDU);
-  return offset;
+  dissect_dop_DSEType(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_DSEType_PDU);
 }
-static int dissect_SupplierInformation_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SupplierInformation_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_SupplierInformation(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_SupplierInformation_PDU);
-  return offset;
+  dissect_dop_SupplierInformation(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_SupplierInformation_PDU);
 }
-static int dissect_ConsumerInformation_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ConsumerInformation_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_ConsumerInformation(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_ConsumerInformation_PDU);
-  return offset;
+  dissect_dop_ConsumerInformation(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_ConsumerInformation_PDU);
 }
-static int dissect_SupplierAndConsumers_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SupplierAndConsumers_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_SupplierAndConsumers(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_SupplierAndConsumers_PDU);
-  return offset;
+  dissect_dop_SupplierAndConsumers(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_SupplierAndConsumers_PDU);
 }
-static int dissect_HierarchicalAgreement_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_HierarchicalAgreement_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_HierarchicalAgreement(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_HierarchicalAgreement_PDU);
-  return offset;
+  dissect_dop_HierarchicalAgreement(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_HierarchicalAgreement_PDU);
 }
-static int dissect_SuperiorToSubordinate_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SuperiorToSubordinate_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_SuperiorToSubordinate(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_SuperiorToSubordinate_PDU);
-  return offset;
+  dissect_dop_SuperiorToSubordinate(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_SuperiorToSubordinate_PDU);
 }
-static int dissect_SubordinateToSuperior_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SubordinateToSuperior_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_SubordinateToSuperior(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_SubordinateToSuperior_PDU);
-  return offset;
+  dissect_dop_SubordinateToSuperior(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_SubordinateToSuperior_PDU);
 }
-static int dissect_SuperiorToSubordinateModification_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_SuperiorToSubordinateModification_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_SuperiorToSubordinateModification(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_SuperiorToSubordinateModification_PDU);
-  return offset;
+  dissect_dop_SuperiorToSubordinateModification(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_SuperiorToSubordinateModification_PDU);
 }
-static int dissect_NonSpecificHierarchicalAgreement_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_NonSpecificHierarchicalAgreement_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_NonSpecificHierarchicalAgreement(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_NonSpecificHierarchicalAgreement_PDU);
-  return offset;
+  dissect_dop_NonSpecificHierarchicalAgreement(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_NonSpecificHierarchicalAgreement_PDU);
 }
-static int dissect_NHOBSuperiorToSubordinate_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_NHOBSuperiorToSubordinate_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_NHOBSuperiorToSubordinate(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_NHOBSuperiorToSubordinate_PDU);
-  return offset;
+  dissect_dop_NHOBSuperiorToSubordinate(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_NHOBSuperiorToSubordinate_PDU);
 }
-static int dissect_NHOBSubordinateToSuperior_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_NHOBSubordinateToSuperior_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_NHOBSubordinateToSuperior(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_NHOBSubordinateToSuperior_PDU);
-  return offset;
+  dissect_dop_NHOBSubordinateToSuperior(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_NHOBSubordinateToSuperior_PDU);
 }
-static int dissect_ACIItem_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
+static void dissect_ACIItem_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_) {
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-  offset = dissect_dop_ACIItem(FALSE, tvb, offset, &asn1_ctx, tree, hf_dop_ACIItem_PDU);
-  return offset;
+  dissect_dop_ACIItem(FALSE, tvb, 0, &asn1_ctx, tree, hf_dop_ACIItem_PDU);
 }
 
 
 /*--- End of included file: packet-dop-fn.c ---*/
-#line 89 "../../asn1/dop/packet-dop-template.c"
+#line 87 "../../asn1/dop/packet-dop-template.c"
 
 static int
 call_dop_oid_callback(const char *base_string, tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree, const char *col_info, void* data)
@@ -2055,12 +2029,13 @@ call_dop_oid_callback(const char *base_string, tvbuff_t *tvb, int offset, packet
   if (dissector_try_string(dop_dissector_table, binding_param, tvb, pinfo, tree, data)) {
      offset = tvb_reported_length (tvb);
   } else {
-     proto_item *item;
-     proto_tree *next_tree;
+     proto_item *item=NULL;
+     proto_tree *next_tree=NULL;
 
-     next_tree = proto_tree_add_subtree_format(tree, tvb, 0, -1, ett_dop_unknown, &item,
-         "Dissector for parameter %s OID:%s not implemented. Contact Wireshark developers if you want this supported", base_string, binding_type ? binding_type : "<empty>");
-
+     item = proto_tree_add_text(tree, tvb, 0, tvb_length_remaining(tvb, offset), "Dissector for parameter %s OID:%s not implemented. Contact Wireshark developers if you want this supported", base_string, binding_type ? binding_type : "<empty>");
+     if (item) {
+        next_tree = proto_item_add_subtree(item, ett_dop_unknown);
+     }
      offset = dissect_unknown_ber(pinfo, tvb, offset, next_tree);
      expert_add_info(pinfo, item, &ei_dop_unknown_binding_parameter);
    }
@@ -2127,8 +2102,8 @@ dissect_dop(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* da
 	    dop_op_name = "Modify-Operational-Binding-Argument";
 	    break;
 	  default:
-	    proto_tree_add_expert_format(tree, pinfo, &ei_dop_unsupported_opcode, tvb, offset, -1,
-	        "Unsupported DOP Argument opcode (%d)", session->ros_op & ROS_OP_OPCODE_MASK);
+	    proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DOP Argument opcode (%d)",
+				session->ros_op & ROS_OP_OPCODE_MASK);
 	    break;
 	  }
 	  break;
@@ -2147,8 +2122,8 @@ dissect_dop(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* da
 	    dop_op_name = "Modify-Operational-Binding-Result";
 	    break;
 	  default:
-	    proto_tree_add_expert_format(tree, pinfo, &ei_dop_unsupported_opcode, tvb, offset, -1,
-	            "Unsupported DOP Result opcode (%d)", session->ros_op & ROS_OP_OPCODE_MASK);
+	    proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DOP Result opcode (%d)",
+				session->ros_op & ROS_OP_OPCODE_MASK);
 	    break;
 	  }
 	  break;
@@ -2159,14 +2134,14 @@ dissect_dop(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* da
 	    dop_op_name = "Operational-Binding-Error";
 	    break;
 	  default:
-	    proto_tree_add_expert_format(tree, pinfo, &ei_dop_unsupported_errcode, tvb, offset, -1,
-	        "Unsupported DOP Error opcode (%d)", session->ros_op & ROS_OP_OPCODE_MASK);
+	    proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DOP Error opcode (%d)",
+				session->ros_op & ROS_OP_OPCODE_MASK);
 	    break;
 	  }
 	  break;
 	default:
-	  proto_tree_add_expert(tree, pinfo, &ei_dop_unsupported_pdu, tvb, offset, -1);
-	  return tvb_captured_length(tvb);
+	  proto_tree_add_text(tree, tvb, offset, -1,"Unsupported DOP PDU");
+	  return tvb_length(tvb);
 	}
 
 	if(dop_dissector) {
@@ -2176,13 +2151,13 @@ dissect_dop(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* da
 	    old_offset=offset;
 	    offset=(*dop_dissector)(FALSE, tvb, offset, &asn1_ctx, tree, -1);
 	    if(offset == old_offset){
-	      proto_tree_add_expert(tree, pinfo, &ei_dop_zero_pdu, tvb, offset, -1);
+	      proto_tree_add_text(tree, tvb, offset, -1,"Internal error, zero-byte DOP PDU");
 	      break;
 	    }
 	  }
 	}
 
-	return tvb_captured_length(tvb);
+	return tvb_length(tvb);
 }
 
 
@@ -2958,7 +2933,7 @@ void proto_register_dop(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-dop-hfarr.c ---*/
-#line 241 "../../asn1/dop/packet-dop-template.c"
+#line 240 "../../asn1/dop/packet-dop-template.c"
   };
 
   /* List of subtrees */
@@ -3037,15 +3012,11 @@ void proto_register_dop(void) {
     &ett_dop_GrantsAndDenials,
 
 /*--- End of included file: packet-dop-ettarr.c ---*/
-#line 248 "../../asn1/dop/packet-dop-template.c"
+#line 247 "../../asn1/dop/packet-dop-template.c"
   };
 
   static ei_register_info ei[] = {
      { &ei_dop_unknown_binding_parameter, { "dop.unknown_binding_parameter", PI_UNDECODED, PI_WARN, "Unknown binding-parameter", EXPFILL }},
-     { &ei_dop_unsupported_opcode, { "dop.unsupported_opcode", PI_UNDECODED, PI_WARN, "Unsupported DOP opcode", EXPFILL }},
-     { &ei_dop_unsupported_errcode, { "dop.unsupported_errcode", PI_UNDECODED, PI_WARN, "Unsupported DOP errcode", EXPFILL }},
-     { &ei_dop_unsupported_pdu, { "dop.unsupported_pdu", PI_UNDECODED, PI_WARN, "Unsupported DOP PDU", EXPFILL }},
-     { &ei_dop_zero_pdu, { "dop.zero_pdu", PI_PROTOCOL, PI_ERROR, "Internal error, zero-byte DOP PDU", EXPFILL }},
   };
 
   expert_module_t* expert_dop;
@@ -3084,27 +3055,27 @@ void proto_reg_handoff_dop(void) {
 
 /*--- Included file: packet-dop-dis-tab.c ---*/
 #line 1 "../../asn1/dop/packet-dop-dis-tab.c"
-  new_register_ber_oid_dissector("2.5.12.0", dissect_DSEType_PDU, proto_dop, "id-doa-dseType");
-  new_register_ber_oid_dissector("2.5.12.5", dissect_SupplierInformation_PDU, proto_dop, "id-doa-supplierKnowledge");
-  new_register_ber_oid_dissector("2.5.12.6", dissect_ConsumerInformation_PDU, proto_dop, "id-doa-consumerKnowledge");
-  new_register_ber_oid_dissector("2.5.12.7", dissect_SupplierAndConsumers_PDU, proto_dop, "id-doa-secondaryShadows");
-  dissector_add_string("dop.oid", "agreement.2.5.19.2", new_create_dissector_handle(dissect_HierarchicalAgreement_PDU, proto_dop));
-  dissector_add_string("dop.oid", "establish.rolea.2.5.19.2", new_create_dissector_handle(dissect_SuperiorToSubordinate_PDU, proto_dop));
-  dissector_add_string("dop.oid", "modify.rolea.2.5.19.2", new_create_dissector_handle(dissect_SuperiorToSubordinateModification_PDU, proto_dop));
-  dissector_add_string("dop.oid", "establish.roleb.2.5.19.2", new_create_dissector_handle(dissect_SubordinateToSuperior_PDU, proto_dop));
-  dissector_add_string("dop.oid", "modify.roleb.2.5.19.2", new_create_dissector_handle(dissect_SubordinateToSuperior_PDU, proto_dop));
-  dissector_add_string("dop.oid", "agreement.2.5.19.3", new_create_dissector_handle(dissect_NonSpecificHierarchicalAgreement_PDU, proto_dop));
-  dissector_add_string("dop.oid", "establish.rolea.2.5.19.3", new_create_dissector_handle(dissect_NHOBSuperiorToSubordinate_PDU, proto_dop));
-  dissector_add_string("dop.oid", "modify.rolea.2.5.19.3", new_create_dissector_handle(dissect_NHOBSuperiorToSubordinate_PDU, proto_dop));
-  dissector_add_string("dop.oid", "establish.roleb.2.5.19.3", new_create_dissector_handle(dissect_NHOBSubordinateToSuperior_PDU, proto_dop));
-  dissector_add_string("dop.oid", "modify.roleb.2.5.19.3", new_create_dissector_handle(dissect_NHOBSubordinateToSuperior_PDU, proto_dop));
-  new_register_ber_oid_dissector("2.5.24.4", dissect_ACIItem_PDU, proto_dop, "id-aca-prescriptiveACI");
-  new_register_ber_oid_dissector("2.5.24.5", dissect_ACIItem_PDU, proto_dop, "id-aca-entryACI");
-  new_register_ber_oid_dissector("2.5.24.6", dissect_ACIItem_PDU, proto_dop, "id-aca-subentryACI");
+  register_ber_oid_dissector("2.5.12.0", dissect_DSEType_PDU, proto_dop, "id-doa-dseType");
+  register_ber_oid_dissector("2.5.12.5", dissect_SupplierInformation_PDU, proto_dop, "id-doa-supplierKnowledge");
+  register_ber_oid_dissector("2.5.12.6", dissect_ConsumerInformation_PDU, proto_dop, "id-doa-consumerKnowledge");
+  register_ber_oid_dissector("2.5.12.7", dissect_SupplierAndConsumers_PDU, proto_dop, "id-doa-secondaryShadows");
+  dissector_add_string("dop.oid", "agreement.2.5.19.2", create_dissector_handle(dissect_HierarchicalAgreement_PDU, proto_dop));
+  dissector_add_string("dop.oid", "establish.rolea.2.5.19.2", create_dissector_handle(dissect_SuperiorToSubordinate_PDU, proto_dop));
+  dissector_add_string("dop.oid", "modify.rolea.2.5.19.2", create_dissector_handle(dissect_SuperiorToSubordinateModification_PDU, proto_dop));
+  dissector_add_string("dop.oid", "establish.roleb.2.5.19.2", create_dissector_handle(dissect_SubordinateToSuperior_PDU, proto_dop));
+  dissector_add_string("dop.oid", "modify.roleb.2.5.19.2", create_dissector_handle(dissect_SubordinateToSuperior_PDU, proto_dop));
+  dissector_add_string("dop.oid", "agreement.2.5.19.3", create_dissector_handle(dissect_NonSpecificHierarchicalAgreement_PDU, proto_dop));
+  dissector_add_string("dop.oid", "establish.rolea.2.5.19.3", create_dissector_handle(dissect_NHOBSuperiorToSubordinate_PDU, proto_dop));
+  dissector_add_string("dop.oid", "modify.rolea.2.5.19.3", create_dissector_handle(dissect_NHOBSuperiorToSubordinate_PDU, proto_dop));
+  dissector_add_string("dop.oid", "establish.roleb.2.5.19.3", create_dissector_handle(dissect_NHOBSubordinateToSuperior_PDU, proto_dop));
+  dissector_add_string("dop.oid", "modify.roleb.2.5.19.3", create_dissector_handle(dissect_NHOBSubordinateToSuperior_PDU, proto_dop));
+  register_ber_oid_dissector("2.5.24.4", dissect_ACIItem_PDU, proto_dop, "id-aca-prescriptiveACI");
+  register_ber_oid_dissector("2.5.24.5", dissect_ACIItem_PDU, proto_dop, "id-aca-entryACI");
+  register_ber_oid_dissector("2.5.24.6", dissect_ACIItem_PDU, proto_dop, "id-aca-subentryACI");
 
 
 /*--- End of included file: packet-dop-dis-tab.c ---*/
-#line 292 "../../asn1/dop/packet-dop-template.c"
+#line 287 "../../asn1/dop/packet-dop-template.c"
   /* APPLICATION CONTEXT */
 
   oid_add_from_string("id-ac-directory-operational-binding-management","2.5.3.3");

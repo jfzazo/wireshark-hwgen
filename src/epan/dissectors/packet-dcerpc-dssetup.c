@@ -10,6 +10,13 @@
 
 
 #include "config.h"
+#ifdef _MSC_VER
+#pragma warning(disable:4005)
+#pragma warning(disable:4013)
+#pragma warning(disable:4018)
+#pragma warning(disable:4101)
+#endif
+
 #include <glib.h>
 #include <string.h>
 #include <epan/packet.h>
@@ -18,8 +25,6 @@
 #include "packet-dcerpc-nt.h"
 #include "packet-windows-common.h"
 #include "packet-dcerpc-dssetup.h"
-void proto_register_dcerpc_dssetup(void);
-void proto_reg_handoff_dcerpc_dssetup(void);
 
 /* Ett declarations */
 static gint ett_dcerpc_dssetup = -1;
@@ -31,26 +36,26 @@ static gint ett_dssetup_dssetup_DsRoleInfo = -1;
 
 
 /* Header field declarations */
+static gint hf_dssetup_werror = -1;
+static gint hf_dssetup_dssetup_DsRoleGetPrimaryDomainInformation_info = -1;
+static gint hf_dssetup_dssetup_DsRoleUpgradeStatus_previous_role = -1;
+static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_role = -1;
+static gint hf_dssetup_dssetup_DsRoleInfo_upgrade = -1;
+static gint hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_UPGRADE_IN_PROGRESS = -1;
+static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_domain = -1;
+static gint hf_dssetup_dssetup_DsRoleInfo_opstatus = -1;
+static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_flags = -1;
+static gint hf_dssetup_dssetup_DsRoleUpgradeStatus_upgrading = -1;
+static gint hf_dssetup_dssetup_DsRoleGetPrimaryDomainInformation_level = -1;
+static gint hf_dssetup_dssetup_DsRoleInfo_basic = -1;
+static gint hf_dssetup_opnum = -1;
+static gint hf_dssetup_dssetup_DsRoleOpStatus_status = -1;
+static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_forest = -1;
 static gint hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DOMAIN_GUID_PRESENT = -1;
 static gint hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DS_MIXED_MODE = -1;
 static gint hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DS_RUNNING = -1;
-static gint hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_UPGRADE_IN_PROGRESS = -1;
-static gint hf_dssetup_dssetup_DsRoleGetPrimaryDomainInformation_info = -1;
-static gint hf_dssetup_dssetup_DsRoleGetPrimaryDomainInformation_level = -1;
-static gint hf_dssetup_dssetup_DsRoleInfo_basic = -1;
-static gint hf_dssetup_dssetup_DsRoleInfo_opstatus = -1;
-static gint hf_dssetup_dssetup_DsRoleInfo_upgrade = -1;
-static gint hf_dssetup_dssetup_DsRoleOpStatus_status = -1;
-static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_dns_domain = -1;
-static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_domain = -1;
 static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_domain_guid = -1;
-static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_flags = -1;
-static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_forest = -1;
-static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_role = -1;
-static gint hf_dssetup_dssetup_DsRoleUpgradeStatus_previous_role = -1;
-static gint hf_dssetup_dssetup_DsRoleUpgradeStatus_upgrading = -1;
-static gint hf_dssetup_opnum = -1;
-static gint hf_dssetup_werror = -1;
+static gint hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_dns_domain = -1;
 
 static gint proto_dcerpc_dssetup = -1;
 /* Version information */
@@ -143,12 +148,12 @@ int
 dssetup_dissect_enum_DsRole(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, guint8 *drep _U_, int hf_index _U_, guint1632 *param _U_)
 {
 	guint1632 parameter=0;
-	if (param) {
-		parameter = *param;
+	if(param){
+		parameter=(guint1632)*param;
 	}
 	offset = dissect_ndr_uint1632(tvb, offset, pinfo, tree, di, drep, hf_index, &parameter);
-	if (param) {
-		*param = parameter;
+	if(param){
+		*param=(guint32)parameter;
 	}
 	return offset;
 }
@@ -175,7 +180,7 @@ dssetup_dissect_bitmap_DsRoleFlags(tvbuff_t *tvb _U_, int offset _U_, packet_inf
 		tree = proto_item_add_subtree(item,ett_dssetup_dssetup_DsRoleFlags);
 	}
 
-	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, -1, &flags);
+	offset = dissect_ndr_uint32(tvb, offset, pinfo, NULL, di, drep, -1, &flags);
 	proto_item_append_text(item, ": ");
 
 	if (!flags)
@@ -320,8 +325,6 @@ dssetup_dissect_struct_DsRolePrimaryDomInfoBasic(tvbuff_t *tvb _U_, int offset _
 
 	ALIGN_TO_5_BYTES;
 
-	ALIGN_TO_5_BYTES;
-
 	old_offset = offset;
 
 	if (parent_tree) {
@@ -362,12 +365,12 @@ int
 dssetup_dissect_enum_DsUpgrade(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, guint8 *drep _U_, int hf_index _U_, guint32 *param _U_)
 {
 	guint32 parameter=0;
-	if (param) {
-		parameter = *param;
+	if(param){
+		parameter=(guint32)*param;
 	}
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_index, &parameter);
-	if (param) {
-		*param = parameter;
+	if(param){
+		*param=(guint32)parameter;
 	}
 	return offset;
 }
@@ -383,12 +386,12 @@ int
 dssetup_dissect_enum_DsPrevious(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, guint8 *drep _U_, int hf_index _U_, guint1632 *param _U_)
 {
 	guint1632 parameter=0;
-	if (param) {
-		parameter = *param;
+	if(param){
+		parameter=(guint1632)*param;
 	}
 	offset = dissect_ndr_uint1632(tvb, offset, pinfo, tree, di, drep, hf_index, &parameter);
-	if (param) {
-		*param = parameter;
+	if(param){
+		*param=(guint32)parameter;
 	}
 	return offset;
 }
@@ -421,8 +424,6 @@ dssetup_dissect_struct_DsRoleUpgradeStatus(tvbuff_t *tvb _U_, int offset _U_, pa
 	proto_item *item = NULL;
 	proto_tree *tree = NULL;
 	int old_offset;
-
-	ALIGN_TO_4_BYTES;
 
 	ALIGN_TO_4_BYTES;
 
@@ -459,12 +460,12 @@ int
 dssetup_dissect_enum_DsRoleOp(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, guint8 *drep _U_, int hf_index _U_, guint1632 *param _U_)
 {
 	guint1632 parameter=0;
-	if (param) {
-		parameter = *param;
+	if(param){
+		parameter=(guint1632)*param;
 	}
 	offset = dissect_ndr_uint1632(tvb, offset, pinfo, tree, di, drep, hf_index, &parameter);
-	if (param) {
-		*param = parameter;
+	if(param){
+		*param=(guint32)parameter;
 	}
 	return offset;
 }
@@ -488,8 +489,6 @@ dssetup_dissect_struct_DsRoleOpStatus(tvbuff_t *tvb _U_, int offset _U_, packet_
 	proto_item *item = NULL;
 	proto_tree *tree = NULL;
 	int old_offset;
-
-	ALIGN_TO_3_BYTES;
 
 	ALIGN_TO_3_BYTES;
 
@@ -524,12 +523,12 @@ int
 dssetup_dissect_enum_DsRoleInfoLevel(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, guint8 *drep _U_, int hf_index _U_, guint1632 *param _U_)
 {
 	guint1632 parameter=0;
-	if (param) {
-		parameter = *param;
+	if(param){
+		parameter=(guint1632)*param;
 	}
 	offset = dissect_ndr_uint1632(tvb, offset, pinfo, tree, di, drep, hf_index, &parameter);
-	if (param) {
-		*param = parameter;
+	if(param){
+		*param=(guint32)parameter;
 	}
 	return offset;
 }
@@ -575,7 +574,8 @@ dssetup_dissect_DsRoleInfo(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo
 
 	old_offset = offset;
 	if (parent_tree) {
-		tree = proto_tree_add_subtree(parent_tree, tvb, offset, -1, ett_dssetup_dssetup_DsRoleInfo, &item, "dssetup_DsRoleInfo");
+		item = proto_tree_add_text(parent_tree, tvb, offset, -1, "dssetup_DsRoleInfo");
+		tree = proto_item_add_subtree(item, ett_dssetup_dssetup_DsRoleInfo);
 	}
 
 	offset = dissect_ndr_uint1632(tvb, offset, pinfo, tree, di, drep, hf_index, &level);
@@ -625,7 +625,7 @@ dssetup_dissect_element_DsRoleGetPrimaryDomainInformation_info_(tvbuff_t *tvb _U
 
 /* IDL: WERROR dssetup_DsRoleGetPrimaryDomainInformation( */
 /* IDL: [in] dssetup_DsRoleInfoLevel level, */
-/* IDL: [out] [switch_is(level)] [unique(1)] dssetup_DsRoleInfo *info */
+/* IDL: [out] [unique(1)] [switch_is(level)] dssetup_DsRoleInfo *info */
 /* IDL: ); */
 
 static int
@@ -934,46 +934,46 @@ static dcerpc_sub_dissector dssetup_dissectors[] = {
 void proto_register_dcerpc_dssetup(void)
 {
 	static hf_register_info hf[] = {
-	{ &hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DOMAIN_GUID_PRESENT,
-		{ "Ds Role Primary Domain Guid Present", "dssetup.dssetup_DsRoleFlags.DS_ROLE_PRIMARY_DOMAIN_GUID_PRESENT", FT_BOOLEAN, 32, TFS(&dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DOMAIN_GUID_PRESENT_tfs), ( 0x01000000 ), NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DS_MIXED_MODE,
-		{ "Ds Role Primary Ds Mixed Mode", "dssetup.dssetup_DsRoleFlags.DS_ROLE_PRIMARY_DS_MIXED_MODE", FT_BOOLEAN, 32, TFS(&dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DS_MIXED_MODE_tfs), ( 0x00000002 ), NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DS_RUNNING,
-		{ "Ds Role Primary Ds Running", "dssetup.dssetup_DsRoleFlags.DS_ROLE_PRIMARY_DS_RUNNING", FT_BOOLEAN, 32, TFS(&dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DS_RUNNING_tfs), ( 0x00000001 ), NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_UPGRADE_IN_PROGRESS,
-		{ "Ds Role Upgrade In Progress", "dssetup.dssetup_DsRoleFlags.DS_ROLE_UPGRADE_IN_PROGRESS", FT_BOOLEAN, 32, TFS(&dssetup_DsRoleFlags_DS_ROLE_UPGRADE_IN_PROGRESS_tfs), ( 0x00000004 ), NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleGetPrimaryDomainInformation_info,
-		{ "Info", "dssetup.dssetup_DsRoleGetPrimaryDomainInformation.info", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleGetPrimaryDomainInformation_level,
-		{ "Level", "dssetup.dssetup_DsRoleGetPrimaryDomainInformation.level", FT_UINT1632, BASE_DEC, VALS(dssetup_dssetup_DsRoleInfoLevel_vals), 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleInfo_basic,
-		{ "Basic", "dssetup.dssetup_DsRoleInfo.basic", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleInfo_opstatus,
-		{ "Opstatus", "dssetup.dssetup_DsRoleInfo.opstatus", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleInfo_upgrade,
-		{ "Upgrade", "dssetup.dssetup_DsRoleInfo.upgrade", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleOpStatus_status,
-		{ "Status", "dssetup.dssetup_DsRoleOpStatus.status", FT_UINT1632, BASE_DEC, VALS(dssetup_dssetup_DsRoleOp_vals), 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_dns_domain,
-		{ "Dns Domain", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.dns_domain", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_domain,
-		{ "Domain", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.domain", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_domain_guid,
-		{ "Domain Guid", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.domain_guid", FT_GUID, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_flags,
-		{ "Flags", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.flags", FT_UINT32, BASE_HEX, NULL, 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_forest,
-		{ "Forest", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.forest", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_role,
-		{ "Role", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.role", FT_UINT1632, BASE_DEC, VALS(dssetup_dssetup_DsRole_vals), 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleUpgradeStatus_previous_role,
-		{ "Previous Role", "dssetup.dssetup_DsRoleUpgradeStatus.previous_role", FT_UINT1632, BASE_DEC, VALS(dssetup_dssetup_DsPrevious_vals), 0, NULL, HFILL }},
-	{ &hf_dssetup_dssetup_DsRoleUpgradeStatus_upgrading,
-		{ "Upgrading", "dssetup.dssetup_DsRoleUpgradeStatus.upgrading", FT_UINT32, BASE_DEC, VALS(dssetup_dssetup_DsUpgrade_vals), 0, NULL, HFILL }},
-	{ &hf_dssetup_opnum,
-		{ "Operation", "dssetup.opnum", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
 	{ &hf_dssetup_werror,
-		{ "Windows Error", "dssetup.werror", FT_UINT32, BASE_HEX, VALS(WERR_errors), 0, NULL, HFILL }},
+	  { "Windows Error", "dssetup.werror", FT_UINT32, BASE_HEX, VALS(WERR_errors), 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleGetPrimaryDomainInformation_info,
+	  { "Info", "dssetup.dssetup_DsRoleGetPrimaryDomainInformation.info", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleUpgradeStatus_previous_role,
+	  { "Previous Role", "dssetup.dssetup_DsRoleUpgradeStatus.previous_role", FT_UINT1632, BASE_DEC, VALS(dssetup_dssetup_DsPrevious_vals), 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_role,
+	  { "Role", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.role", FT_UINT1632, BASE_DEC, VALS(dssetup_dssetup_DsRole_vals), 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleInfo_upgrade,
+	  { "Upgrade", "dssetup.dssetup_DsRoleInfo.upgrade", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_UPGRADE_IN_PROGRESS,
+	  { "Ds Role Upgrade In Progress", "dssetup.dssetup_DsRoleFlags.DS_ROLE_UPGRADE_IN_PROGRESS", FT_BOOLEAN, 32, TFS(&dssetup_DsRoleFlags_DS_ROLE_UPGRADE_IN_PROGRESS_tfs), ( 0x00000004 ), NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_domain,
+	  { "Domain", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.domain", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleInfo_opstatus,
+	  { "Opstatus", "dssetup.dssetup_DsRoleInfo.opstatus", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_flags,
+	  { "Flags", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.flags", FT_UINT32, BASE_HEX, NULL, 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleUpgradeStatus_upgrading,
+	  { "Upgrading", "dssetup.dssetup_DsRoleUpgradeStatus.upgrading", FT_UINT32, BASE_DEC, VALS(dssetup_dssetup_DsUpgrade_vals), 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleGetPrimaryDomainInformation_level,
+	  { "Level", "dssetup.dssetup_DsRoleGetPrimaryDomainInformation.level", FT_UINT1632, BASE_DEC, VALS(dssetup_dssetup_DsRoleInfoLevel_vals), 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleInfo_basic,
+	  { "Basic", "dssetup.dssetup_DsRoleInfo.basic", FT_NONE, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_dssetup_opnum,
+	  { "Operation", "dssetup.opnum", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleOpStatus_status,
+	  { "Status", "dssetup.dssetup_DsRoleOpStatus.status", FT_UINT1632, BASE_DEC, VALS(dssetup_dssetup_DsRoleOp_vals), 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_forest,
+	  { "Forest", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.forest", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DOMAIN_GUID_PRESENT,
+	  { "Ds Role Primary Domain Guid Present", "dssetup.dssetup_DsRoleFlags.DS_ROLE_PRIMARY_DOMAIN_GUID_PRESENT", FT_BOOLEAN, 32, TFS(&dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DOMAIN_GUID_PRESENT_tfs), ( 0x01000000 ), NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DS_MIXED_MODE,
+	  { "Ds Role Primary Ds Mixed Mode", "dssetup.dssetup_DsRoleFlags.DS_ROLE_PRIMARY_DS_MIXED_MODE", FT_BOOLEAN, 32, TFS(&dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DS_MIXED_MODE_tfs), ( 0x00000002 ), NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DS_RUNNING,
+	  { "Ds Role Primary Ds Running", "dssetup.dssetup_DsRoleFlags.DS_ROLE_PRIMARY_DS_RUNNING", FT_BOOLEAN, 32, TFS(&dssetup_DsRoleFlags_DS_ROLE_PRIMARY_DS_RUNNING_tfs), ( 0x00000001 ), NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_domain_guid,
+	  { "Domain Guid", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.domain_guid", FT_GUID, BASE_NONE, NULL, 0, NULL, HFILL }},
+	{ &hf_dssetup_dssetup_DsRolePrimaryDomInfoBasic_dns_domain,
+	  { "Dns Domain", "dssetup.dssetup_DsRolePrimaryDomInfoBasic.dns_domain", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
 	};
 
 

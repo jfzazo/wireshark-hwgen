@@ -535,6 +535,8 @@ char *uat_load_text;
 	/*
 	 * uat_load.l
 	 *
+	 * $Id$
+	 *
 	 *  User Accessible Tables
 	 *  Mantain an array of user accessible data strucures
 	 *  One parser to fit them all
@@ -565,9 +567,11 @@ char *uat_load_text;
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include <glib.h>
 
+#include <epan/emem.h>
 #include "uat-int.h"
 #include "uat_load_lex.h"
 #include <wsutil/file_util.h>
@@ -590,18 +594,15 @@ static gchar *parse_str;
 static guint parse_str_pos;
 
 #define ERROR(fmtd) do { \
-    char* fmt_str = g_strdup_printf fmtd; \
-    error = g_strdup_printf("%s:%d: %s",uat->filename,linenum,fmt_str); \
-    g_free(fmt_str); \
+    error = ep_strdup_printf("%s:%d: %s",uat->filename,linenum,ep_strdup_printf fmtd); \
     yyterminate(); \
 } while(0)
 
 #define SET_FIELD() \
-	{ gchar* errx; \
+	{ const gchar* errx; \
 	if (uat->fields[colnum].cb.chk) { \
 		if ( ! uat->fields[colnum].cb.chk(record, ptrx, len, uat->fields[colnum].cbdata.chk, uat->fields[colnum].fld_data, &errx) ) { \
-			error = g_strdup_printf("%s:%d: %s",uat->filename,linenum,errx); \
-			g_free(errx); \
+			error = ep_strdup_printf("%s:%d: %s",uat->filename,linenum,ep_strdup_printf("%s",errx)); \
 			valid_record = FALSE; \
 		}\
 	}\
@@ -656,7 +657,7 @@ static guint parse_str_pos;
 		 * workarround in uat_save(), using /x5c and /x22
 		 */
 
-#line 660 "uat_load.c"
+#line 661 "uat_load.c"
 
 #define INITIAL 0
 #define START_OF_LINE 1
@@ -846,9 +847,9 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 156 "uat_load.l"
+#line 157 "uat_load.l"
 
-#line 852 "uat_load.c"
+#line 853 "uat_load.c"
 
 	if ( !(yy_init) )
 		{
@@ -929,24 +930,24 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 157 "uat_load.l"
+#line 158 "uat_load.l"
 ;
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 158 "uat_load.l"
+#line 159 "uat_load.l"
 linenum++;
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 159 "uat_load.l"
+#line 160 "uat_load.l"
 linenum++;
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 161 "uat_load.l"
+#line 162 "uat_load.l"
 {
 	ptrx = g_strdup("");
 	len = 0;
@@ -965,7 +966,7 @@ YY_RULE_SETUP
 case 5:
 /* rule 5 can match eol */
 YY_RULE_SETUP
-#line 176 "uat_load.l"
+#line 177 "uat_load.l"
 {
 	ptrx = g_strdup("");
 	len = 0;
@@ -978,7 +979,7 @@ YY_RULE_SETUP
 case 6:
 /* rule 6 can match eol */
 YY_RULE_SETUP
-#line 185 "uat_load.l"
+#line 186 "uat_load.l"
 {
 	ptrx = uat_undquote(uat_load_text, (guint) uat_load_leng, &len);
 
@@ -994,7 +995,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 198 "uat_load.l"
+#line 199 "uat_load.l"
 {
 	ptrx = uat_unbinstring(uat_load_text,  (guint) uat_load_leng, &len);
 
@@ -1013,7 +1014,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 214 "uat_load.l"
+#line 215 "uat_load.l"
 {
 
 	DUMP_FIELD("separator->next");
@@ -1030,7 +1031,7 @@ YY_RULE_SETUP
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 227 "uat_load.l"
+#line 228 "uat_load.l"
 {
 	linenum++;
 	ERROR(("expecting field %s in previous line",uat->fields[colnum].name));
@@ -1038,14 +1039,14 @@ YY_RULE_SETUP
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 232 "uat_load.l"
+#line 233 "uat_load.l"
 {
 	ERROR(("unexpected char '%s' while looking for field %s",uat_load_text,uat->fields[colnum].name));
 }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 236 "uat_load.l"
+#line 237 "uat_load.l"
 {
 	ERROR(("more fields than required"));
 }
@@ -1053,10 +1054,10 @@ YY_RULE_SETUP
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 240 "uat_load.l"
+#line 241 "uat_load.l"
 {
 	void* rec;
-	char* err = NULL;
+	const char* err = NULL;
 
 	linenum++;
 
@@ -1070,8 +1071,12 @@ YY_RULE_SETUP
 		uat->update_cb(rec,&err);
 
 	if (err) {
-		error = err;
-		yyterminate();
+		char *tmp = ep_strdup(err);
+		/* XXX bit of a hack to remove emem from dissectors, this can
+		 * be removed as proper use of glib memory is propogated
+		 * through the rest of the UAT code */
+		g_free((char*)err);
+		ERROR(("%s",tmp));
 	}
 
 	valid_record = TRUE;
@@ -1087,7 +1092,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 271 "uat_load.l"
+#line 276 "uat_load.l"
 {
 	ERROR(("unexpected char while looking for end of line"));
 }
@@ -1095,31 +1100,31 @@ YY_RULE_SETUP
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 275 "uat_load.l"
+#line 280 "uat_load.l"
 { linenum++; BEGIN START_OF_LINE; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 276 "uat_load.l"
+#line 281 "uat_load.l"
 ;
 	YY_BREAK
 case 16:
 /* rule 16 can match eol */
 YY_RULE_SETUP
-#line 278 "uat_load.l"
-{ linenum++; ERROR(("incomplete record")); }
+#line 283 "uat_load.l"
+{ linenum++; ERROR(("incomplete record")); BEGIN START_OF_LINE; }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 279 "uat_load.l"
+#line 284 "uat_load.l"
 { ERROR(("unexpected input")); }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 281 "uat_load.l"
+#line 286 "uat_load.l"
 ECHO;
 	YY_BREAK
-#line 1123 "uat_load.c"
+#line 1128 "uat_load.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(START_OF_LINE):
 case YY_STATE_EOF(NEXT_FIELD):
@@ -2082,7 +2087,7 @@ void uat_load_free (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 281 "uat_load.l"
+#line 286 "uat_load.l"
 
 
 
@@ -2090,7 +2095,7 @@ void uat_load_free (void * ptr )
 
 
 gboolean
-uat_load(uat_t *uat_in, char **errx)
+uat_load(uat_t *uat_in, const char **errx)
 {
 	gchar *fname = uat_get_actual_filename(uat_in, FALSE);
 
@@ -2108,7 +2113,7 @@ uat_load(uat_t *uat_in, char **errx)
 
 
 	if (!(uat_load_in = ws_fopen(fname,"r"))) {
-		*errx = g_strdup(g_strerror(errno));
+		*errx = g_strerror(errno);
 		g_free(fname);
 		return FALSE;
 	}
@@ -2133,7 +2138,7 @@ uat_load(uat_t *uat_in, char **errx)
 	UAT_UPDATE(uat);
 
 	if (error) {
-		*errx = error;
+		*errx = ep_strdup(error);
 		return FALSE;
 	}
 
@@ -2172,7 +2177,7 @@ uat_load_str(uat_t *uat_in, char *entry, char **err)
 	UAT_UPDATE(uat);
 
 	if (error) {
-		*err = error;
+		*err = ep_strdup(error);
 		return FALSE;
 	}
 

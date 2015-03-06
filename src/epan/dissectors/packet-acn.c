@@ -39,8 +39,11 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/ipv6-utils.h>
 #include <epan/to_str.h>
 
 /* Forward declarations */
@@ -241,10 +244,6 @@ static int hf_acn_dmp_adt_d = -1;
 static int hf_acn_dmp_adt_x = -1;
 static int hf_acn_dmp_reason_code = -1;
 static int hf_acn_dmp_vector = -1;
-static int hf_acn_dmp_actual_address = -1;
-static int hf_acn_dmp_virtual_address = -1;
-static int hf_acn_dmp_actual_address_first = -1;
-static int hf_acn_dmp_virtual_address_first = -1;
 static int hf_acn_expiry = -1;
 static int hf_acn_first_memeber_to_ack = -1;
 static int hf_acn_first_missed_sequence = -1;
@@ -276,7 +275,6 @@ static int hf_acn_reason_code = -1;
 static int hf_acn_reciprocal_channel = -1;
 static int hf_acn_refuse_code = -1;
 static int hf_acn_reliable_sequence_number = -1;
-static int hf_acn_adhoc_expiry = -1;
 /* static int hf_acn_sdt_pdu = -1; */
 static int hf_acn_sdt_vector = -1;
 static int hf_acn_dmx_vector = -1;
@@ -296,7 +294,6 @@ static int hf_acn_dmx_2_first_property_address = -1;
 static int hf_acn_dmx_increment = -1;
 static int hf_acn_dmx_count = -1;
 static int hf_acn_dmx_2_start_code = -1;
-static int hf_acn_dmx_data = -1;
 
 /* static int hf_acn_dmx_dmp_vector = -1; */
 
@@ -459,7 +456,7 @@ is_acn(tvbuff_t *tvb)
 {
   static const char acn_packet_id[] = "ASC-E1.17\0\0\0";  /* must be 12 bytes */
 
-  if (tvb_captured_length(tvb) < (4+sizeof(acn_packet_id)))
+  if (tvb_length(tvb) < (4+sizeof(acn_packet_id)))
     return FALSE;
 
   /* Check the bytes in octets 4 - 16 */
@@ -501,8 +498,8 @@ acn_add_channel_owner_info_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
   guint32     session_count;
   guint32     x;
 
-  this_tree = proto_tree_add_subtree(tree, tvb, offset, 8, ett_acn_channel_owner_info_block, NULL,
-                                    "Channel Owner Info Block");
+  pi        = proto_tree_add_text(tree, tvb, offset, 8, "Channel Owner Info Block");
+  this_tree = proto_item_add_subtree(pi, ett_acn_channel_owner_info_block);
 
   proto_tree_add_item(this_tree, hf_acn_member_id, tvb, offset, 2, ENC_BIG_ENDIAN);
   offset += 2;
@@ -530,8 +527,8 @@ acn_add_channel_member_info_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
   guint32     session_count;
   guint32     x;
 
-  this_tree = proto_tree_add_subtree(tree, tvb, offset, 8, ett_acn_channel_member_info_block,
-                                NULL, "Channel Member Info Block");
+  pi        = proto_tree_add_text(tree, tvb, offset, 8, "Channel Member Info Block");
+  this_tree = proto_item_add_subtree(pi, ett_acn_channel_member_info_block);
 
   proto_tree_add_item(this_tree, hf_acn_member_id, tvb, offset, 2, ENC_BIG_ENDIAN);
   offset += 2;
@@ -557,9 +554,9 @@ acn_add_channel_member_info_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
 /******************************************************************************/
 /* Add labeled expiry                                                         */
 static guint32
-acn_add_expiry(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, int hf)
+acn_add_expiry(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, const char *label)
 {
-  proto_tree_add_item(tree, hf, tvb, offset, 2, ENC_NA);
+  proto_tree_add_text(tree, tvb, offset, 2, "%s %d", label, tvb_get_guint8(tvb, offset));
   offset += 1;
   return offset;
 }
@@ -570,11 +567,11 @@ acn_add_expiry(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offs
 static guint32
 acn_add_channel_parameter(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset)
 {
+  proto_item *pi;
   proto_tree *param_tree;
 
-  param_tree = proto_tree_add_subtree(tree, tvb, offset, 8, ett_acn_channel_parameter,
-                            NULL, "Channel Parameter Block");
-
+  pi = proto_tree_add_text(tree, tvb, offset, 8, "Channel Parameter Block");
+  param_tree = proto_item_add_subtree(pi, ett_acn_channel_parameter);
   proto_tree_add_item(param_tree, hf_acn_expiry, tvb, offset, 1, ENC_BIG_ENDIAN);
   offset += 1;
   proto_tree_add_item(param_tree, hf_acn_nak_outbound_flag, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -597,7 +594,12 @@ acn_add_address(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int off
   proto_item *pi;
   proto_tree *addr_tree = NULL;
   guint8      ip_address_type;
+  address     addr;
+  guint32     IPv4;
   guint32     port;
+
+  struct e_in6_addr IPv6;
+
 
   /* Get type */
   ip_address_type = tvb_get_guint8(tvb, offset);
@@ -609,7 +611,8 @@ acn_add_address(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int off
       break;
     case ACN_ADDR_IPV4:
       /* Build tree and add type*/
-      addr_tree = proto_tree_add_subtree(tree, tvb, offset, 7, ett_acn_address, &pi, label);
+      pi         = proto_tree_add_text(tree, tvb, offset, 7, "%s", label);
+      addr_tree  = proto_item_add_subtree(pi, ett_acn_address);
       proto_tree_add_item(addr_tree, hf_acn_ip_address_type, tvb, offset, 1, ENC_BIG_ENDIAN);
       offset    += 1;
       /* Add port */
@@ -619,12 +622,15 @@ acn_add_address(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int off
       /* Add Address */
       proto_tree_add_item(addr_tree, hf_acn_ipv4, tvb, offset, 4, ENC_BIG_ENDIAN);
       /* Append port and address to tree item */
-      proto_item_append_text(pi, " %s, Port %d", tvb_address_to_str(wmem_packet_scope(), tvb, AT_IPv4, offset), port);
+      IPv4       = tvb_get_ipv4(tvb, offset);
+      SET_ADDRESS(&addr, AT_IPv4, sizeof(IPv4), &IPv4);
+      proto_item_append_text(pi, " %s, Port %d", address_to_str(wmem_packet_scope(), &addr), port);
       offset    += 4;
       break;
     case ACN_ADDR_IPV6:
       /* Build tree and add type*/
-      addr_tree = proto_tree_add_subtree(tree, tvb, offset, 19, ett_acn_address, &pi, label);
+      pi         = proto_tree_add_text(tree, tvb, offset, 19, "%s", label);
+      addr_tree  = proto_item_add_subtree(pi, ett_acn_address);
       proto_tree_add_item(addr_tree, hf_acn_ip_address_type, tvb, offset, 1, ENC_BIG_ENDIAN);
       offset    += 1;
       /* Add port */
@@ -634,19 +640,22 @@ acn_add_address(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int off
       /* Add Address */
       proto_tree_add_item(addr_tree, hf_acn_ipv6, tvb, offset, 16, ENC_NA);
       /* Append port and address to tree item */
-      proto_item_append_text(pi, " %s, Port %d", tvb_address_to_str(wmem_packet_scope(), tvb, AT_IPv6, offset), port);
+      tvb_get_ipv6(tvb, offset, &IPv6);
+      SET_ADDRESS(&addr, AT_IPv6, sizeof(struct e_in6_addr), &IPv6);
+      proto_item_append_text(pi, " %s, Port %d", address_to_str(wmem_packet_scope(), &addr), port);
       offset    += 16;
       break;
     case ACN_ADDR_IPPORT:
       /* Build tree and add type*/
-      addr_tree = proto_tree_add_subtree(tree, tvb, offset, 3, ett_acn_address, &pi, label);
+      pi         = proto_tree_add_text(tree, tvb, offset, 3, "%s", label);
+      addr_tree  = proto_item_add_subtree(pi, ett_acn_address);
       proto_tree_add_item(addr_tree, hf_acn_ip_address_type, tvb, offset, 1, ENC_BIG_ENDIAN);
       offset    += 1;
       /* Add port */
       port       = tvb_get_ntohs(tvb, offset);
       proto_tree_add_item(addr_tree, hf_acn_port, tvb, offset, 2, ENC_BIG_ENDIAN);
       /* Append port to tree item */
-      proto_item_append_text(pi, " Port %d", port);
+      proto_item_append_text(pi, " %s Port %d", address_to_str(wmem_packet_scope(), &addr), port);
       offset    += 2;
       break;
   }
@@ -658,7 +667,8 @@ acn_add_address(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int off
 static guint32
 acn_add_dmp_address_type(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, acn_dmp_adt_type *adt)
 {
-  proto_tree  *this_tree;
+  proto_item  *pi;
+  proto_tree  *this_tree = NULL;
   guint8       D;
   const gchar *name;
 
@@ -667,9 +677,9 @@ acn_add_dmp_address_type(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 
   D = ACN_DMP_ADT_EXTRACT_D(adt->flags);
   name = val_to_str(D, acn_dmp_adt_d_vals, "not valid (%d)");
-  this_tree = proto_tree_add_subtree_format(tree, tvb, offset, 1, ett_acn_address_type,
-                                NULL, "Address and Data Type: %s", name);
+  pi = proto_tree_add_text(tree, tvb, offset, 1, "Address and Data Type: %s", name);
 
+  this_tree = proto_item_add_subtree(pi, ett_acn_address_type);
   proto_tree_add_uint(this_tree, hf_acn_dmp_adt_v, tvb, offset, 1, adt->flags);
   proto_tree_add_uint(this_tree, hf_acn_dmp_adt_r, tvb, offset, 1, adt->flags);
   proto_tree_add_uint(this_tree, hf_acn_dmp_adt_d, tvb, offset, 1, adt->flags);
@@ -719,9 +729,9 @@ acn_add_dmp_address(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int
       }                         /* of switch (A)  */
 
       if (adt->flags & ACN_DMP_ADT_FLAG_V) {
-        proto_tree_add_uint(tree, hf_acn_dmp_virtual_address, tvb, start_offset, bytes_used, adt->address);
+        proto_tree_add_text(tree, tvb, start_offset, bytes_used, "Virtual Address: 0x%X", adt->address);
       } else {
-        proto_tree_add_uint(tree, hf_acn_dmp_actual_address, tvb, start_offset, bytes_used, adt->address);
+        proto_tree_add_text(tree, tvb, start_offset, bytes_used, "Actual Address: 0x%X", adt->address);
       }
       break;
 
@@ -759,12 +769,12 @@ acn_add_dmp_address(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int
       }                         /* of switch (A)  */
 
       if (adt->flags & ACN_DMP_ADT_FLAG_V) {
-        proto_tree_add_uint_format_value(tree, hf_acn_dmp_virtual_address_first, tvb, start_offset, bytes_used,
-                            adt->address, "0x%X, inc: %d, count: %d",
+        proto_tree_add_text(tree, tvb, start_offset, bytes_used,
+                            "Virtual Address first: 0x%X, inc: %d, count: %d",
                             adt->address, adt->increment, adt->count);
       } else {
-        proto_tree_add_uint_format_value(tree, hf_acn_dmp_actual_address_first, tvb, start_offset, bytes_used,
-                            adt->address, "0x%X, inc: %d, count: %d",
+        proto_tree_add_text(tree, tvb, start_offset, bytes_used,
+                            "Actual Address first: 0x%X, inc: %d, count: %d",
                             adt->address, adt->increment, adt->count);
       }
       break;
@@ -803,12 +813,12 @@ acn_add_dmp_address(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int
       }                         /* of switch (A)  */
 
       if (adt->flags & ACN_DMP_ADT_FLAG_V) {
-        proto_tree_add_uint_format_value(tree, hf_acn_dmp_virtual_address_first, tvb, start_offset, bytes_used,
-                            adt->address, "0x%X, inc: %d, count: %d",
+        proto_tree_add_text(tree, tvb, start_offset, bytes_used,
+                            "Virtual Address first: 0x%X, inc: %d, count: %d",
                             adt->address, adt->increment, adt->count);
       } else {
-        proto_tree_add_uint_format_value(tree, hf_acn_dmp_actual_address_first, tvb, start_offset, bytes_used,
-                            adt->address, "0x%X, inc: %d, count: %d",
+        proto_tree_add_text(tree, tvb, start_offset, bytes_used,
+                            "Actual Address first: 0x%X, inc: %d, count: %d",
                             adt->address, adt->increment, adt->count);
       }
       break;
@@ -847,12 +857,12 @@ acn_add_dmp_address(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int
       } /* of switch (A)  */
 
       if (adt->flags & ACN_DMP_ADT_FLAG_V) {
-        proto_tree_add_uint_format_value(tree, hf_acn_dmp_virtual_address_first, tvb, start_offset, bytes_used,
-                            adt->address, "0x%X, inc: %d, count: %d",
+        proto_tree_add_text(tree, tvb, start_offset, bytes_used,
+                            "Virtual Address first: 0x%X, inc: %d, count: %d",
                             adt->address, adt->increment, adt->count);
       } else {
-        proto_tree_add_uint_format_value(tree, hf_acn_dmp_actual_address_first, tvb, start_offset, bytes_used,
-                            adt->address, "0x%X, inc: %d, count: %d",
+        proto_tree_add_text(tree, tvb, start_offset, bytes_used,
+                            "Actual Address first: 0x%X, inc: %d, count: %d",
                             adt->address, adt->increment, adt->count);
       }
       break;
@@ -1617,7 +1627,7 @@ dissect_acn_sdt_wrapped_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree 
     case ACN_SDT_VECTOR_CHANNEL_PARAMS:
       data_offset = acn_add_channel_parameter(tvb, pinfo, pdu_tree, data_offset);
       data_offset = acn_add_address(tvb, pinfo, pdu_tree, data_offset, "Ad-hoc Address:");
-      /*data_offset =*/ acn_add_expiry(tvb, pinfo, pdu_tree, data_offset, hf_acn_adhoc_expiry);
+      /*data_offset =*/ acn_add_expiry(tvb, pinfo, pdu_tree, data_offset, "Ad-hoc Expiry:");
       break;
     case ACN_SDT_VECTOR_LEAVE:
       /* nothing more */
@@ -1884,8 +1894,9 @@ dissect_acn_dmx_data_pdu(guint32 protocol_id, tvbuff_t *tvb, packet_info *pinfo,
   guint32           item_cnt;
 
   proto_item       *ti, *pi;
-  proto_tree       *pdu_tree;
-  proto_tree       *flag_tree;
+  proto_tree       *pdu_tree  = NULL;
+  proto_tree       *flag_tree = NULL;
+/*  proto_tree *addr_tree = NULL; */
 
 /* this pdu */
   acn_dmp_adt_type  adt       = {0,0,0,0,0,0};
@@ -1932,7 +1943,7 @@ dissect_acn_dmx_data_pdu(guint32 protocol_id, tvbuff_t *tvb, packet_info *pinfo,
   pdu_tree = proto_item_add_subtree(ti, ett_acn_dmx_data_pdu);
 
   /* Add flag item and tree */
-  pi = proto_tree_add_uint(pdu_tree, hf_acn_pdu_flags, tvb, pdu_start, 1, pdu_flags);
+  pi        = proto_tree_add_uint(pdu_tree, hf_acn_pdu_flags, tvb, pdu_start, 1, pdu_flags);
   flag_tree = proto_item_add_subtree(pi, ett_acn_pdu_flags);
   proto_tree_add_item(flag_tree, hf_acn_pdu_flag_l, tvb, pdu_start, 1, ENC_BIG_ENDIAN);
   proto_tree_add_item(flag_tree, hf_acn_pdu_flag_v, tvb, pdu_start, 1, ENC_BIG_ENDIAN);
@@ -2057,6 +2068,9 @@ dissect_acn_dmx_data_pdu(guint32 protocol_id, tvbuff_t *tvb, packet_info *pinfo,
         tvb_get_guint8(tvb, data_offset+5));
 
       /* add a header line */
+      g_snprintf(buffer, BUFFER_SIZE, "%-10s: ", "Data...");
+
+      buf_ptr += 9;
       for (x=0; x<perline; x++) {
         buf_ptr = ltos((guint8)(x+1), buf_ptr, 10, ' ', min_char, FALSE);
         if ((x+1)==halfline) {
@@ -2065,7 +2079,7 @@ dissect_acn_dmx_data_pdu(guint32 protocol_id, tvbuff_t *tvb, packet_info *pinfo,
         }
       }
       *buf_ptr = '\0';
-      proto_tree_add_string(pdu_tree, hf_acn_dmx_data, tvb, data_offset, dmx_count, buffer);
+      proto_tree_add_text(pdu_tree, tvb, data_offset, dmx_count, "%s", buffer);
 
       /* start our line */
       g_snprintf(buffer, BUFFER_SIZE, "001-%03d: ", perline);
@@ -2088,7 +2102,7 @@ dissect_acn_dmx_data_pdu(guint32 protocol_id, tvbuff_t *tvb, packet_info *pinfo,
 
         if (item_cnt == perline || x == (end_offset-1)) {
           /* add leader... */
-          proto_tree_add_string_format(pdu_tree, hf_acn_dmx_data, tvb, data_offset, item_cnt, buffer, "%s", buffer);
+          proto_tree_add_text(pdu_tree, tvb, data_offset, item_cnt, "%s", buffer);
           data_offset += perline;
           g_snprintf(buffer, BUFFER_SIZE, "%03d-%03d: ",total_cnt, total_cnt+perline);
           buf_ptr = buffer + 9;
@@ -2140,8 +2154,8 @@ dissect_acn_dmx_pdu(guint32 protocol_id, tvbuff_t *tvb, packet_info *pinfo, prot
   guint32          data_length;
 
   proto_item      *ti, *pi;
-  proto_tree      *pdu_tree;
-  proto_tree      *flag_tree;
+  proto_tree      *pdu_tree    = NULL;
+  proto_tree      *flag_tree   = NULL;
 
   const char      *name;
 
@@ -2298,8 +2312,8 @@ dissect_acn_sdt_base_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, in
   guint32          data_length;
 
   proto_item      *ti, *pi;
-  proto_tree      *pdu_tree;
-  proto_tree      *flag_tree;
+  proto_tree      *pdu_tree    = NULL;
+  proto_tree      *flag_tree   = NULL;
 
   /* this pdu */
   const gchar     *name;
@@ -2426,7 +2440,7 @@ dissect_acn_sdt_base_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, in
       data_offset += 4;
       data_offset = acn_add_address(tvb, pinfo, pdu_tree, data_offset, "Destination Address:");
       data_offset = acn_add_channel_parameter(tvb, pinfo, pdu_tree, data_offset);
-      /*data_offset =*/ acn_add_expiry(tvb, pinfo, pdu_tree, data_offset, hf_acn_adhoc_expiry);
+      /*data_offset =*/ acn_add_expiry(tvb, pinfo, pdu_tree, data_offset, "Ad-hoc Expiry:");
       break;
     case ACN_SDT_VECTOR_JOIN_REFUSE:
       pi = proto_tree_add_item(pdu_tree, hf_acn_cid,                  tvb, data_offset, 16, ENC_BIG_ENDIAN);
@@ -2539,8 +2553,8 @@ dissect_acn_root_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int of
   guint32          data_length;
 
   proto_item      *ti, *pi;
-  proto_tree      *pdu_tree;
-  proto_tree      *flag_tree;
+  proto_tree      *pdu_tree    = NULL;
+  proto_tree      *flag_tree   = NULL;
 
   /* this pdu */
   guint32          protocol_id;
@@ -2597,6 +2611,8 @@ dissect_acn_root_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int of
   }
   /* offset should now be pointing to header (if one exists) */
 
+
+
   /* Get Protocol ID (vector) */
   protocol_id = tvb_get_ntohl(tvb, vector_offset);
   proto_tree_add_uint(pdu_tree, hf_acn_protocol_id, tvb, vector_offset, 4, protocol_id);
@@ -2623,10 +2639,10 @@ dissect_acn_root_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int of
 
         /* get Header (CID) 16 bytes */
         tvb_get_guid(tvb, header_offset, &guid, ENC_BIG_ENDIAN);
-        proto_item_append_text(ti, ", Src: %s", guid_to_str(wmem_packet_scope(), &guid));
+        proto_item_append_text(ti, ", Src: %s", guid_to_ep_str(&guid));
 
         /* add cid to info */
-        col_add_fstr(pinfo->cinfo,COL_INFO, "CID %s", guid_to_str(wmem_packet_scope(), &guid));
+        col_add_fstr(pinfo->cinfo,COL_INFO, "CID %s", guid_to_ep_str(&guid));
 
         proto_tree_add_item(pdu_tree, hf_acn_cid, tvb, header_offset, 16, ENC_BIG_ENDIAN);
         /*header_offset += 16;*/
@@ -2672,7 +2688,7 @@ dissect_acn_root_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int of
 
       /* get Header (CID) 16 bytes */
       tvb_get_guid(tvb, header_offset, &guid, ENC_BIG_ENDIAN);
-      proto_item_append_text(ti, ", Src: %s", guid_to_str(wmem_packet_scope(), &guid));
+      proto_item_append_text(ti, ", Src: %s", guid_to_ep_str(&guid));
 
       proto_tree_add_item(pdu_tree, hf_acn_cid, tvb, header_offset, 16, ENC_BIG_ENDIAN);
       /*header_offset += 16;*/
@@ -2708,8 +2724,8 @@ dissect_acn_root_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int of
 static int
 dissect_acn(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-  proto_item      *ti;
-  proto_tree      *acn_tree;
+  proto_item      *ti          = NULL;
+  proto_tree      *acn_tree    = NULL;
   guint32          data_offset = 0;
   guint32          old_offset;
   guint32          end_offset;
@@ -2742,7 +2758,7 @@ dissect_acn(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     data_offset = dissect_acn_root_pdu(tvb, pinfo, acn_tree, data_offset, &pdu_offsets);
     if (data_offset == old_offset) break;
   }
-  return tvb_reported_length(tvb);
+  return tvb_length(tvb);
 }
 
 /******************************************************************************/
@@ -2860,31 +2876,6 @@ proto_register_acn(void)
         FT_UINT8, BASE_DEC, VALS(acn_dmp_vector_vals), 0x0,
         NULL, HFILL }
     },
-
-    { &hf_acn_dmp_actual_address,
-      { "Actual Address", "acn.dmp_actual_address",
-        FT_UINT32, BASE_HEX, NULL, 0x0,
-        NULL, HFILL }
-    },
-
-    { &hf_acn_dmp_virtual_address,
-      { "Virtual Address", "acn.dmp_virtual_address",
-        FT_UINT32, BASE_HEX, NULL, 0x0,
-        NULL, HFILL }
-    },
-
-    { &hf_acn_dmp_actual_address_first,
-      { "Actual Address First", "acn.dmp_actual_address_first",
-        FT_UINT32, BASE_HEX, NULL, 0x0,
-        NULL, HFILL }
-    },
-
-    { &hf_acn_dmp_virtual_address_first,
-      { "Virtual Address First", "acn.dmp_virtual_address_first",
-        FT_UINT32, BASE_HEX, NULL, 0x0,
-        NULL, HFILL }
-    },
-
     /* Expiry */
     { &hf_acn_expiry,
       { "Expiry", "acn.expiry",
@@ -3061,12 +3052,6 @@ proto_register_acn(void)
         FT_UINT32, BASE_DEC_HEX, NULL, 0x0,
         NULL, HFILL }
     },
-    /* Ad-hoc Expiry */
-    { &hf_acn_adhoc_expiry,
-      { "Ad-hoc Expiry", "acn.adhoc_expiry",
-        FT_UINT8, BASE_DEC, NULL, 0x0,
-        NULL, HFILL }
-    },
     /* SDT Vector */
     { &hf_acn_sdt_vector,
       { "STD Vector", "acn.sdt_vector",
@@ -3169,12 +3154,6 @@ proto_register_acn(void)
         "DMX Start Code", HFILL }
     },
 
-    { &hf_acn_dmx_data,
-      { "Data", "acn.dmx.data",
-        FT_BYTES, BASE_NONE, NULL, 0x0,
-        NULL, HFILL }
-    },
-
     /* Session Count */
 #if 0
     { &hf_acn_session_count,
@@ -3265,9 +3244,10 @@ proto_reg_handoff_acn(void)
 {
   /* dissector_handle_t acn_handle; */
   /* acn_handle = new_create_dissector_handle(dissect_acn, proto_acn); */
-  /* dissector_add_for_decode_as("udp.port", acn_handle);                         */
+  /* dissector_add_handle("udp.port", acn_handle);                         */
   heur_dissector_add("udp", dissect_acn_heur, proto_acn);
 }
+
 
 /*
  * Editor modelines

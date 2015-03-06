@@ -29,6 +29,8 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
+#include <epan/wmem/wmem.h>
+
 #include "packet-usb.h"
 
 static int proto_pn532_hci                                                 = -1;
@@ -117,7 +119,7 @@ dissect_pn532_hci(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
         proto_tree_add_item(main_tree, hf_packet_code, tvb, offset, 2, ENC_BIG_ENDIAN);
         offset += 2;
 
-        proto_tree_add_item(main_tree, hf_specific_application_level_error_code, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(main_tree, hf_specific_application_level_error_code, tvb, offset, 1, ENC_NA);
         offset += 1;
     } else if (packet_code == 0xFFFF) { /* Extended Information Frame */
         col_set_str(pinfo->cinfo, COL_INFO, "Extended Information Frame");
@@ -126,18 +128,18 @@ dissect_pn532_hci(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
         length = tvb_get_ntohs(tvb, offset);
         offset += 2;
 
-        proto_tree_add_item(main_tree, hf_length_checksum, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(main_tree, hf_length_checksum, tvb, offset, 1, ENC_NA);
         checksum = (length >> 8) + (length & 0xFF) + tvb_get_guint8(tvb, offset);
         if (checksum != 0) {
             proto_tree_add_expert(main_tree, pinfo, &ei_invalid_length_checksum, tvb, offset, 1);
         }
         offset += 1;
 
-        next_tvb = tvb_new_subset_length(tvb, offset, length);
+        next_tvb = tvb_new_subset(tvb, offset, length, length);
         call_dissector_with_data(pn532_handle, next_tvb, pinfo, tree, usb_conv_info);
         offset += length;
 
-        proto_tree_add_item(main_tree, hf_data_checksum, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(main_tree, hf_data_checksum, tvb, offset, 1, ENC_NA);
         checksum = tvb_get_guint8(tvb, offset);
         while (length) {
             checksum += tvb_get_guint8(tvb, offset - length);
@@ -150,21 +152,21 @@ dissect_pn532_hci(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
     } else { /* Normal Information Frame */
         col_set_str(pinfo->cinfo, COL_INFO, "Normal Information Frame");
 
-        proto_tree_add_item(main_tree, hf_length, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(main_tree, hf_length, tvb, offset, 1, ENC_NA);
         length = tvb_get_guint8(tvb, offset);
         offset += 1;
 
-        proto_tree_add_item(main_tree, hf_length_checksum, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(main_tree, hf_length_checksum, tvb, offset, 1, ENC_NA);
         checksum = length + tvb_get_guint8(tvb, offset);
         if (checksum != 0)
             proto_tree_add_expert(main_tree, pinfo, &ei_invalid_length_checksum, tvb, offset, 1);
         offset += 1;
 
-        next_tvb = tvb_new_subset_length(tvb, offset, length);
+        next_tvb = tvb_new_subset(tvb, offset, length, length);
         call_dissector_with_data(pn532_handle, next_tvb, pinfo, tree, usb_conv_info);
         offset += length;
 
-        proto_tree_add_item(main_tree, hf_data_checksum, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item(main_tree, hf_data_checksum, tvb, offset, 1, ENC_NA);
         checksum = tvb_get_guint8(tvb, offset);
         while (length) {
             checksum += tvb_get_guint8(tvb, offset - length);
@@ -284,8 +286,8 @@ proto_reg_handoff_pn532_hci(void)
 
     dissector_add_uint("usb.product", (0x04e6 << 16) | 0x5591, pn532_hci_handle);
 
-    dissector_add_for_decode_as("usb.device", pn532_hci_handle);
-    dissector_add_for_decode_as("usb.protocol", pn532_hci_handle);
+    dissector_add_handle("usb.device", pn532_hci_handle);
+    dissector_add_handle("usb.protocol", pn532_hci_handle);
 }
 
 /*

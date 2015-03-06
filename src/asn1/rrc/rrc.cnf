@@ -676,6 +676,7 @@ HNBName TYPE=FT_STRING DISPLAY=STR_UNICODE
 #.FN_BODY NAS-SystemInformationGSM-MAP VAL_PTR = &nas_sys_info_gsm_map_tvb
   tvbuff_t *nas_sys_info_gsm_map_tvb = NULL;
   guint32 length;
+  proto_item *item;
   proto_tree *subtree;
 
 %(DEFAULT_BODY)s
@@ -684,18 +685,18 @@ HNBName TYPE=FT_STRING DISPLAY=STR_UNICODE
     if (actx->private_data) {
       switch (GPOINTER_TO_UINT(actx->private_data)-1) {
         case RRC_NAS_SYS_INFO_CN_COMMON:
-          subtree = proto_tree_add_subtree(tree, nas_sys_info_gsm_map_tvb, 0, length,
-					ett_rrc_cn_CommonGSM_MAP_NAS_SysInfo, NULL, "CN Common GSM-MAP NAS system information");
+          item = proto_tree_add_text(tree, nas_sys_info_gsm_map_tvb, 0, length, "CN Common GSM-MAP NAS system information");
+          subtree = proto_item_add_subtree(item, ett_rrc_cn_CommonGSM_MAP_NAS_SysInfo);
           de_cn_common_gsm_map_nas_sys_info(nas_sys_info_gsm_map_tvb, subtree, actx->pinfo, 0, length, NULL, 0);
           break;
         case RRC_NAS_SYS_INFO_CS:
-          subtree = proto_tree_add_subtree(tree, nas_sys_info_gsm_map_tvb, 0, length,
-					ett_rrc_cn_CommonGSM_MAP_NAS_SysInfo, NULL, "CS domain specific system information");
+          item = proto_tree_add_text(tree, nas_sys_info_gsm_map_tvb, 0, length, "CS domain specific system information");
+          subtree = proto_item_add_subtree(item, ett_rrc_cn_CommonGSM_MAP_NAS_SysInfo);
           de_cs_domain_spec_sys_info(nas_sys_info_gsm_map_tvb, subtree, actx->pinfo, 0, length, NULL, 0);
           break;
         case RRC_NAS_SYS_INFO_PS:
-          subtree = proto_tree_add_subtree(tree, nas_sys_info_gsm_map_tvb, 0, length,
-				ett_rrc_cn_CommonGSM_MAP_NAS_SysInfo, NULL, "PS domain specific system information");
+          item = proto_tree_add_text(tree, nas_sys_info_gsm_map_tvb, 0, length, "PS domain specific system information");
+          subtree = proto_item_add_subtree(item, ett_rrc_cn_CommonGSM_MAP_NAS_SysInfo);
           de_ps_domain_spec_sys_info(nas_sys_info_gsm_map_tvb, subtree, actx->pinfo, 0, length, NULL, 0);
           break;
         default:
@@ -724,7 +725,7 @@ HNBName TYPE=FT_STRING DISPLAY=STR_UNICODE
                 expert_add_info(actx->pinfo, actx->created_item, &ei_rrc_no_hrnti);
             }
             else{
-                /*If it doesn't exists, insert it*/
+                /*If it doesnt exists, insert it*/
                 if( (cur_val=(gint *)g_tree_lookup(hsdsch_muxed_flows, GUINT_TO_POINTER((guint)rrcinf->hrnti[actx->pinfo->fd->subnum]))) == NULL ){
 
                     flowd_p = (guint*)g_malloc0(sizeof(gint));
@@ -760,7 +761,7 @@ HNBName TYPE=FT_STRING DISPLAY=STR_UNICODE
                 expert_add_info(actx->pinfo, actx->created_item, &ei_rrc_no_hrnti);
             }
             else{
-                /*If it doesn't exists, insert it*/
+                /*If it doesnt exists, insert it*/
                 if( (cur_val=(gint *)g_tree_lookup(hsdsch_muxed_flows, GUINT_TO_POINTER((guint)rrcinf->hrnti[actx->pinfo->fd->subnum]))) == NULL ){
 
                     flowd_p = (guint*)g_malloc0(sizeof(gint));

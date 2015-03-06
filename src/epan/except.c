@@ -378,6 +378,8 @@ void except_free(void *ptr)
 
 #ifdef KAZLIB_TEST_MAIN
 
+#include <stdio.h>
+#include <ctype.h>
 
 static void cleanup(void *arg)
 {
@@ -390,7 +392,7 @@ static void bottom_level(void)
     printf("throw exception? "); fflush(stdout);
     fgets(buf, sizeof buf, stdin);
 
-    if (buf[0] >= 0 && (buf[0] == 'Y' || buf[0] == 'y'))
+    if (buf[0] >= 0 && toupper(buf[0]) == 'Y')
         except_throw(1, 1, "nasty exception");
 }
 

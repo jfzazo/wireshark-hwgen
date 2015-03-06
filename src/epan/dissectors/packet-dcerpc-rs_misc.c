@@ -27,6 +27,7 @@
 #include "config.h"
 
 
+#include <glib.h>
 #include <epan/packet.h>
 #include "packet-dcerpc.h"
 
@@ -63,7 +64,7 @@ rs_misc_dissect_login_get_info_rqst (tvbuff_t *tvb, int offset,
 	if (key_size){ /* Not able to yet decipher the OTHER versions of this call just yet. */
 
 		proto_tree_add_item (tree, hf_rs_misc_login_get_info_rqst_key_t, tvb, offset, key_size, ENC_ASCII|ENC_NA);
-		key_t1 = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, key_size, ENC_ASCII);
+		key_t1 = tvb_get_string(wmem_packet_scope(), tvb, offset, key_size);
 		offset += key_size;
 
 		col_append_fstr(pinfo->cinfo, COL_INFO,
@@ -116,16 +117,3 @@ proto_reg_handoff_rs_misc (void)
 	/* Register the protocol as dcerpc */
 	dcerpc_init_uuid (proto_rs_misc, ett_rs_misc, &uuid_rs_misc, ver_rs_misc, rs_misc_dissectors, hf_rs_misc_opnum);
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 8
- * tab-width: 8
- * indent-tabs-mode: t
- * End:
- *
- * vi: set shiftwidth=8 tabstop=8 noexpandtab:
- * :indentSize=8:tabSize=8:noTabs=false:
- */

@@ -25,6 +25,7 @@
 
 #include "wtap-int.h"
 #include "file_wrappers.h"
+#include <wsutil/buffer.h>
 
 #include "catapult_dct2000.h"
 
@@ -110,7 +111,7 @@ static gboolean catapult_dct2000_seek_read(wtap *wth, gint64 seek_off,
 static void catapult_dct2000_close(wtap *wth);
 
 static gboolean catapult_dct2000_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
-                                      const guint8 *pd, int *err, gchar **err_info);
+                                      const guint8 *pd, int *err);
 
 
 /************************************************************/
@@ -164,7 +165,7 @@ static gboolean free_line_prefix_info(gpointer key, gpointer value, gpointer use
 /********************************************/
 /* Open file (for reading)                 */
 /********************************************/
-wtap_open_return_val
+int
 catapult_dct2000_open(wtap *wth, int *err, gchar **err_info)
 {
     gint64  offset = 0;
@@ -185,18 +186,18 @@ catapult_dct2000_open(wtap *wth, int *err, gchar **err_info)
     if (!read_new_line(wth->fh, &offset, &firstline_length, linebuff,
                        sizeof linebuff, err, err_info)) {
         if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-            return WTAP_OPEN_ERROR;
-        return WTAP_OPEN_NOT_MINE;
+            return -1;
+        return 0;
     }
     if (((size_t)firstline_length < strlen(catapult_dct2000_magic)) ||
         firstline_length >= MAX_FIRST_LINE_LENGTH) {
 
-        return WTAP_OPEN_NOT_MINE;
+        return 0;
     }
 
     /* This file is not for us if it doesn't match our signature */
     if (memcmp(catapult_dct2000_magic, linebuff, strlen(catapult_dct2000_magic)) != 0) {
-        return WTAP_OPEN_NOT_MINE;
+        return 0;
     }
 
     /* Make sure table is ready for use */
@@ -225,15 +226,15 @@ catapult_dct2000_open(wtap *wth, int *err, gchar **err_info)
                        linebuff, sizeof linebuff, err, err_info)) {
         g_free(file_externals);
         if (*err != 0 && *err != WTAP_ERR_SHORT_READ)
-            return WTAP_OPEN_ERROR;
-        return WTAP_OPEN_NOT_MINE;
+            return -1;
+        return 0;
     }
     if ((file_externals->secondline_length >= MAX_TIMESTAMP_LINE_LENGTH) ||
         (!get_file_time_stamp(linebuff, &timestamp, &usecs))) {
 
         /* Give up if file time line wasn't valid */
         g_free(file_externals);
-        return WTAP_OPEN_NOT_MINE;
+        return 0;
     }
 
     /* Fill in timestamp */
@@ -259,7 +260,7 @@ catapult_dct2000_open(wtap *wth, int *err, gchar **err_info)
     wth->subtype_close = catapult_dct2000_close;
 
     /* Choose microseconds (have 4 decimal places...) */
-    wth->file_tsprec = WTAP_TSPREC_USEC;
+    wth->tsprecision = WTAP_FILE_TSPREC_USEC;
 
 
     /***************************************************************/
@@ -271,7 +272,7 @@ catapult_dct2000_open(wtap *wth, int *err, gchar **err_info)
     wth->priv = (void*)file_externals;
 
     *err = errno;
-    return WTAP_OPEN_MINE;
+    return 1;
 }
 
 /* Ugly, but much faster than using g_snprintf! */
@@ -574,7 +575,7 @@ catapult_dct2000_dump_can_write_encap(int encap)
 
         default:
             /* But don't write to any other formats... */
-            return WTAP_ERR_UNWRITABLE_ENCAP;
+            return WTAP_ERR_UNSUPPORTED_ENCAP;
     }
 }
 
@@ -585,7 +586,7 @@ catapult_dct2000_dump_can_write_encap(int encap)
 
 static gboolean
 catapult_dct2000_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
-                      const guint8 *pd, int *err, gchar **err_info _U_)
+                      const guint8 *pd, int *err)
 {
     const union wtap_pseudo_header *pseudo_header = &phdr->pseudo_header;
     guint32 n;
@@ -605,7 +606,7 @@ catapult_dct2000_dump(wtap_dumper *wdh, const struct wtap_pkthdr *phdr,
 
     /* We can only write packet records. */
     if (phdr->rec_type != REC_TYPE_PACKET) {
-        *err = WTAP_ERR_UNWRITABLE_REC_TYPE;
+        *err = WTAP_ERR_REC_TYPE_UNSUPPORTED;
         return FALSE;
     }
 
@@ -1296,7 +1297,7 @@ process_parsed_line(wtap *wth, dct2000_file_externals_t *file_externals,
 
     /*****************************/
     /* Get the data buffer ready */
-    ws_buffer_assure_space(buf,
+    buffer_assure_space(buf,
                         strlen(context_name)+1 +     /* Context name */
                         1 +                          /* port */
                         strlen(timestamp_string)+1 + /* timestamp */
@@ -1306,7 +1307,7 @@ process_parsed_line(wtap *wth, dct2000_file_externals_t *file_externals,
                         1 +                          /* direction */
                         1 +                          /* encap */
                         (is_comment ? data_chars : (data_chars/2)));
-    frame_buffer = ws_buffer_start_ptr(buf);
+    frame_buffer = buffer_start_ptr(buf);
 
     /******************************************/
     /* Write the stub info to the data buffer */
@@ -1653,16 +1654,3 @@ free_line_prefix_info(gpointer key, gpointer value,
     /* Item will always be removed from table */
     return TRUE;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

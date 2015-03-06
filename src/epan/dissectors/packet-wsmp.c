@@ -25,16 +25,17 @@
 
 #include "config.h"
 
+#include <glib.h>
+
 #include <epan/packet.h>
 #include <epan/etypes.h>
 
-/* elemenID Types */
-#define TRANSMITPW 0x04
-#define CHANNUM    0x0F
-#define DATARATE   0x10
 #define WSMP       0x80
 #define WSMP_S     0x81
 #define WSMP_I     0x82
+#define CHANNUM    0x0F
+#define DATARATE   0x10
+#define TRANSMITPW 0x04
 
 void proto_register_wsmp(void);
 void proto_reg_handoff_wsmp(void);
@@ -69,7 +70,7 @@ static int wme_getpsidlen (guint8 *psid)
     int length = 0;
     if ((psid[0] & 0xF0) == 0xF0) {
         length = 255;
-    } else if ( (psid[0] & 0xF0) == 0xE0) {
+    } else if ( (psid[0] & 0xE0) == 0xE0) {
         length = 4;
     } else if ( (psid[0] & 0xE0) == 0xC0) {
         length = 3;
@@ -89,7 +90,7 @@ static void
 dissect_wsmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
     /* Set up structures needed to add the protocol subtree and manage it */
-    proto_item *ti;
+    proto_item *ti, *wsmdata_item;
     proto_tree *wsmp_tree, *wsmdata_tree;
     tvbuff_t   *wsmdata_tvb;
     guint16     wsmlength, offset;
@@ -118,7 +119,11 @@ dissect_wsmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     if (psidLen == 2)
         psid = tvb_get_ntohs(tvb, offset);
     else if (psidLen == 3)
-        psid = tvb_get_ntoh24(tvb, offset);
+    {
+        psid = tvb_get_ntohl(tvb, offset);
+        psid = psid & 0x00FFFF; /* three bytes */
+
+    }
     else if (psidLen == 4)
         psid = tvb_get_ntohl(tvb, offset);
 
@@ -127,13 +132,13 @@ dissect_wsmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     offset += psidLen;
 
 
-    /* TLV decoder that does not display the T and L elements */
     elemenId = tvb_get_guint8(tvb, offset);
     while ((elemenId != WSMP) && (elemenId != WSMP_S) && (elemenId != WSMP_I))
     {
         offset++;
         if (elemenId == CHANNUM)
         {
+            /* channel number */
             elemenLen = tvb_get_guint8(tvb, offset);
             offset++;
             proto_tree_add_item(wsmp_tree,
@@ -142,6 +147,7 @@ dissect_wsmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         }
         else if (elemenId == DATARATE)
         {
+            /* Data rate  */
             elemenLen = tvb_get_guint8(tvb, offset);
             offset++;
             proto_tree_add_item(wsmp_tree,
@@ -150,6 +156,7 @@ dissect_wsmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         }
         else if (elemenId == TRANSMITPW)
         {
+            /* Transmit power */
             elemenLen = tvb_get_guint8(tvb, offset);
             offset++;
             proto_tree_add_item(wsmp_tree,
@@ -184,8 +191,9 @@ dissect_wsmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         offset    += supLen;
     }
 
-    wsmdata_tree = proto_tree_add_subtree(wsmp_tree, tvb, offset, wsmlength,
-                                        ett_wsmdata, NULL, "Wave Short Message");
+    wsmdata_item = proto_tree_add_text (wsmp_tree, tvb, offset, wsmlength,
+                                        "Wave Short Message");
+    wsmdata_tree = proto_item_add_subtree(wsmdata_item, ett_wsmdata);
 
     wsmdata_tvb  = tvb_new_subset(tvb, offset, -1, wsmlength);
 
@@ -201,6 +209,7 @@ dissect_wsmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 void
 proto_register_wsmp(void)
 {
+    /* Setup list of header fields  See Section 1.6.1 for details*/
     static hf_register_info hf[] = {
         { &hf_wsmp_version,
           { "Version",           "wsmp.version", FT_UINT8, BASE_DEC, NULL, 0x0,
@@ -260,16 +269,3 @@ proto_reg_handoff_wsmp(void)
     data_handle = find_dissector("data");
     return;
 }
-
-/*
- * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

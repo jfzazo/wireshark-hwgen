@@ -1,5 +1,4 @@
-/* packet-pdcp-lte.c
- * Routines for LTE PDCP
+/* Routines for LTE PDCP
  *
  * Martin Mathieson
  *
@@ -24,10 +23,15 @@
 
 #include "config.h"
 
+#include <string.h>
 
+#include <glib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
+#include <epan/addr_resolv.h>
+#include <epan/wmem/wmem.h>
+
 #include <epan/uat.h>
 
 #ifdef HAVE_LIBGCRYPT
@@ -56,7 +60,7 @@ void proto_reg_handoff_pdcp_lte(void);
    - Decipher even if sequence analysis isn't 'OK'?
       - know SN, but might be unsure about HFN.
    - Speed up AES decryption by keeping the crypt handle around for the channel
-     (like ESP decryption in IPSEC dissector)
+     (like ESP decryption in IPSEC dissector) 
    - Add Relay Node user plane data PDU dissection
 */
 
@@ -248,7 +252,7 @@ static void update_key_from_string(const char *stringKey, guint8 *binaryKey, gbo
 }
 
 /* Update by checking whether the 3 key strings are valid or not, and storing result */
-static void uat_ue_keys_record_update_cb(void* record, char** error _U_) {
+static void uat_ue_keys_record_update_cb(void* record, const char** error _U_) {
     uat_ue_keys_record_t* rec = (uat_ue_keys_record_t *)record;
 
     /* Check and convert RRC key */
@@ -336,12 +340,8 @@ void set_pdcp_lte_up_ciphering_key(guint16 ueid, const char *key)
 /* Preference settings for deciphering and integrity checking.  Currently all default to off */
 static gboolean global_pdcp_decipher_signalling = TRUE;
 static gboolean global_pdcp_decipher_userplane = FALSE;  /* Can be slow, so default to FALSE */
-static gboolean global_pdcp_check_integrity = TRUE;
+static gboolean global_pdcp_check_integrity = FALSE;
 
-/* Use these values where we know the keys but may have missed the algorithm,
-   e.g. when handing over and RRCReconfigurationRequest goes to target cell only */
-static enum security_ciphering_algorithm_e global_default_ciphering_algorithm = eea0;
-static enum security_integrity_algorithm_e global_default_integrity_algorithm = eia0;
 
 
 static const value_string direction_vals[] =
@@ -474,6 +474,20 @@ typedef struct
 /* The sequence analysis channel hash table.
    Maps key -> status */
 static GHashTable *pdcp_sequence_analysis_channel_hash = NULL;
+
+/* Equal keys */
+static gint pdcp_channel_equal(gconstpointer v, gconstpointer v2)
+{
+    /* Key fits in 4 bytes, so just compare pointers! */
+    return (v == v2);
+}
+
+/* Compute a hash value for a given key. */
+static guint pdcp_channel_hash_func(gconstpointer v)
+{
+    /* Just use pointer, as the fields are all in this value */
+    return GPOINTER_TO_UINT(v);
+}
 
 
 /* Hash table types & functions for frame reports */
@@ -1630,6 +1644,7 @@ static guint32 calculate_digest(pdu_security_settings_t *pdu_security_settings, 
                 size_t read_digest_length = 4;
 
                 /* Open gcrypt handle */
+                /* N.B. Unfortunately GCRY_MAC_CMAC_AES is not available in currently used version of gcrypt! */
                 gcrypt_err = gcry_mac_open(&mac_hd, GCRY_MAC_CMAC_AES, 0, NULL);
                 if (gcrypt_err != 0) {
                     return 0;
@@ -1767,20 +1782,6 @@ static void dissect_pdcp_lte(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
             g_hash_table_insert(pdcp_security_result_hash,
                                 get_ueid_frame_hash_key(p_pdcp_info->ueid, pinfo->fd->num, TRUE),
                                 security_to_store);
-        }
-        else {
-            /* No entry added from RRC, but still use configured defaults */
-            if ((global_default_ciphering_algorithm != eea0) ||
-                (global_default_integrity_algorithm != eia0)) {
-                /* Copy algorithms from preference defaults */
-                pdcp_security_info_t *security_to_store = wmem_new0(wmem_file_scope(), pdcp_security_info_t);
-                security_to_store->ciphering = global_default_ciphering_algorithm;
-                security_to_store->integrity = global_default_integrity_algorithm;
-                security_to_store->seen_next_ul_pdu = TRUE;
-                g_hash_table_insert(pdcp_security_result_hash,
-                                    get_ueid_frame_hash_key(p_pdcp_info->ueid, pinfo->fd->num, TRUE),
-                                    security_to_store);
-            }
         }
     }
 
@@ -2244,7 +2245,7 @@ static void pdcp_lte_init_protocol(void)
 
 
     /* Now create them over */
-    pdcp_sequence_analysis_channel_hash = g_hash_table_new(g_direct_hash, g_direct_equal);
+    pdcp_sequence_analysis_channel_hash = g_hash_table_new(pdcp_channel_hash_func, pdcp_channel_equal);
     pdcp_lte_sequence_analysis_report_hash = g_hash_table_new(pdcp_result_hash_func, pdcp_result_hash_equal);
     pdcp_security_hash = g_hash_table_new(pdcp_lte_ueid_hash_func, pdcp_lte_ueid_hash_equal);
     pdcp_security_result_hash = g_hash_table_new(pdcp_lte_ueid_frame_hash_func, pdcp_lte_ueid_frame_hash_equal);
@@ -2395,7 +2396,7 @@ void proto_register_pdcp(void)
         },
         { &hf_pdcp_lte_mac,
             { "MAC",
-              "pdcp-lte.mac", FT_UINT32, BASE_HEX, NULL, 0x0,
+              "pdcp-lte.mac", FT_UINT32, BASE_HEX_DEC, NULL, 0x0,
               NULL, HFILL
             }
         },
@@ -2574,22 +2575,6 @@ void proto_register_pdcp(void)
         {NULL, NULL, -1}
     };
 
-    static const enum_val_t default_ciphering_algorithm_vals[] = {
-        {"eea0", "EEA0 (NULL)",   eea0},
-        {"eea1", "EEA1 (SNOW3G)", eea1},
-        {"eea2", "EEA2 (AES)",    eea2},
-        {"eea3", "EEA3 (ZUC)",    eea3},
-        {NULL, NULL, -1}
-    };
-
-    static const enum_val_t default_integrity_algorithm_vals[] = {
-        {"eia0", "EIA0 (NULL)",   eia0},
-        {"eia1", "EIA1 (SNOW3G)", eia1},
-        {"eia2", "EIA2 (AES)",    eia2},
-        {"eia3", "EIA3 (ZUC)",    eia3},
-        {NULL, NULL, -1}
-    };
-
   static uat_field_t ue_keys_uat_flds[] = {
       UAT_FLD_DEC(uat_ue_keys_records, ueid, "UEId", "UE Identifier of UE associated with keys"),
       UAT_FLD_CSTRING(uat_ue_keys_records, rrcCipherKeyString, "RRC Cipher Key",        "Key for deciphering signalling messages"),
@@ -2671,16 +2656,6 @@ void proto_register_pdcp(void)
                                   "PDCP UE Keys",
                                   "Preconfigured PDCP keys",
                                   ue_keys_uat);
-
-    prefs_register_enum_preference(pdcp_lte_module, "default_ciphering_algorithm",
-        "Ciphering algorithm to use if not signalled",
-        "If RRC Security Info not seen, e.g. in Handover",
-        (gint*)&global_default_ciphering_algorithm, default_ciphering_algorithm_vals, FALSE);
-
-    prefs_register_enum_preference(pdcp_lte_module, "default_integrity_algorithm",
-        "Integrity algorithm to use if not signalled",
-        "If RRC Security Info not seen, e.g. in Handover",
-        (gint*)&global_default_integrity_algorithm, default_integrity_algorithm_vals, FALSE);
 
     /* Attempt to decipher RRC messages */
     prefs_register_bool_preference(pdcp_lte_module, "decipher_signalling",

@@ -31,8 +31,9 @@
 
 #include "config.h"
 
-#include <epan/packet.h>
+#include <glib.h>
 #include <epan/prefs.h>
+#include <epan/packet.h>
 #include <epan/asn1.h>
 #include <epan/expert.h>
 
@@ -722,7 +723,7 @@ static int hf_mms_Transitions_idle_to_active = -1;
 static int hf_mms_Transitions_any_to_deleted = -1;
 
 /*--- End of included file: packet-mms-hf.c ---*/
-#line 46 "../../asn1/mms/packet-mms-template.c"
+#line 47 "../../asn1/mms/packet-mms-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_mms = -1;
@@ -939,11 +940,10 @@ static gint ett_mms_DirectoryEntry = -1;
 static gint ett_mms_FileAttributes = -1;
 
 /*--- End of included file: packet-mms-ett.c ---*/
-#line 50 "../../asn1/mms/packet-mms-template.c"
+#line 51 "../../asn1/mms/packet-mms-template.c"
 
 static expert_field ei_mms_mal_timeofday_encoding = EI_INIT;
 static expert_field ei_mms_mal_utctime_encoding = EI_INIT;
-static expert_field ei_mms_zero_pdu = EI_INIT;
 
 
 /*--- Included file: packet-mms-fn.c ---*/
@@ -1845,7 +1845,7 @@ dissect_mms_TimeOfDay(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _
 	if(len == 4)
 	{
 		milliseconds = tvb_get_ntohl(tvb, offset);
-		ptime = time_msecs_to_str(wmem_packet_scope(), milliseconds);
+		ptime = time_msecs_to_ep_str(milliseconds);
 
 		if(hf_index >= 0)
 		{
@@ -1865,7 +1865,7 @@ dissect_mms_TimeOfDay(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _
 		ts.secs = (days + 5113) * 86400 + milliseconds / 1000;
 		ts.nsecs = (milliseconds % 1000) * 1000000U;
 
-		ptime = abs_time_to_str(wmem_packet_scope(), &ts, ABSOLUTE_TIME_UTC, TRUE);
+		ptime = abs_time_to_ep_str(&ts, ABSOLUTE_TIME_UTC, TRUE);
 		if(hf_index >= 0)
 		{
 			proto_tree_add_string(tree, hf_index, tvb, offset, len, ptime);
@@ -1941,7 +1941,7 @@ dissect_mms_UtcTime(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_
 	ts.secs = seconds;
 	ts.nsecs = nanoseconds;
 
-	ptime = abs_time_to_str(wmem_packet_scope(), &ts, ABSOLUTE_TIME_UTC, TRUE);
+	ptime = abs_time_to_ep_str(&ts, ABSOLUTE_TIME_UTC, TRUE);
 
 	if(hf_index >= 0)
 	{
@@ -7073,7 +7073,7 @@ dissect_mms(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 		old_offset=offset;
 		offset=dissect_mms_MMSpdu(FALSE, tvb, offset, &asn1_ctx , tree, -1);
 		if(offset == old_offset){
-			proto_tree_add_expert(tree, pinfo, &ei_mms_zero_pdu, tvb, offset, -1);
+			proto_tree_add_text(tree, tvb, offset, -1,"Internal error, zero-byte MMS PDU");
 			break;
 		}
 	}
@@ -9980,7 +9980,6 @@ void proto_register_mms(void) {
   static ei_register_info ei[] = {
      { &ei_mms_mal_timeofday_encoding, { "mms.malformed.timeofday_encoding", PI_MALFORMED, PI_WARN, "BER Error: malformed TimeOfDay encoding", EXPFILL }},
      { &ei_mms_mal_utctime_encoding, { "mms.malformed.utctime", PI_MALFORMED, PI_WARN, "BER Error: malformed IEC61850 UTCTime encoding", EXPFILL }},
-     { &ei_mms_zero_pdu, { "mms.zero_pdu", PI_PROTOCOL, PI_ERROR, "Internal error, zero-byte MMS PDU", EXPFILL }},
   };
 
   expert_module_t* expert_mms;
