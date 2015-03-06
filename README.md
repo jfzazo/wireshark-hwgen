@@ -16,6 +16,13 @@ If you want to compile this project, you just have to:
 
 Enjoy the program! You can run it from the same terminal (./run/editcap) or install it in the base system (sudo make install).
 
+###Problems with dependencies.
+If you are suffering some inconveniences with the wireshark dependencies while compiling the program, you might want to checkout for the stable branch. You can adquire it by typing:
+
+git clone -b wireshark-stable https://github.com/jfzazo/wireshark-hwgen.git
+
+and you should repeat the previous steps.
+
 ##How to use it?
 If you want to convert from a generic format (like pcap) to the HW generator specific type,
 
