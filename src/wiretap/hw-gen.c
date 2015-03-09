@@ -12,6 +12,27 @@
 
 #include "hw-gen.h"
 
+#define max(x, y) (((x) > (y)) ? (x) : (y))
+#define min(x, y) (((x) < (y)) ? (x) : (y))
+
+#define ceil(a) ( ((a) - (int)(a))==0 ? (int)(a) : (int)(a)+1 )
+
+
+
+#define HWGEN_MAX_PACKET_SIZE 0xFFFF
+
+#define MIN_IFP                 3            /**< Minimum interframe gap. 10 Gbits needs at least a 12 Bytes ifp, 3 words of 32 bits.*/
+#define MAX_IFP                 100000       /**< Maximum interframe gap. 10 Gbits needs at least a 12 Bytes ifp, 3 words of 32 bits.*/
+#define DEFAULT_IFG             3 
+
+
+static guint64 npackets = 0;
+static guint64 lsize    = 0;
+static nstime_t ltime;
+static guint8  lpacket[HWGEN_MAX_PACKET_SIZE];
+
+
+
 static guint32 crc32_tab[] = {
         0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
         0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
@@ -177,6 +198,28 @@ int hwgen_dump_can_write_encap(int encap)
   }
   
 }
+static void calculateInterFrameGap (guint32 *ifp, const struct nstime_t *ts)
+{
+  double ttime;
+  ttime = ts->secs * 1e09 + ts->nsecs;
+  /*
+    10 Gbits/s = 10*1024*1024*1024/8 B/S = 10*128*1024*1024 B/S
+
+    1 us = 1e-09 s
+    1 W (word) = 4 bytes
+
+
+    1/(10*128*1024*1024) s/B = 1/(10*128*1024*1024) * 1e06 us / B
+                 = 4 * 1e06/(10*128*1024*1024)  us / W = 1e06/(10.0*32*1024*1024) us / W
+   */
+  *ifp =  max (MIN_IFP, min (ceil (ttime / (1e09 / (10.0 * 32 * 1024 * 1024))),  MAX_IFP));
+  if( (*ifp) >= (MIN_IFP + lsize/4) ) 
+    *ifp -=  (guint32)(lsize / 4);
+  else 
+    *ifp = MIN_IFP; 
+
+  return;
+}
 
 static unsigned char etherbuffer[] = {0x01,0x02,0x03,0x04,0x05,0x06,0x2c,0xb0,0x5d,0xb5,0x47,0x3e,0x08,0x00};
 static unsigned char buffer[65536]; 
@@ -187,7 +230,8 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
   //const union wtap_pseudo_header *pseudo_header = &phdr->pseudo_header;
   struct hwgen_hdr rec_hdr;
   guint32 padding = 0, lpadding = 0;
-  unsigned int i;
+  unsigned int i, offset = 0;
+  guint32 crc = 0;
 
   /* We can only write packet records. */
   if (phdr->rec_type != REC_TYPE_PACKET) {
@@ -201,9 +245,9 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
     return FALSE;
   }
 
-  rec_hdr.ifg = 3;  
+  //rec_hdr.ifg = 3;  
   rec_hdr.magic_word = 0x6969;
-  rec_hdr.size = phdr->len; //phdr->caplen;
+  rec_hdr.size = phdr->len; 
 
   // Obtain the correct size:
   // 1) Add the Ethernet encap if IP RAW data is being processed.
@@ -215,36 +259,7 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
     rec_hdr.size  += 4;
   }
 
-  // Write the packet header
-  if (!wtap_dump_file_write(wdh, &rec_hdr, sizeof rec_hdr, err))
-    return FALSE;
-  wdh->bytes_dumped += sizeof rec_hdr;
-
-  if(phdr->pkt_encap == WTAP_ENCAP_RAW_IP) {
-    // Write the ethernet header (optional)
-    if (!wtap_dump_file_write(wdh, etherbuffer, sizeof etherbuffer, err))
-      return FALSE;
-    wdh->bytes_dumped += sizeof etherbuffer;
-  }
-
-  // Dump the packet content
-  if (!wtap_dump_file_write(wdh, pd, phdr->caplen, err))
-    return FALSE;
-  wdh->bytes_dumped += phdr->caplen; 
-
-  if( (phdr->presence_flags & WTAP_HAS_CAP_LEN) && (phdr->caplen!=phdr->len)) {
-    guint8   garbage = 0;
-
-    for(i=0; i<(phdr->len-phdr->caplen); i++) {
-      if (!wtap_dump_file_write(wdh, &garbage, 1, err))
-       return FALSE;
-      wdh->bytes_dumped++;
-    }
-  }  
-
-  // Add the CRC if it hasnt been calculated previously
   if((phdr->pseudo_header.eth.fcs_len <= 0) || (phdr->caplen!=phdr->len)) {
-    guint32 crc = 0;
     if(phdr->pkt_encap == WTAP_ENCAP_RAW_IP) {
       memcpy(buffer, etherbuffer,sizeof etherbuffer ); 
       memcpy(buffer+sizeof etherbuffer, pd,rec_hdr.size-sizeof etherbuffer ); 
@@ -252,17 +267,70 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
     } else {
       crc = crc32(0, pd, rec_hdr.size-4); // Substract 4, the FCS size
     }
+  }   
 
-    if (!wtap_dump_file_write(wdh, &crc, 4, err))
+  if(npackets) {
+    struct hwgen_hdr *prec_hdr = (struct hwgen_hdr *)lpacket;
+    //Calculate the IFG of the previous packet and dump to disk
+    if(phdr->presence_flags & WTAP_HAS_TS) {  
+      
+      nstime_t delta;
+      guint32 ifg;
+
+      nstime_delta (&delta, &(phdr->ts), &ltime);
+      calculateInterFrameGap (&ifg, &delta);
+
+      prec_hdr->ifg = ifg;
+    } else {
+      prec_hdr->ifg = DEFAULT_IFG;
+    }
+    // Write the last packet after calculate the IFG
+    if (!wtap_dump_file_write(wdh, lpacket, lsize, err))
       return FALSE;
-    wdh->bytes_dumped += 4;
-  } 
+    wdh->bytes_dumped += lsize;
+  }
 
-  //Add the padding
+  // Store the packet for the next iteration
+  memcpy( lpacket, &rec_hdr, sizeof rec_hdr );
+  offset += (guint32) sizeof rec_hdr;
+  if(phdr->pkt_encap == WTAP_ENCAP_RAW_IP) {
+    memcpy(lpacket+offset, etherbuffer, sizeof etherbuffer);
+    offset += (guint32) sizeof etherbuffer;
+  }
+  memcpy( lpacket+offset, pd, phdr->caplen);
+  offset += phdr->caplen; 
+
+  if( (phdr->presence_flags & WTAP_HAS_CAP_LEN) && (phdr->caplen!=phdr->len)) {
+    for(i=0; i<(phdr->len-phdr->caplen); i++) {
+      lpacket[offset] = 0;
+      offset++;
+    }
+  }  
+  if((phdr->pseudo_header.eth.fcs_len <= 0) || (phdr->caplen!=phdr->len)) {
+    memcpy(lpacket+offset, &crc, 4);
+    offset += 4;
+  } 
   lpadding = 4 - (rec_hdr.size%4);
-  if (!wtap_dump_file_write(wdh, &padding, lpadding, err))
+  memcpy(lpacket+offset, &padding, lpadding);
+  offset += lpadding ;
+
+  lsize = offset;
+  ltime = phdr->ts;
+  npackets++;
+
+  return TRUE;
+}
+
+static gboolean hwgen_close(wtap_dumper *wdh,
+  int *err)
+{
+  struct hwgen_hdr *rec_hdr = (struct hwgen_hdr *)lpacket;
+  rec_hdr->ifg = DEFAULT_IFG;
+
+  if (!wtap_dump_file_write(wdh, lpacket, lsize, err))
     return FALSE;
-  wdh->bytes_dumped += lpadding ;
+  wdh->bytes_dumped += lsize;
+
   return TRUE;
 }
 
@@ -274,7 +342,7 @@ gboolean hwgen_dump_open(wtap_dumper *wdh, int *err)
   err = 0;
 
   wdh->subtype_write = hwgen_dump;
-  wdh->subtype_close = NULL;
+  wdh->subtype_close = hwgen_close;
 
 
   return TRUE;  
