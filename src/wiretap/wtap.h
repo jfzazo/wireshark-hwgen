@@ -350,7 +350,7 @@ extern "C" {
 #define WTAP_FILE_TYPE_SUBTYPE_LOGCAT_TIME                   72
 #define WTAP_FILE_TYPE_SUBTYPE_LOGCAT_THREADTIME             73
 #define WTAP_FILE_TYPE_SUBTYPE_LOGCAT_LONG                   74
-#define WTAP_FILE_TYPE_SUBTYPE_HWGEN_V1			     77
+#define WTAP_FILE_TYPE_SUBTYPE_HWGEN_V1			     75
 #define WTAP_NUM_FILE_TYPES_SUBTYPES  wtap_get_num_file_types_subtypes()
 
 /* timestamp precision (currently only these values are supported) */
