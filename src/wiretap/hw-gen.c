@@ -154,6 +154,7 @@ hwgen_read_packet(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr,
     return FALSE; 
 
 
+  *err = 0;
   return TRUE;
 }
 
@@ -318,12 +319,15 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
   ltime = phdr->ts;
   npackets++;
 
+  *err = 0;
   return TRUE;
 }
 
 static gboolean hwgen_close(wtap_dumper *wdh,
   int *err)
 {
+fprintf(stderr, "%s\n", "Me llaman");
+  if(lsize) {
   struct hwgen_hdr *rec_hdr = (struct hwgen_hdr *)lpacket;
   rec_hdr->ifg = DEFAULT_IFG;
 
@@ -331,6 +335,9 @@ static gboolean hwgen_close(wtap_dumper *wdh,
     return FALSE;
   wdh->bytes_dumped += lsize;
 
+  }
+  lsize = 0;
+  *err = 0;
   return TRUE;
 }
 
@@ -339,7 +346,7 @@ static gboolean hwgen_close(wtap_dumper *wdh,
 gboolean hwgen_dump_open(wtap_dumper *wdh, int *err)
 {
   
-  err = 0;
+  *err = 0;
 
   wdh->subtype_write = hwgen_dump;
   wdh->subtype_close = hwgen_close;
