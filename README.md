@@ -28,3 +28,6 @@ To make the analogous operation in the reverse direction:
 
 Just the libpcap has been adapted to processed the hw_gen captured style. Sorry for the inconveniences.
 
+#Important consideration
+
+It is possible that this branch will not work properly. If this is the case, consider using the master branch 
