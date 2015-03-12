@@ -105,27 +105,32 @@ hwgen_read_packet(wtap *wth, FILE_T fh, struct wtap_pkthdr *phdr,
   guint orig_size;
   struct hwgen_hdr hdr;
   guint32 padding = 0;
-
   wth->file_encap = WTAP_ENCAP_ETHERNET;
 
 
   /*
    * Read the header.
    */
-  if (file_read(&hdr, sizeof hdr, fh) != sizeof hdr)
+  if (file_read(&hdr, sizeof hdr, fh) != sizeof hdr) {
     return FALSE;
+  }
 
   if(hdr.magic_word!=0x6969) {
-    *err = WTAP_ERR_BAD_FILE;
-    if (err_info != NULL) {
-      *err_info = g_strdup_printf("hwgen format: It was impossible to locate the magic word in the header");
+    if(npackets!= *((guint64 *)&hdr)) {
+	*err = WTAP_ERR_BAD_FILE;
+	if (err_info != NULL) {
+    	  *err_info = g_strdup_printf("hwgen format: It was impossible to locate the magic word in the header");
+        }
+
+        return FALSE; // We expect to receive the number of packets at the end.
     }
-    return FALSE;    
+    *err = 0;
+    return TRUE;    
   }
 
   packet_size = hdr.size;
   orig_size   = hdr.size;
-
+  npackets++;
 
  /* phdr_len = pcap_process_pseudo_header(fh, wth->file_type_subtype,
       wth->file_encap, packet_size, TRUE, phdr, err, err_info);
@@ -246,30 +251,6 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
     return FALSE;
   }
 
-  //rec_hdr.ifg = 3;  
-  rec_hdr.magic_word = 0x6969;
-  rec_hdr.size = phdr->len; 
-
-  // Obtain the correct size:
-  // 1) Add the Ethernet encap if IP RAW data is being processed.
-  if(phdr->pkt_encap == WTAP_ENCAP_RAW_IP) {
-    rec_hdr.size  += sizeof etherbuffer;
-  } 
-  // 2) Add the FCS if none CRC is provided.
-  if(phdr->pseudo_header.eth.fcs_len <= 0|| (phdr->caplen!=phdr->len)) {
-    rec_hdr.size  += 4;
-  }
-
-  if((phdr->pseudo_header.eth.fcs_len <= 0) || (phdr->caplen!=phdr->len)) {
-    if(phdr->pkt_encap == WTAP_ENCAP_RAW_IP) {
-      memcpy(buffer, etherbuffer,sizeof etherbuffer ); 
-      memcpy(buffer+sizeof etherbuffer, pd,rec_hdr.size-sizeof etherbuffer ); 
-      crc = crc32(0, buffer, rec_hdr.size-4);
-    } else {
-      crc = crc32(0, pd, rec_hdr.size-4); // Substract 4, the FCS size
-    }
-  }   
-
   if(npackets) {
     struct hwgen_hdr *prec_hdr = (struct hwgen_hdr *)lpacket;
     //Calculate the IFG of the previous packet and dump to disk
@@ -292,14 +273,25 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
   }
 
   // Store the packet for the next iteration
-  memcpy( lpacket, &rec_hdr, sizeof rec_hdr );
-  offset += (guint32) sizeof rec_hdr;
+  //rec_hdr.ifg = 3;  
+  rec_hdr.magic_word = 0x6969;
+  rec_hdr.size = phdr->len; 
+
+
+  offset = (guint32) sizeof rec_hdr;
+  // Obtain the correct size:
+  // 1) Add the Ethernet encap if IP RAW data is being processed.
   if(phdr->pkt_encap == WTAP_ENCAP_RAW_IP) {
-    memcpy(lpacket+offset, etherbuffer, sizeof etherbuffer);
+    rec_hdr.size  += sizeof etherbuffer;
+  } 
+  // 2) Add the FCS if none CRC is provided.
+  if(phdr->pkt_encap == WTAP_ENCAP_RAW_IP) {
+    memcpy(lpacket+offset, etherbuffer,sizeof etherbuffer ); 
     offset += (guint32) sizeof etherbuffer;
-  }
-  memcpy( lpacket+offset, pd, phdr->caplen);
-  offset += phdr->caplen; 
+  }  
+
+  memcpy(lpacket+offset, pd, phdr->caplen); 
+  offset += phdr->caplen;
 
   if( (phdr->presence_flags & WTAP_HAS_CAP_LEN) && (phdr->caplen!=phdr->len)) {
     for(i=0; i<(phdr->len-phdr->caplen); i++) {
@@ -307,6 +299,16 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
       offset++;
     }
   }  
+
+  if((phdr->pseudo_header.eth.fcs_len <= 0) || (phdr->caplen!=phdr->len)) {
+    rec_hdr.size  += 4;
+    offset += rec_hdr.size < 64 ? 64-rec_hdr.size : 0;
+    rec_hdr.size = rec_hdr.size < 64 ? 64 : rec_hdr.size;
+    crc = crc32(0, lpacket+sizeof rec_hdr, rec_hdr.size-4); // Substract 4, the FCS size
+  }   
+
+
+  memcpy( lpacket, &rec_hdr, sizeof rec_hdr );
   if((phdr->pseudo_header.eth.fcs_len <= 0) || (phdr->caplen!=phdr->len)) {
     memcpy(lpacket+offset, &crc, 4);
     offset += 4;
@@ -314,7 +316,6 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
   lpadding = 4 - (rec_hdr.size%4);
   memcpy(lpacket+offset, &padding, lpadding);
   offset += lpadding ;
-
   lsize = offset;
   ltime = phdr->ts;
   npackets++;
@@ -325,7 +326,6 @@ static gboolean hwgen_dump(wtap_dumper *wdh,
 static gboolean hwgen_close(wtap_dumper *wdh,
   int *err)
 {
-fprintf(stderr, "%s\n", "Me llaman");
   if(lsize) {
   	struct hwgen_hdr *rec_hdr = (struct hwgen_hdr *)lpacket;
   	rec_hdr->ifg = DEFAULT_IFG;
@@ -333,6 +333,10 @@ fprintf(stderr, "%s\n", "Me llaman");
 	  if (!wtap_dump_file_write(wdh, lpacket, lsize, err))
 	    return FALSE;
 	  wdh->bytes_dumped += lsize;
+	  if (!wtap_dump_file_write(wdh, &npackets, sizeof(guint64), err))
+	    return FALSE;
+	  wdh->bytes_dumped += sizeof(guint64);
+
   }
   lsize = 0;
   *err = 0;
