@@ -1,5 +1,5 @@
 # wireshark-hwgen
-Fork of wireshark-tools (editcap), version 1.99.2 with additional support for new formats such as hwgen, a personal definition
+Fork of wireshark-tools (editcap), stable version 1.12.4  with additional support for new formats such as hwgen, a personal definition
 
 ##How to install it?
 
